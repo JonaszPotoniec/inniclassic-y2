@@ -34,7 +34,7 @@ public class Y1WebServer extends Thread {
 
     Y1WebServer(Context context, File rootFolder, int port) {
         this.context = context;
-        this.rootFolder = rootFolder.getAbsoluteFile();
+        this.rootFolder = (rootFolder != null ? rootFolder : StoragePaths.getWebServerRoot()).getAbsoluteFile();
         this.port = port;
     }
 

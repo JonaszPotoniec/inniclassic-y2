@@ -22,6 +22,7 @@ import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.util.Util;
 import com.themoon.y1.MainActivity;
 import com.themoon.y1.R;
+import com.themoon.y1.StoragePaths;
 import com.themoon.y1.ThemeManager;
 
 import java.io.File;
@@ -700,7 +701,7 @@ public class AudioPlayerManager {
             int safeFileNameDot = safeFileName.lastIndexOf(".");
             if (safeFileNameDot > 0)
                 safeFileName = safeFileName.substring(0, safeFileNameDot);
-            File coverFile = new File("/storage/sdcard0/Y1_Covers", safeFileName + ".jpg");
+            File coverFile = new File(StoragePaths.getCoversDir(), safeFileName + ".jpg");
 
             // 🚀 [팟캐스트 초고속 렌더링 지름길 장착!]
             boolean isPodcast = track.getAbsolutePath().contains("/Podcasts/");
@@ -722,9 +723,9 @@ public class AudioPlayerManager {
                     String parentName = track.getParentFile().getParentFile().getName();
                     String folderName = track.getParentFile().getName();
 
-                    if (parentName != null && !parentName.equals("Music") && !parentName.equals("Audiobooks") && !parentName.equals("sdcard0") && !parentName.equals("Y1_Playlists")) {
+                    if (parentName != null && !parentName.equals("Music") && !parentName.equals("Audiobooks") && !StoragePaths.isStorageVolumeName(parentName) && !parentName.equals("Y1_Playlists")) {
                         a = parentName;
-                    } else if (folderName != null && !folderName.equals("Music") && !folderName.equals("Audiobooks") && !folderName.equals("sdcard0") && !folderName.equals("Y1_Playlists")) {
+                    } else if (folderName != null && !folderName.equals("Music") && !folderName.equals("Audiobooks") && !StoragePaths.isStorageVolumeName(folderName) && !folderName.equals("Y1_Playlists")) {
                         a = folderName;
                     }
                 } catch (Exception e) {}
@@ -964,7 +965,7 @@ public class AudioPlayerManager {
                     String filePath = main.currentPlaylist.get(main.currentIndex).getAbsolutePath();
 
                     // 🚀 [수정] 오디오북 폴더, 팟캐스트 로컬 폴더, 팟캐스트 스트리밍 주소까지 모두 저장 허용!
-                    if (filePath.startsWith("/storage/sdcard0/Audiobooks") || filePath.contains("/Podcasts") || filePath.startsWith("/PODCAST_STREAM") || main.isAudiobookLibraryMode) {
+                    if (StoragePaths.isUnderAudiobooks(filePath) || filePath.contains("/Podcasts") || filePath.startsWith("/PODCAST_STREAM") || main.isAudiobookLibraryMode) {
                         AudiobookManager.getInstance(main).saveBookmark(filePath, getCurrentPosition(), main.currentIndex);
 
                         main.prefs.edit()

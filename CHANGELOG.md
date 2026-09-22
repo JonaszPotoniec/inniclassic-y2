@@ -2,6 +2,24 @@
 
 All notable changes to InniClassic (formerly "JJ Launcher Classic Version") are documented here. This project is based on JJ Launcher `0.11`; this changelog covers only what changed on top of that base.
 
+## [1.5.0] - 2026-09-22
+
+Full support for the **Innioasis Y2** device, ported from upstream `y1_launcher`.
+
+### Added
+- **Innioasis Y2 device support**:
+  - **Dual storage abstraction (`StoragePaths`)**: fully abstracts internal `/storage/sdcard0`, external MicroSD `/storage/sdcard1`, and `custom_media` folders across both Y1 and Y2 devices.
+  - **MicroSD watchdog & self-healing monitor (`ExternalSdMountMonitor`)**: background watchdog polling storage state every 12s, listening to system media mounts and USB unbind broadcasts, executing automated `fsck`/`vdc` recovery commands, remounting `fuse_sdcard1`, and notifying `MainActivity` to rescan media once storage recovers.
+  - **FM Radio Y2 support (`FmRadioManager`)**: handles Android 4.4.2 (API 19 / MT6582) Airplane Mode tuner lockouts (`ensureAirplaneModeOff()`), routes stream properly (`getFmStreamType()`), syncs volume with `STREAM_MUSIC`, and holds `PARTIAL_WAKE_LOCK` while playing to prevent background dropouts.
+  - **Clickwheel keylayout (`scripts/Y2.kl`)**: maps hardware clickwheel scancodes 103 and 108 on `mtk-tpd-kpd` to `DPAD_LEFT` and `DPAD_RIGHT`.
+  - **ROM builder script (`scripts/build-rom.sh`)**: supports automated builds for Y1 (Type A, Type B with InniClassic boot logo) and Y2 (stripping Solar artifacts and installing InniClassic with Y2 keylayout).
+  - **Multi-volume scanning**: Music, Audiobooks, and Videos (`/storage/sdcard1/Videos`) are automatically scanned and indexed across all connected volumes.
+  - **Offline library cache tool**: updated `tools/build_library_cache.py` with `--device-root /storage/sdcard1` support.
+
+### Changed
+- Refactored all hardcoded `/storage/sdcard0` paths throughout `MainActivity`, managers (`AudioPlayerManager`, `LastFmScrobbler`, `AudiobookManager`, `AudioEffectManager`, `LanguageManager`, `Y1WebServer`), and adapters (`CategoryListAdapter`, `SongListAdapter`) to use dynamic `StoragePaths` resolution.
+- Maintained 100% backward compatibility with Innioasis Y1 devices.
+
 ## [1.4.3] - 2026-09-22
 
 A theme-consistency pass plus a round of real correctness/security fixes underneath, including a Last.fm crash and a Wireless PC Upload path-traversal issue.

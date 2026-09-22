@@ -1,11 +1,16 @@
 package com.themoon.y1.managers;
 
 import android.content.Context;
+import android.content.Intent;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
+import android.os.Build;
+import android.provider.Settings;
+import android.util.Log;
 import java.lang.reflect.Method;
 
 public class FmRadioManager {
+    private static final String TAG = "Y1FmRadio";
     private static FmRadioManager instance;
     private Context context;
     private AudioManager audioManager;
@@ -19,6 +24,7 @@ public class FmRadioManager {
 
     private Class<?> fmNativeClass;
     private MediaPlayer fmPlayer; // 🚀 [핵심] 소리를 스피커로 빼내 줄 미디어 플레이어
+    private android.os.PowerManager.WakeLock radioWakeLock; // 🚀 화면이 꺼져도 라디오가 안 끊기게 하는 WakeLock
 
     private FmRadioManager(Context context) {
         this.context = context.getApplicationContext();
@@ -68,6 +74,107 @@ public class FmRadioManager {
         return instance;
     }
 
+    /** Stream used for FM volume keys / UI (MediaPlayer path → MUSIC). */
+    public int getFmStreamType() {
+        return AudioManager.STREAM_MUSIC;
+    }
+
+    /**
+     * Read airplane mode on both pre- and post-API-17 storage locations.
+     * Y1 (JB): often {@link Settings.System}; Y2 (KK 4.4): {@link Settings.Global}.
+     */
+    public boolean isAirplaneModeOn() {
+        if (Build.VERSION.SDK_INT >= 17) {
+            try {
+                if (Settings.Global.getInt(context.getContentResolver(),
+                        Settings.Global.AIRPLANE_MODE_ON, 0) != 0)
+                    return true;
+            } catch (Throwable ignored) {
+            }
+        }
+        try {
+            if (Settings.System.getInt(context.getContentResolver(),
+                    Settings.System.AIRPLANE_MODE_ON, 0) != 0)
+                return true;
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
+
+    /**
+     * Force airplane mode OFF before engaging the FM chip.
+     * Tries Settings writes then rooted shell fallbacks that differ between Jelly Bean (Y1) and KitKat (Y2).
+     */
+    public boolean ensureAirplaneModeOff() {
+        if (!isAirplaneModeOn())
+            return true;
+
+        Log.i(TAG, "Airplane mode is ON — disabling before FM (sdk=" + Build.VERSION.SDK_INT + ")");
+
+        try {
+            if (Build.VERSION.SDK_INT >= 17) {
+                Settings.Global.putInt(context.getContentResolver(),
+                        Settings.Global.AIRPLANE_MODE_ON, 0);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Global.putInt airplane failed: " + t.getMessage());
+        }
+        try {
+            Settings.System.putInt(context.getContentResolver(),
+                    Settings.System.AIRPLANE_MODE_ON, 0);
+        } catch (Throwable t) {
+            Log.w(TAG, "System.putInt airplane failed: " + t.getMessage());
+        }
+
+        try {
+            Intent intent = new Intent(Intent.ACTION_AIRPLANE_MODE_CHANGED);
+            intent.putExtra("state", false);
+            context.sendBroadcast(intent);
+        } catch (Throwable t) {
+            Log.w(TAG, "AIRPLANE_MODE_CHANGED broadcast failed: " + t.getMessage());
+        }
+
+        runSuQuiet(
+                "settings put global airplane_mode_on 0; "
+                        + "settings put system airplane_mode_on 0; "
+                        + "setprop persist.radio.airplane_mode_on 0; "
+                        + "am broadcast -a android.intent.action.AIRPLANE_MODE --ez state false");
+
+        try {
+            Thread.sleep(400);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+        }
+
+        boolean stillOn = isAirplaneModeOn();
+        if (stillOn) {
+            lastError = "Could not disable Airplane Mode (required for FM).";
+            Log.w(TAG, lastError);
+        }
+        return !stillOn;
+    }
+
+    private static void runSuQuiet(String cmd) {
+        Process p = null;
+        try {
+            p = Runtime.getRuntime().exec(new String[] { "su", "-c", cmd });
+            long deadline = System.currentTimeMillis() + 5000;
+            while (System.currentTimeMillis() < deadline) {
+                try {
+                    p.exitValue();
+                    return;
+                } catch (IllegalThreadStateException stillRunning) {
+                    Thread.sleep(50);
+                }
+            }
+            p.destroy();
+        } catch (Throwable t) {
+            Log.w(TAG, "su airplane cmd failed: " + t.getMessage());
+            if (p != null)
+                p.destroy();
+        }
+    }
+
     private Method getNativeMethod(String name, Class<?>... parameterTypes) throws NoSuchMethodException {
         Class<?> clazz = fmNativeClass;
         while (clazz != null) {
@@ -87,6 +194,20 @@ public class FmRadioManager {
                 fmPlayer.release();
             }
             fmPlayer = new MediaPlayer();
+            fmPlayer.setWakeMode(context, android.os.PowerManager.PARTIAL_WAKE_LOCK);
+
+            try {
+                android.os.PowerManager pm = (android.os.PowerManager) context.getSystemService(Context.POWER_SERVICE);
+                if (pm != null) {
+                    if (radioWakeLock == null) {
+                        radioWakeLock = pm.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "Y1:FmRadioLock");
+                    }
+                    if (!radioWakeLock.isHeld()) {
+                        radioWakeLock.acquire();
+                    }
+                }
+            } catch (Exception e) {}
+
             // 💡 미디어텍 전용 숨겨진 FM 라디오 오디오 스트림 주소
             fmPlayer.setDataSource("MEDIATEK://MEDIAPLAYER_PLAYERTYPE_FM");
 
@@ -108,6 +229,12 @@ public class FmRadioManager {
 
     // 🚀 [신규 기술] 라디오 소리 끄기
     private void stopFmAudio() {
+        try {
+            if (radioWakeLock != null && radioWakeLock.isHeld()) {
+                radioWakeLock.release();
+            }
+        } catch (Exception e) {}
+
         if (fmPlayer != null) {
             try {
                 if (fmPlayer.isPlaying()) fmPlayer.stop();
@@ -124,6 +251,10 @@ public class FmRadioManager {
             return false;
         }
         try {
+            // 0. Airplane mode blocks FM on both Y1 (JB) and Y2 (KK) — clear it first.
+            if (!ensureAirplaneModeOff()) {
+                Log.w(TAG, "Continuing FM powerUp despite airplane-mode clear uncertainty");
+            }
             // 🚀 1. 백그라운드에 숨어있는 순정 라디오 앱들을 모두 확실하게 사살하여 점유를 해제합니다.
             Runtime.getRuntime().exec(new String[]{"su", "-c", "killall com.mediatek.FMRadio"});
             Runtime.getRuntime().exec(new String[]{"su", "-c", "killall com.innioasis.fm"});

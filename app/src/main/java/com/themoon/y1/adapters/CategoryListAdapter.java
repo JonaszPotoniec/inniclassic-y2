@@ -19,6 +19,7 @@ import android.widget.TextView;
 import com.themoon.y1.MainActivity;
 import com.themoon.y1.views.ClassicMenuStyle;
 import com.themoon.y1.R;
+import com.themoon.y1.StoragePaths;
 import com.themoon.y1.ThemeManager;
 import com.themoon.y1.models.SongItem;
 
@@ -332,7 +333,7 @@ public class CategoryListAdapter extends BaseAdapter {
 
                 // ② 금고 등록 정보가 누락되었을 경우를 대비해, 파일 이름 매칭으로 폴더 직접 스캔 더블 체크!
                 String safeFileName = file.getName().replace(".mp3", "").replace(".flac", "").replace(".wav", "").replace(".m4a", "").replace(".aac", "").replace(".ogg", "");
-                File manualCoverFile = new File("/storage/sdcard0/Y1_Covers", safeFileName + ".jpg");
+                File manualCoverFile = new File(StoragePaths.getCoversDir(), safeFileName + ".jpg");
                 if (manualCoverFile.exists()) {
                     artPath = manualCoverFile.getAbsolutePath();
                     break; // 실제 파일이 존재하면 즉시 탈출!

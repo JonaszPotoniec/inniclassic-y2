@@ -2,18 +2,18 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Platform">
-  <img src="https://img.shields.io/badge/Device-Innioasis%20Y1%20only-blue?style=flat-square" alt="Device">
+  <img src="https://img.shields.io/badge/Device-Innioasis%20Y1%20%26%20Y2-blue?style=flat-square" alt="Device">
   <img src="https://img.shields.io/badge/Status-Beta-Orange?style=flat-square" alt="Status">
-  <img src="https://img.shields.io/badge/Version-1.4.3-informational?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/Version-1.5.0-informational?style=flat-square" alt="Version">
   <a href="https://buymeacoffee.com/gz17egcara"><img src="https://img.shields.io/badge/Buy%20me%20a-coffee-FFDD00?style=flat-square&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee"></a>
 </p>
 
-**InniClassic** is a launcher for the **Innioasis Y1** built directly on top of and based on [ismileblue/y1_launcher](https://github.com/ismileblue/y1_launcher) (JJ Launcher / MO-ON Launcher) — all credit for the original launcher, media engine, and theme system goes to that project. The goal of InniClassic is to turn JJ Launcher into as close to the original **iPod Classic experience** as possible, while going beyond it where it makes sense (FM Radio, Podcasts, Video, a from-scratch Music Quiz).
+**InniClassic** is a launcher for the **Innioasis Y1 and Y2** built directly on top of and based on [ismileblue/y1_launcher](https://github.com/ismileblue/y1_launcher) (JJ Launcher / MO-ON Launcher) — all credit for the original launcher, media engine, and theme system goes to that project. The goal of InniClassic is to turn JJ Launcher into as close to the original **iPod Classic experience** as possible, while going beyond it where it makes sense (FM Radio, Podcasts, Video, a from-scratch Music Quiz).
 
 This is **not** a GitHub "Fork" in the technical sense (it's a separate repository), but it is built directly on top of JJ Launcher's source and stays close to upstream so future JJ Launcher releases can keep being merged in.
 
-> [!WARNING]
-> Currently only tested and available for the **Innioasis Y1**. The Method 1 ROM ships Y1 Firmware 3.1.2; the standalone APK (Method 2) has also been verified on device System Software version 2.1.9 — check your own firmware version before installing anything below.
+> [!NOTE]
+> Supports both the **Innioasis Y1** (Android 4.2.2) and **Innioasis Y2** (Android 4.4.2), including dual storage (`/storage/sdcard0` and `/storage/sdcard1`), automatic SD self-healing, Y2 clickwheel layout, and hardware FM radio.
 
 ---
 
@@ -56,6 +56,13 @@ This is **not** a GitHub "Fork" in the technical sense (it's a separate reposito
 - **Video playback** — a dedicated Videos folder on the SD card, full-screen playback with wheel-driven volume/seek, powered by libVLC for stable, correctly-synced playback. The Videos list shows a real thumbnail per file, playback remembers where you left off, and **Settings → Fill Video Screen** lets you choose between preserving the original aspect ratio (letterboxed) or filling the whole screen (see [Known limitations](#known-limitations))
 - **Audiobooks** — bookmarked, resumable playback
 - **Wireless PC Upload** — a small web server for copying music onto the device over Wi-Fi, no cable needed
+
+### Innioasis Y2 support
+- **Dual storage & multi-volume scanning**: seamlessly indexes Music, Audiobooks, and Videos across internal storage (`/storage/sdcard0`), external MicroSD (`/storage/sdcard1`), and custom media directories (`custom_media`).
+- **MicroSD watchdog & self-healing engine**: background monitor that automatically detects unmounted or degraded FAT/exFAT filesystems, runs self-healing repair tools, remounts `fuse_sdcard1`, and triggers a library rescan when storage is ready.
+- **Hardware FM Radio on Y2**: automatically bypasses Android 4.4.2 Airplane Mode tuner lockouts (`ensureAirplaneModeOff()`), synchronizes MediaTek FM streams, and holds a partial wake lock to prevent playback drops on screen sleep.
+- **Hardware clickwheel layout**: includes `scripts/Y2.kl` mapping input scancodes 103 and 108 to `DPAD_LEFT` and `DPAD_RIGHT`.
+- **ROM builder script**: `scripts/build-rom.sh` generates flashable images for Y1 (Type A, Type B with InniClassic boot logo) and Y2 (stripping Solar artifacts and installing InniClassic with Y2 keylayout).
 
 ### Installable two ways
 - **Flashable ROM** (`rom.zip`) via the [Innioasis Updater](https://www.innioasis.com/pages/download) — no ADB required

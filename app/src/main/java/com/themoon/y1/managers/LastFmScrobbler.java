@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 import com.themoon.y1.BuildConfig;
+import com.themoon.y1.StoragePaths;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -22,7 +23,7 @@ import okhttp3.Request;
 import okhttp3.Response;
 
 // Last.fm scrobbling. Two independent records are kept for every eligible play:
-// 1) a permanent local /storage/sdcard0/.scrobbler.log in the classic Audioscrobbler
+// 1) a permanent local .scrobbler.log on primary storage in the classic Audioscrobbler
 //    1.1 format (same idea as Rockbox's scrobbler.log - a durable record you can
 //    hand to any external uploader), and
 // 2) a small pending-submission queue that is drained against the real Last.fm API
@@ -37,7 +38,7 @@ public class LastFmScrobbler {
     private static final String API_SECRET = BuildConfig.LASTFM_API_SECRET;
 
     private static final String API_ROOT = "https://ws.audioscrobbler.com/2.0/";
-    private static final File SCROBBLE_LOG_FILE = new File("/storage/sdcard0/.scrobbler.log");
+    private static final File SCROBBLE_LOG_FILE = StoragePaths.primaryFile(".scrobbler.log");
     private static final int MIN_TRACK_LENGTH_SEC = 30;
     private static final int MAX_PENDING_QUEUE = 500;
 
@@ -227,7 +228,7 @@ public class LastFmScrobbler {
 
     private boolean isExcludedPath(String path) {
         // Audiobooks/podcasts aren't "tracks" in the Last.fm sense - skip them.
-        return path.startsWith("/storage/sdcard0/Audiobooks") || path.contains("/Podcasts") || path.startsWith("/PODCAST_STREAM");
+        return StoragePaths.isUnderAudiobooks(path) || path.contains("/Podcasts") || path.startsWith("/PODCAST_STREAM");
     }
 
     // ================= now playing =================

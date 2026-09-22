@@ -11,10 +11,13 @@ library scan on-device becomes a fast existence check instead of a full re-tag.
 
 Usage:
     python3 build_library_cache.py /path/to/sdcard/mountpoint
+    # For Innioasis Y2 external MicroSD card:
+    python3 build_library_cache.py /path/to/sdcard/mountpoint --device-root /storage/sdcard1
 
 Run this any time after copying new music onto the card, before putting it back
 into the device. Safe to re-run - it always rebuilds the cache from what's
-currently on the card.
+currently on the card. (Note: On Innioasis Y2, copy the resulting .y1_library_cache.json
+to primary storage /storage/sdcard0 if using multiple volumes).
 
 Requires: pip install mutagen
 """
