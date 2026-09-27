@@ -7,6 +7,7 @@ on:
       - master
     tags:
       - "v*"
+      - "[0-9]*"
   workflow_dispatch:
 
 permissions:
@@ -45,21 +46,24 @@ jobs:
         run: |
           VERSION=$(grep -m1 'versionName' app/build.gradle | sed -E 's/.*"([^"]+)".*/\1/')
           echo "Detected version: $VERSION"
-          APK_NAME="InniClassic-v${VERSION}.apk"
+
+          DATE=$(date -u +'%Y%m%d')
 
           if [ "${{ github.ref_type }}" = "tag" ]; then
             TAG_NAME="${{ github.ref_name }}"
             RELEASE_NAME="${{ github.ref_name }}"
           else
             git fetch --tags origin || true
-            if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
-              TAG_NAME="v${VERSION}-build.${{ github.run_number }}"
-              RELEASE_NAME="v${VERSION} (Build ${{ github.run_number }})"
+            if git rev-parse "${DATE}" >/dev/null 2>&1; then
+              TAG_NAME="${DATE}-build.${{ github.run_number }}"
+              RELEASE_NAME="${DATE} (Build ${{ github.run_number }})"
             else
-              TAG_NAME="v${VERSION}"
-              RELEASE_NAME="v${VERSION}"
+              TAG_NAME="${DATE}"
+              RELEASE_NAME="${DATE}"
             fi
           fi
+
+          APK_NAME="InniClassic-${TAG_NAME}.apk"
 
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
