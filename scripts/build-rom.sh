@@ -302,6 +302,14 @@ audit_rom_contents() {
     # Y1: Generic.kl == Stock.kl (scripts/Stock.kl).
     # Y2: pin scripts/Y2.kl onto the device input names launcher needs.
     if [ "$rom_type" = "y2" ]; then
+        if [ ! -f "$sys_mount/lib/libaudiocustparam.so" ]; then
+            echo "audit fail: /system/lib/libaudiocustparam.so missing" >&2
+            errors=$((errors + 1))
+        elif ! python3 "$REPO_ROOT/tools/patch_y2_audio.py" --check "$sys_mount/lib/libaudiocustparam.so" >/dev/null 2>&1; then
+            echo "audit fail: libaudiocustparam.so does not have low-gain headset curve" >&2
+            errors=$((errors + 1))
+        fi
+
         local y2_kl=""
         for y2_kl in Generic.kl Stock.kl mtk-tpd-kpd.kl mtk-kpd.kl Rockbox.kl Y2-Rockbox.kl; do
             if [ ! -f "$sys_mount/usr/keylayout/$y2_kl" ]; then
@@ -448,6 +456,14 @@ fi
 chmod 666 /dev/fm 2>/dev/null
 chmod 666 /dev/FM50AF 2>/dev/null
 chown system:media /dev/fm 2>/dev/null
+
+# Reset cached NVRAM volume table once so the patched libaudiocustparam.so takes effect on existing installs
+if [ ! -f /data/nvram/.audio_vol_lowgain_v1 ]; then
+    rm -f /data/nvram/APCFG/APRDEB/Audio_Vol_custom
+    mkdir -p /data/nvram 2>/dev/null
+    touch /data/nvram/.audio_vol_lowgain_v1 2>/dev/null
+    chmod 644 /data/nvram/.audio_vol_lowgain_v1 2>/dev/null
+fi
 EOF
 sudo chmod 755 "$MOUNT_SYS/etc/install-recovery.sh"
 sudo chown root:root "$MOUNT_SYS/etc/install-recovery.sh"
@@ -461,6 +477,10 @@ fi
 # Y2 Solar base only: strip Solar before installing InniClassic. Type a|b skip this (Y1 path unchanged).
 if [ "$TYPE" = "y2" ]; then
     strip_solar_artefacts "$MOUNT_SYS" "$MOUNT_USER"
+    echo "==> Patching Y2 audio gain table for quiet headphone listening"
+    sudo python3 "$REPO_ROOT/tools/patch_y2_audio.py" "$MOUNT_SYS/lib/libaudiocustparam.so"
+    sudo chmod 644 "$MOUNT_SYS/lib/libaudiocustparam.so"
+    sudo chown root:root "$MOUNT_SYS/lib/libaudiocustparam.so"
 fi
 
 sudo mkdir -p "$MOUNT_SYS/app" "$MOUNT_SYS/usr/keylayout"
@@ -477,6 +497,8 @@ sudo rm -f "$MOUNT_USER/data/initialized"
 sudo rm -f "$MOUNT_USER/data/jj_launcher_initialized"
 if [ "$TYPE" = "y2" ]; then
     strip_solar_artefacts "$MOUNT_SYS" "$MOUNT_USER"
+    sudo rm -f "$MOUNT_USER/data/nvram/APCFG/APRDEB/Audio_Vol_custom"
+    sudo rm -f "$MOUNT_USER/data/nvram/.audio_vol_lowgain_v1"
 fi
 
 # Pin compatible keylayouts last on /system so first boot cannot

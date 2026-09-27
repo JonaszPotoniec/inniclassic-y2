@@ -62,7 +62,8 @@ This is **not** a GitHub "Fork" in the technical sense (it's a separate reposito
 - **MicroSD watchdog & self-healing engine**: background monitor that automatically detects unmounted or degraded FAT/exFAT filesystems, runs self-healing repair tools, remounts `fuse_sdcard1`, and triggers a library rescan when storage is ready.
 - **Hardware FM Radio on Y2**: automatically bypasses Android 4.4.2 Airplane Mode tuner lockouts (`ensureAirplaneModeOff()`), synchronizes MediaTek FM streams, and holds a partial wake lock to prevent playback drops on screen sleep.
 - **Hardware clickwheel layout**: includes `scripts/Y2.kl` mapping input scancodes 103 and 108 to `DPAD_LEFT` and `DPAD_RIGHT`.
-- **ROM builder script**: `scripts/build-rom.sh` generates flashable images for Y1 (Type A, Type B with InniClassic boot logo) and Y2 (stripping Solar artifacts and installing InniClassic with Y2 keylayout).
+- **Low-gain headphone volume curve**: re-calibrates MediaTek hardware Headset gain tables so minimum volume (Step 1) is ~18 dB quieter, enabling comfortable, quiet listening with sensitive headphones (e.g. Koss Porta Pro, IEMs).
+- **ROM builder script**: `scripts/build-rom.sh` generates flashable images for Y1 (Type A, Type B with InniClassic boot logo) and Y2 (stripping Solar artifacts, installing InniClassic with Y2 keylayout, and tuning headphone gain).
 
 ### Installable two ways
 - **Flashable ROM** (`rom.zip`) via the [Innioasis Updater](https://www.innioasis.com/pages/download) — no ADB required
