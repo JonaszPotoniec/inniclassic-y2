@@ -1,0 +1,200 @@
+name: Build & Release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Build APK
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag_name: ${{ steps.version.outputs.tag_name }}
+      release_name: ${{ steps.version.outputs.release_name }}
+      apk_name: ${{ steps.version.outputs.apk_name }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+          cache: "gradle"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK Licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Build Release APK
+        run: ./gradlew assembleRelease
+
+      - name: Determine Version and Release Tag
+        id: version
+        run: |
+          VERSION=$(grep -m1 'versionName' app/build.gradle | sed -E 's/.*"([^"]+)".*/\1/')
+          echo "Detected version: $VERSION"
+          APK_NAME="InniClassic-v${VERSION}.apk"
+
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            TAG_NAME="${{ github.ref_name }}"
+            RELEASE_NAME="${{ github.ref_name }}"
+          else
+            git fetch --tags origin || true
+            if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+              TAG_NAME="v${VERSION}-build.${{ github.run_number }}"
+              RELEASE_NAME="v${VERSION} (Build ${{ github.run_number }})"
+            else
+              TAG_NAME="v${VERSION}"
+              RELEASE_NAME="v${VERSION}"
+            fi
+          fi
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+          echo "release_name=${RELEASE_NAME}" >> "$GITHUB_OUTPUT"
+          echo "apk_name=${APK_NAME}" >> "$GITHUB_OUTPUT"
+
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk "dist/${APK_NAME}"
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: launcher-apk
+          path: dist/InniClassic-*.apk
+          retention-days: 14
+
+  build-roms:
+    name: Build ${{ matrix.name }} ROM
+    needs: build-apk
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - type: y2
+            name: "Y2"
+            filename: rom_y2.zip
+            artifact: rom-y2
+          - type: a
+            name: "Y1 Type A"
+            filename: rom_y1_type_a.zip
+            artifact: rom-y1-type-a
+          - type: b
+            name: "Y1 Type B"
+            filename: rom_y1_type_b.zip
+            artifact: rom-y1-type-b
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip zip e2fsprogs curl
+
+      - name: Download Launcher APK
+        uses: actions/download-artifact@v4
+        with:
+          name: launcher-apk
+          path: apk_dir
+
+      - name: Build ${{ matrix.name }} ROM
+        run: |
+          chmod +x scripts/build-rom.sh
+          APK_PATH=$(find apk_dir -name '*.apk' | head -1)
+          echo "Using launcher APK: $APK_PATH"
+          mkdir -p dist
+          ./scripts/build-rom.sh ${{ matrix.type }} --launcher-apk "$APK_PATH" "dist/${{ matrix.filename }}"
+
+      - name: Upload ${{ matrix.name }} ROM Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.filename }}
+          retention-days: 14
+
+  release:
+    name: Publish Release
+    needs: [build-apk, build-roms]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release_assets
+          merge-multiple: true
+
+      - name: Prepare release files and checksums
+        run: |
+          cd release_assets
+          # Provide legacy aliases for Y1 flash tools
+          if [ -f rom_y1_type_a.zip ]; then
+            cp rom_y1_type_a.zip rom.zip
+          fi
+          if [ -f rom_y1_type_b.zip ]; then
+            cp rom_y1_type_b.zip rom_type_b.zip
+          fi
+          sha256sum *.zip *.apk > SHA256SUMS.txt
+          echo "Release assets prepared:"
+          ls -lh
+
+      - name: Prepare Release Notes
+        run: |
+          cat << 'EOF' > release_body.md
+          ### InniClassic Release
+
+          Automated build with full support for **Innioasis Y1** (Type A & Type B) and **Innioasis Y2**.
+
+          #### 📦 Release Assets
+
+          | File | Target Device | Notes |
+          | :--- | :--- | :--- |
+          | **`${{ needs.build-apk.outputs.apk_name }}`** | All Devices (Y1 / Y2) | Standalone launcher APK (sideload or install) |
+          | **`rom_y2.zip`** | **Innioasis Y2** (MT6582) | Complete flashable ROM with dual-storage, watchdog & clickwheel keylayout |
+          | **`rom_y1_type_a.zip`** (`rom.zip`) | **Innioasis Y1** (Type A) | Flashable ROM for Y1 players with original firmware **2.0.0 or higher** |
+          | **`rom_y1_type_b.zip`** (`rom_type_b.zip`) | **Innioasis Y1** (Type B) | Flashable ROM for Y1 players with original firmware **below 2.0.0** |
+          | **`SHA256SUMS.txt`** | All Files | SHA-256 integrity checksums |
+
+          #### ⚡ Flashing Instructions (SP Flash Tool)
+          1. Extract the corresponding zip file for your device.
+          2. Launch `flash_tool.exe` (or Linux `flash_tool`).
+          3. Load the scatter file (`MT6582_Android_scatter.txt` for Y2, `MT6572_Android_scatter.txt` for Y1).
+          4. Select **Firmware Upgrade** or **Download Only**.
+          5. Power off the device completely, click **Download**, and connect the USB cable.
+
+          ---
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.build-apk.outputs.tag_name }}
+          name: InniClassic ${{ needs.build-apk.outputs.release_name }}
+          body_path: release_body.md
+          files: release_assets/*
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+          make_latest: true
+          overwrite_files: true
