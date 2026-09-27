@@ -278,6 +278,11 @@ audit_rom_contents() {
         errors=$((errors + 1))
     fi
 
+    if [ ! -f "$sys_mount/etc/install-recovery.sh" ]; then
+        echo "audit fail: /system/etc/install-recovery.sh missing" >&2
+        errors=$((errors + 1))
+    fi
+
     # Y1: Generic.kl == Stock.kl (scripts/Stock.kl).
     # Y2: pin scripts/Y2.kl onto the device input names launcher needs.
     if [ "$rom_type" = "y2" ]; then
@@ -410,7 +415,51 @@ sudo rm -f "$MOUNT_SYS/app/org.rockbox.apk"
 sudo rm -f "$MOUNT_SYS/lib/librockbox.so"
 sudo rm -f "$MOUNT_SYS/etc/init.d/99Y1ButtonScript"
 sudo rm -f "$MOUNT_SYS/etc/init.d/99Y1LauncherInit.sh"
-sudo rm -f "$MOUNT_SYS/etc/install-recovery.sh"
+
+echo "==> Configuring /system/etc/install-recovery.sh and init.d for FM radio & SuperSU"
+sudo tee "$MOUNT_SYS/etc/install-recovery.sh" > /dev/null << 'EOF'
+#!/system/bin/sh
+
+# Launch SuperSU daemon if present (required under SELinux enforcing on KitKat)
+if [ -f /system/xbin/daemonsu ]; then
+    /system/xbin/daemonsu --auto-daemon &
+elif [ -f /system/xbin/su ]; then
+    /system/xbin/su --daemon &
+fi
+
+# Ensure FM radio hardware character device nodes are accessible by all apps
+[ -c /dev/fm ] && chmod 666 /dev/fm
+[ -c /dev/FM50AF ] && chmod 666 /dev/FM50AF
+
+# Execute init.d scripts if directory exists
+if [ -d /system/etc/init.d ]; then
+    for script in /system/etc/init.d/*; do
+        if [ -x "$script" ] && [ -f "$script" ]; then
+            "$script" &
+        fi
+    done
+fi
+EOF
+sudo chmod 755 "$MOUNT_SYS/etc/install-recovery.sh"
+sudo chown root:root "$MOUNT_SYS/etc/install-recovery.sh"
+
+if [ -d "$MOUNT_SYS/bin" ]; then
+    sudo rm -f "$MOUNT_SYS/bin/install-recovery.sh"
+    sudo ln -sf /system/etc/install-recovery.sh "$MOUNT_SYS/bin/install-recovery.sh" 2>/dev/null || \
+    sudo cp -f "$MOUNT_SYS/etc/install-recovery.sh" "$MOUNT_SYS/bin/install-recovery.sh"
+fi
+
+sudo mkdir -p "$MOUNT_SYS/etc/init.d"
+sudo tee "$MOUNT_SYS/etc/init.d/01fm" > /dev/null << 'EOF'
+#!/system/bin/sh
+# Ensure FM radio device nodes exist and are readable/writable
+[ ! -c /dev/fm ] && mknod /dev/fm c 193 0 2>/dev/null
+chmod 666 /dev/fm 2>/dev/null
+chmod 666 /dev/FM50AF 2>/dev/null
+chown system:media /dev/fm 2>/dev/null
+EOF
+sudo chmod 755 "$MOUNT_SYS/etc/init.d/01fm"
+sudo chown root:root "$MOUNT_SYS/etc/init.d/01fm"
 
 # Y2 Solar base only: strip Solar before installing InniClassic. Type a|b skip this (Y1 path unchanged).
 if [ "$TYPE" = "y2" ]; then

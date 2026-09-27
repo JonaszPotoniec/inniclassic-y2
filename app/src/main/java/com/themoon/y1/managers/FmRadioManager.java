@@ -138,6 +138,7 @@ public class FmRadioManager {
                 "settings put global airplane_mode_on 0; "
                         + "settings put system airplane_mode_on 0; "
                         + "setprop persist.radio.airplane_mode_on 0; "
+                        + "setprop ril.flightmode 0; "
                         + "am broadcast -a android.intent.action.AIRPLANE_MODE --ez state false");
 
         try {
@@ -154,25 +155,70 @@ public class FmRadioManager {
         return !stillOn;
     }
 
-    private static void runSuQuiet(String cmd) {
-        Process p = null;
-        try {
-            p = Runtime.getRuntime().exec(new String[] { "su", "-c", cmd });
-            long deadline = System.currentTimeMillis() + 5000;
-            while (System.currentTimeMillis() < deadline) {
-                try {
-                    p.exitValue();
-                    return;
-                } catch (IllegalThreadStateException stillRunning) {
-                    Thread.sleep(50);
+    private static boolean runSuQuiet(String cmd) {
+        String[] suCandidates = new String[] {
+                "su",
+                "/system/xbin/su",
+                "/system/bin/su",
+                "/system/xbin/daemonsu"
+        };
+        for (String suBin : suCandidates) {
+            Process p = null;
+            try {
+                p = Runtime.getRuntime().exec(new String[] { suBin, "-c", cmd });
+                long deadline = System.currentTimeMillis() + 4000;
+                while (System.currentTimeMillis() < deadline) {
+                    try {
+                        int code = p.exitValue();
+                        return (code == 0);
+                    } catch (IllegalThreadStateException stillRunning) {
+                        Thread.sleep(50);
+                    }
                 }
-            }
-            p.destroy();
-        } catch (Throwable t) {
-            Log.w(TAG, "su airplane cmd failed: " + t.getMessage());
-            if (p != null)
                 p.destroy();
+            } catch (Throwable t) {
+                if (p != null)
+                    p.destroy();
+            }
         }
+        return false;
+    }
+
+    /**
+     * Unblocks FM hardware access:
+     * 1. Forces daemonsu to start if not already running (for SELinux on KK 4.4).
+     * 2. Force-stops background stock FM apps (com.mediatek.FMRadio, com.innioasis.fm, etc.) so they release /dev/fm.
+     * 3. Changes permissions on /dev/fm and /dev/FM50AF to 0666.
+     * 4. Ensures airplane mode radio blocks are cleared.
+     */
+    public void prepareFmHardware() {
+        try {
+            android.app.ActivityManager am = (android.app.ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+            if (am != null) {
+                am.killBackgroundProcesses("com.mediatek.FMRadio");
+                am.killBackgroundProcesses("com.innioasis.fm");
+                am.killBackgroundProcesses("com.android.fmradio");
+            }
+        } catch (Throwable ignored) {}
+
+        runSuQuiet("/system/xbin/daemonsu --auto-daemon &");
+
+        String unblockCmd =
+                "am force-stop com.mediatek.FMRadio 2>/dev/null; "
+                + "am force-stop com.innioasis.fm 2>/dev/null; "
+                + "am force-stop com.android.fmradio 2>/dev/null; "
+                + "kill $(pidof com.mediatek.FMRadio) 2>/dev/null; "
+                + "kill $(pidof com.innioasis.fm) 2>/dev/null; "
+                + "pkill -9 -f FMRadio 2>/dev/null; "
+                + "killall -9 com.mediatek.FMRadio 2>/dev/null; "
+                + "[ ! -c /dev/fm ] && mknod /dev/fm c 193 0 2>/dev/null; "
+                + "chmod 666 /dev/fm 2>/dev/null; "
+                + "chmod 666 /dev/FM50AF 2>/dev/null; "
+                + "chown system:media /dev/fm 2>/dev/null; "
+                + "setprop persist.radio.airplane_mode_on 0 2>/dev/null; "
+                + "setprop ril.flightmode 0 2>/dev/null";
+
+        runSuQuiet(unblockCmd);
     }
 
     private Method getNativeMethod(String name, Class<?>... parameterTypes) throws NoSuchMethodException {
@@ -255,17 +301,13 @@ public class FmRadioManager {
             if (!ensureAirplaneModeOff()) {
                 Log.w(TAG, "Continuing FM powerUp despite airplane-mode clear uncertainty");
             }
-            // 🚀 1. 백그라운드에 숨어있는 순정 라디오 앱들을 모두 확실하게 사살하여 점유를 해제합니다.
-            Runtime.getRuntime().exec(new String[]{"su", "-c", "killall com.mediatek.FMRadio"});
-            Runtime.getRuntime().exec(new String[]{"su", "-c", "killall com.innioasis.fm"});
-            Runtime.getRuntime().exec(new String[]{"su", "-c", "killall com.android.fmradio"});
 
-            // 🚀 2. [가장 핵심!] 시스템이 꽉 쥐고 있는 FM 하드웨어 칩셋(/dev/fm)의 권한을 모든 앱이 쓸 수 있도록 강제 개방(chmod 666)합니다!
-            Runtime.getRuntime().exec(new String[]{"su", "-c", "chmod 666 /dev/fm"});
+            // 1. Unblock hardware & force-stop background stock apps holding /dev/fm
+            prepareFmHardware();
 
-            Thread.sleep(300); // 💡 권한이 적용되고 칩셋이 정신을 차릴 시간 0.3초 부여
+            Thread.sleep(200);
 
-            // 🚀 3. 혹시 이전 연결이 비정상적으로 꼬여서 열려있다면, 강제로 한 번 닫아버리고 뇌관을 초기화합니다.
+            // 2. Reset any previous stale connection
             try {
                 Method closeDev = getNativeMethod("closedev");
                 closeDev.invoke(null);
@@ -273,14 +315,31 @@ public class FmRadioManager {
 
             isDeviceOpen = false;
 
-            // 🚀 4. 방해물이 모두 사라진 깨끗한 상태에서 칩셋을 엽니다!
-            if (!isDeviceOpen) {
-                Method openDev = getNativeMethod("opendev");
-                isDeviceOpen = (Boolean) openDev.invoke(null);
+            // 3. Open the FM device node with retry
+            Method openDev = getNativeMethod("opendev");
+            for (int attempt = 0; attempt < 3; attempt++) {
+                try {
+                    isDeviceOpen = (Boolean) openDev.invoke(null);
+                } catch (Throwable t) {
+                    Log.w(TAG, "opendev exception attempt " + attempt + ": " + t.getMessage());
+                }
+                if (isDeviceOpen) break;
+
+                // Close, wait, and re-run unblock
+                try {
+                    Method closeDev = getNativeMethod("closedev");
+                    closeDev.invoke(null);
+                } catch (Throwable ignore) {}
+
+                prepareFmHardware();
+                Thread.sleep(250);
             }
 
             if (!isDeviceOpen) {
-                lastError = "Failed to open /dev/fm (Hardware is busy or blocked)";
+                java.io.File fmDev = new java.io.File("/dev/fm");
+                lastError = "Failed to open /dev/fm (exists=" + fmDev.exists() 
+                        + ", r=" + fmDev.canRead() + ", w=" + fmDev.canWrite() + ")";
+                Log.e(TAG, lastError);
                 return false;
             }
 
