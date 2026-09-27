@@ -38,46 +38,70 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-      - name: Build Release APK
-        run: ./gradlew assembleRelease
-
       - name: Determine Version and Release Tag
         id: version
         run: |
-          VERSION=$(grep -m1 'versionName' app/build.gradle | sed -E 's/.*"([^"]+)".*/\1/')
-          echo "Detected version: $VERSION"
+          VERSION=$(grep -m1 'appVersionName' app/build.gradle | grep -o '".*"' | tr -d '"' || echo "1.5.0")
+          DEFAULT_CODE="150"
+          echo "Detected default version: $VERSION (code: $DEFAULT_CODE)"
 
           DATE=$(date -u +'%Y%m%d')
 
           if [ "${{ github.ref_type }}" = "tag" ]; then
             TAG_NAME="${{ github.ref_name }}"
             RELEASE_NAME="${{ github.ref_name }}"
+            VERSION_NAME="${{ github.ref_name }}"
+            VERSION_CODE="${DEFAULT_CODE}"
           else
             git fetch --tags origin || true
             if git rev-parse "${DATE}" >/dev/null 2>&1; then
               TAG_NAME="${DATE}-build.${{ github.run_number }}"
               RELEASE_NAME="${DATE} (Build ${{ github.run_number }})"
+              VERSION_NAME="${DATE}-build.${{ github.run_number }}"
             else
               TAG_NAME="${DATE}"
               RELEASE_NAME="${DATE}"
+              VERSION_NAME="${DATE}"
             fi
+            VERSION_CODE="${DATE}"
           fi
 
           APK_NAME="InniClassic-${TAG_NAME}.apk"
 
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
+          echo "version_code=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
           echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
           echo "release_name=${RELEASE_NAME}" >> "$GITHUB_OUTPUT"
           echo "apk_name=${APK_NAME}" >> "$GITHUB_OUTPUT"
 
-          mkdir -p dist
-          cp app/build/outputs/apk/release/app-release.apk "dist/${APK_NAME}"
+      - name: Build Release APK
+        run: ./gradlew assembleRelease -PappVersionCode="${{ steps.version.outputs.version_code }}" -PappVersionName="${{ steps.version.outputs.version_name }}"
 
-      - name: Upload APK Artifact
+      - name: Package APK and Generate Update Metadata
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk "dist/${{ steps.version.outputs.apk_name }}"
+          cat << EOF > dist/update.json
+          {
+            "versionCode": ${{ steps.version.outputs.version_code }},
+            "versionName": "${{ steps.version.outputs.version_name }}",
+            "releaseName": "InniClassic ${{ steps.version.outputs.release_name }}",
+            "apkName": "${{ steps.version.outputs.apk_name }}",
+            "apkUrl": "https://github.com/${{ github.repository }}/releases/latest/download/${{ steps.version.outputs.apk_name }}",
+            "outputFile": "${{ steps.version.outputs.apk_name }}"
+          }
+          EOF
+          echo "Generated dist/update.json:"
+          cat dist/update.json
+
+      - name: Upload APK and Update Metadata
         uses: actions/upload-artifact@v4
         with:
           name: launcher-apk
-          path: dist/InniClassic-*.apk
+          path: |
+            dist/InniClassic-*.apk
+            dist/update.json
           retention-days: 14
 
   build-roms:
@@ -170,6 +194,7 @@ jobs:
           | File | Target Device | Notes |
           | :--- | :--- | :--- |
           | **`${{ needs.build-apk.outputs.apk_name }}`** | All Devices (Y1 / Y2) | Standalone launcher APK (sideload or install) |
+          | **`update.json`** | All Devices | OTA update metadata for in-app updater |
           | **`rom_y2.zip`** | **Innioasis Y2** (MT6582) | Complete flashable ROM with dual-storage, watchdog & clickwheel keylayout |
           | **`rom_y1_type_a.zip`** (`rom.zip`) | **Innioasis Y1** (Type A) | Flashable ROM for Y1 players with original firmware **2.0.0 or higher** |
           | **`rom_y1_type_b.zip`** (`rom_type_b.zip`) | **Innioasis Y1** (Type B) | Flashable ROM for Y1 players with original firmware **below 2.0.0** |

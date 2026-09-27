@@ -94,9 +94,8 @@ import android.util.Log;
 
 public class MainActivity extends Activity {
     private static final String TAG = "MainActivity";
-    // 주의: 주소 맨 끝에 반드시 슬래시(/)를 붙여주세요!
-    private static final String SERVER_BASE_URL = "http://knock2025.cafe24.com/knock_knock/y1/";
-    private static final String METADATA_URL = SERVER_BASE_URL + "output-metadata.json";
+    // OTA Update URL pointing to GitHub Releases
+    private static final String UPDATE_JSON_URL = "https://github.com/JonaszPotoniec/inniclassic-y2/releases/latest/download/update.json";
     // 🚀 [대개조 완료] 원하는 앨범 개수(홀수: 3, 5, 7 등)를 언제든 설정할 수 있는 스마트 제어판
     private int visibleCoversCount = 7; // 💡 5개로 복귀! 테스트 시 7 등으로 여기만 바꾸면 전체 자동 연동됩니다.
 
@@ -7026,6 +7025,37 @@ public class MainActivity extends Activity {
         }
     }
 
+    private static okhttp3.OkHttpClient getUpdateHttpClient() {
+        try {
+            final javax.net.ssl.X509TrustManager trustAll = new javax.net.ssl.X509TrustManager() {
+                public void checkClientTrusted(java.security.cert.X509Certificate[] certs, String authType) {}
+                public void checkServerTrusted(java.security.cert.X509Certificate[] certs, String authType) {}
+                public java.security.cert.X509Certificate[] getAcceptedIssuers() { return new java.security.cert.X509Certificate[0]; }
+            };
+            javax.net.ssl.SSLContext sslContext = javax.net.ssl.SSLContext.getInstance("TLS", "Conscrypt");
+            sslContext.init(null, new javax.net.ssl.TrustManager[]{trustAll}, new java.security.SecureRandom());
+
+            return new okhttp3.OkHttpClient.Builder()
+                    .sslSocketFactory(sslContext.getSocketFactory(), trustAll)
+                    .hostnameVerifier(new javax.net.ssl.HostnameVerifier() {
+                        @Override
+                        public boolean verify(String hostname, javax.net.ssl.SSLSession session) { return true; }
+                    })
+                    .followRedirects(true)
+                    .followSslRedirects(true)
+                    .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+                    .build();
+        } catch (Exception e) {
+            return new okhttp3.OkHttpClient.Builder()
+                    .followRedirects(true)
+                    .followSslRedirects(true)
+                    .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+                    .build();
+        }
+    }
+
     private void buildUpdateSettingsUI() {
         currentSettingsDepth = 1; // 🚀 메인 설정은 깊이 0
         containerSettingsItems.removeAllViews();
@@ -7043,7 +7073,7 @@ public class MainActivity extends Activity {
         final int myVersionCode = tempCode;
 
         // 2. 현재 버전 표시 줄
-        LinearLayout rowCurrent = createSettingRow("Current Version", "v" + myVersionName);
+        LinearLayout rowCurrent = createSettingRow("Current Version", myVersionName.startsWith("v") ? myVersionName : ("v" + myVersionName));
         containerSettingsItems.addView(rowCurrent);
 
         // 3. 서버 버전 표시 줄 (처음엔 Checking... 으로 표시)
@@ -7054,78 +7084,56 @@ public class MainActivity extends Activity {
 
         // 4. 하단 업데이트 실행 버튼 (서버 확인 전까지는 숨겨둡니다)
         final Button btnExecuteUpdate = createListButton("🚀 " + t("DOWNLOAD & UPDATE"));
-        ;
         btnExecuteUpdate.setVisibility(View.GONE);
         containerSettingsItems.addView(btnExecuteUpdate);
 
-        // 🚀 5. 화면이 열리자마자 백그라운드에서 서버의 output-metadata.json을 읽어옵니다!
+        // 🚀 5. 화면이 열리자마자 백그라운드에서 GitHub Release의 update.json을 읽어옵니다!
         new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
-                    java.net.URL url = new java.net.URL(METADATA_URL);
-                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+                    okhttp3.OkHttpClient client = getUpdateHttpClient();
+                    okhttp3.Request request = new okhttp3.Request.Builder()
+                            .url(UPDATE_JSON_URL)
+                            .header("User-Agent", "InniClassic-OTA")
+                            .build();
 
-                    // 🚀 [필수 1] 깃허브 보안(TLS 1.2) 뚫기: 만들어둔 비밀 무기 장착!
-                    if (conn instanceof javax.net.ssl.HttpsURLConnection) {
-                        try {
-                            ((javax.net.ssl.HttpsURLConnection) conn).setSSLSocketFactory(new TLSSocketFactory());
-                        } catch (Exception e) {
-                        }
+                    okhttp3.Response response = client.newCall(request).execute();
+                    if (!response.isSuccessful()) {
+                        throw new Exception("HTTP " + response.code());
                     }
 
-                    conn.setInstanceFollowRedirects(false); // 수동 추적을 위해 기본 기능 끄기
-                    conn.setConnectTimeout(5000);
+                    String body = response.body().string();
+                    org.json.JSONObject root = new org.json.JSONObject(body);
 
-                    // 🚀 [필수 2] 깃허브 리다이렉트(주소 우회) 끝까지 쫓아가기!
-                    int status = conn.getResponseCode();
-                    if (status == 301 || status == 302 || status == 303) {
-                        String newUrl = conn.getHeaderField("Location");
-                        conn = (java.net.HttpURLConnection) new java.net.URL(newUrl).openConnection();
-                        if (conn instanceof javax.net.ssl.HttpsURLConnection) {
-                            try {
-                                ((javax.net.ssl.HttpsURLConnection) conn).setSSLSocketFactory(new TLSSocketFactory());
-                            } catch (Exception e) {
-                            }
-                        }
+                    final int serverVersionCode = root.optInt("versionCode", 0);
+                    final String serverVersionName = root.optString("versionName", "");
+                    String apkUrl = root.optString("apkUrl", "");
+                    if (apkUrl.isEmpty()) {
+                        String apkName = root.optString("apkName", root.optString("outputFile", "InniClassic.apk"));
+                        apkUrl = "https://github.com/JonaszPotoniec/inniclassic-y2/releases/latest/download/" + apkName;
                     }
-
-                    java.io.BufferedReader in = new java.io.BufferedReader(
-                            new java.io.InputStreamReader(conn.getInputStream()));
-                    StringBuilder sb = new StringBuilder();
-                    String line;
-                    while ((line = in.readLine()) != null)
-                        sb.append(line);
-                    in.close();
-
-                    org.json.JSONObject root = new org.json.JSONObject(sb.toString());
-                    org.json.JSONArray elements = root.getJSONArray("elements");
-                    org.json.JSONObject element = elements.getJSONObject(0);
-
-                    final int serverVersionCode = element.getInt("versionCode");
-                    final String serverVersionName = element.getString("versionName");
-                    final String apkFileName = element.getString("outputFile");
+                    final String finalDownloadUrl = apkUrl;
 
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
-                            // 서버 버전 텍스트를 업데이트 (예: Checking... -> v1.2)
                             TextView tvServer = (TextView) rowServer.getChildAt(1);
-                            tvServer.setText("v" + serverVersionName);
+                            tvServer.setText(serverVersionName.startsWith("v") ? serverVersionName : ("v" + serverVersionName));
 
                             // 🚀 [비교] 업데이트가 필요할 때
                             if (serverVersionCode > myVersionCode) {
                                 tvServer.setTextColor(0xFF00FF00); // 서버 버전을 눈에 띄는 초록색으로!
 
                                 btnExecuteUpdate.setVisibility(View.VISIBLE);
+                                btnExecuteUpdate.setText("🚀 " + t("DOWNLOAD & UPDATE"));
                                 btnExecuteUpdate.setTextColor(0xFFFFFFFF);
                                 btnExecuteUpdate.setTypeface(ThemeManager.getCustomFontBold());
                                 btnExecuteUpdate.setOnClickListener(new View.OnClickListener() {
                                     @Override
                                     public void onClick(View v) {
                                         clickFeedback();
-                                        String downloadUrl = SERVER_BASE_URL + apkFileName;
-                                        downloadAndInstallApk(downloadUrl); // 다운로드 엔진 호출
+                                        downloadAndInstallApk(finalDownloadUrl); // 다운로드 엔진 호출
                                     }
                                 });
                             }
@@ -7320,60 +7328,31 @@ public class MainActivity extends Activity {
             @Override
             public void run() {
                 try {
-                    java.net.URL url = new java.net.URL(apkUrl);
-                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+                    okhttp3.OkHttpClient client = getUpdateHttpClient();
+                    okhttp3.Request request = new okhttp3.Request.Builder()
+                            .url(apkUrl)
+                            .header("User-Agent", "InniClassic-OTA")
+                            .header("Accept-Encoding", "identity")
+                            .build();
 
-                    // 🚀 [필수 1] 깃허브 보안(TLS 1.2) 뚫기
-                    if (conn instanceof javax.net.ssl.HttpsURLConnection) {
-                        try {
-                            ((javax.net.ssl.HttpsURLConnection) conn).setSSLSocketFactory(new TLSSocketFactory());
-                        } catch (Exception e) {
-                        }
+                    okhttp3.Response response = client.newCall(request).execute();
+                    if (!response.isSuccessful()) {
+                        throw new Exception("HTTP " + response.code());
                     }
 
-                    conn.setInstanceFollowRedirects(false);
+                    okhttp3.ResponseBody responseBody = response.body();
+                    final long fileLength = responseBody != null ? responseBody.contentLength() : -1;
 
-                    // 🚀 [여기 추가!!] 안드로이드의 자동 압축(GZIP) 오지랖 끄기! (용량 뻥튀기 원천 차단)
-                    conn.setRequestProperty("Accept-Encoding", "identity");
-                    conn.setUseCaches(false);
-                    conn.setRequestProperty("Cache-Control", "no-cache");
-                    // 🚀 [필수 2] 깃허브 리다이렉트(주소 우회) 쫓아가서 파일 낚아채기!
-                    int status = conn.getResponseCode();
-                    if (status == 301 || status == 302 || status == 303) {
-                        String newUrl = conn.getHeaderField("Location");
-                        conn = (java.net.HttpURLConnection) new java.net.URL(newUrl).openConnection();
-                        if (conn instanceof javax.net.ssl.HttpsURLConnection) {
-                            try {
-                                ((javax.net.ssl.HttpsURLConnection) conn).setSSLSocketFactory(new TLSSocketFactory());
-                            } catch (Exception e) {
-                            }
-                        }
-
-                        // 🚀 [여기 추가!!] 리다이렉트 된 진짜 다운로드 주소에서도 압축 금지 명령 다시 내리기!
-                        conn.setRequestProperty("Accept-Encoding", "identity");
-                    }
-
-                    conn.connect();
-
-                    // 서버로부터 파일의 전체 총 용량을 알아냅니다.
-                    final int fileLength = conn.getContentLength();
-
-                    // ❌ [기존 다운로드 경로 지정 코드를 전부 지워주세요]
-                    // File sdcard = android.os.Environment.getExternalStorageDirectory();
-                    // ...
-
-                    // 🚀 ⭕ [새로운 코드로 덮어쓰기] SD카드의 간섭을 받지 않는 '앱 전용 내부 금고'를 생성합니다!
                     File dir = getDir("update", Context.MODE_PRIVATE);
-                    final File updateFile = new File(dir, "Y1_Launcher_Update.apk");
+                    final File updateFile = new File(dir, "InniClassic_Update.apk");
 
                     FileOutputStream fos = new FileOutputStream(updateFile);
-                    java.io.InputStream is = conn.getInputStream();
+                    java.io.InputStream is = responseBody.byteStream();
 
-                    byte[] buffer = new byte[4096]; // 💡 다운로드 속도를 위해 버퍼를 4배 늘렸습니다.
+                    byte[] buffer = new byte[8192];
                     int len;
                     long total = 0;
 
-                    // 파일을 조각조각 다운로드 받으면서 동시에 화면에 퍼센트를 쏴줍니다.
                     while ((len = is.read(buffer)) != -1) {
                         total += len;
                         fos.write(buffer, 0, len);
@@ -7383,7 +7362,6 @@ public class MainActivity extends Activity {
                             final long downloadedMB = total / (1024 * 1024);
                             final long totalMB = fileLength / (1024 * 1024);
 
-                            // 화면(UI)을 조작하는 것은 반드시 메인 쓰레드에서 해야 합니다.
                             runOnUiThread(new Runnable() {
                                 @Override
                                 public void run() {
@@ -7395,7 +7373,6 @@ public class MainActivity extends Activity {
                     }
                     fos.close();
                     is.close();
-                    // (앞부분 생략) 루프가 끝난 직후 찌꺼기 검사 부분부터 덮어쓰기
 
                     if (fileLength > 0 && total != fileLength) {
                         if (updateFile.exists())
@@ -7403,25 +7380,16 @@ public class MainActivity extends Activity {
                         throw new Exception("Incomplete Download: Size Mismatch");
                     }
 
-                    // 🚀 [여기서부터 덮어쓰기!!] 다운로드가 끝나면 창을 바로 닫지 않고, 서버가 준 용량과 내가 받은 용량을 화면에 박제합니다!
-                    final String debugMessage = "Server told: " + fileLength + " bytes\nActually got: " + total
-                            + " bytes";
-
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
-                            // 1. 프로그레스 바를 꽉 채우고, 우리가 확인해야 할 핵심 숫자를 화면에 띄웁니다.
                             progressBar.setProgress(100);
-                            tvProgress.setText(t("Download Finished! Waiting 3 sec...\n\n") + debugMessage);
-                            tvProgress.setTextColor(0xFF000000); // 눈에 확 띄게 노란색으로!
+                            tvProgress.setText(t("Download Finished! Installing..."));
 
-                            // 2. 정확히 3초(3000ms) 동안 화면을 멈춰둔 뒤에 팝업을 닫고 설치를 시도합니다.
                             new Handler().postDelayed(new Runnable() {
                                 @Override
                                 public void run() {
                                     progressDialog.dismiss();
-
-                                    // 🚀 [UI 멈춤 팝업 완벽 차단] 메인 화면 일꾼은 놔주고, 설치는 백그라운드 일꾼에게 조용히 시킵니다!
                                     new Thread(new Runnable() {
                                         @Override
                                         public void run() {
@@ -7429,11 +7397,9 @@ public class MainActivity extends Activity {
                                         }
                                     }).start();
                                 }
-                            }, 3000);
+                            }, 1000);
                         }
                     });
-
-                    // 👆 [여기까지 덮어쓰기 끝] 👆
                 } catch (Exception e) {
                     runOnUiThread(new Runnable() {
                         @Override
