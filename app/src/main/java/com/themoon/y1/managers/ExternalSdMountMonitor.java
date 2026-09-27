@@ -72,6 +72,9 @@ public final class ExternalSdMountMonitor {
         if (!running.compareAndSet(false, true))
             return;
 
+        lastPriReady = isPrimaryReady();
+        lastSecReady = isSecondaryReady();
+
         if (bgThread == null || !bgThread.isAlive()) {
             bgThread = new android.os.HandlerThread("y1-sd-monitor-bg");
             bgThread.start();
@@ -81,13 +84,7 @@ public final class ExternalSdMountMonitor {
         registerMediaReceiver();
         registerUsbReceiver();
         if (bgHandler != null) {
-            bgHandler.post(pollTask);
-            bgHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    checkAndMaybeMount("start");
-                }
-            });
+            bgHandler.postDelayed(pollTask, POLL_MS);
         }
     }
 
@@ -105,25 +102,35 @@ public final class ExternalSdMountMonitor {
         unregisterUsbReceiver();
     }
 
-    /** True when primary storage (/storage/sdcard0) is mounted. */
+    /** True when primary storage is usable and readable. */
     public static boolean isPrimaryReady() {
-        return mountsContain(PRIMARY) || mountsContain("/mnt/media_rw/sdcard0");
+        try {
+            File pri = StoragePaths.getPrimaryRoot();
+            return pri != null && pri.exists() && pri.isDirectory() && pri.canRead();
+        } catch (Exception e) {
+            return false;
+        }
     }
 
-    /** True when apps can list the secondary volume (FUSE up). */
+    /** True when apps can list the secondary volume (/storage/sdcard1). */
     public static boolean isSecondaryReady() {
         if (!hasSecondarySlot())
             return false;
-        String fuse = readProp("init.svc.fuse_sdcard1");
-        if (!"running".equals(fuse))
+        try {
+            File sec = new File(SECONDARY);
+            if (!sec.exists() || !sec.isDirectory() || !sec.canRead())
+                return false;
+            String[] list = sec.list();
+            return list != null;
+        } catch (Exception e) {
             return false;
-        return mountsContain(SECONDARY) || mountsContain("/mnt/media_rw/sdcard1");
+        }
     }
 
+    /** True only if a physical secondary SD card device exists in hardware. */
     public static boolean hasSecondarySlot() {
         try {
-            File stub = new File(SECONDARY);
-            return stub.exists();
+            return new File("/sys/block/mmcblk1").exists() || new File("/dev/block/mmcblk1").exists();
         } catch (Exception e) {
             return false;
         }
@@ -144,11 +151,9 @@ public final class ExternalSdMountMonitor {
             notifyReady();
         }
 
-        // Internal memory (sdcard0) and external slot (sdcard1) both ready -> no action needed
-        boolean priNeeded = !priReady;
+        // Only secondary slot can ever be remounted; never touch primary storage!
         boolean secNeeded = hasSecondarySlot() && !secReady;
-
-        if (!priNeeded && !secNeeded) {
+        if (!secNeeded) {
             return;
         }
 
@@ -161,18 +166,14 @@ public final class ExternalSdMountMonitor {
         lastMountAttemptMs = now;
 
         try {
-            Log.i(TAG, "Storage unmounted or corrupted (pri=" + priReady + ", sec=" + secReady + ", " + reason + ") — running self-healing engine");
-            boolean ok = attemptRemount();
-            boolean afterPri = isPrimaryReady();
+            Log.i(TAG, "Secondary storage not ready (" + reason + ") — attempting mount");
+            attemptRemount();
             boolean afterSec = isSecondaryReady();
-            if ((afterPri && !priReady) || (afterSec && !secReady)) {
-                Log.i(TAG, "Self-healing remount succeeded (pri=" + afterPri + ", sec=" + afterSec + ")");
+            if (afterSec && !secReady) {
+                Log.i(TAG, "Secondary remount succeeded");
                 StoragePaths.invalidate();
-                lastPriReady = afterPri;
                 lastSecReady = afterSec;
                 notifyReady();
-            } else {
-                Log.w(TAG, "Self-healing remount completed (pri=" + afterPri + ", sec=" + afterSec + ")");
             }
         } finally {
             mountInFlight.set(false);
@@ -180,65 +181,13 @@ public final class ExternalSdMountMonitor {
     }
 
     /**
-     * Self-healing repair engine for dirty bits or stuck vold handles.
+     * Attempts to mount secondary storage without touching primary storage.
      */
     private boolean attemptRemount() {
-        // 1. Repair and remount primary storage (/storage/sdcard0)
-        if (!isPrimaryReady()) {
-            Log.i(TAG, "Attempting self-healing repair for primary storage (sdcard0)...");
-            runSuTimed("vdc volume unmount sdcard0 force 2>/dev/null");
-
-            runSuTimed(
-                    "dosfsck -a -w /dev/block/mmcblk0p1 2>/dev/null; "
-                    + "fsck_msdos -y /dev/block/mmcblk0p1 2>/dev/null; "
-                    + "fsck.vfat -a -w /dev/block/mmcblk0p1 2>/dev/null; "
-                    + "fsck.exfat -y /dev/block/mmcblk0p1 2>/dev/null; "
-                    + "dosfsck -a -w /dev/block/mmcblk1p1 2>/dev/null; "
-                    + "fsck_msdos -y /dev/block/mmcblk1p1 2>/dev/null; "
-                    + "fsck.vfat -a -w /dev/block/mmcblk1p1 2>/dev/null; "
-                    + "fsck.exfat -y /dev/block/mmcblk1p1 2>/dev/null"
-            );
-
-            runSuTimed("vdc volume mount sdcard0 2>/dev/null");
-
-            if (!isPrimaryReady()) {
-                runSuTimed(
-                        "mkdir -p /storage/sdcard0 2>/dev/null; "
-                        + "mount -t vfat -o rw,nosuid,nodev,noexec,uid=1000,gid=1015,fmask=0702,dmask=0702,shortname=mixed,utf8 /dev/block/mmcblk0p1 /storage/sdcard0 2>/dev/null || "
-                        + "mount -t exfat -o rw,nosuid,nodev,noexec,uid=1000,gid=1015,fmask=0702,dmask=0702 /dev/block/mmcblk0p1 /storage/sdcard0 2>/dev/null || "
-                        + "mount -t vfat -o rw /dev/block/mmcblk0p1 /storage/sdcard0 2>/dev/null || "
-                        + "mount -t exfat -o rw /dev/block/mmcblk0p1 /storage/sdcard0 2>/dev/null || "
-                        + "mount -t vfat -o rw,nosuid,nodev,noexec,uid=1000,gid=1015,fmask=0702,dmask=0702,shortname=mixed,utf8 /dev/block/mmcblk1p1 /storage/sdcard0 2>/dev/null || "
-                        + "mount -t vfat -o rw /dev/block/mmcblk1p1 /storage/sdcard0 2>/dev/null"
-                );
-            }
-        }
-
-        // 2. Repair and remount secondary storage (/storage/sdcard1)
         if (hasSecondarySlot() && !isSecondaryReady()) {
-            Log.i(TAG, "Attempting self-healing repair for secondary storage (sdcard1)...");
-            runSuTimed(
-                    "killall -9 mount.exfat 2>/dev/null; "
-                    + "stop fuse_sdcard1 2>/dev/null; "
-                    + "vdc volume unmount sdcard1 force 2>/dev/null"
-            );
-
-            runSuTimed(
-                    "dosfsck -a -w /dev/block/mmcblk1p1 2>/dev/null; "
-                    + "fsck_msdos -y /dev/block/mmcblk1p1 2>/dev/null; "
-                    + "fsck.vfat -a -w /dev/block/mmcblk1p1 2>/dev/null; "
-                    + "fsck.exfat -y /dev/block/mmcblk1p1 2>/dev/null"
-            );
-
-            runSuTimed(
-                    "vdc volume mount sdcard1 2>/dev/null; "
-                    + "start fuse_sdcard1 2>/dev/null; "
-                    + "sleep 1; "
-                    + "getprop init.svc.fuse_sdcard1"
-            );
+            runSuTimed("vdc volume mount sdcard1 2>/dev/null; start fuse_sdcard1 2>/dev/null");
         }
-
-        return isPrimaryReady() || isSecondaryReady();
+        return isSecondaryReady();
     }
 
     private void notifyReady() {

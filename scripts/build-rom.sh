@@ -118,6 +118,11 @@ case "$TYPE" in
         ;;
 esac
 
+case "$OUTPUT" in
+    /*) ;;
+    *) OUTPUT="$PWD/$OUTPUT" ;;
+esac
+
 require_cmd curl
 require_cmd unzip
 require_cmd zip
@@ -207,6 +212,17 @@ strip_solar_artefacts() {
     sudo rm -f "$sys_mount/etc/init.d/"*Solar* 2>/dev/null || true
     sudo rm -f "$sys_mount/etc/init.d/99SolarInit.sh" \
                "$sys_mount/etc/init.d/99SolarPrep.sh" 2>/dev/null || true
+    sudo rm -f "$sys_mount/etc/init.d/"*Xposed* \
+               "$sys_mount/etc/init.d/99XposedInit.sh" 2>/dev/null || true
+    if [ -f "$sys_mount/bin/app_process.orig" ]; then
+        echo "  restoring stock /system/bin/app_process from app_process.orig"
+        sudo cp -f "$sys_mount/bin/app_process.orig" "$sys_mount/bin/app_process"
+        sudo chmod 755 "$sys_mount/bin/app_process"
+        sudo chown root:shell "$sys_mount/bin/app_process" 2>/dev/null || sudo chown root:root "$sys_mount/bin/app_process"
+        sudo rm -f "$sys_mount/bin/app_process.orig"
+    fi
+    sudo rm -f "$sys_mount/framework/XposedBridge.jar" 2>/dev/null || true
+    sudo rm -rf "$sys_mount/data/data/de.robv.android.xposed.installer" 2>/dev/null || true
 
     if [ -n "$user_mount" ] && [ -d "$user_mount" ]; then
         sudo rm -rf "$user_mount/data/com.solar.launcher" \
@@ -416,7 +432,7 @@ sudo rm -f "$MOUNT_SYS/lib/librockbox.so"
 sudo rm -f "$MOUNT_SYS/etc/init.d/99Y1ButtonScript"
 sudo rm -f "$MOUNT_SYS/etc/init.d/99Y1LauncherInit.sh"
 
-echo "==> Configuring /system/etc/install-recovery.sh and init.d for FM radio & SuperSU"
+echo "==> Configuring /system/etc/install-recovery.sh for SuperSU and FM radio"
 sudo tee "$MOUNT_SYS/etc/install-recovery.sh" > /dev/null << 'EOF'
 #!/system/bin/sh
 
@@ -427,18 +443,11 @@ elif [ -f /system/xbin/su ]; then
     /system/xbin/su --daemon &
 fi
 
-# Ensure FM radio hardware character device nodes are accessible by all apps
-[ -c /dev/fm ] && chmod 666 /dev/fm
-[ -c /dev/FM50AF ] && chmod 666 /dev/FM50AF
-
-# Execute init.d scripts if directory exists
-if [ -d /system/etc/init.d ]; then
-    for script in /system/etc/init.d/*; do
-        if [ -x "$script" ] && [ -f "$script" ]; then
-            "$script" &
-        fi
-    done
-fi
+# Ensure FM radio hardware character device nodes exist and are accessible by all apps
+[ ! -c /dev/fm ] && mknod /dev/fm c 193 0 2>/dev/null
+chmod 666 /dev/fm 2>/dev/null
+chmod 666 /dev/FM50AF 2>/dev/null
+chown system:media /dev/fm 2>/dev/null
 EOF
 sudo chmod 755 "$MOUNT_SYS/etc/install-recovery.sh"
 sudo chown root:root "$MOUNT_SYS/etc/install-recovery.sh"
@@ -448,18 +457,6 @@ if [ -d "$MOUNT_SYS/bin" ]; then
     sudo ln -sf /system/etc/install-recovery.sh "$MOUNT_SYS/bin/install-recovery.sh" 2>/dev/null || \
     sudo cp -f "$MOUNT_SYS/etc/install-recovery.sh" "$MOUNT_SYS/bin/install-recovery.sh"
 fi
-
-sudo mkdir -p "$MOUNT_SYS/etc/init.d"
-sudo tee "$MOUNT_SYS/etc/init.d/01fm" > /dev/null << 'EOF'
-#!/system/bin/sh
-# Ensure FM radio device nodes exist and are readable/writable
-[ ! -c /dev/fm ] && mknod /dev/fm c 193 0 2>/dev/null
-chmod 666 /dev/fm 2>/dev/null
-chmod 666 /dev/FM50AF 2>/dev/null
-chown system:media /dev/fm 2>/dev/null
-EOF
-sudo chmod 755 "$MOUNT_SYS/etc/init.d/01fm"
-sudo chown root:root "$MOUNT_SYS/etc/init.d/01fm"
 
 # Y2 Solar base only: strip Solar before installing InniClassic. Type a|b skip this (Y1 path unchanged).
 if [ "$TYPE" = "y2" ]; then

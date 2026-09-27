@@ -90,8 +90,10 @@ import com.themoon.y1.views.PieChartView;
 import com.themoon.y1.views.WidgetBatteryBarView;
 
 import org.conscrypt.Conscrypt;
+import android.util.Log;
 
 public class MainActivity extends Activity {
+    private static final String TAG = "MainActivity";
     // 주의: 주소 맨 끝에 반드시 슬래시(/)를 붙여주세요!
     private static final String SERVER_BASE_URL = "http://knock2025.cafe24.com/knock_knock/y1/";
     private static final String METADATA_URL = SERVER_BASE_URL + "output-metadata.json";
@@ -2733,24 +2735,33 @@ public class MainActivity extends Activity {
                             if (oggTags.length > 9 && oggTags[9] != null)
                                 cp = (String) oggTags[9];
                         } else {
-                            MediaMetadataRetriever mmr = new MediaMetadataRetriever();
-                            java.io.FileInputStream fis = new java.io.FileInputStream(f);
-                            mmr.setDataSource(fis.getFD());
+                            MediaMetadataRetriever mmr = null;
+                            java.io.FileInputStream fis = null;
+                            try {
+                                mmr = new MediaMetadataRetriever();
+                                fis = new java.io.FileInputStream(f);
+                                mmr.setDataSource(fis.getFD());
 
-                            t = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);
-                            a = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
-                            if (a == null || a.isEmpty())
-                                a = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_AUTHOR);
-                            al = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM);
-                            trackStr = mmr
-                                    .extractMetadata(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER);
-                            y = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DATE);
-                            g = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_GENRE);
-                            aa = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST);
-                            cp = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_COMPOSER);
-
-                            fis.close();
-                            mmr.release();
+                                t = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);
+                                a = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
+                                if (a == null || a.isEmpty())
+                                    a = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_AUTHOR);
+                                al = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM);
+                                trackStr = mmr
+                                        .extractMetadata(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER);
+                                y = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DATE);
+                                g = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_GENRE);
+                                aa = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST);
+                                cp = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_COMPOSER);
+                            } catch (Throwable ex) {
+                            } finally {
+                                if (fis != null) {
+                                    try { fis.close(); } catch (Throwable ignored) {}
+                                }
+                                if (mmr != null) {
+                                    try { mmr.release(); } catch (Throwable ignored) {}
+                                }
+                            }
                         }
 
                         if (t != null && !t.trim().isEmpty())
@@ -2805,7 +2816,7 @@ public class MainActivity extends Activity {
                             } catch (Exception e) {
                             }
                         }
-                    } catch (Exception e) {
+                    } catch (Throwable e) {
                     }
 
                     // 새 파일 장부에 적어 넣기!
@@ -2844,51 +2855,99 @@ public class MainActivity extends Activity {
     }
 
     // 🚀 [신규 추가] 스캔 완료된 라이브러리를 디스크에 저장해서, 다음 부팅 때 처음부터 다시 스캔하지 않도록!
-    private static final File LIBRARY_CACHE_FILE = StoragePaths.primaryFile(".y1_library_cache.json");
-
     private void saveLibraryCache() {
+        File cacheFile = StoragePaths.primaryFile(".y1_library_cache.json");
+        File tempFile = StoragePaths.primaryFile(".y1_library_cache.json.tmp");
+        java.io.BufferedWriter bw = null;
         try {
-            org.json.JSONObject root = new org.json.JSONObject();
-            root.put("music", songListToJson(customLibrary));
-            root.put("books", songListToJson(audiobookLibrary));
-            java.io.FileWriter fw = new java.io.FileWriter(LIBRARY_CACHE_FILE);
-            fw.write(root.toString());
-            fw.close();
-        } catch (Exception e) {
+            File parent = cacheFile.getParentFile();
+            if (parent != null && !parent.exists()) {
+                parent.mkdirs();
+            }
+            bw = new java.io.BufferedWriter(new java.io.FileWriter(tempFile), 32768);
+            bw.write("{\"music\":[");
+            writeSongListJson(bw, customLibrary);
+            bw.write("],\"books\":[");
+            writeSongListJson(bw, audiobookLibrary);
+            bw.write("]}");
+            bw.flush();
+            bw.close();
+            bw = null;
+            if (tempFile.exists() && tempFile.length() > 0) {
+                if (cacheFile.exists()) {
+                    cacheFile.delete();
+                }
+                tempFile.renameTo(cacheFile);
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "Failed to save library cache: " + t.getMessage());
+            try {
+                if (tempFile.exists()) {
+                    tempFile.delete();
+                }
+            } catch (Throwable ignored) {}
+        } finally {
+            if (bw != null) {
+                try {
+                    bw.close();
+                } catch (Throwable ignored) {}
+            }
         }
     }
 
-    private org.json.JSONArray songListToJson(List<SongItem> list) throws org.json.JSONException {
-        org.json.JSONArray arr = new org.json.JSONArray();
+    private void writeSongListJson(java.io.Writer w, List<SongItem> list) throws java.io.IOException {
+        if (list == null) return;
+        boolean first = true;
         for (SongItem song : list) {
-            org.json.JSONObject o = new org.json.JSONObject();
-            o.put("path", song.file.getAbsolutePath());
-            o.put("title", song.title);
-            o.put("artist", song.artist);
-            o.put("album", song.album);
-            o.put("year", song.year);
-            o.put("genre", song.genre);
-            o.put("albumArtist", song.albumArtist);
-            o.put("composer", song.composer);
+            if (song == null || song.file == null) continue;
+            if (!first) w.write(",");
+            first = false;
+            w.write("{\"path\":");
+            w.write(org.json.JSONObject.quote(song.file.getAbsolutePath()));
+            w.write(",\"title\":");
+            w.write(org.json.JSONObject.quote(song.title != null ? song.title : ""));
+            w.write(",\"artist\":");
+            w.write(org.json.JSONObject.quote(song.artist != null ? song.artist : ""));
+            w.write(",\"album\":");
+            w.write(org.json.JSONObject.quote(song.album != null ? song.album : ""));
+            w.write(",\"year\":");
+            w.write(org.json.JSONObject.quote(song.year != null ? song.year : ""));
+            w.write(",\"genre\":");
+            w.write(org.json.JSONObject.quote(song.genre != null ? song.genre : ""));
+            w.write(",\"albumArtist\":");
+            w.write(org.json.JSONObject.quote(song.albumArtist != null ? song.albumArtist : ""));
+            w.write(",\"composer\":");
+            w.write(org.json.JSONObject.quote(song.composer != null ? song.composer : ""));
             Integer trackNum = trackNumberMap.get(song.file.getAbsolutePath());
-            o.put("trackNum", trackNum != null ? trackNum : 0);
-            arr.put(o);
+            w.write(",\"trackNum\":");
+            w.write(String.valueOf(trackNum != null ? trackNum : 0));
+            w.write("}");
         }
-        return arr;
     }
 
     private void loadLibraryCache() {
-        try {
-            if (!LIBRARY_CACHE_FILE.exists())
+        File cacheFile = StoragePaths.primaryFile(".y1_library_cache.json");
+        if (!cacheFile.exists() || cacheFile.length() == 0) {
+            File secFile = new File(StoragePaths.SECONDARY_PATH, ".y1_library_cache.json");
+            if (secFile.exists() && secFile.length() > 0) {
+                cacheFile = secFile;
+            } else {
                 return;
-            java.io.FileInputStream fis = new java.io.FileInputStream(LIBRARY_CACHE_FILE);
-            byte[] data = new byte[(int) LIBRARY_CACHE_FILE.length()];
-            fis.read(data);
-            fis.close();
-            org.json.JSONObject root = new org.json.JSONObject(new String(data, "UTF-8"));
+            }
+        }
+        try {
+            java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(cacheFile), 32768);
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+            reader.close();
+            org.json.JSONObject root = new org.json.JSONObject(sb.toString());
             jsonToSongList(root.optJSONArray("music"), customLibrary);
             jsonToSongList(root.optJSONArray("books"), audiobookLibrary);
-        } catch (Exception e) {
+        } catch (Throwable t) {
+            Log.e(TAG, "Failed to load library cache: " + t.getMessage());
         }
     }
 
@@ -2908,7 +2967,7 @@ public class MainActivity extends Activity {
                         o.optString("albumArtist", ""), o.optString("composer", ""));
                 target.add(song);
                 trackNumberMap.put(f.getAbsolutePath(), o.optInt("trackNum", 0));
-            } catch (Exception e) {
+            } catch (Throwable t) {
             }
         }
     }
@@ -2933,104 +2992,119 @@ public class MainActivity extends Activity {
         new Thread(new Runnable() {
             @Override
             public void run() {
-                // 🚀 [부분 스캔 1단계] 삭제된 파일 감지 (기존 바구니 정리)
-                java.util.Iterator<SongItem> itMusic = customLibrary.iterator();
-                while (itMusic.hasNext()) {
-                    SongItem item = itMusic.next();
-                    if (!item.file.exists()) {
-                        trackNumberMap.remove(item.file.getAbsolutePath());
-                        itMusic.remove(); // 파일이 지워졌으면 장부에서 즉시 파쇄!
-                    }
-                }
-
-                java.util.Iterator<SongItem> itBook = audiobookLibrary.iterator();
-                while (itBook.hasNext()) {
-                    SongItem item = itBook.next();
-                    if (!item.file.exists()) {
-                        trackNumberMap.remove(item.file.getAbsolutePath());
-                        itBook.remove(); // 파일이 지워졌으면 장부에서 즉시 파쇄!
-                    }
-                }
-
-                // 🚀 이미 안전하게 살아있는 파일들의 '주소 명단'을 추출합니다. (검색 속도 극대화)
-                HashSet<String> existingMusic = new HashSet<>();
-                for (SongItem item : customLibrary)
-                    existingMusic.add(item.file.getAbsolutePath());
-
-                HashSet<String> existingBooks = new HashSet<>();
-                for (SongItem item : audiobookLibrary)
-                    existingBooks.add(item.file.getAbsolutePath());
-
-                totalAudioFiles = 0;
-                scannedAudioFiles = 0;
-
-                // Re-probe volumes so Y2 microSD (/storage/sdcard1) is included after insert.
-                StoragePaths.invalidate();
-                rootFolder = StoragePaths.getMusicDir();
-                audiobookRootFolder = StoragePaths.getAudiobooksDir();
-
-                // Count + scan Music/Audiobooks on every volume (sdcard0 + sdcard1).
-                for (java.io.File musicDir : StoragePaths.getMusicDirs())
-                    countAudioFiles(musicDir);
-                for (java.io.File bookDir : StoragePaths.getAudiobooksDirs())
-                    countAudioFiles(bookDir);
-
-                for (java.io.File musicDir : StoragePaths.getMusicDirs())
-                    buildCustomLibrary(musicDir, customLibrary, existingMusic);
-                for (java.io.File bookDir : StoragePaths.getAudiobooksDirs())
-                    buildCustomLibrary(bookDir, audiobookLibrary, existingBooks);
-
-                // 🚀 [신규 엔진 장착] 중복 폭탄 해체! 최고 음질 1개만 남기고 다 분쇄합니다!
-                filterDuplicateSongs(customLibrary);
-                filterDuplicateSongs(audiobookLibrary);
-
-                // 즐겨찾기 자동 청소기
-                HashSet<String> aliveSongs = new HashSet<>();
-                for (SongItem song : customLibrary)
-                    aliveSongs.add(song.file.getAbsolutePath());
-                for (SongItem book : audiobookLibrary)
-                    aliveSongs.add(book.file.getAbsolutePath());
-
-                boolean isCleanedUp = false;
-                java.util.Iterator<String> favIterator = favoritePaths.iterator();
-                while (favIterator.hasNext()) {
-                    String favPath = favIterator.next();
-                    if (!aliveSongs.contains(favPath)) {
-                        favIterator.remove();
-                        isCleanedUp = true;
-                    }
-                }
-                if (isCleanedUp)
-                    prefs.edit().putStringSet("favorites", favoritePaths).commit();
-
-                // 🚀 [신규 추가] 다음 부팅 때 처음부터 다시 스캔하지 않도록, 완성된 라이브러리를 디스크에 저장!
-                saveLibraryCache();
-
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        isCustomScanning = false;
-                        Toast
-                                .makeText(
-                                        MainActivity.this, t("Scan Complete! Music") + ": " + customLibrary.size() + " "
-                                                + t("Books: ") + audiobookLibrary.size(),
-                                        Toast.LENGTH_SHORT)
-                                .show();
-
-                        if (currentScreenState == STATE_BROWSER) {
-                            if (currentBrowserMode == BROWSER_ROOT)
-                                buildFileBrowserUI();
-                            else if (currentBrowserMode == BROWSER_ARTISTS)
-                                buildVirtualCategories("ARTIST");
-                            else if (currentBrowserMode == BROWSER_ALBUMS)
-                                buildVirtualCategories("ALBUM");
-                            else if (currentBrowserMode == BROWSER_VIRTUAL_SONGS)
-                                buildVirtualSongs();
-                            else if (currentBrowserMode == BROWSER_COVER_FLOW)
-                                buildCoverFlowUI();
+                try {
+                    // 🚀 [부분 스캔 1단계] 삭제된 파일 감지 (기존 바구니 정리)
+                    java.util.Iterator<SongItem> itMusic = customLibrary.iterator();
+                    while (itMusic.hasNext()) {
+                        SongItem item = itMusic.next();
+                        if (!item.file.exists()) {
+                            trackNumberMap.remove(item.file.getAbsolutePath());
+                            itMusic.remove(); // 파일이 지워졌으면 장부에서 즉시 파쇄!
                         }
                     }
-                });
+
+                    java.util.Iterator<SongItem> itBook = audiobookLibrary.iterator();
+                    while (itBook.hasNext()) {
+                        SongItem item = itBook.next();
+                        if (!item.file.exists()) {
+                            trackNumberMap.remove(item.file.getAbsolutePath());
+                            itBook.remove(); // 파일이 지워졌으면 장부에서 즉시 파쇄!
+                        }
+                    }
+
+                    // 🚀 이미 안전하게 살아있는 파일들의 '주소 명단'을 추출합니다. (검색 속도 극대화)
+                    HashSet<String> existingMusic = new HashSet<>();
+                    for (SongItem item : customLibrary)
+                        existingMusic.add(item.file.getAbsolutePath());
+
+                    HashSet<String> existingBooks = new HashSet<>();
+                    for (SongItem item : audiobookLibrary)
+                        existingBooks.add(item.file.getAbsolutePath());
+
+                    totalAudioFiles = 0;
+                    scannedAudioFiles = 0;
+
+                    // Re-probe volumes so Y2 microSD (/storage/sdcard1) is included after insert.
+                    StoragePaths.invalidate();
+                    rootFolder = StoragePaths.getMusicDir();
+                    audiobookRootFolder = StoragePaths.getAudiobooksDir();
+
+                    // Count + scan Music/Audiobooks on every volume (sdcard0 + sdcard1).
+                    for (java.io.File musicDir : StoragePaths.getMusicDirs())
+                        countAudioFiles(musicDir);
+                    for (java.io.File bookDir : StoragePaths.getAudiobooksDirs())
+                        countAudioFiles(bookDir);
+
+                    for (java.io.File musicDir : StoragePaths.getMusicDirs())
+                        buildCustomLibrary(musicDir, customLibrary, existingMusic);
+                    for (java.io.File bookDir : StoragePaths.getAudiobooksDirs())
+                        buildCustomLibrary(bookDir, audiobookLibrary, existingBooks);
+
+                    // 🚀 [신규 엔진 장착] 중복 폭탄 해체! 최고 음질 1개만 남기고 다 분쇄합니다!
+                    filterDuplicateSongs(customLibrary);
+                    filterDuplicateSongs(audiobookLibrary);
+
+                    // 즐겨찾기 자동 청소기
+                    HashSet<String> aliveSongs = new HashSet<>();
+                    for (SongItem song : customLibrary)
+                        aliveSongs.add(song.file.getAbsolutePath());
+                    for (SongItem book : audiobookLibrary)
+                        aliveSongs.add(book.file.getAbsolutePath());
+
+                    boolean isCleanedUp = false;
+                    java.util.Iterator<String> favIterator = favoritePaths.iterator();
+                    while (favIterator.hasNext()) {
+                        String favPath = favIterator.next();
+                        if (!aliveSongs.contains(favPath)) {
+                            favIterator.remove();
+                            isCleanedUp = true;
+                        }
+                    }
+                    if (isCleanedUp)
+                        prefs.edit().putStringSet("favorites", favoritePaths).commit();
+
+                    // 🚀 [신규 추가] 다음 부팅 때 처음부터 다시 스캔하지 않도록, 완성된 라이브러리를 디스크에 저장!
+                    saveLibraryCache();
+
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            isCustomScanning = false;
+                            Toast
+                                    .makeText(
+                                            MainActivity.this, t("Scan Complete! Music") + ": " + customLibrary.size() + " "
+                                                    + t("Books: ") + audiobookLibrary.size(),
+                                            Toast.LENGTH_SHORT)
+                                    .show();
+
+                            if (currentScreenState == STATE_BROWSER) {
+                                if (currentBrowserMode == BROWSER_ROOT)
+                                    buildFileBrowserUI();
+                                else if (currentBrowserMode == BROWSER_ARTISTS)
+                                    buildVirtualCategories("ARTIST");
+                                else if (currentBrowserMode == BROWSER_ALBUMS)
+                                    buildVirtualCategories("ALBUM");
+                                else if (currentBrowserMode == BROWSER_VIRTUAL_SONGS)
+                                    buildVirtualSongs();
+                                else if (currentBrowserMode == BROWSER_COVER_FLOW)
+                                    buildCoverFlowUI();
+                            }
+                        }
+                    });
+                } catch (Throwable t) {
+                    Log.e(TAG, "startMediaLibraryScan error: " + t.getMessage(), t);
+                } finally {
+                    isCustomScanning = false;
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (layoutLoadingOverlay != null) {
+                                layoutLoadingOverlay.setVisibility(View.GONE);
+                            }
+                            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                        }
+                    });
+                }
             }
         }).start();
     }

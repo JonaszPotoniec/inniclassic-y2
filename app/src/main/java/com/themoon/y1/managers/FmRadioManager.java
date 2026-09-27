@@ -159,8 +159,7 @@ public class FmRadioManager {
         String[] suCandidates = new String[] {
                 "su",
                 "/system/xbin/su",
-                "/system/bin/su",
-                "/system/xbin/daemonsu"
+                "/system/bin/su"
         };
         for (String suBin : suCandidates) {
             Process p = null;
@@ -201,7 +200,11 @@ public class FmRadioManager {
             }
         } catch (Throwable ignored) {}
 
-        runSuQuiet("/system/xbin/daemonsu --auto-daemon &");
+        try {
+            if (new java.io.File("/system/xbin/daemonsu").exists()) {
+                Runtime.getRuntime().exec(new String[] { "/system/xbin/daemonsu", "--auto-daemon" });
+            }
+        } catch (Throwable ignored) {}
 
         String unblockCmd =
                 "am force-stop com.mediatek.FMRadio 2>/dev/null; "
