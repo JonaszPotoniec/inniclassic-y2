@@ -471,8 +471,8 @@ echo "==> Creating $OUTPUT"
 rm -f "$OUTPUT"
 (
     cd "$BASE_DIR"
-    # Pack top-level base contents (scatter, images, SP Flash Tool helpers, etc.).
-    zip -j -q "$OUTPUT" ./*
+    # Pack base contents (scatter, images, SP Flash Tool helpers, etc.).
+    zip -r -q "$OUTPUT" ./*
 )
 
 echo "==> Built $OUTPUT ($(du -h "$OUTPUT" | awk '{print $1}'))"
