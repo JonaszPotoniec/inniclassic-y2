@@ -34,12 +34,6 @@ jobs:
           java-version: "17"
           cache: "gradle"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept Android SDK Licenses
-        run: yes | sdkmanager --licenses || true
-
       - name: Make gradlew executable
         run: chmod +x gradlew
 
