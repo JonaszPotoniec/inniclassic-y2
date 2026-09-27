@@ -15,8 +15,12 @@ if (localPropsFile.exists()) {
 def lastFmApiKey = localProps.getProperty("lastfm.api.key", "")
 def lastFmApiSecret = localProps.getProperty("lastfm.api.secret", "")
 
-def appVersionCode = project.hasProperty('appVersionCode') ? project.property('appVersionCode').toInteger() : 150
-def appVersionName = project.hasProperty('appVersionName') ? project.property('appVersionName') : "1.5.0"
+def todayDate = new java.text.SimpleDateFormat("yyyyMMdd").format(new Date())
+def defaultVersionCode = todayDate.toInteger()
+def defaultVersionName = todayDate
+
+def appVersionCode = project.hasProperty('appVersionCode') ? project.property('appVersionCode').toInteger() : defaultVersionCode
+def appVersionName = project.hasProperty('appVersionName') ? project.property('appVersionName') : defaultVersionName
 
 android {
     namespace 'com.themoon.y1'

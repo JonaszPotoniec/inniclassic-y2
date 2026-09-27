@@ -25,7 +25,7 @@ WORK_DIR=""
 MOUNT_SYS=""
 MOUNT_USER=""
 
-LAUNCHER_REPO="${LAUNCHER_REPO:-FabianZettl/inniclassic}"
+LAUNCHER_REPO="${LAUNCHER_REPO:-JonaszPotoniec/inniclassic-y2}"
 
 # Published Y2 base (Solar-built pack for stripping + InniClassic install).
 Y2_BASE_URL="${Y2_BASE_URL:-https://github.com/ryan-specter/jj_auto/releases/download/y2-test/rom_y2.zip}"
@@ -163,11 +163,11 @@ download_launcher_apk() {
     apk_url="$(
         curl -fsSL -A 'inniclassic-rom-build/1.0' \
             "https://github.com/${LAUNCHER_REPO}/releases/expanded_assets/${tag}" \
-        | grep -Eo "href=\"/${LAUNCHER_REPO}/releases/download/[^\"]+app-release[^\"]*\.apk\"" \
+        | grep -Eo "href=\"/${LAUNCHER_REPO}/releases/download/[^\"]+(InniClassic|app-release)[^\"]*\.apk\"" \
         | head -1 \
         | sed 's/^href="//; s/"$//'
     )"
-    [ -n "$apk_url" ] || die "could not find app-release APK for release ${tag} in ${LAUNCHER_REPO}"
+    [ -n "$apk_url" ] || die "could not find launcher APK for release ${tag} in ${LAUNCHER_REPO}"
 
     apk_url="https://github.com${apk_url}"
     echo "Downloading $(basename "$apk_url") from release ${tag}"
