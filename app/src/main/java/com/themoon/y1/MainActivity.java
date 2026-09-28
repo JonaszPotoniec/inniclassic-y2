@@ -1,6 +1,8 @@
 package com.themoon.y1;
 
 import android.content.pm.PackageManager;
+import android.view.MotionEvent;
+import com.themoon.y1.managers.SafeVolumeBypasser;
 import com.themoon.y1.views.ClassicMenuStyle;
 
 import android.app.Activity;
@@ -983,11 +985,15 @@ public class MainActivity extends Activity {
         }
     };
 
+    private int lastTargetVolume = -1;
+    private long lastTargetVolumeTime = 0;
+
     private Handler volumeHandler = new Handler();
     private Runnable hideVolumeTask = new Runnable() {
         @Override
         public void run() {
             layoutVolumeOverlay.setVisibility(View.GONE);
+            lastTargetVolume = -1;
         }
     };
     // 🚀 [iPod 스타일] Now Playing 화면에서는 볼륨 조절 시 팝업 대신 Progress 바 자리에 잠깐 겹쳐 보여주고 원래대로 복귀!
@@ -997,6 +1003,7 @@ public class MainActivity extends Activity {
             if (rowPlayerVolume != null)
                 rowPlayerVolume.setVisibility(View.GONE);
             updateNowPlayingBottomBarState();
+            lastTargetVolume = -1;
         }
     };
 
@@ -1039,6 +1046,7 @@ public class MainActivity extends Activity {
                 if (state == 1) {
                     ivStatusHeadphone.setVisibility(View.VISIBLE);
                     ivStatusHeadphone.setColorFilter(ThemeManager.getTextColorPrimary());
+                    SafeVolumeBypasser.bypass(context, audioManager);
                 } else {
                     ivStatusHeadphone.setVisibility(View.GONE);
                 }
@@ -1572,6 +1580,7 @@ public class MainActivity extends Activity {
         root.addView(tvFastScrollLetter, flp);
 
         audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        SafeVolumeBypasser.init(this, audioManager);
         // 🚀 [시스템 공식 등록] 화면이 꺼져도 버튼 신호를 받을 수 있도록 수신기를 장착합니다!
         ComponentName componentName = new ComponentName(getPackageName(), MediaBtnReceiver.class.getName());
         audioManager.registerMediaButtonEventReceiver(componentName);
@@ -1612,8 +1621,17 @@ public class MainActivity extends Activity {
             // 절대 볼륨 자체를 꺼서 헤드셋이 자기 물리 볼륨을 그대로 쓰게 만듭니다.
             String cmd5 = "setprop persist.bluetooth.disableabsvol true";
 
+            // 🚀 [Safe Media Volume 바이패스] 안드로이드 기본 80% 헤드폰 볼륨 제한 해제
+            String cmd6 = "setprop audio.safemedia.bypass true";
+            String cmd7 = "settings put global audio_safe_volume_state 2";
+            String cmd8 = "settings put system audio_safe_volume_state 2";
+            String cmd9 = "settings put global safe_media_volume_enabled 0";
+            String cmd10 = "settings put system safe_media_volume_enabled 0";
+            String cmd11 = "pm grant " + pkg + " android.permission.STATUS_BAR_SERVICE 2>/dev/null";
+
             // 명령어들을 &&(AND)로 묶어 연달아 실행하고 시스템을 동기화(sync)합니다.
-            String combinedCmd = cmd1 + " && " + cmd2 + " && " + cmd3 + " && " + cmd4 + " && " + cmd5 + " && sync";
+            String combinedCmd = cmd1 + " && " + cmd2 + " && " + cmd3 + " && " + cmd4 + " && " + cmd5 +
+                    " && " + cmd6 + " && " + cmd7 + " && " + cmd8 + " && " + cmd9 + " && " + cmd10 + " && " + cmd11 + " && sync";
 
             Process proc = Runtime.getRuntime().exec(new String[] { "su", "-c", combinedCmd });
             proc.waitFor(); // 명령어 적용이 끝날 때까지 잠시 대기
@@ -2153,6 +2171,69 @@ public class MainActivity extends Activity {
         playerVolumeProgress = findViewById(R.id.player_volume_progress);
         if (playerVolumeProgress != null) {
             playerVolumeProgress.setMax(audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
+        }
+
+        View.OnTouchListener volumeTouchListener = new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                int action = event.getAction();
+                if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_MOVE) {
+                    ProgressBar bar = (v == volumeProgress || v == layoutVolumeOverlay) ? volumeProgress : playerVolumeProgress;
+                    if (bar != null && bar.getWidth() > 0) {
+                        int[] loc = new int[2];
+                        bar.getLocationOnScreen(loc);
+                        float relX = event.getRawX() - loc[0];
+                        float ratio = Math.max(0f, Math.min(1f, relX / bar.getWidth()));
+                        int stream = AudioManager.STREAM_MUSIC;
+                        try {
+                            com.themoon.y1.managers.FmRadioManager fm = com.themoon.y1.managers.FmRadioManager.getInstance(MainActivity.this);
+                            if (fm.isPowerUp) {
+                                stream = fm.getFmStreamType();
+                            }
+                        } catch (Exception ignored) {}
+                        int maxVol = audioManager.getStreamMaxVolume(stream);
+                        int effectiveMax = (volumeLimitMax >= 0) ? Math.min(volumeLimitMax, maxVol) : maxVol;
+                        int targetVol = Math.round(ratio * effectiveMax);
+                        setVolumeLevel(targetVol);
+                        return true;
+                    }
+                }
+                return false;
+            }
+        };
+
+        if (rowPlayerVolume != null) {
+            rowPlayerVolume.setOnTouchListener(volumeTouchListener);
+        }
+        if (playerVolumeProgress != null) {
+            playerVolumeProgress.setOnTouchListener(volumeTouchListener);
+        }
+        if (layoutVolumeOverlay != null) {
+            layoutVolumeOverlay.setOnTouchListener(volumeTouchListener);
+        }
+        if (volumeProgress != null) {
+            volumeProgress.setOnTouchListener(volumeTouchListener);
+        }
+
+        View btnVolDown = findViewById(R.id.tv_player_volume_down);
+        if (btnVolDown != null) {
+            btnVolDown.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    adjustVolume(false);
+                    clickFeedback();
+                }
+            });
+        }
+        View btnVolUp = findViewById(R.id.tv_player_volume_up);
+        if (btnVolUp != null) {
+            btnVolUp.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    adjustVolume(true);
+                    clickFeedback();
+                }
+            });
         }
         rowPlayerSeek = findViewById(R.id.row_player_seek);
         rowPlayerShuffleRepeat = findViewById(R.id.row_player_shuffle_repeat);
@@ -11802,7 +11883,66 @@ public class MainActivity extends Activity {
         }
     }
 
-    // 🚀 [버그 원인 제거 완료] 여기에 있던 불필요한 잉여 중괄호 '}' 하나를 완벽하게 삭제했습니다!
+    private int getEffectiveStreamVolume(int stream) {
+        int sysVol = audioManager.getStreamVolume(stream);
+        if (lastTargetVolume >= 0 && (System.currentTimeMillis() - lastTargetVolumeTime < 400)) {
+            return Math.max(sysVol, lastTargetVolume);
+        }
+        return sysVol;
+    }
+
+    public void setVolumeLevel(int targetVol) {
+        int stream = AudioManager.STREAM_MUSIC;
+        try {
+            com.themoon.y1.managers.FmRadioManager fm = com.themoon.y1.managers.FmRadioManager.getInstance(this);
+            if (fm.isPowerUp) {
+                stream = fm.getFmStreamType();
+            }
+        } catch (Exception ignored) {
+        }
+        int maxVol = audioManager.getStreamMaxVolume(stream);
+        setVolumeLevel(stream, targetVol, maxVol);
+    }
+
+    public void setVolumeLevel(int stream, int targetVol, int maxVol) {
+        int effectiveMax = (volumeLimitMax >= 0) ? Math.min(volumeLimitMax, maxVol) : maxVol;
+        if (targetVol > effectiveMax) targetVol = effectiveMax;
+        if (targetVol < 0) targetVol = 0;
+
+        lastTargetVolume = targetVol;
+        lastTargetVolumeTime = System.currentTimeMillis();
+
+        SafeVolumeBypasser.setStreamVolumeWithBypass(this, audioManager, stream, targetVol, 0);
+
+        // Keep MUSIC in sync for UI/widgets when adjusting FM.
+        if (stream != AudioManager.STREAM_MUSIC) {
+            try {
+                int musicMax = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+                int musicVol = (int) (((float) targetVol / Math.max(1, maxVol)) * musicMax);
+                SafeVolumeBypasser.setStreamVolumeWithBypass(this, audioManager, AudioManager.STREAM_MUSIC, musicVol, 0);
+            } catch (Exception ignored) {
+            }
+        }
+
+        // 🚀 [버그 수리 완료] 라디오가 켜져 있다면, 미디어텍 라디오 전용 통로(STREAM_FM = 10)의 하드웨어 볼륨도 똑같이 동기화!
+        try {
+            com.themoon.y1.managers.FmRadioManager fm = com.themoon.y1.managers.FmRadioManager.getInstance(this);
+            if (fm.isPowerUp) {
+                int streamFm = 10;
+                try {
+                    streamFm = (Integer) AudioManager.class.getDeclaredField("STREAM_FM").get(null);
+                } catch (Exception ignored) {
+                }
+                int fmMax = audioManager.getStreamMaxVolume(streamFm);
+                int fmVol = (int) (((float) targetVol / Math.max(1, maxVol)) * fmMax);
+                SafeVolumeBypasser.setStreamVolumeWithBypass(this, audioManager, streamFm, fmVol, 0);
+            }
+        } catch (Exception ignored) {
+        }
+
+        showDynamicVolumeOverlay(targetVol, maxVol);
+    }
+
     private void adjustVolume(boolean up) {
         int stream = AudioManager.STREAM_MUSIC;
         try {
@@ -11810,10 +11950,10 @@ public class MainActivity extends Activity {
             if (fm.isPowerUp) {
                 stream = fm.getFmStreamType();
             }
-        } catch (Exception e) {
+        } catch (Exception ignored) {
         }
 
-        int currentVol = audioManager.getStreamVolume(stream);
+        int currentVol = getEffectiveStreamVolume(stream);
         int maxVol = audioManager.getStreamMaxVolume(stream);
         // 🚀 [iPod 스타일] Volume Limit이 설정되어 있으면 그 값을 실질적인 최대치로 취급합니다.
         int effectiveMax = (volumeLimitMax >= 0) ? Math.min(volumeLimitMax, maxVol) : maxVol;
@@ -11823,36 +11963,8 @@ public class MainActivity extends Activity {
             currentVol--;
         if (currentVol > effectiveMax)
             currentVol = effectiveMax; // 한도가 방금 낮아졌다면 기존 볼륨도 즉시 깎아냅니다.
-        audioManager.setStreamVolume(stream, currentVol, 0);
 
-        // Keep MUSIC in sync for UI/widgets when adjusting FM.
-        if (stream != AudioManager.STREAM_MUSIC) {
-            try {
-                int musicMax = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-                int musicVol = (int) (((float) currentVol / Math.max(1, maxVol)) * musicMax);
-                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, musicVol, 0);
-            } catch (Exception e) {
-            }
-        }
-
-        // 🚀 [버그 수리 완료] 라디오가 켜져 있다면, 미디어텍 라디오 전용 통로(STREAM_FM = 10)의 하드웨어 볼륨도 똑같이 깎아서
-        // 동기화합니다!
-        try {
-            com.themoon.y1.managers.FmRadioManager fm = com.themoon.y1.managers.FmRadioManager.getInstance(this);
-            if (fm.isPowerUp) {
-                int streamFm = 10;
-                try {
-                    streamFm = (Integer) AudioManager.class.getDeclaredField("STREAM_FM").get(null);
-                } catch (Exception e) {
-                }
-                int fmMax = audioManager.getStreamMaxVolume(streamFm);
-                int fmVol = (int) (((float) currentVol / Math.max(1, maxVol)) * fmMax);
-                audioManager.setStreamVolume(streamFm, fmVol, 0);
-            }
-        } catch (Exception e) {
-        }
-
-        showDynamicVolumeOverlay();
+        setVolumeLevel(stream, currentVol, maxVol);
     }
 
     private void showDynamicVolumeOverlay() {
@@ -11862,11 +11974,14 @@ public class MainActivity extends Activity {
             if (fm.isPowerUp) {
                 stream = fm.getFmStreamType();
             }
-        } catch (Exception e) {
+        } catch (Exception ignored) {
         }
-        int currentVol = audioManager.getStreamVolume(stream);
+        int currentVol = getEffectiveStreamVolume(stream);
         int maxVol = audioManager.getStreamMaxVolume(stream);
+        showDynamicVolumeOverlay(currentVol, maxVol);
+    }
 
+    private void showDynamicVolumeOverlay(int currentVol, int maxVol) {
         // 🚀 [iPod 스타일] Now Playing 화면에서는 떠다니는 팝업 대신, Progress 바와 같은 모양의 인라인 게이지로 표시!
         if (currentScreenState == STATE_PLAYER && rowPlayerVolume != null) {
             rowPlayerProgress.setVisibility(View.GONE);
@@ -13637,7 +13752,7 @@ public class MainActivity extends Activity {
         applyAlbumTiltSetting();
 
         try {
-            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC,
+            SafeVolumeBypasser.setStreamVolumeWithBypass(this, audioManager, AudioManager.STREAM_MUSIC,
                     audioManager.getStreamVolume(AudioManager.STREAM_MUSIC), 0);
         } catch (Exception e) {
         }
@@ -13685,7 +13800,7 @@ public class MainActivity extends Activity {
                     // 지금 볼륨이 새 한도보다 크다면 즉시 깎아줍니다.
                     int cur = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
                     if (cur > level)
-                        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, level, 0);
+                        SafeVolumeBypasser.setStreamVolumeWithBypass(MainActivity.this, audioManager, AudioManager.STREAM_MUSIC, level, 0);
                     buildSettingsUI();
                 }
             });

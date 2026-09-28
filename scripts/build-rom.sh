@@ -457,6 +457,13 @@ chmod 666 /dev/fm 2>/dev/null
 chmod 666 /dev/FM50AF 2>/dev/null
 chown system:media /dev/fm 2>/dev/null
 
+# Bypass Android safe media volume limit (>80% headphone cap)
+setprop audio.safemedia.bypass true
+settings put global audio_safe_volume_state 2 2>/dev/null
+settings put system audio_safe_volume_state 2 2>/dev/null
+settings put global safe_media_volume_enabled 0 2>/dev/null
+settings put system safe_media_volume_enabled 0 2>/dev/null
+
 # Reset cached NVRAM volume table once so the patched libaudiocustparam.so takes effect on existing installs
 if [ ! -f /data/nvram/.audio_vol_lowgain_v1 ]; then
     rm -f /data/nvram/APCFG/APRDEB/Audio_Vol_custom
@@ -472,6 +479,20 @@ if [ -d "$MOUNT_SYS/bin" ]; then
     sudo rm -f "$MOUNT_SYS/bin/install-recovery.sh"
     sudo ln -sf /system/etc/install-recovery.sh "$MOUNT_SYS/bin/install-recovery.sh" 2>/dev/null || \
     sudo cp -f "$MOUNT_SYS/etc/install-recovery.sh" "$MOUNT_SYS/bin/install-recovery.sh"
+fi
+
+if [ -f "$MOUNT_SYS/build.prop" ]; then
+    if ! grep -q "^audio.safemedia.bypass" "$MOUNT_SYS/build.prop"; then
+        echo "==> Setting audio.safemedia.bypass=true in build.prop"
+        echo "audio.safemedia.bypass=true" | sudo tee -a "$MOUNT_SYS/build.prop" > /dev/null
+    fi
+fi
+
+if [ -f "$MOUNT_SYS/framework/framework-res.apk" ]; then
+    echo "==> Patching framework-res.apk to disable Safe Media Volume"
+    sudo python3 "$REPO_ROOT/tools/patch_safe_volume.py" "$MOUNT_SYS/framework/framework-res.apk"
+    sudo chmod 644 "$MOUNT_SYS/framework/framework-res.apk"
+    sudo chown root:root "$MOUNT_SYS/framework/framework-res.apk"
 fi
 
 # Y2 Solar base only: strip Solar before installing InniClassic. Type a|b skip this (Y1 path unchanged).
