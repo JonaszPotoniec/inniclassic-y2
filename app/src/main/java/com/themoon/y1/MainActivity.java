@@ -4372,10 +4372,11 @@ public class MainActivity extends Activity {
         tileLp.setMargins((int) (4 * d), 0, (int) (4 * d), 0);
         tile.setLayoutParams(tileLp);
 
-        final ImageView ivCover = new ImageView(this);
+        final com.themoon.y1.views.SquareImageView ivCover = new com.themoon.y1.views.SquareImageView(this);
         ivCover.setScaleType(ImageView.ScaleType.CENTER_CROP);
         ivCover.setImageResource(R.drawable.default_album);
-        LinearLayout.LayoutParams coverLp = new LinearLayout.LayoutParams(0, 0, 1.0f);
+        LinearLayout.LayoutParams coverLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         ivCover.setLayoutParams(coverLp);
         tile.addView(ivCover);
 
@@ -4407,24 +4408,64 @@ public class MainActivity extends Activity {
             public void run() {
                 Bitmap art = null;
                 try {
-                    MediaMetadataRetriever mmr = new MediaMetadataRetriever();
-                    java.io.FileInputStream fis = new java.io.FileInputStream(file);
-                    mmr.setDataSource(fis.getFD());
-                    byte[] pic = mmr.getEmbeddedPicture();
-                    fis.close();
-                    mmr.release();
-                    if (pic != null && pic.length > 0) {
-                        BitmapFactory.Options opts = new BitmapFactory.Options();
-                        opts.inSampleSize = 2;
-                        art = BitmapFactory.decodeByteArray(pic, 0, pic.length, opts);
+                    String path = file.getAbsolutePath();
+                    String lower = path.toLowerCase(Locale.US);
+                    if (lower.endsWith(".m4a") || lower.endsWith(".alac")) {
+                        Object[] tags = com.themoon.y1.managers.AudioPlayerManager.getInstance()
+                                .extractAlacMetadata(file);
+                        if (tags != null && tags.length > 5 && tags[5] != null) {
+                            byte[] pic = (byte[]) tags[5];
+                            BitmapFactory.Options opts = new BitmapFactory.Options();
+                            opts.inSampleSize = 2;
+                            art = BitmapFactory.decodeByteArray(pic, 0, pic.length, opts);
+                        }
+                    } else {
+                        MediaMetadataRetriever mmr = new MediaMetadataRetriever();
+                        java.io.FileInputStream fis = new java.io.FileInputStream(file);
+                        try {
+                            mmr.setDataSource(fis.getFD());
+                            byte[] pic = mmr.getEmbeddedPicture();
+                            if (pic != null && pic.length > 0) {
+                                BitmapFactory.Options opts = new BitmapFactory.Options();
+                                opts.inSampleSize = 2;
+                                art = BitmapFactory.decodeByteArray(pic, 0, pic.length, opts);
+                            }
+                        } finally {
+                            try { fis.close(); } catch (Exception ignored) {}
+                            try { mmr.release(); } catch (Exception ignored) {}
+                        }
                     }
                 } catch (Exception e) {
                 }
                 if (art == null) {
                     try {
+                        String safeFileName = file.getName();
+                        int dot = safeFileName.lastIndexOf(".");
+                        if (dot > 0) safeFileName = safeFileName.substring(0, dot);
+                        File manualCoverFile = new File(StoragePaths.getCoversDir(), safeFileName + ".jpg");
+                        if (manualCoverFile.exists()) {
+                            BitmapFactory.Options opts = new BitmapFactory.Options();
+                            opts.inSampleSize = 2;
+                            art = BitmapFactory.decodeFile(manualCoverFile.getAbsolutePath(), opts);
+                        }
+                    } catch (Exception e) {
+                    }
+                }
+                if (art == null) {
+                    try {
                         File folderCover = findFolderCover(file.getParentFile());
-                        if (folderCover != null)
-                            art = BitmapFactory.decodeFile(folderCover.getAbsolutePath());
+                        if (folderCover != null) {
+                            BitmapFactory.Options boundsOpts = new BitmapFactory.Options();
+                            boundsOpts.inJustDecodeBounds = true;
+                            BitmapFactory.decodeFile(folderCover.getAbsolutePath(), boundsOpts);
+                            int scale = 1;
+                            while (boundsOpts.outWidth / scale > 500 || boundsOpts.outHeight / scale > 500) {
+                                scale *= 2;
+                            }
+                            BitmapFactory.Options opts = new BitmapFactory.Options();
+                            opts.inSampleSize = scale;
+                            art = BitmapFactory.decodeFile(folderCover.getAbsolutePath(), opts);
+                        }
                     } catch (Exception e) {
                     }
                 }
