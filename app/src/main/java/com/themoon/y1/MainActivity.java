@@ -14076,11 +14076,6 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
         }
 
-        // 🚀 이미 최신 버전의 기본 언어팩이 기기에 깔려있다면 중복 복사를 막아 속도를 높입니다.
-        if (lastInstalledVersion >= currentAppVersion)
-            return;
-
-        // 💡 주의: 아래 경로는 현재 아티스트님의 LanguageManager가 파일을 읽어오는 폴더 경로로 맞춰주세요!
         File targetDir = StoragePaths.getLanguagesDir();
         if (!targetDir.exists())
             targetDir.mkdirs();
@@ -14093,17 +14088,19 @@ public class MainActivity extends Activity {
             if (files != null) {
                 for (String filename : files) {
                     if (filename.toLowerCase().endsWith(".json")) {
-                        java.io.InputStream is = assetManager.open("languages/" + filename);
                         File outFile = new File(targetDir, filename);
-                        FileOutputStream fout = new FileOutputStream(outFile);
+                        if (!outFile.exists() || lastInstalledVersion < currentAppVersion) {
+                            java.io.InputStream is = assetManager.open("languages/" + filename);
+                            FileOutputStream fout = new FileOutputStream(outFile);
 
-                        byte[] buffer = new byte[8192];
-                        int count;
-                        while ((count = is.read(buffer)) != -1) {
-                            fout.write(buffer, 0, count);
+                            byte[] buffer = new byte[8192];
+                            int count;
+                            while ((count = is.read(buffer)) != -1) {
+                                fout.write(buffer, 0, count);
+                            }
+                            fout.close();
+                            is.close();
                         }
-                        fout.close();
-                        is.close();
                     }
                 }
             }
