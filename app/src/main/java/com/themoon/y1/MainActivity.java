@@ -342,6 +342,7 @@ public class MainActivity extends Activity {
     private static final int STATE_MUSIC_QUIZ = 11;
     private static final int STATE_VIDEOS = 12;
     private static final int STATE_VIDEO_PLAYER = 13;
+    private static final int STATE_GAMES = 14;
     // 💡 미디어 라이브러리 브라우저 상태 관리 변수들
     private static final int BROWSER_ROOT = 0;
     private static final int BROWSER_FOLDER = 1;
@@ -458,6 +459,11 @@ public class MainActivity extends Activity {
     // 🚀 [신규 추가] Videos 목록 화면 + 전체화면 재생 화면
     private View layoutVideosMode, layoutVideoPlayerMode;
     private LinearLayout containerVideoItems;
+    // 🚀 [신규 추가] Games 목록 화면 (iPod Games)
+    private View layoutGamesMode;
+    private LinearLayout containerGameItems;
+    private List<com.themoon.y1.games.GameItem> gameLibrary = new ArrayList<>();
+    private volatile boolean isScanningGames = false;
     private android.view.SurfaceView surfaceVideo;
     private TextView tvVideoTitle, tvVideoTimeCurrent, tvVideoTimeTotal, tvVideoModeHint;
     private ProgressBar videoProgressBar;
@@ -1953,6 +1959,8 @@ public class MainActivity extends Activity {
         // 🚀 [신규 추가] Videos 목록 + 전체화면 재생 화면 뷰 연결
         layoutVideosMode = findViewById(R.id.layout_videos_mode);
         containerVideoItems = findViewById(R.id.container_video_items);
+        layoutGamesMode = findViewById(R.id.layout_games_mode);
+        containerGameItems = findViewById(R.id.container_game_items);
         layoutVideoPlayerMode = findViewById(R.id.layout_video_player_mode);
         surfaceVideo = findViewById(R.id.surface_video);
         tvVideoTitle = findViewById(R.id.tv_video_title);
@@ -4181,6 +4189,8 @@ public class MainActivity extends Activity {
             title = t("Music Quiz");
         } else if (currentScreenState == STATE_VIDEOS) {
             title = t("Videos");
+        } else if (currentScreenState == STATE_GAMES) {
+            title = t("Games");
         } else if (currentScreenState == STATE_MENU) {
             // 🚀 [iPod 스타일] 실제 아이팟처럼 메인 메뉴 좌상단에 "iPod"라고 표시합니다
             title = "iPod";
@@ -4205,7 +4215,8 @@ public class MainActivity extends Activity {
                 }
             }
         } else if (state == STATE_BLUETOOTH || state == STATE_WIFI || state == STATE_BRIGHTNESS
-                || state == STATE_STORAGE || state == STATE_WEBSERVER || state == STATE_MUSIC_QUIZ) {
+                || state == STATE_STORAGE || state == STATE_WEBSERVER || state == STATE_MUSIC_QUIZ
+                || state == STATE_GAMES) {
             if (currentScreenState == STATE_MENU || currentScreenState == STATE_BROWSER
                     || currentScreenState == STATE_SETTINGS) {
                 backTargetForUtility = currentScreenState;
@@ -4229,6 +4240,7 @@ public class MainActivity extends Activity {
         layoutWebServerMode.setVisibility(state == STATE_WEBSERVER ? View.VISIBLE : View.GONE);
         layoutMusicQuizMode.setVisibility(state == STATE_MUSIC_QUIZ ? View.VISIBLE : View.GONE);
         layoutVideosMode.setVisibility(state == STATE_VIDEOS ? View.VISIBLE : View.GONE);
+        if (layoutGamesMode != null) layoutGamesMode.setVisibility(state == STATE_GAMES ? View.VISIBLE : View.GONE);
         layoutVideoPlayerMode.setVisibility(state == STATE_VIDEO_PLAYER ? View.VISIBLE : View.GONE);
         if (state != STATE_VIDEO_PLAYER) {
             // 🚀 다른 화면으로 나가면 재생을 멈추고 진행률 갱신 루프도 정지시켜 배터리/자원을 아낍니다.
@@ -7734,6 +7746,260 @@ public class MainActivity extends Activity {
         });
     }
 
+    // 🚀 [iPod Games] Games 목록 화면 구축
+    private void buildGameListUI() {
+        buildGameListUI(false);
+    }
+
+    private void buildGameListUI(boolean forceRescan) {
+        if (containerGameItems == null) return;
+        TextView tvHeader = findViewById(R.id.tv_games_header);
+        if (tvHeader != null) {
+            tvHeader.setText(t("Games").toUpperCase());
+        }
+
+        if (!forceRescan && gameLibrary != null && !gameLibrary.isEmpty()) {
+            renderGameList(gameLibrary);
+            return;
+        }
+
+        if (isScanningGames) {
+            return;
+        }
+        isScanningGames = true;
+
+        containerGameItems.removeAllViews();
+        float d = getResources().getDisplayMetrics().density;
+
+        LinearLayout loadingLayout = new LinearLayout(this);
+        loadingLayout.setOrientation(LinearLayout.VERTICAL);
+        loadingLayout.setGravity(Gravity.CENTER);
+        loadingLayout.setPadding(0, (int) (50 * d), 0, (int) (40 * d));
+        loadingLayout.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        ProgressBar pb = new ProgressBar(this);
+        LinearLayout.LayoutParams pbLp = new LinearLayout.LayoutParams(
+                (int) (36 * d), (int) (36 * d));
+        pbLp.gravity = Gravity.CENTER_HORIZONTAL;
+        pb.setLayoutParams(pbLp);
+        loadingLayout.addView(pb);
+
+        final TextView tvStatus = new TextView(this);
+        tvStatus.setText(t("Indexing games..."));
+        tvStatus.setTextSize(16f);
+        tvStatus.setTextColor(ThemeManager.getTextColorPrimary());
+        tvStatus.setTypeface(ThemeManager.getCustomFontBold());
+        tvStatus.setGravity(Gravity.CENTER);
+        tvStatus.setPadding(0, (int) (14 * d), 0, 0);
+        loadingLayout.addView(tvStatus);
+
+        containerGameItems.addView(loadingLayout);
+
+        new Thread(() -> {
+            final List<com.themoon.y1.games.GameItem> items =
+                    com.themoon.y1.games.GameScanner.scanGames(status -> {
+                        runOnUiThread(() -> {
+                            if (currentScreenState == STATE_GAMES && containerGameItems != null) {
+                                String localizedStatus = status;
+                                if (status.startsWith("Extracting ")) {
+                                    String name = status.substring("Extracting ".length());
+                                    if (name.endsWith("...")) {
+                                        name = name.substring(0, name.length() - 3);
+                                    }
+                                    localizedStatus = String.format(t("Extracting %s..."), name);
+                                }
+                                tvStatus.setText(localizedStatus);
+                            }
+                        });
+                    });
+
+            runOnUiThread(() -> {
+                isScanningGames = false;
+                gameLibrary = items;
+                if (currentScreenState == STATE_GAMES && containerGameItems != null) {
+                    renderGameList(gameLibrary);
+                }
+            });
+        }, "GameScannerThread").start();
+    }
+
+    private void renderGameList(final List<com.themoon.y1.games.GameItem> games) {
+        if (containerGameItems == null) return;
+        containerGameItems.removeAllViews();
+        float d = getResources().getDisplayMetrics().density;
+
+        if (games == null || games.isEmpty()) {
+            TextView tvEmpty = new TextView(this);
+            tvEmpty.setText(t("No iPod games found.\nCopy decrypted game folders or .ipg files into the \"Games\" folder on your SD card."));
+            tvEmpty.setTextSize(16f);
+            tvEmpty.setTextColor(ThemeManager.getTextColorSecondary());
+            tvEmpty.setGravity(Gravity.CENTER);
+            tvEmpty.setPadding(0, (int) (40 * d), 0, (int) (20 * d));
+            containerGameItems.addView(tvEmpty);
+
+            View rescanRow = createGameRescanRow();
+            containerGameItems.addView(rescanRow);
+
+            containerGameItems.post(() -> {
+                if (containerGameItems.getChildCount() > 1) {
+                    containerGameItems.getChildAt(1).requestFocus();
+                }
+            });
+            return;
+        }
+
+        for (int i = 0; i < games.size(); i++) {
+            final com.themoon.y1.games.GameItem game = games.get(i);
+            View row = createGameRowView(game);
+            row.setOnClickListener(v -> {
+                clickFeedback();
+                launchGame(game);
+            });
+            containerGameItems.addView(row);
+        }
+
+        View rescanRow = createGameRescanRow();
+        containerGameItems.addView(rescanRow);
+
+        containerGameItems.post(() -> {
+            if (containerGameItems.getChildCount() > 0) {
+                containerGameItems.getChildAt(0).requestFocus();
+            }
+        });
+    }
+
+    private View createGameRescanRow() {
+        float d = getResources().getDisplayMetrics().density;
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setFocusable(true);
+        row.setClickable(true);
+        row.setSoundEffectsEnabled(false);
+        row.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
+        row.setPadding((int) (12 * d), (int) (10 * d), (int) (12 * d), (int) (10 * d));
+        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        rowLp.setMargins(0, (int) (10 * d), 0, (int) (10 * d));
+        row.setLayoutParams(rowLp);
+
+        TextView tv = new TextView(this);
+        tv.setText("↻ " + t("Rescan Games"));
+        tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, ThemeManager.getListTextSize() * d);
+        tv.setTypeface(ThemeManager.getCustomFontBold());
+        tv.setSingleLine(true);
+        tv.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        tv.setLayoutParams(titleLp);
+        final int normalColor = ThemeManager.getTextColorSecondary();
+        tv.setTextColor(normalColor);
+        row.addView(tv);
+
+        row.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) {
+                row.setBackground(createFocusedButtonBackground());
+                tv.setTextColor(ThemeManager.getListButtonFocusedTextColor());
+            } else {
+                row.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
+                tv.setTextColor(normalColor);
+            }
+        });
+
+        row.setOnClickListener(v -> {
+            clickFeedback();
+            buildGameListUI(true);
+        });
+
+        return row;
+    }
+
+    private void launchGame(com.themoon.y1.games.GameItem game) {
+        if (game == null || game.getBundleDir() == null) return;
+        try {
+            Intent intent = new Intent(this, com.themoon.y1.games.GamePlayerActivity.class);
+            intent.putExtra("BUNDLE_PATH", game.getBundleDir().getAbsolutePath());
+            intent.putExtra("GAME_TITLE", game.getTitle());
+            startActivity(intent);
+        } catch (Exception e) {
+            android.util.Log.e("MainActivity", "Failed to launch game", e);
+        }
+    }
+
+    private View createGameRowView(final com.themoon.y1.games.GameItem game) {
+        float d = getResources().getDisplayMetrics().density;
+        int coverSize = (int) (52 * d);
+
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setFocusable(true);
+        row.setClickable(true);
+        row.setSoundEffectsEnabled(false);
+        row.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
+        row.setPadding((int) (8 * d), (int) (6 * d), (int) (10 * d), (int) (6 * d));
+        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        rowLp.setMargins(0, ThemeManager.isClassicTheme() ? 0 : 2, 0, ThemeManager.isClassicTheme() ? 0 : 2);
+        row.setLayoutParams(rowLp);
+
+        final ImageView ivThumb = new ImageView(this);
+        ivThumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        LinearLayout.LayoutParams thumbLp = new LinearLayout.LayoutParams(coverSize, coverSize);
+        thumbLp.rightMargin = (int) (10 * d);
+        ivThumb.setLayoutParams(thumbLp);
+        ivThumb.setImageResource(R.drawable.cover);
+        if (game.getIconFile() != null && game.getIconFile().exists()) {
+            try {
+                Bitmap bmp = android.graphics.BitmapFactory.decodeFile(game.getIconFile().getAbsolutePath());
+                if (bmp != null) ivThumb.setImageBitmap(bmp);
+            } catch (Exception ignored) {}
+        }
+        row.addView(ivThumb);
+
+        final TextView tvTitle = new TextView(this);
+        tvTitle.setText(game.getTitle());
+        tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, ThemeManager.getListTextSize() * d);
+        tvTitle.setTypeface(ThemeManager.getCustomFontBold());
+        tvTitle.setSingleLine(true);
+        tvTitle.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
+        tvTitle.setMarqueeRepeatLimit(-1);
+        tvTitle.setHorizontalFadingEdgeEnabled(true);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        tvTitle.setLayoutParams(titleLp);
+        row.addView(tvTitle);
+
+        final TextView tvArrow = new TextView(this);
+        tvArrow.setText("〉");
+        tvArrow.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 20f * d);
+        tvArrow.setTextColor(0xFFFFFFFF);
+        tvArrow.setVisibility(View.GONE);
+        LinearLayout.LayoutParams arrowLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        arrowLp.leftMargin = (int) (10 * d);
+        tvArrow.setLayoutParams(arrowLp);
+        row.addView(tvArrow);
+
+        final int normalColor = ThemeManager.getTextColorPrimary();
+        row.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) {
+                row.setBackground(createFocusedButtonBackground());
+                tvTitle.setTextColor(ThemeManager.getListButtonFocusedTextColor());
+                tvTitle.setSelected(true);
+                tvArrow.setVisibility(View.VISIBLE);
+                showFastScrollLetter(tvTitle.getText().toString());
+            } else {
+                row.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
+                tvTitle.setTextColor(normalColor);
+                tvTitle.setSelected(false);
+                tvArrow.setVisibility(View.GONE);
+            }
+        });
+
+        return row;
+    }
+
     // 🚀 [비디오 썸네일 캐시] 프레임 추출은 MediaMetadataRetriever로 하는데 이게 느릴 수 있어서(특히 이
     // 기기), Albums ANR 버그에서 배운 대로 절대 메인 스레드에서 동기로 하지 않고, 백그라운드 스레드 +
     // 메모리 캐시로 처리합니다.
@@ -11101,6 +11367,11 @@ public class MainActivity extends Activity {
                             changeScreen(STATE_VIDEOS);
                             buildVideoListUI();
                             break;
+                        case "OPEN_GAMES":
+                            clickFeedback();
+                            changeScreen(STATE_GAMES);
+                            buildGameListUI();
+                            break;
                         // 🚀🚀🚀 [여기서부터 새로 추가된 다이렉트 숏컷 액션들!] 🚀🚀🚀
                         case "OPEN_ROOT_FOLDER":
                             currentBrowserMode = BROWSER_FOLDER;
@@ -12068,6 +12339,76 @@ public class MainActivity extends Activity {
                 return true;
             }
             return true; // 🚨 이 화면에서는 다른 어떤 키도 볼륨 조절 등 엉뚱한 동작으로 새지 않도록 완전 차단!
+        }
+
+        // 🚀 [신규 추가] Games 화면 전용 키 핸들러 (휠 위/아래로 게임 목록 이동 + 확인 + 뒤로가기)
+        if (currentScreenState == STATE_GAMES) {
+            if (keyCode == 21) { // 휠 위로 (CCW)
+                View c = getCurrentFocus();
+                if (c != null && containerGameItems != null && c.getParent() == containerGameItems) {
+                    int idx = containerGameItems.indexOfChild(c);
+                    boolean moved = false;
+                    for (int i = idx - 1; i >= 0; i--) {
+                        View n = containerGameItems.getChildAt(i);
+                        if (n != null && n.getVisibility() == View.VISIBLE && n.isFocusable()) {
+                            n.requestFocus();
+                            clickFeedback();
+                            moved = true;
+                            break;
+                        }
+                    }
+                    if (!moved && isLoopScrollOn) {
+                        for (int i = containerGameItems.getChildCount() - 1; i > idx; i--) {
+                            View n = containerGameItems.getChildAt(i);
+                            if (n != null && n.getVisibility() == View.VISIBLE && n.isFocusable()) {
+                                n.requestFocus();
+                                clickFeedback();
+                                break;
+                            }
+                        }
+                    }
+                }
+                return true;
+            }
+            if (keyCode == 22) { // 휠 아래로 (CW)
+                View c = getCurrentFocus();
+                if (c != null && containerGameItems != null && c.getParent() == containerGameItems) {
+                    int idx = containerGameItems.indexOfChild(c);
+                    boolean moved = false;
+                    for (int i = idx + 1; i < containerGameItems.getChildCount(); i++) {
+                        View n = containerGameItems.getChildAt(i);
+                        if (n != null && n.getVisibility() == View.VISIBLE && n.isFocusable()) {
+                            n.requestFocus();
+                            clickFeedback();
+                            moved = true;
+                            break;
+                        }
+                    }
+                    if (!moved && isLoopScrollOn) {
+                        for (int i = 0; i < idx; i++) {
+                            View n = containerGameItems.getChildAt(i);
+                            if (n != null && n.getVisibility() == View.VISIBLE && n.isFocusable()) {
+                                n.requestFocus();
+                                clickFeedback();
+                                break;
+                            }
+                        }
+                    }
+                }
+                return true;
+            }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+                View c = getCurrentFocus();
+                if (c != null)
+                    c.performClick();
+                return true;
+            }
+            if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == 19) {
+                changeScreen(backTargetForUtility != 0 ? backTargetForUtility : STATE_MENU);
+                clickFeedback();
+                return true;
+            }
+            return true;
         }
 
         // [🟢 onKeyDown 함수 시작 부분에 최우선적으로 추가!]
@@ -13447,10 +13788,23 @@ public class MainActivity extends Activity {
         return super.onKeyLongPress(keyCode, event);
     }
 
+    @Override
+    protected void onPause() {
+        super.onPause();
+        backlightHandler.removeCallbacks(backlightTimeoutRunnable);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        resetBacklightTimer();
+    }
+
     // ⭕ [아래 코드로 덮어쓰기]
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        backlightHandler.removeCallbacks(backlightTimeoutRunnable);
         if (webServer != null) webServer.stopServer();
         clockHandler.removeCallbacks(clockTask);
         progressHandler.removeCallbacks(updateProgressTask);
@@ -14293,12 +14647,26 @@ public class MainActivity extends Activity {
             e.printStackTrace();
         }
 
-        // 🚀 [핵심 방어막] 이미 현재 버전과 같거나 더 높은 버전의 테마가 깔려있다면 건너뜁니다!
-        // 만약 앱 버전이 올라갔다면(예: 1 -> 2) 이 조건문을 통과하여 테마를 새로 덮어씌웁니다.
-        if (lastInstalledVersion >= currentAppVersion)
-            return;
-
         File targetDir = StoragePaths.getThemesDir();
+        if (lastInstalledVersion >= currentAppVersion) {
+            File ipodConfig = new File(targetDir, "iPod Classic/config.json");
+            boolean needsGamesUpdate = true;
+            if (ipodConfig.exists() && ipodConfig.isFile()) {
+                try {
+                    java.io.FileInputStream fis = new java.io.FileInputStream(ipodConfig);
+                    byte[] data = new byte[(int) ipodConfig.length()];
+                    fis.read(data);
+                    fis.close();
+                    String content = new String(data, "UTF-8");
+                    if (content.contains("OPEN_GAMES")) {
+                        needsGamesUpdate = false;
+                    }
+                } catch (Exception ignored) {}
+            }
+            if (!needsGamesUpdate)
+                return;
+        }
+
         if (!targetDir.exists())
             targetDir.mkdirs();
 

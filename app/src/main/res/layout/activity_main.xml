@@ -507,6 +507,23 @@
         </ScrollView>
     </LinearLayout>
 
+    <LinearLayout
+        android:id="@+id/layout_games_mode"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:paddingTop="36dp"
+        android:paddingBottom="10dp"
+        android:paddingLeft="10dp"
+        android:paddingRight="10dp"
+        android:background="#66000000"
+        android:visibility="gone">
+        <TextView android:id="@+id/tv_games_header" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="GAMES" android:textColor="#BBFFFFFF" android:textSize="16sp" android:textStyle="bold" android:singleLine="true" android:layout_marginBottom="6dp"/>
+        <ScrollView android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
+            <LinearLayout android:id="@+id/container_game_items" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" />
+        </ScrollView>
+    </LinearLayout>
+
     <!-- 🚀 [신규 추가] 비디오 재생 화면: ExoPlayer가 그리는 SurfaceView 위에 최소한의 정보만 오버레이 -->
     <FrameLayout
         android:id="@+id/layout_video_player_mode"

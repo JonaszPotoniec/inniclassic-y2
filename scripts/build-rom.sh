@@ -504,10 +504,23 @@ if [ "$TYPE" = "y2" ]; then
     sudo chown root:root "$MOUNT_SYS/lib/libaudiocustparam.so"
 fi
 
-sudo mkdir -p "$MOUNT_SYS/app" "$MOUNT_SYS/usr/keylayout"
+sudo mkdir -p "$MOUNT_SYS/app" "$MOUNT_SYS/lib" "$MOUNT_SYS/usr/keylayout"
 sudo cp "$LAUNCHER_APK" "$MOUNT_SYS/app/com.themoon.y1.apk"
 sudo chmod 644 "$MOUNT_SYS/app/com.themoon.y1.apk"
 sudo chown root:root "$MOUNT_SYS/app/com.themoon.y1.apk"
+
+# Install native libraries bundled in InniClassic to /system/lib (required for /system/app on KitKat)
+if unzip -l "$LAUNCHER_APK" "lib/armeabi-v7a/libfliwheel_android.so" >/dev/null 2>&1; then
+    echo "==> Extracting libfliwheel_android.so from launcher APK to /system/lib"
+    sudo unzip -p "$LAUNCHER_APK" "lib/armeabi-v7a/libfliwheel_android.so" | sudo tee "$MOUNT_SYS/lib/libfliwheel_android.so" > /dev/null
+    sudo chmod 644 "$MOUNT_SYS/lib/libfliwheel_android.so"
+    sudo chown root:root "$MOUNT_SYS/lib/libfliwheel_android.so"
+elif [ -f "$REPO_ROOT/app/src/main/jniLibs/armeabi-v7a/libfliwheel_android.so" ]; then
+    echo "==> Copying libfliwheel_android.so from repository to /system/lib"
+    sudo cp -f "$REPO_ROOT/app/src/main/jniLibs/armeabi-v7a/libfliwheel_android.so" "$MOUNT_SYS/lib/libfliwheel_android.so"
+    sudo chmod 644 "$MOUNT_SYS/lib/libfliwheel_android.so"
+    sudo chown root:root "$MOUNT_SYS/lib/libfliwheel_android.so"
+fi
 
 echo "==> Patching userdata partition"
 sudo rm -rf "$MOUNT_USER/org.rockbox"

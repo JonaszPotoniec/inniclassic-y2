@@ -16,8 +16,8 @@ def lastFmApiKey = localProps.getProperty("lastfm.api.key", "")
 def lastFmApiSecret = localProps.getProperty("lastfm.api.secret", "")
 
 def todayDate = new java.text.SimpleDateFormat("yyyyMMdd").format(new Date())
-def defaultVersionCode = todayDate.toInteger()
-def defaultVersionName = todayDate
+def defaultVersionCode = (todayDate + "18").toInteger()
+def defaultVersionName = todayDate + "-v18"
 
 def appVersionCode = project.hasProperty('appVersionCode') ? project.property('appVersionCode').toInteger() : defaultVersionCode
 def appVersionName = project.hasProperty('appVersionName') ? project.property('appVersionName') : defaultVersionName

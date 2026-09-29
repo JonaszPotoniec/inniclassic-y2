@@ -141,16 +141,19 @@ public class ThemeManager {
         // 🚀 [신규 추가] Videos 다이렉트 숏컷
         defaultTheme.menuElements.add(new MenuElement("btn_videos", "button", "main_scroll_list", "", 0, 8, -1, 48, "Videos", "Videos", "〉", "", "", "", "", "cover.png", "OPEN_VIDEOS", "top|left", -1, 3, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
 
-// 🚀 [신규 추가] Playlists 다이렉트 숏컷 (포커스 인덱스: 2번)
-        defaultTheme.menuElements.add(new MenuElement("btn_playlist", "button", "main_scroll_list", "", 0, 8, -1, 48, "Playlists", "Playlists", "〉", "", "", "", "", "playlist.png", "OPEN_PLAYLISTS", "top|left", -1, 4, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
+        // 🚀 [신규 추가] Games 다이렉트 숏컷 (iPod Games)
+        defaultTheme.menuElements.add(new MenuElement("btn_games", "button", "main_scroll_list", "", 0, 8, -1, 48, "Games", "Games", "〉", "", "", "", "", "cover.png", "OPEN_GAMES", "top|left", -1, 4, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
 
-        defaultTheme.menuElements.add(new MenuElement("btn_radio", "button", "main_scroll_list", "", 0, 8, -1, 48, "Radio", "Radio", "〉", "", "", "", "", "radio_circle.png", "OPEN_RADIO", "top|left", -1, 5, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
-        defaultTheme.menuElements.add(new MenuElement("btn_audiobook", "button", "main_scroll_list", "", 0, 8, -1, 48, "Audiobooks", "Audiobooks", "〉", "", "", "", "", "book.png", "OPEN_AUDIOBOOKS", "top|left", -1, 6, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
-        defaultTheme.menuElements.add(new MenuElement("btn_podcast", "button", "main_scroll_list", "", 0, 8, -1, 48, "Podcasts", "Podcasts", "〉", "", "", "", "", "icon_podcast.png", "OPEN_PODCASTS", "top|left", -1, 7, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
-        defaultTheme.menuElements.add(new MenuElement("btn_bt", "button", "main_scroll_list", "", 0, 8, -1, 48, "Bluetooth", "Bluetooth", "〉", "", "", "", "", "bluetooth_circle.png", "OPEN_BLUETOOTH", "top|left", -1, 8, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
-        defaultTheme.menuElements.add(new MenuElement("btn_wifi", "button", "main_scroll_list", "", 0, 8, -1, 48, "Wi-Fi", "Wi-Fi", "〉", "", "", "", "", "wifi_circle.png", "OPEN_WIFI", "top|left", -1, 9, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
-        defaultTheme.menuElements.add(new MenuElement("btn_set", "button", "main_scroll_list", "", 0, 8, -1, 48, "Settings", "Settings", "〉", "", "", "", "", "setting_circle.png", "OPEN_SETTINGS", "top|left", -1, 10, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
-        defaultTheme.menuElements.add(new MenuElement("btn_web", "button", "main_scroll_list", "", 0, 8, -1, 48, "PC Upload", "PC Upload", "〉", "", "", "", "", "file_sync.png", "OPEN_WEBSERVER", "top|left", -1, 11, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
+// 🚀 [신규 추가] Playlists 다이렉트 숏컷 (포커스 인덱스: 5번)
+        defaultTheme.menuElements.add(new MenuElement("btn_playlist", "button", "main_scroll_list", "", 0, 8, -1, 48, "Playlists", "Playlists", "〉", "", "", "", "", "playlist.png", "OPEN_PLAYLISTS", "top|left", -1, 5, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
+
+        defaultTheme.menuElements.add(new MenuElement("btn_radio", "button", "main_scroll_list", "", 0, 8, -1, 48, "Radio", "Radio", "〉", "", "", "", "", "radio_circle.png", "OPEN_RADIO", "top|left", -1, 6, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
+        defaultTheme.menuElements.add(new MenuElement("btn_audiobook", "button", "main_scroll_list", "", 0, 8, -1, 48, "Audiobooks", "Audiobooks", "〉", "", "", "", "", "book.png", "OPEN_AUDIOBOOKS", "top|left", -1, 7, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
+        defaultTheme.menuElements.add(new MenuElement("btn_podcast", "button", "main_scroll_list", "", 0, 8, -1, 48, "Podcasts", "Podcasts", "〉", "", "", "", "", "icon_podcast.png", "OPEN_PODCASTS", "top|left", -1, 8, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
+        defaultTheme.menuElements.add(new MenuElement("btn_bt", "button", "main_scroll_list", "", 0, 8, -1, 48, "Bluetooth", "Bluetooth", "〉", "", "", "", "", "bluetooth_circle.png", "OPEN_BLUETOOTH", "top|left", -1, 9, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
+        defaultTheme.menuElements.add(new MenuElement("btn_wifi", "button", "main_scroll_list", "", 0, 8, -1, 48, "Wi-Fi", "Wi-Fi", "〉", "", "", "", "", "wifi_circle.png", "OPEN_WIFI", "top|left", -1, 10, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
+        defaultTheme.menuElements.add(new MenuElement("btn_set", "button", "main_scroll_list", "", 0, 8, -1, 48, "Settings", "Settings", "〉", "", "", "", "", "setting_circle.png", "OPEN_SETTINGS", "top|left", -1, 11, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
+        defaultTheme.menuElements.add(new MenuElement("btn_web", "button", "main_scroll_list", "", 0, 8, -1, 48, "PC Upload", "PC Upload", "〉", "", "", "", "", "file_sync.png", "OPEN_WEBSERVER", "top|left", -1, 12, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f));
         // 3. 우측 포커스 연동형 다이내믹 위젯 세트
         defaultTheme.menuElements.add(new MenuElement("widget_clock", "widget_clock", "", "btn_now", 284, 18, 150, 81, "", "", "", "", "", "", "", "", "NONE", "top|left", 0, -1, 16, -1, "bottom", "left", "", 8, 0, 0, 1.0f));
         defaultTheme.menuElements.add(new MenuElement("widget_album", "widget_album", "", "btn_now", 254, 13, 211, 212, "", "", "", "", "", "", "", "", "NONE", "bottom|left", -1, -1, 16, 12, "bottom", "center", "", 0, 0, 0, 1.0f));
@@ -304,11 +307,62 @@ public class ThemeManager {
                                     ));
                                 }
                             }
+                            ensureGamesMenuItem(theme);
                             availableThemes.add(theme);
                         } catch (Exception e) { e.printStackTrace(); }
                     }
                 }
             }
+        }
+    }
+
+    public static void ensureGamesMenuItem(ThemeData theme) {
+        if (theme == null || theme.menuElements == null || theme.menuElements.isEmpty()) return;
+        for (MenuElement el : theme.menuElements) {
+            if ("OPEN_GAMES".equals(el.action) || "btn_games".equals(el.id)) {
+                return;
+            }
+        }
+
+        MenuElement refBtn = null;
+        int insertIndex = -1;
+        for (int i = 0; i < theme.menuElements.size(); i++) {
+            MenuElement el = theme.menuElements.get(i);
+            if ("button".equals(el.type)) {
+                if ("btn_videos".equals(el.id) || "OPEN_VIDEOS".equals(el.action)) {
+                    refBtn = el;
+                    insertIndex = i + 1;
+                    break;
+                } else if ("btn_musicquiz".equals(el.id) || "OPEN_MUSIC_QUIZ".equals(el.action)) {
+                    refBtn = el;
+                    insertIndex = i + 1;
+                } else if (refBtn == null && ("btn_music".equals(el.id) || "OPEN_BROWSER".equals(el.action)
+                        || "btn_now".equals(el.id) || "OPEN_PLAYER".equals(el.action))) {
+                    refBtn = el;
+                    insertIndex = i + 1;
+                }
+            }
+        }
+
+        if (refBtn != null && insertIndex >= 0) {
+            int newFocusIndex = refBtn.focusIndex + 1;
+            for (MenuElement el : theme.menuElements) {
+                if ("button".equals(el.type) && el.focusIndex >= newFocusIndex) {
+                    el.focusIndex++;
+                }
+            }
+            MenuElement gamesBtn = new MenuElement(
+                    "btn_games", "button", refBtn.parentId, "",
+                    refBtn.x, refBtn.y, refBtn.width, refBtn.height,
+                    "Games", "Games", refBtn.textRight,
+                    refBtn.textRightColor, refBtn.textRightFocusedColor,
+                    refBtn.iconNormal != null && !refBtn.iconNormal.isEmpty() ? refBtn.iconNormal : "cover.png",
+                    refBtn.iconFocused, "cover.png", "OPEN_GAMES",
+                    refBtn.gravity, refBtn.radius, newFocusIndex, refBtn.textSize, refBtn.textSecondarySize,
+                    refBtn.textPosition, refBtn.textAlign, refBtn.bgColor, refBtn.padding,
+                    refBtn.focusOffsetX, refBtn.focusOffsetY, refBtn.focusScale
+            );
+            theme.menuElements.add(insertIndex, gamesBtn);
         }
     }
 
@@ -323,7 +377,12 @@ public class ThemeManager {
         return -1;
     }
     public static int getCurrentThemeIndex() { return currentThemeIndex; }
-    public static ThemeData getCurrentTheme() { return availableThemes.get(currentThemeIndex); }
+    public static ThemeData getCurrentTheme() {
+        if (availableThemes.isEmpty()) return null;
+        ThemeData t = availableThemes.get(currentThemeIndex);
+        ensureGamesMenuItem(t);
+        return t;
+    }
     public static android.graphics.Typeface getCustomFont() {
         if (availableThemes.isEmpty()) return android.graphics.Typeface.DEFAULT;
         return availableThemes.get(currentThemeIndex).customFont;

@@ -136,6 +136,14 @@ public final class StoragePaths {
         return mediaDirs("Videos");
     }
 
+    public static File getGamesDir() {
+        return primaryMediaDir("Games");
+    }
+
+    public static List<File> getGamesDirs() {
+        return mediaDirs("Games");
+    }
+
     public static File getPodcastsDir() {
         return new File(getPrimaryRoot(), "Podcasts");
     }
