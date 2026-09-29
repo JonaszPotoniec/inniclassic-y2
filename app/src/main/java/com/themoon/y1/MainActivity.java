@@ -729,6 +729,7 @@ public class MainActivity extends Activity {
     }
 
     public void turnOffScreen() {
+        updateScreenOffFeedback(false);
         com.themoon.y1.managers.FmRadioManager fm = com.themoon.y1.managers.FmRadioManager.getInstance(this);
         // 🚀 [웹 서버 방어막] 라디오뿐만 아니라 서버가 돌아갈 때도 '가상 암전 모드'를 사용하여 CPU가 잠들지 않게 보호합니다!
         if (fm.isPowerUp || activePlayer == 1 || isServerRunning) {
@@ -802,6 +803,7 @@ public class MainActivity extends Activity {
             getWindow().setAttributes(lp);
         } catch (Exception e) {
         }
+        updateScreenOffFeedback(true);
     }
 
     // 🚀 [신규 엔진] 리로드 없이 주파수와 사탕 캡슐 색상만 초고속으로 갈아끼우는 무감쇠 엔진
@@ -1015,10 +1017,12 @@ public class MainActivity extends Activity {
             if (Intent.ACTION_SCREEN_OFF.equals(action)) {
                 isScreenSleeping = true;
                 autoManageWifiPower(true); // 🚀 [절전 모드 진입]
+                updateScreenOffFeedback(false);
             } else if (Intent.ACTION_SCREEN_ON.equals(action)) {
                 isScreenSleeping = false;
                 lastScreenOnTime = System.currentTimeMillis();
                 autoManageWifiPower(false); // 🚀 [절전 모드 해제]
+                updateScreenOffFeedback(true);
             } else if (Intent.ACTION_BATTERY_CHANGED.equals(action)) {
                 int level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
                 int scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
@@ -1698,6 +1702,8 @@ public class MainActivity extends Activity {
         try {
             isVibrationEnabled = prefs.getBoolean("vibrate", true);
             vibrationStrengthLevel = prefs.getInt("vibrate_strength", 1);
+            Settings.System.putInt(getContentResolver(), Settings.System.HAPTIC_FEEDBACK_ENABLED,
+                    isVibrationEnabled ? 1 : 0);
         } catch (Exception e) {
         }
         try {
@@ -5135,6 +5141,9 @@ public class MainActivity extends Activity {
     public java.util.HashMap<String, Integer> exactOffsetMemory = new java.util.HashMap<>();
 
     public void clickFeedback() {
+        if (!isScreenOffControlEnabled && (isScreenSleeping || isFakeScreenOff || !isDeviceScreenOn()))
+            return;
+
         long now = System.currentTimeMillis();
 
         if (now - lastClickTime < 30)
@@ -7311,6 +7320,8 @@ public class MainActivity extends Activity {
                 ((TextView) btnToggle.getChildAt(1)).setText(isVibrationEnabled ? t("ON") : t("OFF"));
                 try {
                     prefs.edit().putBoolean("vibrate", isVibrationEnabled).commit();
+                    Settings.System.putInt(getContentResolver(), Settings.System.HAPTIC_FEEDBACK_ENABLED,
+                            isVibrationEnabled ? 1 : 0);
                 } catch (Exception e) {
                 }
             }
@@ -12879,17 +12890,27 @@ public class MainActivity extends Activity {
     public boolean dispatchKeyEvent(KeyEvent event) {
         int keyCode = event.getKeyCode();
         int action = event.getAction();
+        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        boolean isScreenOnForLock = true;
+        try {
+            if (Build.VERSION.SDK_INT >= 20)
+                isScreenOnForLock = pm.isInteractive();
+            else
+                isScreenOnForLock = pm.isScreenOn();
+        } catch (Exception e) {
+        }
+
         if (action == KeyEvent.ACTION_DOWN && (keyCode == 21 || keyCode == 22)) {
             long now = android.os.SystemClock.uptimeMillis();
             classicWheelStreak = now - lastClassicWheelTime < 200 ? classicWheelStreak + 1 : 1;
             lastClassicWheelTime = now;
         }
 
-        // 🚀 [백라이트 타이머 버그 수정] 이것도 예전에는 절대 실행되지 않는 onKeyDown()에만 있었습니다 -
-        // dispatchKeyEvent가 휠/버튼을 먼저 다 소비해버려서, 실제로는 휠을 아무리 돌려도 타이머가
-        // 리셋되지 않고 있다가 실사용 중에도 화면이 꺼져버리는 원인이었습니다. 아무 키 입력이나 여기서
-        // 바로 리셋해서 진짜 "조작 중엔 안 꺼짐"이 되도록 합니다.
-        resetBacklightTimer();
+        // 🚀 [백라이트 타이머 버그 수정] 화면이 켜져 있을 때만 타이머를 리셋하여, 꺼진 화면(주머니)에서 휠을 돌렸을 때
+        // 뒤늦게 전원 토글이 실행되어 화면이 켜지는 부작용을 방지합니다.
+        if (isScreenOnForLock && !isFakeScreenOff) {
+            resetBacklightTimer();
+        }
 
         // 🚀 [가상 암전 깨우기] 라디오/웹서버 재생 중이라 진짜 화면 전원은 안 끄고 검은 오버레이+밝기
         // 0.01로만 "가짜로" 꺼둔 상태(isFakeScreenOff)일 때는, 실제 화면 인터랙티브 상태(pm.isInteractive())가
@@ -12907,16 +12928,6 @@ public class MainActivity extends Activity {
         // onKeyDown()에 있었던 게 진짜 버그의 원인이었습니다 - dispatchKeyEvent가 이미 이 키들을
         // 먼저 소비해버려서 onKeyDown까지 내려가지 않았습니다.)
         // =======================================================
-        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-        boolean isScreenOnForLock = true;
-        try {
-            if (Build.VERSION.SDK_INT >= 20)
-                isScreenOnForLock = pm.isInteractive();
-            else
-                isScreenOnForLock = pm.isScreenOn();
-        } catch (Exception e) {
-        }
-
         boolean isWakingUp = !isScreenOnForLock || ((event.getFlags() & KeyEvent.FLAG_WOKE_HERE) != 0)
                 || (System.currentTimeMillis() - lastScreenOnTime < 500);
 
@@ -12936,12 +12947,18 @@ public class MainActivity extends Activity {
                 } catch (Exception e) {
                 }
                 lastScreenOnTime = System.currentTimeMillis();
+                updateScreenOffFeedback(true);
             }
 
             if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
                 if (action == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
                     event.startTracking();
                 }
+                return true;
+            }
+
+            // 🚀 [스크린 오프 컨트롤 꺼짐 방어막] 스크린 오프 컨트롤이 꺼져 있으면 화면 밖 조작과 피드백을 원천 차단합니다.
+            if (!isScreenOffControlEnabled) {
                 return true;
             }
 
@@ -13489,6 +13506,40 @@ public class MainActivity extends Activity {
         }
 
         unregisterReceiver(systemStatusReceiver);
+        updateScreenOffFeedback(true);
+    }
+
+    public boolean isDeviceScreenOn() {
+        try {
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (pm != null) {
+                if (Build.VERSION.SDK_INT >= 20)
+                    return pm.isInteractive();
+                else
+                    return pm.isScreenOn();
+            }
+        } catch (Exception e) {
+        }
+        return true;
+    }
+
+    public void updateScreenOffFeedback(boolean screenOn) {
+        try {
+            if (screenOn) {
+                applySoundSetting();
+                Settings.System.putInt(getContentResolver(), Settings.System.HAPTIC_FEEDBACK_ENABLED,
+                        isVibrationEnabled ? 1 : 0);
+            } else {
+                if (!isScreenOffControlEnabled) {
+                    if (audioManager != null) {
+                        audioManager.setStreamMute(AudioManager.STREAM_SYSTEM, true);
+                    }
+                    Settings.System.putInt(getContentResolver(), Settings.System.SOUND_EFFECTS_ENABLED, 0);
+                    Settings.System.putInt(getContentResolver(), Settings.System.HAPTIC_FEEDBACK_ENABLED, 0);
+                }
+            }
+        } catch (Exception e) {
+        }
     }
 
     // 💡 안드로이드 시스템 자체의 하드웨어 삑 소리 스트림을 직접 차단/허용하는 함수
