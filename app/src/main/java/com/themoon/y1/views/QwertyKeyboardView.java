@@ -163,7 +163,11 @@ public class QwertyKeyboardView extends LinearLayout {
                 TextView keyView = new TextView(getContext());
                 keyView.setGravity(Gravity.CENTER);
                 keyView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f);
-                keyView.setTypeface(ThemeManager.getCustomFontBold());
+                try {
+                    keyView.setTypeface(ThemeManager.getCustomFontBold());
+                } catch (Exception e) {
+                    keyView.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+                }
                 keyView.setIncludeFontPadding(false);
 
                 // Set key layout weight
@@ -238,8 +242,14 @@ public class QwertyKeyboardView extends LinearLayout {
     public void updateKeyFocus() {
         float density = getResources().getDisplayMetrics().density;
         int cornerRadius = (int) (5 * density);
-        int focusedBg = ThemeManager.getListButtonFocusedBg();
-        int focusedTextColor = ThemeManager.getListButtonFocusedTextColor();
+        int focusedBg = 0xFF0275D8;
+        int focusedTextColor = Color.WHITE;
+        try {
+            focusedBg = ThemeManager.getListButtonFocusedBg();
+            focusedTextColor = ThemeManager.getListButtonFocusedTextColor();
+            cornerRadius = (int) (ThemeManager.getButtonRadius() * density);
+        } catch (Exception e) {
+        }
         int normalTextColor = Color.WHITE;
         int normalBgColor = 0x33444444;
         int specialKeyBgColor = 0x55222222;
