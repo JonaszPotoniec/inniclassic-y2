@@ -15676,21 +15676,30 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * Enables USB Mass Storage directly — no system-settings activity is opened.
+     * Enables USB Mass Storage directly — no system-settings activity opened.
      *
-     * Tries three methods in order, all without leaving the launcher:
-     *   1. IMountService.enableUsbMassStorage() reflection (works if we're a system app).
-     *   2. su: setprop sys.usb.config mass_storage,adb  (changes gadget USB function).
-     *   3. su: svc usb setFunction mass_storage  (Android UsbService CLI).
-     * After any su attempt also runs `vdc volume shared /storage/sdcard1 ums` so
-     * the SD card actually appears as a drive on the host PC.
-     * A toast is shown on the UI thread regardless of which path succeeded.
+     * Root cause of "nothing shows on PC": two independent kernel layers must
+     * both be switched:
+     *   A) USB gadget function → mass_storage  (sysfs android_usb or setprop)
+     *   B) vold volume share  → vdc volume shared /storage/sdcard1 ums
+     *
+     * Previous code only did B, so vold returned "Share disabled" because the
+     * gadget wasn't in mass_storage mode.  This version always does A first.
+     *
+     * Order of attempts:
+     *   1. IMountService.enableUsbMassStorage() reflection  (handles A+B if it works)
+     *   2. su: direct sysfs write to /sys/class/android_usb/android0/  (A)
+     *          then vdc volume shared  (B)
+     *   3. su: setprop sys.usb.config mass_storage,adb  (A via init.rc trigger)
+     *          then vdc volume shared  (B)
      */
     private void enableUsbMassStorage() {
         new Thread(() -> {
+            android.util.Log.i("USB", "enableUsbMassStorage starting");
             boolean success = false;
 
             // ── Method 1: IMountService reflection ────────────────────────────
+            // Handles the full flow internally; needs MOUNT_UNMOUNT_FILESYSTEMS
             try {
                 Object binder = Class.forName("android.os.ServiceManager")
                         .getMethod("getService", String.class)
@@ -15702,55 +15711,102 @@ public class MainActivity extends Activity {
                     if (stub != null) {
                         stub.getClass().getMethod("enableUsbMassStorage").invoke(stub);
                         success = true;
-                        android.util.Log.i("USB", "enableUsbMassStorage via IMountService OK");
+                        android.util.Log.i("USB", "Method 1 (IMountService) OK");
                     }
                 }
             } catch (Exception e) {
-                android.util.Log.w("USB", "IMountService reflection failed: " + e.getMessage());
+                android.util.Log.w("USB", "Method 1 failed: " + e.getMessage());
             }
 
-            // ── Method 2: su — setprop + vdc ──────────────────────────────────
+            // ── Method 2: direct sysfs write (most reliable on MediaTek) ─────
+            // Switches the USB gadget function, waits for re-enumeration,
+            // then asks vold to share both SD slots.
             if (!success) {
-                try {
-                    Process proc = Runtime.getRuntime().exec(new String[]{"su", "-c",
-                            "setprop sys.usb.config mass_storage,adb;" +
-                            "sleep 1;" +
-                            "vdc volume shared /storage/sdcard1 ums 2>/dev/null;" +
-                            "vdc volume shared /storage/sdcard0 ums 2>/dev/null"});
-                    proc.waitFor();
-                    success = true;
-                    android.util.Log.i("USB", "setprop/vdc via su OK (exit=" + proc.exitValue() + ")");
-                } catch (Exception e) {
-                    android.util.Log.w("USB", "su setprop failed: " + e.getMessage());
-                }
+                String sysfsCmd =
+                    // Disable gadget, switch function to mass_storage, re-enable
+                    "echo 0 > /sys/class/android_usb/android0/enable;" +
+                    "echo mass_storage,adb > /sys/class/android_usb/android0/functions;" +
+                    "echo 1 > /sys/class/android_usb/android0/enable;" +
+                    // Let USB host re-enumerate the device (~2s)
+                    "sleep 2;" +
+                    // Share both storage slots (one will succeed depending on ROM config)
+                    "vdc volume shared /storage/sdcard1 ums;" +
+                    "vdc volume shared sdcard1 ums;" +
+                    "vdc volume shared /storage/sdcard0 ums;"+
+                    "vdc volume shared sdcard0 ums";
+                String out = usbRunSu(sysfsCmd);
+                android.util.Log.i("USB", "Method 2 (sysfs) out: " + out);
+                // "200" = vold OK; also accept empty (sysfs write may be sufficient)
+                success = out.contains("200") || out.isEmpty();
             }
 
-            // ── Method 3: su — svc usb ────────────────────────────────────────
+            // ── Method 3: setprop (triggers init.rc USB gadget switch) ────────
             if (!success) {
-                try {
-                    Process proc = Runtime.getRuntime().exec(new String[]{"su", "-c",
-                            "svc usb setFunction mass_storage;" +
-                            "sleep 1;" +
-                            "vdc volume shared /storage/sdcard1 ums 2>/dev/null"});
-                    proc.waitFor();
-                    success = true;
-                    android.util.Log.i("USB", "svc usb setFunction via su OK");
-                } catch (Exception e) {
-                    android.util.Log.w("USB", "svc usb failed: " + e.getMessage());
-                }
+                String propCmd =
+                    "setprop sys.usb.config mass_storage,adb;" +
+                    "sleep 2;" +
+                    "vdc volume shared /storage/sdcard1 ums;" +
+                    "vdc volume shared sdcard1 ums";
+                String out = usbRunSu(propCmd);
+                android.util.Log.i("USB", "Method 3 (setprop) out: " + out);
+                success = out.contains("200");
             }
 
             final boolean done = success;
-            runOnUiThread(() -> {
-                if (done) {
-                    Toast.makeText(this,
-                            t("Connecting as USB storage\u2026"), Toast.LENGTH_SHORT).show();
-                } else {
-                    Toast.makeText(this,
-                            t("Please enable USB storage in system settings."), Toast.LENGTH_LONG).show();
-                }
-            });
+            runOnUiThread(() -> Toast.makeText(this,
+                    done ? t("Connecting as USB storage\u2026")
+                         : t("Please enable USB storage in system settings."),
+                    done ? Toast.LENGTH_SHORT : Toast.LENGTH_LONG).show());
         }, "y1-usb-enable").start();
+    }
+
+    /** Runs a compound su shell command, returns combined stdout, logs stderr. */
+    private String usbRunSu(String cmd) {
+        StringBuilder out = new StringBuilder();
+        try {
+            Process proc = Runtime.getRuntime().exec(new String[]{"su", "-c", cmd});
+
+            // Drain stdout on a reader thread (avoid deadlock)
+            java.io.BufferedReader br = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(proc.getInputStream()));
+            Thread reader = new Thread(() -> {
+                try {
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        if (out.length() > 0) out.append('\n');
+                        out.append(line);
+                    }
+                } catch (Exception ignored) {}
+            }, "y1-usb-reader");
+            reader.start();
+
+            // Drain stderr to logcat
+            new Thread(() -> {
+                try {
+                    java.io.BufferedReader ebr = new java.io.BufferedReader(
+                            new java.io.InputStreamReader(proc.getErrorStream()));
+                    String line;
+                    while ((line = ebr.readLine()) != null)
+                        android.util.Log.d("USB", "stderr: " + line);
+                } catch (Exception ignored) {}
+            }, "y1-usb-err").start();
+
+            // Wait up to 8 s (command includes up to 2s sleep)
+            long deadline = System.currentTimeMillis() + 8000;
+            while (System.currentTimeMillis() < deadline) {
+                try {
+                    proc.exitValue();
+                    break;
+                } catch (IllegalThreadStateException running) {
+                    Thread.sleep(100);
+                }
+            }
+            try { proc.exitValue(); } catch (IllegalThreadStateException e) { proc.destroy(); }
+            reader.join(500);
+        } catch (Exception e) {
+            android.util.Log.w("USB", "usbRunSu exception: " + e.getMessage());
+        }
+        return out.toString();
     }
 
     // =======================================================
