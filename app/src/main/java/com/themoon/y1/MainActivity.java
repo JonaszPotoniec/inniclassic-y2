@@ -15544,35 +15544,42 @@ public class MainActivity extends Activity {
         rootLayout.setBackground(bg);
         rootLayout.setPadding((int) (15 * d), (int) (20 * d), (int) (15 * d), (int) (15 * d));
 
-        // Tabler USB icon (tab:usb — 24×24 viewport) drawn on a small Canvas
-        // Path taken from tabler.io icon set (MIT licence)
+        // Tabler IconUsb — exact SVG path data from tabler.io (MIT licence)
+        // https://github.com/tabler/tabler-icons/blob/master/icons/outline/usb.svg
         android.widget.ImageView ivUsb = new android.widget.ImageView(this);
-        int iconSizePx = (int) (32 * d);
+        int iconSizePx = (int) (36 * d);
         android.graphics.Bitmap bmp = android.graphics.Bitmap.createBitmap(iconSizePx, iconSizePx,
                 android.graphics.Bitmap.Config.ARGB_8888);
         android.graphics.Canvas c = new android.graphics.Canvas(bmp);
         android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
         p.setColor(ThemeManager.getTextColorPrimary());
         p.setStyle(android.graphics.Paint.Style.STROKE);
-        p.setStrokeWidth(1.5f * d);
+        float strokeInDesign = 2.0f;
+        p.setStrokeWidth(strokeInDesign * (iconSizePx / 24f));
         p.setStrokeCap(android.graphics.Paint.Cap.ROUND);
         p.setStrokeJoin(android.graphics.Paint.Join.ROUND);
-        float sc = iconSizePx / 24f;
-        // Tabler "usb" icon paths (simplified stroke paths on 24×24 grid)
-        android.graphics.Path path = new android.graphics.Path();
-        // connector body: M 10 20 L 14 20 — bottom bar
-        path.moveTo(10 * sc, 20 * sc); path.lineTo(14 * sc, 20 * sc);
-        // M 12 20 L 12 8 — stem
-        path.moveTo(12 * sc, 20 * sc); path.lineTo(12 * sc, 8 * sc);
-        // M 9 8 L 15 8 — top bar
-        path.moveTo(9 * sc, 8 * sc); path.lineTo(15 * sc, 8 * sc);
-        // M 9 8 L 9 11 — left leg
-        path.moveTo(9 * sc, 8 * sc); path.lineTo(9 * sc, 11 * sc);
-        // M 15 8 L 15 11 — right leg
-        path.moveTo(15 * sc, 8 * sc); path.lineTo(15 * sc, 11 * sc);
-        // circle at top: M 12 5 m -1.5 0 a 1.5 1.5 0 1 0 3 0 a 1.5 1.5 0 1 0 -3 0
-        path.addCircle(12 * sc, 5 * sc, 1.5f * sc, android.graphics.Path.Direction.CW);
-        c.drawPath(path, p);
+        // Scale transform: Tabler 24×24 → iconSizePx
+        c.scale(iconSizePx / 24f, iconSizePx / 24f);
+        // Parse each SVG sub-path via PathParser (same approach as QwertyKeyboardView)
+        String[] usbPaths = {
+            "M10 19a2 2 0 1 0 4 0a2 2 0 1 0 -4 0",   // bottom circle
+            "M12 17v-11.5",                             // vertical stem
+            "M7 10v3l5 3",                              // left branch
+            "M12 14.5l5 -2v-2.5",                      // right branch
+            "M16 10h2v-2h-2l0 2",                      // right square
+            "M6 9a1 1 0 1 0 2 0a1 1 0 1 0 -2 0",      // left circle
+            "M10 5.5h4l-2 -2.5l-2 2.5"                 // top arrow
+        };
+        try {
+            for (String svgPath : usbPaths) {
+                android.graphics.Path pp = androidx.core.graphics.PathParser.createPathFromPathData(svgPath);
+                if (pp != null) c.drawPath(pp, p);
+            }
+        } catch (Throwable fallback) {
+            // Fallback: minimal USB stem if PathParser unavailable
+            c.drawLine(12, 5.5f, 12, 17, p);
+            c.drawCircle(12, 19, 2, p);
+        }
         ivUsb.setImageBitmap(bmp);
         LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(iconSizePx, iconSizePx);
         iconLp.gravity = Gravity.CENTER_HORIZONTAL;
@@ -15669,46 +15676,81 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * Enables USB Mass Storage so the device appears as a drive on the PC.
-     * Uses IMountService reflection (KitKat / API 19 path). Falls back to the
-     * system UsbStorageActivity intent if reflection is unavailable.
+     * Enables USB Mass Storage directly — no system-settings activity is opened.
+     *
+     * Tries three methods in order, all without leaving the launcher:
+     *   1. IMountService.enableUsbMassStorage() reflection (works if we're a system app).
+     *   2. su: setprop sys.usb.config mass_storage,adb  (changes gadget USB function).
+     *   3. su: svc usb setFunction mass_storage  (Android UsbService CLI).
+     * After any su attempt also runs `vdc volume shared /storage/sdcard1 ums` so
+     * the SD card actually appears as a drive on the host PC.
+     * A toast is shown on the UI thread regardless of which path succeeded.
      */
     private void enableUsbMassStorage() {
-        try {
-            // KitKat path: android.os.storage.IMountService via ServiceManager
-            Object mountService = Class.forName("android.os.ServiceManager")
-                    .getMethod("getService", String.class)
-                    .invoke(null, "mount");
-            if (mountService != null) {
-                Object stub = Class.forName("android.os.storage.IMountService$Stub")
-                        .getMethod("asInterface", android.os.IBinder.class)
-                        .invoke(null, mountService);
-                if (stub != null) {
-                    stub.getClass().getMethod("enableUsbMassStorage").invoke(stub);
-                    Toast.makeText(this, t("Connecting as USB storage\u2026"), Toast.LENGTH_SHORT).show();
-                    return;
+        new Thread(() -> {
+            boolean success = false;
+
+            // ── Method 1: IMountService reflection ────────────────────────────
+            try {
+                Object binder = Class.forName("android.os.ServiceManager")
+                        .getMethod("getService", String.class)
+                        .invoke(null, "mount");
+                if (binder != null) {
+                    Object stub = Class.forName("android.os.storage.IMountService$Stub")
+                            .getMethod("asInterface", android.os.IBinder.class)
+                            .invoke(null, binder);
+                    if (stub != null) {
+                        stub.getClass().getMethod("enableUsbMassStorage").invoke(stub);
+                        success = true;
+                        android.util.Log.i("USB", "enableUsbMassStorage via IMountService OK");
+                    }
+                }
+            } catch (Exception e) {
+                android.util.Log.w("USB", "IMountService reflection failed: " + e.getMessage());
+            }
+
+            // ── Method 2: su — setprop + vdc ──────────────────────────────────
+            if (!success) {
+                try {
+                    Process proc = Runtime.getRuntime().exec(new String[]{"su", "-c",
+                            "setprop sys.usb.config mass_storage,adb;" +
+                            "sleep 1;" +
+                            "vdc volume shared /storage/sdcard1 ums 2>/dev/null;" +
+                            "vdc volume shared /storage/sdcard0 ums 2>/dev/null"});
+                    proc.waitFor();
+                    success = true;
+                    android.util.Log.i("USB", "setprop/vdc via su OK (exit=" + proc.exitValue() + ")");
+                } catch (Exception e) {
+                    android.util.Log.w("USB", "su setprop failed: " + e.getMessage());
                 }
             }
-        } catch (Exception ignored) {
-        }
 
-        // Fallback: ask the system UMS activity
-        try {
-            Intent umsIntent = new Intent();
-            umsIntent.setClassName("com.android.settings",
-                    "com.android.settings.UsbSettings");
-            startActivity(umsIntent);
-        } catch (Exception e) {
-            try {
-                Intent umsIntent = new Intent("android.hardware.usb.action.USB_STATE");
-                umsIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(umsIntent);
-            } catch (Exception ignored2) {
-                Toast.makeText(this,
-                        t("Please enable USB storage in system settings."),
-                        Toast.LENGTH_LONG).show();
+            // ── Method 3: su — svc usb ────────────────────────────────────────
+            if (!success) {
+                try {
+                    Process proc = Runtime.getRuntime().exec(new String[]{"su", "-c",
+                            "svc usb setFunction mass_storage;" +
+                            "sleep 1;" +
+                            "vdc volume shared /storage/sdcard1 ums 2>/dev/null"});
+                    proc.waitFor();
+                    success = true;
+                    android.util.Log.i("USB", "svc usb setFunction via su OK");
+                } catch (Exception e) {
+                    android.util.Log.w("USB", "svc usb failed: " + e.getMessage());
+                }
             }
-        }
+
+            final boolean done = success;
+            runOnUiThread(() -> {
+                if (done) {
+                    Toast.makeText(this,
+                            t("Connecting as USB storage\u2026"), Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(this,
+                            t("Please enable USB storage in system settings."), Toast.LENGTH_LONG).show();
+                }
+            });
+        }, "y1-usb-enable").start();
     }
 
     // =======================================================
