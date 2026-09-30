@@ -353,9 +353,9 @@
 
         <!-- 🚀 [iPod 스타일] 볼륨 조절 시 Progress 바와 똑같은 모양으로 일시적으로 겹쳐 보여주는 인라인 볼륨 게이지 -->
         <LinearLayout android:id="@+id/row_player_volume" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="bottom" android:orientation="horizontal" android:gravity="center_vertical" android:paddingLeft="26dp" android:paddingRight="26dp" android:paddingBottom="14dp" android:visibility="gone">
-            <TextView android:id="@+id/tv_player_volume_down" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🔈" android:textSize="14sp" android:layout_marginRight="10dp"/>
-            <ProgressBar android:id="@+id/player_volume_progress" style="?android:attr/progressBarStyleHorizontal" android:progressDrawable="@drawable/progress_bar_now_playing" android:layout_width="0dp" android:layout_height="26dp" android:layout_weight="1" android:max="100" android:progress="0"/>
-            <TextView android:id="@+id/tv_player_volume_up" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🔊" android:textSize="14sp" android:layout_marginLeft="10dp"/>
+            <ImageView android:id="@+id/tv_player_volume_down" android:layout_width="16dp" android:layout_height="18dp" android:src="@drawable/ic_ipod_volume_down" android:tint="#000000" android:scaleType="fitCenter" android:layout_marginRight="10dp" android:contentDescription="Volume Down"/>
+            <ProgressBar android:id="@+id/player_volume_progress" style="?android:attr/progressBarStyleHorizontal" android:progressDrawable="@drawable/progress_bar_now_playing" android:layout_width="0dp" android:layout_height="26dp" android:layout_weight="1" android:max="30" android:progress="0"/>
+            <ImageView android:id="@+id/tv_player_volume_up" android:layout_width="24dp" android:layout_height="20dp" android:src="@drawable/ic_ipod_volume_up" android:tint="#000000" android:scaleType="fitCenter" android:layout_marginLeft="10dp" android:contentDescription="Volume Up"/>
         </LinearLayout>
 
         <!-- 🚀 [iPod 스타일] Center 클릭으로 순환되는 2번째 상태: Seek(탐색) 바, 다이아몬드 손잡이를 휠로 움직여 곡 위치 점프 -->
@@ -430,16 +430,40 @@
 
     <LinearLayout
         android:id="@+id/layout_volume_overlay"
-        android:layout_width="220dp"
-        android:layout_height="wrap_content"
+        android:layout_width="320dp"
+        android:layout_height="56dp"
         android:layout_gravity="center"
-        android:background="#CC000000"
-        android:orientation="vertical"
-        android:padding="20dp"
-        android:gravity="center"
+        android:background="@drawable/bg_volume_overlay"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingLeft="24dp"
+        android:paddingRight="22dp"
         android:visibility="gone">
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Volume" android:textColor="#FFFFFF" android:textSize="16sp" android:layout_marginBottom="10dp"/>
-        <ProgressBar android:id="@+id/volume_progress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="15dp" android:max="15" android:progress="10"/>
+        <ImageView
+            android:id="@+id/tv_overlay_volume_down"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/ic_ipod_volume_down"
+            android:scaleType="fitCenter"
+            android:layout_marginRight="16dp"
+            android:contentDescription="Volume Down"/>
+        <ProgressBar
+            android:id="@+id/volume_progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:progressDrawable="@drawable/progress_bar_volume_overlay"
+            android:layout_width="0dp"
+            android:layout_height="8dp"
+            android:layout_weight="1"
+            android:max="30"
+            android:progress="0"/>
+        <ImageView
+            android:id="@+id/tv_overlay_volume_up"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/ic_ipod_volume_up"
+            android:scaleType="fitCenter"
+            android:layout_marginLeft="16dp"
+            android:contentDescription="Volume Up"/>
     </LinearLayout>
 
     <LinearLayout

@@ -987,8 +987,12 @@ public class MainActivity extends Activity {
         }
     };
 
+    public static final int VIRTUAL_VOLUME_STEPS = 30;
+    private int currentVirtualVolume = -1;
+
     private int lastTargetVolume = -1;
     private long lastTargetVolumeTime = 0;
+    private int lastKnownSystemVolume = -1;
 
     private Handler volumeHandler = new Handler();
     private Runnable hideVolumeTask = new Runnable() {
@@ -1023,6 +1027,104 @@ public class MainActivity extends Activity {
                 lastScreenOnTime = System.currentTimeMillis();
                 autoManageWifiPower(false); // 🚀 [절전 모드 해제]
                 updateScreenOffFeedback(true);
+                try {
+                    int curSys = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+                    int maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+                    lastKnownSystemVolume = curSys;
+                    int expectedSys = (currentVirtualVolume >= 0) ? virtualToSystemVolume(currentVirtualVolume, maxVol) : -1;
+                    if (expectedSys != curSys) {
+                        currentVirtualVolume = systemToVirtualVolume(curSys, maxVol);
+                    }
+                    float gain = virtualToSoftwareGain(currentVirtualVolume);
+                    com.themoon.y1.managers.AudioPlayerManager.getInstance().setMasterVolume(gain);
+                } catch (Exception ignored) {}
+            } else if ("android.media.VOLUME_CHANGED_ACTION".equals(action)) {
+                int streamType = intent.getIntExtra("android.media.EXTRA_VOLUME_STREAM_TYPE", -1);
+                if (streamType == AudioManager.STREAM_MUSIC || streamType == -1) {
+                    int newVol = intent.getIntExtra("android.media.EXTRA_VOLUME_STREAM_VALUE", -1);
+                    if (newVol >= 0) {
+                        int maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+
+                        // 🚀 [에코 필터] 우리 앱이 직접 변경하여 발생한 브로드캐스트는 가상 볼륨을 재계산하지 않고 통과!
+                        if (lastTargetVolume >= 0 && newVol == lastTargetVolume
+                                && (System.currentTimeMillis() - lastTargetVolumeTime < 500)) {
+                            lastKnownSystemVolume = newVol;
+                            return;
+                        }
+
+                        int prevVol = intent.getIntExtra("android.media.EXTRA_PREV_VOLUME_STREAM_VALUE", lastKnownSystemVolume);
+                        if (prevVol < 0) {
+                            prevVol = (lastKnownSystemVolume >= 0) ? lastKnownSystemVolume : newVol;
+                        }
+                        lastKnownSystemVolume = newVol;
+
+                        if (currentVirtualVolume < 0) {
+                            currentVirtualVolume = systemToVirtualVolume(newVol, maxVol);
+                        }
+
+                        // 🚀 [화면 꺼짐 볼륨 조절 인터셉트]
+                        // 안드로이드 OS는 하드웨어 볼륨 단계를 15단계(1 -> 0)로만 알고 있으므로,
+                        // 화면 꺼짐 상태에서 1에서 0으로 떨어지려 할 때 우리가 5 -> 4 -> 3 -> 2 -> 1 -> 0으로
+                        // 세분화된 가상 감쇠(Software Gain) 단계를 직접 한 단계씩 내려줍니다!
+                        if (prevVol == 1 && newVol == 0) {
+                            if (currentVirtualVolume > 1) {
+                                int targetVirt = currentVirtualVolume - 1;
+                                setVolumeLevel(AudioManager.STREAM_MUSIC, targetVirt, maxVol);
+                                clickFeedback();
+                                return;
+                            } else {
+                                currentVirtualVolume = 0;
+                                setVolumeLevel(AudioManager.STREAM_MUSIC, 0, maxVol);
+                                clickFeedback();
+                                return;
+                            }
+                        } else if (prevVol == 0 && newVol == 1) {
+                            // 음소거에서 볼륨 올림 시 최저 속삭임 단계(1)부터 시작
+                            setVolumeLevel(AudioManager.STREAM_MUSIC, 1, maxVol);
+                            clickFeedback();
+                            return;
+                        } else if (prevVol == 1 && newVol == 2 && currentVirtualVolume < 6) {
+                            // 서브 볼륨(1~5) 구간에서 볼륨 올림 시 6단계까지 차례대로 상승
+                            int targetVirt = currentVirtualVolume + 1;
+                            setVolumeLevel(AudioManager.STREAM_MUSIC, targetVirt, maxVol);
+                            clickFeedback();
+                            return;
+                        } else if (prevVol > newVol) {
+                            if (newVol == 1) {
+                                currentVirtualVolume = 6;
+                            } else {
+                                currentVirtualVolume = systemToVirtualVolume(newVol, maxVol);
+                            }
+                            float gain = virtualToSoftwareGain(currentVirtualVolume);
+                            try {
+                                com.themoon.y1.managers.AudioPlayerManager.getInstance().setMasterVolume(gain);
+                            } catch (Exception ignored) {}
+                            clickFeedback();
+                            if (!isScreenSleeping && isDeviceScreenOn()) {
+                                showDynamicVolumeOverlay(currentVirtualVolume, VIRTUAL_VOLUME_STEPS);
+                            }
+                        } else if (prevVol < newVol) {
+                            currentVirtualVolume = systemToVirtualVolume(newVol, maxVol);
+                            float gain = virtualToSoftwareGain(currentVirtualVolume);
+                            try {
+                                com.themoon.y1.managers.AudioPlayerManager.getInstance().setMasterVolume(gain);
+                            } catch (Exception ignored) {}
+                            clickFeedback();
+                            if (!isScreenSleeping && isDeviceScreenOn()) {
+                                showDynamicVolumeOverlay(currentVirtualVolume, VIRTUAL_VOLUME_STEPS);
+                            }
+                        } else {
+                            currentVirtualVolume = systemToVirtualVolume(newVol, maxVol);
+                            float gain = virtualToSoftwareGain(currentVirtualVolume);
+                            try {
+                                com.themoon.y1.managers.AudioPlayerManager.getInstance().setMasterVolume(gain);
+                            } catch (Exception ignored) {}
+                            if (!isScreenSleeping && isDeviceScreenOn()) {
+                                showDynamicVolumeOverlay(currentVirtualVolume, VIRTUAL_VOLUME_STEPS);
+                            }
+                        }
+                    }
+                }
             } else if (Intent.ACTION_BATTERY_CHANGED.equals(action)) {
                 int level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
                 int scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
@@ -1893,7 +1995,29 @@ public class MainActivity extends Activity {
 
         layoutVolumeOverlay = findViewById(R.id.layout_volume_overlay);
         volumeProgress = findViewById(R.id.volume_progress);
-        volumeProgress.setMax(audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
+        if (volumeProgress != null) {
+            volumeProgress.setMax(VIRTUAL_VOLUME_STEPS);
+        }
+        View overlayVolDown = findViewById(R.id.tv_overlay_volume_down);
+        if (overlayVolDown != null) {
+            overlayVolDown.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    adjustVolume(false);
+                    clickFeedback();
+                }
+            });
+        }
+        View overlayVolUp = findViewById(R.id.tv_overlay_volume_up);
+        if (overlayVolUp != null) {
+            overlayVolUp.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    adjustVolume(true);
+                    clickFeedback();
+                }
+            });
+        }
 
         layoutSettingsMode = findViewById(R.id.layout_settings_mode);
         containerSettingsItems = findViewById(R.id.container_settings_items);
@@ -2176,7 +2300,7 @@ public class MainActivity extends Activity {
         rowPlayerVolume = findViewById(R.id.row_player_volume);
         playerVolumeProgress = findViewById(R.id.player_volume_progress);
         if (playerVolumeProgress != null) {
-            playerVolumeProgress.setMax(audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
+            playerVolumeProgress.setMax(VIRTUAL_VOLUME_STEPS);
         }
 
         View.OnTouchListener volumeTouchListener = new View.OnTouchListener() {
@@ -2198,8 +2322,8 @@ public class MainActivity extends Activity {
                             }
                         } catch (Exception ignored) {}
                         int maxVol = audioManager.getStreamMaxVolume(stream);
-                        int effectiveMax = (volumeLimitMax >= 0) ? Math.min(volumeLimitMax, maxVol) : maxVol;
-                        int targetVol = Math.round(ratio * effectiveMax);
+                        int effectiveVirtualMax = (volumeLimitMax >= 0) ? Math.min(systemToVirtualVolume(volumeLimitMax, maxVol), VIRTUAL_VOLUME_STEPS) : VIRTUAL_VOLUME_STEPS;
+                        int targetVol = Math.round(ratio * effectiveVirtualMax);
                         setVolumeLevel(targetVol);
                         return true;
                     }
@@ -2573,12 +2697,21 @@ public class MainActivity extends Activity {
         filter.addAction(Intent.ACTION_CONFIGURATION_CHANGED);
         // 🚀 [여기에 신규 추가!] 다운로드 국장님이 "다운로드 끝났음!" 하고 외치는 소리를 듣습니다.
         filter.addAction(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+        filter.addAction("android.media.VOLUME_CHANGED_ACTION");
         if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(systemStatusReceiver, filter, Context.RECEIVER_EXPORTED);
         } else {
             registerLegacyStatusReceiver(filter);
         }
 
+        try {
+            int curSys = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+            int maxSys = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+            lastKnownSystemVolume = curSys;
+            currentVirtualVolume = systemToVirtualVolume(curSys, maxSys);
+            float initGain = virtualToSoftwareGain(currentVirtualVolume);
+            com.themoon.y1.managers.AudioPlayerManager.getInstance().setMasterVolume(initGain);
+        } catch (Exception ignored) {}
     }
 
     // API 17 has no receiver flags overload. Only the pre-33 branch calls this helper.
@@ -11894,6 +12027,43 @@ public class MainActivity extends Activity {
         }
     }
 
+    public static float virtualToSoftwareGain(int virtualVol) {
+        if (virtualVol <= 0) return 0.0f;
+        switch (virtualVol) {
+            case 1: return 0.04f; // -28 dBFS: ultra-whisper quiet for sensitive Porta Pros in silent room
+            case 2: return 0.10f; // -20 dBFS: very quiet
+            case 3: return 0.20f; // -14 dBFS
+            case 4: return 0.35f; // -9.1 dBFS
+            case 5: return 0.60f; // -4.4 dBFS
+            default: return 1.0f; // 0 dBFS (unattenuated sys vol 1 at step 6)
+        }
+    }
+
+    public static int virtualToSystemVolume(int virtualVol, int sysMaxVol) {
+        if (virtualVol <= 0) return 0;
+        if (virtualVol <= 6) return 1;
+        if (sysMaxVol <= 1) return 1;
+        int sys = 2 + Math.round((float) (virtualVol - 7) * (sysMaxVol - 2) / 23.0f);
+        if (sys > sysMaxVol) sys = sysMaxVol;
+        return sys;
+    }
+
+    public int systemToVirtualVolume(int sysVol, int sysMaxVol) {
+        if (sysVol <= 0) return 0;
+        if (sysVol == 1) {
+            if (currentVirtualVolume >= 1 && currentVirtualVolume <= 6) {
+                return currentVirtualVolume;
+            }
+            return 6;
+        }
+        if (sysMaxVol <= 2) return VIRTUAL_VOLUME_STEPS;
+        if (sysVol >= sysMaxVol) return VIRTUAL_VOLUME_STEPS;
+        float ratio = (float) (sysVol - 2) / (sysMaxVol - 2);
+        int v = 7 + Math.round(ratio * 23.0f);
+        if (v > VIRTUAL_VOLUME_STEPS) v = VIRTUAL_VOLUME_STEPS;
+        return v;
+    }
+
     private int getEffectiveStreamVolume(int stream) {
         int sysVol = audioManager.getStreamVolume(stream);
         if (lastTargetVolume >= 0 && (System.currentTimeMillis() - lastTargetVolumeTime < 400)) {
@@ -11902,7 +12072,21 @@ public class MainActivity extends Activity {
         return sysVol;
     }
 
-    public void setVolumeLevel(int targetVol) {
+    public int getEffectiveVirtualVolume(int stream) {
+        int sysMaxVol = audioManager.getStreamMaxVolume(stream);
+        int sysVol = getEffectiveStreamVolume(stream);
+        if (currentVirtualVolume < 0) {
+            currentVirtualVolume = systemToVirtualVolume(sysVol, sysMaxVol);
+            return currentVirtualVolume;
+        }
+        int expectedSys = virtualToSystemVolume(currentVirtualVolume, sysMaxVol);
+        if (expectedSys != sysVol) {
+            currentVirtualVolume = systemToVirtualVolume(sysVol, sysMaxVol);
+        }
+        return currentVirtualVolume;
+    }
+
+    public void setVolumeLevel(int targetVirtualVol) {
         int stream = AudioManager.STREAM_MUSIC;
         try {
             com.themoon.y1.managers.FmRadioManager fm = com.themoon.y1.managers.FmRadioManager.getInstance(this);
@@ -11911,26 +12095,36 @@ public class MainActivity extends Activity {
             }
         } catch (Exception ignored) {
         }
-        int maxVol = audioManager.getStreamMaxVolume(stream);
-        setVolumeLevel(stream, targetVol, maxVol);
+        int sysMaxVol = audioManager.getStreamMaxVolume(stream);
+        setVolumeLevel(stream, targetVirtualVol, sysMaxVol);
     }
 
-    public void setVolumeLevel(int stream, int targetVol, int maxVol) {
-        int effectiveMax = (volumeLimitMax >= 0) ? Math.min(volumeLimitMax, maxVol) : maxVol;
-        if (targetVol > effectiveMax) targetVol = effectiveMax;
-        if (targetVol < 0) targetVol = 0;
+    public void setVolumeLevel(int stream, int targetVirtualVol, int sysMaxVol) {
+        int effectiveVirtualMax = (volumeLimitMax >= 0) ? Math.min(systemToVirtualVolume(volumeLimitMax, sysMaxVol), VIRTUAL_VOLUME_STEPS) : VIRTUAL_VOLUME_STEPS;
+        if (targetVirtualVol > effectiveVirtualMax) targetVirtualVol = effectiveVirtualMax;
+        if (targetVirtualVol < 0) targetVirtualVol = 0;
 
-        lastTargetVolume = targetVol;
+        currentVirtualVolume = targetVirtualVol;
+        int targetSysVol = virtualToSystemVolume(targetVirtualVol, sysMaxVol);
+        float masterGain = virtualToSoftwareGain(targetVirtualVol);
+
+        lastTargetVolume = targetSysVol;
         lastTargetVolumeTime = System.currentTimeMillis();
+        lastKnownSystemVolume = targetSysVol;
 
-        SafeVolumeBypasser.setStreamVolumeWithBypass(this, audioManager, stream, targetVol, 0);
+        try {
+            com.themoon.y1.managers.AudioPlayerManager.getInstance().setMasterVolume(masterGain);
+        } catch (Exception ignored) {
+        }
+
+        SafeVolumeBypasser.setStreamVolumeWithBypass(this, audioManager, stream, targetSysVol, 0);
 
         // Keep MUSIC in sync for UI/widgets when adjusting FM.
         if (stream != AudioManager.STREAM_MUSIC) {
             try {
                 int musicMax = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-                int musicVol = (int) (((float) targetVol / Math.max(1, maxVol)) * musicMax);
-                SafeVolumeBypasser.setStreamVolumeWithBypass(this, audioManager, AudioManager.STREAM_MUSIC, musicVol, 0);
+                int musicSys = virtualToSystemVolume(targetVirtualVol, musicMax);
+                SafeVolumeBypasser.setStreamVolumeWithBypass(this, audioManager, AudioManager.STREAM_MUSIC, musicSys, 0);
             } catch (Exception ignored) {
             }
         }
@@ -11945,13 +12139,13 @@ public class MainActivity extends Activity {
                 } catch (Exception ignored) {
                 }
                 int fmMax = audioManager.getStreamMaxVolume(streamFm);
-                int fmVol = (int) (((float) targetVol / Math.max(1, maxVol)) * fmMax);
-                SafeVolumeBypasser.setStreamVolumeWithBypass(this, audioManager, streamFm, fmVol, 0);
+                int fmSys = virtualToSystemVolume(targetVirtualVol, fmMax);
+                SafeVolumeBypasser.setStreamVolumeWithBypass(this, audioManager, streamFm, fmSys, 0);
             }
         } catch (Exception ignored) {
         }
 
-        showDynamicVolumeOverlay(targetVol, maxVol);
+        showDynamicVolumeOverlay(targetVirtualVol, VIRTUAL_VOLUME_STEPS);
     }
 
     private void adjustVolume(boolean up) {
@@ -11964,18 +12158,18 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) {
         }
 
-        int currentVol = getEffectiveStreamVolume(stream);
-        int maxVol = audioManager.getStreamMaxVolume(stream);
-        // 🚀 [iPod 스타일] Volume Limit이 설정되어 있으면 그 값을 실질적인 최대치로 취급합니다.
-        int effectiveMax = (volumeLimitMax >= 0) ? Math.min(volumeLimitMax, maxVol) : maxVol;
-        if (up && currentVol < effectiveMax)
-            currentVol++;
-        else if (!up && currentVol > 0)
-            currentVol--;
-        if (currentVol > effectiveMax)
-            currentVol = effectiveMax; // 한도가 방금 낮아졌다면 기존 볼륨도 즉시 깎아냅니다.
+        int sysMaxVol = audioManager.getStreamMaxVolume(stream);
+        int currentVirtVol = getEffectiveVirtualVolume(stream);
+        int effectiveVirtualMax = (volumeLimitMax >= 0) ? Math.min(systemToVirtualVolume(volumeLimitMax, sysMaxVol), VIRTUAL_VOLUME_STEPS) : VIRTUAL_VOLUME_STEPS;
 
-        setVolumeLevel(stream, currentVol, maxVol);
+        if (up && currentVirtVol < effectiveVirtualMax)
+            currentVirtVol++;
+        else if (!up && currentVirtVol > 0)
+            currentVirtVol--;
+        if (currentVirtVol > effectiveVirtualMax)
+            currentVirtVol = effectiveVirtualMax; // 한도가 방금 낮아졌다면 기존 볼륨도 즉시 깎아냅니다.
+
+        setVolumeLevel(stream, currentVirtVol, sysMaxVol);
     }
 
     private void showDynamicVolumeOverlay() {
@@ -11987,12 +12181,14 @@ public class MainActivity extends Activity {
             }
         } catch (Exception ignored) {
         }
-        int currentVol = getEffectiveStreamVolume(stream);
-        int maxVol = audioManager.getStreamMaxVolume(stream);
-        showDynamicVolumeOverlay(currentVol, maxVol);
+        int currentVirtVol = getEffectiveVirtualVolume(stream);
+        showDynamicVolumeOverlay(currentVirtVol, VIRTUAL_VOLUME_STEPS);
     }
 
     private void showDynamicVolumeOverlay(int currentVol, int maxVol) {
+        if (isScreenSleeping || !isDeviceScreenOn()) {
+            return;
+        }
         // 🚀 [iPod 스타일] Now Playing 화면에서는 떠다니는 팝업 대신, Progress 바와 같은 모양의 인라인 게이지로 표시!
         if (currentScreenState == STATE_PLAYER && rowPlayerVolume != null) {
             rowPlayerProgress.setVisibility(View.GONE);
@@ -12022,6 +12218,11 @@ public class MainActivity extends Activity {
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            adjustVolume(keyCode == KeyEvent.KEYCODE_VOLUME_UP);
+            clickFeedback();
+            return true;
+        }
         resetBacklightTimer(); // 🚀 [iPod 스타일] 아무 키나 누르면 백라이트 타이머를 처음부터 다시 시작!
 
         // 🚀 [신규 추가] Music Quiz 화면은 다른 화면들의 복잡한 분기(볼륨/커버플로우 등)에 절대 섞이지 않도록
@@ -12900,6 +13101,20 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
         }
 
+        // 🔊 [하드웨어 볼륨 버튼 인터셉트] 시스템 볼륨 UI 충돌 차단 및 전 화면 iPod 볼륨 오버레이 표출
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            if (isScreenOnForLock && !isFakeScreenOff) {
+                resetBacklightTimer();
+            }
+            if (action == KeyEvent.ACTION_DOWN) {
+                if (event.getRepeatCount() == 0 || (event.getRepeatCount() % 2 == 0)) {
+                    adjustVolume(keyCode == KeyEvent.KEYCODE_VOLUME_UP);
+                    clickFeedback();
+                }
+            }
+            return true;
+        }
+
         if (action == KeyEvent.ACTION_DOWN && (keyCode == 21 || keyCode == 22)) {
             long now = android.os.SystemClock.uptimeMillis();
             classicWheelStreak = now - lastClassicWheelTime < 200 ? classicWheelStreak + 1 : 1;
@@ -13219,11 +13434,9 @@ public class MainActivity extends Activity {
 
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
-        // if (ignoreNextKeyUp) {
-        // ignoreNextKeyUp = false; // 방어막 해제
-        // return true; // 💡 이벤트를 여기서 파쇄하여 아래의 handleCenterShortClick() 등으로 신호가 흘러가지 않게
-        // 막습니다!
-        // }
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            return true;
+        }
         PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
         boolean isScreenOn = true;
         try {
@@ -13852,6 +14065,10 @@ public class MainActivity extends Activity {
                     int cur = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
                     if (cur > level)
                         SafeVolumeBypasser.setStreamVolumeWithBypass(MainActivity.this, audioManager, AudioManager.STREAM_MUSIC, level, 0);
+                    int limitVirt = systemToVirtualVolume(level, maxVol);
+                    if (currentVirtualVolume > limitVirt) {
+                        setVolumeLevel(limitVirt);
+                    }
                     buildSettingsUI();
                 }
             });
@@ -13916,11 +14133,22 @@ public class MainActivity extends Activity {
                 KeyEvent event = intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT);
 
                 if (event != null && event.getAction() == KeyEvent.ACTION_DOWN) {
+                    int keyCode = event.getKeyCode();
+
+                    // 🔊 하드웨어 볼륨 버튼(24, 25)은 스크린 오프 컨트롤 설정 여부와 무관하게 항상 동작!
+                    if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN || keyCode == 25) {
+                        MainActivity.instance.adjustVolume(false);
+                        MainActivity.instance.clickFeedback();
+                        return;
+                    } else if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == 24) {
+                        MainActivity.instance.adjustVolume(true);
+                        MainActivity.instance.clickFeedback();
+                        return;
+                    }
+
                     // 설정에서 스크린 오프가 꺼져있으면 무시합니다.
                     if (!MainActivity.instance.isScreenOffControlEnabled)
                         return;
-
-                    int keyCode = event.getKeyCode();
 
                     // ⏮ 이전 곡 버튼
                     if (keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS || keyCode == 88) {

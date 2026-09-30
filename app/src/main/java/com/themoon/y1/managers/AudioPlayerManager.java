@@ -51,6 +51,29 @@ public class AudioPlayerManager {
     private java.io.FileInputStream currentFileInputStream;
 
     private float currentSpeed = 1.0f;
+    private float currentMasterVolume = 1.0f;
+
+    public void setMasterVolume(float volume) {
+        this.currentMasterVolume = Math.max(0.0f, Math.min(1.0f, volume));
+        applyMasterVolume();
+    }
+
+    public float getMasterVolume() {
+        return currentMasterVolume;
+    }
+
+    public void applyMasterVolume() {
+        if (exoPlayer != null) {
+            try {
+                exoPlayer.setVolume(currentMasterVolume);
+            } catch (Throwable ignored) {}
+        }
+        if (legacyPlayer != null) {
+            try {
+                legacyPlayer.setVolume(currentMasterVolume, currentMasterVolume);
+            } catch (Throwable ignored) {}
+        }
+    }
 
     // Metadata for the track currently being prepared, handed to LastFmScrobbler
     // once its real duration is known (synchronously for the legacy/FLAC player,
@@ -230,6 +253,7 @@ public class AudioPlayerManager {
                     });
                 }
             });
+            applyMasterVolume();
         }
     }
 
@@ -886,6 +910,7 @@ public class AudioPlayerManager {
                 }
 
                 if (!main.isPausedByHand) legacyPlayer.start();
+                applyMasterVolume();
 
                 if (AudioEffectManager.getInstance() != null) AudioEffectManager.getInstance().applyAudioEffects();
                 main.setupVisualizer();
@@ -929,6 +954,7 @@ public class AudioPlayerManager {
                 exoPlayer.setPlaybackParameters(new PlaybackParameters(currentSpeed, 1.0f));
 
                 if (!main.isPausedByHand) exoPlayer.setPlayWhenReady(true);
+                applyMasterVolume();
             }
 
             main.consecutiveErrorCount = 0;
