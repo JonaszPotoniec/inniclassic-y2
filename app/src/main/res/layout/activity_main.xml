@@ -247,7 +247,7 @@
         android:paddingLeft="10dp"
         android:paddingRight="10dp"
         android:paddingBottom="6dp"
-        android:background="#DD000000"
+        android:background="#F4111215"
         android:visibility="gone">
         <TextView android:id="@+id/tv_keyboard_ssid" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Target: My_Home_Wifi" android:textColor="#BBFFFFFF" android:textSize="15sp" android:textStyle="bold"/>
         <TextView android:id="@+id/tv_keyboard_input" android:layout_width="match_parent" android:layout_height="34dp" android:text="" android:textColor="#FFFFFF" android:textSize="18sp" android:textStyle="bold" android:gravity="center" android:background="#222222" android:layout_marginTop="4dp" android:layout_marginBottom="6dp"/>

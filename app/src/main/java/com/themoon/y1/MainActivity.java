@@ -1877,7 +1877,12 @@ public class MainActivity extends Activity {
 
         try {
             isVibrationEnabled = prefs.getBoolean("vibrate", true);
-            vibrationStrengthLevel = prefs.getInt("vibrate_strength", 1);
+            if (!prefs.contains("vibrate_strength_restored_25ms")) {
+                vibrationStrengthLevel = 1;
+                prefs.edit().putInt("vibrate_strength", 1).putBoolean("vibrate_strength_restored_25ms", true).apply();
+            } else {
+                vibrationStrengthLevel = prefs.getInt("vibrate_strength", 1);
+            }
             Settings.System.putInt(getContentResolver(), Settings.System.HAPTIC_FEEDBACK_ENABLED,
                     isVibrationEnabled ? 1 : 0);
         } catch (Exception e) {
@@ -2258,7 +2263,7 @@ public class MainActivity extends Activity {
         layoutSettingsMode.setBackgroundColor(overlayColor);
         layoutBluetoothMode.setBackgroundColor(overlayColor);
         layoutWifiMode.setBackgroundColor(overlayColor);
-        layoutWifiKeyboard.setBackgroundColor(overlayColor);
+        layoutWifiKeyboard.setBackgroundColor(0xF4111215); // Keep solid dark modal background for keyboard contrast
         layoutBrightnessMode.setBackgroundColor(overlayColor);
         layoutStorageMode.setBackgroundColor(overlayColor);
         layoutWebServerMode.setBackgroundColor(overlayColor);
@@ -4477,6 +4482,14 @@ public class MainActivity extends Activity {
             }
         }
 
+        if (currentScreenState == STATE_WIFI_KEYBOARD && state != STATE_WIFI_KEYBOARD) {
+            try {
+                Settings.System.putInt(getContentResolver(), Settings.System.HAPTIC_FEEDBACK_ENABLED,
+                        isVibrationEnabled ? 1 : 0);
+            } catch (Exception e) {
+            }
+        }
+
         int safeFocusIndex = lastSettingsFocusIndex;
         int safeMenuIndex = lastMainMenuFocusIndex; // 🚀 [안전 금고 2] 화면 전환 시 안드로이드 오토 포커스로 인한 오염을 막기 위한 백업!
 
@@ -5485,8 +5498,13 @@ public class MainActivity extends Activity {
         try {
             if (isVibrationEnabled) {
                 Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-                if (v != null)
-                    v.vibrate(VIBE_DURATIONS[vibrationStrengthLevel]);
+                if (v != null) {
+                    // Always use crisp 10ms low vibration during keyboard navigation
+                    int duration = (currentScreenState == STATE_WIFI_KEYBOARD)
+                            ? 10
+                            : VIBE_DURATIONS[vibrationStrengthLevel];
+                    v.vibrate(duration);
+                }
             }
         } catch (Exception e) {
         }
@@ -5580,6 +5598,9 @@ public class MainActivity extends Activity {
     private void openKeyboard() {
         typedPassword = "";
         keyboardIndex = 0;
+        try {
+            Settings.System.putInt(getContentResolver(), Settings.System.HAPTIC_FEEDBACK_ENABLED, 0);
+        } catch (Exception e) {}
         // 🚀 모드에 따라 상단 제목 다르게 표시!
         if (currentKeyboardMode == 1) {
             tvKeyboardSsid.setText("🔍 " + t("Search Podcast"));
@@ -12552,7 +12573,7 @@ public class MainActivity extends Activity {
                     return true;
                 }
                 if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == 19) {
-                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(0, -1);
+                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(0, -1, false);
                     clickFeedback();
                     return true;
                 }
@@ -12560,27 +12581,27 @@ public class MainActivity extends Activity {
                         || keyCode == KeyEvent.KEYCODE_MEDIA_STOP || keyCode == 86
                         || keyCode == 126 || keyCode == 127
                         || keyCode == KeyEvent.KEYCODE_DPAD_DOWN || keyCode == 20) {
-                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(0, 1);
+                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(0, 1, false);
                     clickFeedback();
                     return true;
                 }
                 if (keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS || keyCode == 88) {
-                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(-1, 0);
+                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(-1, 0, false);
                     clickFeedback();
                     return true;
                 }
                 if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == 87) {
-                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(1, 0);
+                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(1, 0, false);
                     clickFeedback();
                     return true;
                 }
                 if (keyCode == 21) { // Wheel CCW
-                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(-1, 0);
+                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(-1, 0, true);
                     clickFeedback();
                     return true;
                 }
                 if (keyCode == 22) { // Wheel CW
-                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(1, 0);
+                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(1, 0, true);
                     clickFeedback();
                     return true;
                 }
@@ -13486,6 +13507,46 @@ public class MainActivity extends Activity {
         }
 
         // =======================================================
+        // ⌨️ Wi-Fi Keyboard Screen Navigation Interceptor
+        // =======================================================
+        if (currentScreenState == STATE_WIFI_KEYBOARD) {
+            if (isQwertyKeyboard()) {
+                if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == 85
+                        || keyCode == KeyEvent.KEYCODE_MEDIA_STOP || keyCode == 86
+                        || keyCode == 126 || keyCode == 127
+                        || keyCode == KeyEvent.KEYCODE_DPAD_DOWN || keyCode == 20) {
+                    if (action == KeyEvent.ACTION_DOWN) {
+                        if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(0, 1, false);
+                        clickFeedback();
+                    }
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS || keyCode == 88) {
+                    if (action == KeyEvent.ACTION_DOWN) {
+                        if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(-1, 0, false);
+                        clickFeedback();
+                    }
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == 87) {
+                    if (action == KeyEvent.ACTION_DOWN) {
+                        if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(1, 0, false);
+                        clickFeedback();
+                    }
+                    return true;
+                }
+            } else {
+                if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == 85
+                        || keyCode == KeyEvent.KEYCODE_MEDIA_STOP || keyCode == 86
+                        || keyCode == 126 || keyCode == 127
+                        || keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS || keyCode == 88
+                        || keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == 87) {
+                    return true;
+                }
+            }
+        }
+
+        // =======================================================
         // 🎧 1. 하단 시작/정지 버튼 (Play/Pause) 제어 구역
         // =======================================================
         if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE ||
@@ -13574,7 +13635,7 @@ public class MainActivity extends Activity {
                     return true;
                 }
                 if ((event.getFlags() & KeyEvent.FLAG_CANCELED_LONG_PRESS) == 0) {
-                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(0, -1);
+                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(0, -1, false);
                     clickFeedback();
                     return true;
                 }
@@ -14298,8 +14359,9 @@ public class MainActivity extends Activity {
 
                     // ⏮ 이전 곡 버튼 (비디오 재생 화면에서는 dispatchKeyEvent가 -10초 탐색으로 이미 처리하므로 무시)
                     if (keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS || keyCode == 88) {
-                        if (MainActivity.instance.currentScreenState == STATE_VIDEO_PLAYER) {
-                            // 무시 - 비디오 화면에서 담당
+                        if (MainActivity.instance.currentScreenState == STATE_VIDEO_PLAYER
+                                || MainActivity.instance.currentScreenState == STATE_WIFI_KEYBOARD) {
+                            // 무시 - 비디오 화면 및 키보드에서 담당
                         } else if (MainActivity.instance.activePlayer == 1) {
                             // 🚀 [스크린 오프 컨트롤 연동] 라디오가 켜져 있으면 저장된 이전 채널로 이동!
                             MainActivity.instance.tuneToNextSavedRadioChannel(false);
@@ -14311,8 +14373,9 @@ public class MainActivity extends Activity {
                     }
                     // ⏭ 다음 곡 버튼 (비디오 재생 화면에서는 dispatchKeyEvent가 +10초 탐색으로 이미 처리하므로 무시)
                     else if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == 87) {
-                        if (MainActivity.instance.currentScreenState == STATE_VIDEO_PLAYER) {
-                            // 무시 - 비디오 화면에서 담당
+                        if (MainActivity.instance.currentScreenState == STATE_VIDEO_PLAYER
+                                || MainActivity.instance.currentScreenState == STATE_WIFI_KEYBOARD) {
+                            // 무시 - 비디오 화면 및 키보드에서 담당
                         } else if (MainActivity.instance.activePlayer == 1) {
                             // 🚀 [스크린 오프 컨트롤 연동] 라디오가 켜져 있으면 저장된 다음 채널로 이동!
                             MainActivity.instance.tuneToNextSavedRadioChannel(true);
@@ -14330,8 +14393,9 @@ public class MainActivity extends Activity {
                         // Control이 켜져 있을 때) 같은 물리 버튼 신호를 독립적으로 또 받아 음악까지 틀어버리는
                         // 버그였습니다 - 영상은 그대로인데 음악이 갑자기 재생 시작되는 증상으로 나타났습니다.
                         if (MainActivity.instance.activePlayer == 1
-                                || MainActivity.instance.currentScreenState == STATE_VIDEO_PLAYER) {
-                            // 💡 라디오/비디오 화면에서는 하단 버튼을 눌러도 음악을 재생하지 않고 무시합니다.
+                                || MainActivity.instance.currentScreenState == STATE_VIDEO_PLAYER
+                                || MainActivity.instance.currentScreenState == STATE_WIFI_KEYBOARD) {
+                            // 💡 라디오/비디오/키보드 화면에서는 하단 버튼을 눌러도 음악을 재생하지 않고 무시합니다.
                         } else {
                             com.themoon.y1.managers.AudioPlayerManager.getInstance().playOrPauseMusic();
                             MainActivity.instance.clickFeedback();
