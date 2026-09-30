@@ -606,6 +606,7 @@ public class MainActivity extends Activity {
     // 💡 미디어 스캐너가 현재 작업 중인지 추적하는 변수
     private boolean isMediaScanning = false;
     private com.themoon.y1.managers.ExternalSdMountMonitor externalSdMountMonitor;
+    private long lastUsbDialogShownMs = 0;
     private AudioManager audioManager;
     private File rootFolder = StoragePaths.getMusicDir();
     private File currentFolder = rootFolder;
@@ -1394,6 +1395,16 @@ public class MainActivity extends Activity {
             }
             else if ("com.themoon.y1.RESCAN_LIBRARY".equals(action)) {
                 startMediaLibraryScan();
+            }
+            else if ("android.hardware.usb.action.USB_STATE".equals(action)) {
+                boolean usbConnected = intent.getBooleanExtra("connected", false);
+                if (usbConnected) {
+                    long now = System.currentTimeMillis();
+                    if (now - lastUsbDialogShownMs > 8000) {
+                        lastUsbDialogShownMs = now;
+                        showUsbStorageDialog();
+                    }
+                }
             }
         }
     };
@@ -2766,6 +2777,7 @@ public class MainActivity extends Activity {
         filter.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
         filter.addAction(Intent.ACTION_SCREEN_OFF);
         filter.addAction(Intent.ACTION_SCREEN_ON);
+        filter.addAction("android.hardware.usb.action.USB_STATE");
 
 
         try {
@@ -15513,6 +15525,192 @@ public class MainActivity extends Activity {
             }
         });
     }
+    // =======================================================
+    // USB storage dialog — shown when USB cable is connected
+    // =======================================================
+    public void showUsbStorageDialog() {
+        final android.app.Dialog dialog = new android.app.Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
+
+        float d = getResources().getDisplayMetrics().density;
+
+        final LinearLayout rootLayout = new LinearLayout(this);
+        rootLayout.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(ThemeManager.getOverlayBackgroundColor() | 0xCC000000);
+        bg.setCornerRadius(15 * d);
+        bg.setStroke((int) (1 * d), 0x33FFFFFF);
+        rootLayout.setBackground(bg);
+        rootLayout.setPadding((int) (15 * d), (int) (20 * d), (int) (15 * d), (int) (15 * d));
+
+        // Tabler USB icon (tab:usb — 24×24 viewport) drawn on a small Canvas
+        // Path taken from tabler.io icon set (MIT licence)
+        android.widget.ImageView ivUsb = new android.widget.ImageView(this);
+        int iconSizePx = (int) (32 * d);
+        android.graphics.Bitmap bmp = android.graphics.Bitmap.createBitmap(iconSizePx, iconSizePx,
+                android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas c = new android.graphics.Canvas(bmp);
+        android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        p.setColor(ThemeManager.getTextColorPrimary());
+        p.setStyle(android.graphics.Paint.Style.STROKE);
+        p.setStrokeWidth(1.5f * d);
+        p.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+        p.setStrokeJoin(android.graphics.Paint.Join.ROUND);
+        float sc = iconSizePx / 24f;
+        // Tabler "usb" icon paths (simplified stroke paths on 24×24 grid)
+        android.graphics.Path path = new android.graphics.Path();
+        // connector body: M 10 20 L 14 20 — bottom bar
+        path.moveTo(10 * sc, 20 * sc); path.lineTo(14 * sc, 20 * sc);
+        // M 12 20 L 12 8 — stem
+        path.moveTo(12 * sc, 20 * sc); path.lineTo(12 * sc, 8 * sc);
+        // M 9 8 L 15 8 — top bar
+        path.moveTo(9 * sc, 8 * sc); path.lineTo(15 * sc, 8 * sc);
+        // M 9 8 L 9 11 — left leg
+        path.moveTo(9 * sc, 8 * sc); path.lineTo(9 * sc, 11 * sc);
+        // M 15 8 L 15 11 — right leg
+        path.moveTo(15 * sc, 8 * sc); path.lineTo(15 * sc, 11 * sc);
+        // circle at top: M 12 5 m -1.5 0 a 1.5 1.5 0 1 0 3 0 a 1.5 1.5 0 1 0 -3 0
+        path.addCircle(12 * sc, 5 * sc, 1.5f * sc, android.graphics.Path.Direction.CW);
+        c.drawPath(path, p);
+        ivUsb.setImageBitmap(bmp);
+        LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(iconSizePx, iconSizePx);
+        iconLp.gravity = Gravity.CENTER_HORIZONTAL;
+        iconLp.bottomMargin = (int) (8 * d);
+        ivUsb.setLayoutParams(iconLp);
+        rootLayout.addView(ivUsb);
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText(t("USB Connected"));
+        tvTitle.setTextColor(ThemeManager.getTextColorPrimary());
+        tvTitle.setTextSize(17f);
+        tvTitle.setTypeface(ThemeManager.getCustomFontBold());
+        tvTitle.setGravity(Gravity.CENTER);
+        tvTitle.setPadding(0, 0, 0, (int) (6 * d));
+        rootLayout.addView(tvTitle);
+
+        TextView tvMsg = new TextView(this);
+        tvMsg.setText(t("Connect this device as USB storage to transfer files to your computer?"));
+        tvMsg.setTextColor(ThemeManager.getTextColorSecondary());
+        tvMsg.setTextSize(13f);
+        tvMsg.setTypeface(ThemeManager.getCustomFont(), Typeface.NORMAL);
+        tvMsg.setGravity(Gravity.CENTER);
+        tvMsg.setPadding((int) (4 * d), 0, (int) (4 * d), (int) (18 * d));
+        tvMsg.setLineSpacing(0, 1.3f);
+        rootLayout.addView(tvMsg);
+
+        View.OnKeyListener dialogWheelListener = new View.OnKeyListener() {
+            @Override
+            public boolean onKey(View v, int keyCode, KeyEvent event) {
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    if (keyCode == 19 || keyCode == 21) {
+                        int idx = rootLayout.indexOfChild(v);
+                        for (int i = idx - 1; i >= 0; i--) {
+                            if (rootLayout.getChildAt(i).isFocusable()) {
+                                rootLayout.getChildAt(i).requestFocus();
+                                clickFeedback();
+                                return true;
+                            }
+                        }
+                        return true;
+                    }
+                    if (keyCode == 20 || keyCode == 22) {
+                        int idx = rootLayout.indexOfChild(v);
+                        for (int i = idx + 1; i < rootLayout.getChildCount(); i++) {
+                            if (rootLayout.getChildAt(i).isFocusable()) {
+                                rootLayout.getChildAt(i).requestFocus();
+                                clickFeedback();
+                                return true;
+                            }
+                        }
+                        return true;
+                    }
+                }
+                return false;
+            }
+        };
+
+        // Tabler icon: "device-usb-stick" \uED8C (Material: usb \uE1E0)
+        View btnConnect = createListButtonWithIcon("\uE1E0", t("Connect as Storage"));
+        btnConnect.setOnKeyListener(dialogWheelListener);
+        btnConnect.setOnClickListener(v -> {
+            clickFeedback();
+            dialog.dismiss();
+            enableUsbMassStorage();
+        });
+        rootLayout.addView(btnConnect);
+
+        View btnCharge = createListButtonWithIcon("\uE14F", t("Charge Only"));
+        btnCharge.setOnKeyListener(dialogWheelListener);
+        btnCharge.setOnClickListener(v -> {
+            clickFeedback();
+            dialog.dismiss();
+        });
+        rootLayout.addView(btnCharge);
+
+        dialog.setContentView(rootLayout);
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setLayout((int) (300 * d), ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        dialog.show();
+
+        rootLayout.postDelayed(() -> {
+            if (rootLayout.getChildCount() > 0) {
+                // Focus "Connect as Storage" button (index 3 — after icon, title, msg)
+                for (int i = 0; i < rootLayout.getChildCount(); i++) {
+                    if (rootLayout.getChildAt(i).isFocusable()) {
+                        rootLayout.getChildAt(i).requestFocus();
+                        break;
+                    }
+                }
+            }
+        }, 60);
+    }
+
+    /**
+     * Enables USB Mass Storage so the device appears as a drive on the PC.
+     * Uses IMountService reflection (KitKat / API 19 path). Falls back to the
+     * system UsbStorageActivity intent if reflection is unavailable.
+     */
+    private void enableUsbMassStorage() {
+        try {
+            // KitKat path: android.os.storage.IMountService via ServiceManager
+            Object mountService = Class.forName("android.os.ServiceManager")
+                    .getMethod("getService", String.class)
+                    .invoke(null, "mount");
+            if (mountService != null) {
+                Object stub = Class.forName("android.os.storage.IMountService$Stub")
+                        .getMethod("asInterface", android.os.IBinder.class)
+                        .invoke(null, mountService);
+                if (stub != null) {
+                    stub.getClass().getMethod("enableUsbMassStorage").invoke(stub);
+                    Toast.makeText(this, t("Connecting as USB storage\u2026"), Toast.LENGTH_SHORT).show();
+                    return;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        // Fallback: ask the system UMS activity
+        try {
+            Intent umsIntent = new Intent();
+            umsIntent.setClassName("com.android.settings",
+                    "com.android.settings.UsbSettings");
+            startActivity(umsIntent);
+        } catch (Exception e) {
+            try {
+                Intent umsIntent = new Intent("android.hardware.usb.action.USB_STATE");
+                umsIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(umsIntent);
+            } catch (Exception ignored2) {
+                Toast.makeText(this,
+                        t("Please enable USB storage in system settings."),
+                        Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
     // =======================================================
     // 🚀 [팝업 2] 플레이리스트 목록에서 '플레이리스트 파일 자체'를 지울 때 뜨는 커스텀 팝업
     // =======================================================
