@@ -542,6 +542,8 @@ public class MainActivity extends Activity {
 
     // 🚀 [iPod 스타일] Now Playing 하단 바 4단계 순환 (0:Progress 1:Seek 2:Shuffle&Repeat 3:Rating)
     private int nowPlayingBottomState = 0;
+    private int pendingSeekPosition;
+    private boolean pendingSeekChanged;
     private View rowPlayerProgress, rowPlayerSeek, rowPlayerShuffleRepeat, rowPlayerRatingScrub, rowPlayerVolume;
     private ProgressBar playerVolumeProgress;
     private TextView tvPlayerSeekCurrent, tvPlayerSeekTotal;
@@ -571,6 +573,12 @@ public class MainActivity extends Activity {
 
     public int currentKeyboardMode = 0;
 
+    // 🚀 [버그 수리] Wi-Fi 비밀번호에 세미콜론/콜론 등을 입력할 수 없다는 신고 - 원래 기호 세트가
+    // 너무 좁아서(느낌표/골뱅이 등 몇 개뿐) 실제 WPA 비밀번호에 흔히 쓰이는 문자들이 아예 빠져 있었습니다.
+    // 이 키보드는 Wi-Fi/팟캐스트 검색/Last.fm 로그인/일반 검색에 전부 공유되므로 여기서 넓혀주면
+    // 전부 다 혜택을 봅니다. 큰따옴표(")는 일부러 뺐습니다 - Wi-Fi 연결 코드가 비밀번호를 큰따옴표로
+    // 감싸서 전달하는데(preSharedKey = "\"" + typedPassword + "\""), 비밀번호 안에 큰따옴표가 섞이면
+    // 그 감싸기 자체가 깨질 수 있습니다.
     private final String[] KEYBOARD_CHARS = {
             "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u",
             "v", "w", "x", "y", "z",
@@ -578,6 +586,7 @@ public class MainActivity extends Activity {
             "V", "W", "X", "Y", "Z",
             "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
             "!", "@", "#", "$", "%", "^", "&", "*", "-", "_", "+", "=", ".", "?",
+            ";", ":", ",", "/", "\\", "(", ")", "[", "]", "{", "}", "<", ">", "'", "~", "`", "|",
             "[SPACE]", "[DEL]", "[CONN]"
     };
 
@@ -775,7 +784,7 @@ public class MainActivity extends Activity {
         updateScreenOffFeedback(false);
         com.themoon.y1.managers.FmRadioManager fm = com.themoon.y1.managers.FmRadioManager.getInstance(this);
         // 🚀 [웹 서버 방어막] 라디오뿐만 아니라 서버가 돌아갈 때도 '가상 암전 모드'를 사용하여 CPU가 잠들지 않게 보호합니다!
-        if (fm.isPowerUp || activePlayer == 1 || isServerRunning) {
+        if (fm.isPowerUp || activePlayer == 1 || isServerRunning || currentScreenState == STATE_VIDEO_PLAYER) {
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
@@ -941,7 +950,8 @@ public class MainActivity extends Activity {
                     tvPlayerTimeTotal.setText("-" + formatTime(Math.max(0, duration - current)));
 
                     // 🚀 [iPod 스타일] Seek 상태(1번)일 때는 다이아몬드 탐색바도 같이 흘러가게 동기화!
-                    if (nowPlayingBottomState == 1 && tvPlayerSeekCurrent != null) {
+                    if (nowPlayingBottomState == 1 && !pendingSeekChanged && tvPlayerSeekCurrent != null) {
+                        pendingSeekPosition = current;
                         tvPlayerSeekCurrent.setText(formatTime(current));
                         tvPlayerSeekTotal.setText("-" + formatTime(Math.max(0, duration - current)));
                         seekPlayerScrub.setMax(duration > 0 ? duration : 1000);
@@ -1807,8 +1817,17 @@ public class MainActivity extends Activity {
                 int ipodClassicIndex = ThemeManager.findThemeIndexByName("iPod Classic");
                 ThemeManager.setThemeIndex(ipodClassicIndex >= 0 ? ipodClassicIndex : 0);
             } else {
-                int savedThemeIndex = prefs.getInt("app_theme_index", 0);
-                ThemeManager.setThemeIndex(savedThemeIndex);
+                // 🚀 [USB 마스 스토리지 버그 수리] 예전 사용자를 위해 인덱스도 계속 읽지만, 이름 저장값이 있다면
+                // 항상 이름을 우선합니다 - SD카드가 PC에 마운트되었다 빠지면서 폴더 스캔 순서가 바뀌어도
+                // (흔한 FAT32 동작) 저장된 인덱스가 엉뚱한(보통 기본) 테마를 가리키는 문제를 막습니다.
+                String savedThemeName = prefs.getString("app_theme_name", null);
+                int resolvedIndex = savedThemeName != null ? ThemeManager.findThemeIndexByName(savedThemeName) : -1;
+                if (resolvedIndex >= 0) {
+                    ThemeManager.setThemeIndex(resolvedIndex);
+                } else {
+                    int savedThemeIndex = prefs.getInt("app_theme_index", 0);
+                    ThemeManager.setThemeIndex(savedThemeIndex);
+                }
             }
         } catch (Exception e) {
         }
@@ -3906,7 +3925,7 @@ public class MainActivity extends Activity {
                     android.graphics.drawable.LayerDrawable layer = (android.graphics.drawable.LayerDrawable) playerProgress
                             .getProgressDrawable();
                     android.graphics.drawable.Drawable progress = layer.findDrawableByLayerId(android.R.id.progress);
-                    if (progress != null)
+                    if (progress != null && !ThemeManager.isClassicTheme())
                         progress.setColorFilter(themeFocusColor, android.graphics.PorterDuff.Mode.SRC_IN);
                 } catch (Exception e) {
                     playerProgress.getProgressDrawable().setColorFilter(themeFocusColor,
@@ -3918,7 +3937,7 @@ public class MainActivity extends Activity {
                     android.graphics.drawable.LayerDrawable layer = (android.graphics.drawable.LayerDrawable) volumeProgress
                             .getProgressDrawable();
                     android.graphics.drawable.Drawable progress = layer.findDrawableByLayerId(android.R.id.progress);
-                    if (progress != null)
+                    if (progress != null && !ThemeManager.isClassicTheme())
                         progress.setColorFilter(themeFocusColor, android.graphics.PorterDuff.Mode.SRC_IN);
                 } catch (Exception e) {
                     volumeProgress.getProgressDrawable().setColorFilter(themeFocusColor,
@@ -3930,7 +3949,7 @@ public class MainActivity extends Activity {
                     android.graphics.drawable.LayerDrawable layer = (android.graphics.drawable.LayerDrawable) pbBrightness
                             .getProgressDrawable();
                     android.graphics.drawable.Drawable progress = layer.findDrawableByLayerId(android.R.id.progress);
-                    if (progress != null)
+                    if (progress != null && !ThemeManager.isClassicTheme())
                         progress.setColorFilter(themeFocusColor, android.graphics.PorterDuff.Mode.SRC_IN);
                 } catch (Exception e) {
                     pbBrightness.getProgressDrawable().setColorFilter(themeFocusColor,
@@ -3977,6 +3996,11 @@ public class MainActivity extends Activity {
                     try {
                         SharedPreferences.Editor editor = prefs.edit();
                         editor.putInt("app_theme_index", index);
+                        // 🚀 [USB 마스 스토리지 버그 수리] 이름도 함께 저장합니다 - 순수 인덱스만 저장하면, SD카드를
+                        // PC에 마운트했다가 뺀 뒤 파일시스템이 폴더 스캔 순서를 다르게 돌려줄 때(흔한 FAT32 동작)
+                        // 저장된 인덱스가 완전히 다른 테마를 가리키게 되어 "갑자기 기본 테마로 돌아갔다"는 증상이
+                        // 나왔습니다. 다음 시작 시 이름으로 다시 찾으면 순서가 바뀌어도 항상 정확한 테마를 찾습니다.
+                        editor.putString("app_theme_name", ThemeManager.availableThemes.get(index).name);
                         editor.putBoolean("reboot_to_theme", true);
 
                         // 🚀 [지능형 룰 1] 새로 선택한 테마에 고유 배경화면이 있는지 3중으로 검사합니다.
@@ -5313,7 +5337,22 @@ public class MainActivity extends Activity {
 
         if (currentScreenState == STATE_PLAYER) {
             // 🚀 [iPod 스타일] Center 클릭 시 하단 바가 Progress→Seek→Shuffle&Repeat→Rating→Progress 순으로 순환!
-            nowPlayingBottomState = (nowPlayingBottomState + 1) % 4;
+            com.themoon.y1.managers.AudioPlayerManager am = com.themoon.y1.managers.AudioPlayerManager.getInstance();
+            if (nowPlayingBottomState == 1 && pendingSeekChanged) {
+                am.seekRelative(pendingSeekPosition - am.getCurrentPosition());
+                pendingSeekChanged = false;
+                nowPlayingBottomState = 0;
+                int duration = am.getDuration();
+                tvPlayerTimeCurrent.setText(formatTime(pendingSeekPosition));
+                tvPlayerTimeTotal.setText("-" + formatTime(Math.max(0, duration - pendingSeekPosition)));
+                playerProgress.setProgress(duration > 0 ? (int) (100L * pendingSeekPosition / duration) : 0);
+            } else {
+                nowPlayingBottomState = (nowPlayingBottomState + 1) % 4;
+                if (nowPlayingBottomState == 1) {
+                    pendingSeekPosition = am.getCurrentPosition();
+                    pendingSeekChanged = false;
+                }
+            }
             updateNowPlayingBottomBarState();
             clickFeedback();
         } else if (currentScreenState == STATE_WIFI_KEYBOARD) {
@@ -7888,6 +7927,17 @@ public class MainActivity extends Activity {
 
     private void buildVideoListUI() {
         if (containerVideoItems == null) return;
+        float density = getResources().getDisplayMetrics().density;
+        boolean classic = ThemeManager.isClassicTheme();
+        layoutVideosMode.setBackgroundColor(classic ? ThemeManager.getOverlayBackgroundColor() : 0x66000000);
+        layoutVideosMode.setPadding(classic ? 0 : (int) (10 * density),
+                (int) ((classic ? 0 : 36) * density), classic ? 0 : (int) (10 * density),
+                classic ? 0 : (int) (10 * density));
+        android.widget.FrameLayout.LayoutParams videoListParams =
+                (android.widget.FrameLayout.LayoutParams) layoutVideosMode.getLayoutParams();
+        videoListParams.topMargin = classic ? (int) (26 * density) : 0;
+        layoutVideosMode.setLayoutParams(videoListParams);
+        ((ViewGroup) layoutVideosMode).getChildAt(0).setVisibility(classic ? View.GONE : View.VISIBLE);
         scanVideoLibrary();
         containerVideoItems.removeAllViews();
 
@@ -7983,6 +8033,8 @@ public class MainActivity extends Activity {
         row.addView(tvArrow);
 
         final int normalColor = ThemeManager.getTextColorPrimary();
+        tvTitle.setTextColor(normalColor);
+        ClassicMenuStyle.apply(row, tvTitle, tvArrow, 64);
         row.setOnFocusChangeListener(new View.OnFocusChangeListener() {
             @Override
             public void onFocusChange(View v, boolean hasFocus) {
@@ -8053,6 +8105,9 @@ public class MainActivity extends Activity {
 
     private void openVideoPlayer(int index) {
         if (index < 0 || index >= videoLibrary.size() || surfaceVideo == null) return;
+        if (com.themoon.y1.managers.AudioPlayerManager.getInstance().isPlaying()) {
+            com.themoon.y1.managers.AudioPlayerManager.getInstance().playOrPauseMusic();
+        }
         currentVideoIndex = index;
         File videoFile = videoLibrary.get(index);
 
@@ -11853,6 +11908,9 @@ public class MainActivity extends Activity {
 
     private void updateNowPlayingBottomBarState() {
         if (rowPlayerProgress == null) return;
+        volumeHandler.removeCallbacks(hideVolumeTask);
+        volumeHandler.removeCallbacks(hideNowPlayingVolumeTask);
+        if (rowPlayerVolume != null) rowPlayerVolume.setVisibility(View.GONE);
         rowPlayerProgress.setVisibility(nowPlayingBottomState == 0 ? View.VISIBLE : View.GONE);
         rowPlayerSeek.setVisibility(nowPlayingBottomState == 1 ? View.VISIBLE : View.GONE);
         rowPlayerShuffleRepeat.setVisibility(nowPlayingBottomState == 2 ? View.VISIBLE : View.GONE);
@@ -11860,7 +11918,7 @@ public class MainActivity extends Activity {
 
         if (nowPlayingBottomState == 1) {
             com.themoon.y1.managers.AudioPlayerManager am = com.themoon.y1.managers.AudioPlayerManager.getInstance();
-            int current = am.getCurrentPosition();
+            int current = pendingSeekChanged ? pendingSeekPosition : am.getCurrentPosition();
             int duration = am.getDuration();
             tvPlayerSeekCurrent.setText(formatTime(current));
             tvPlayerSeekTotal.setText("-" + formatTime(Math.max(0, duration - current)));
@@ -11876,7 +11934,11 @@ public class MainActivity extends Activity {
     // 🚀 [공용화] Now Playing 화면에서 휠을 돌렸을 때의 동작 - 순환 상태에 따라 볼륨/탐색/셔플&리핏/별점 중 하나로 분기
     private void handleNowPlayingWheelInput(boolean up) {
         if (nowPlayingBottomState == 1) {
-            com.themoon.y1.managers.AudioPlayerManager.getInstance().seekRelative(up ? 5000 : -5000);
+            com.themoon.y1.managers.AudioPlayerManager am = com.themoon.y1.managers.AudioPlayerManager.getInstance();
+            if (!pendingSeekChanged) pendingSeekPosition = am.getCurrentPosition();
+            pendingSeekPosition = (int) Math.max(0L, Math.min((long) am.getDuration(),
+                    (long) pendingSeekPosition + (up ? 5000 : -5000)));
+            pendingSeekChanged = true;
             updateNowPlayingBottomBarState();
         } else if (nowPlayingBottomState == 2) {
             if (up) {
@@ -11901,8 +11963,10 @@ public class MainActivity extends Activity {
 
     private void updateShuffleRepeatScrubLabels() {
         if (tvScrubShuffleValue == null) return;
-        tvScrubShuffleValue.setText(isShuffleMode ? t("Songs") : t("Off"));
-        tvScrubRepeatValue.setText(t(getRepeatModeText(repeatMode)));
+        tvScrubShuffleValue.setText(t("Shuffle") + ": " + (isShuffleMode ? t("Songs") : t("Off")));
+        tvScrubRepeatValue.setText(t("Repeat") + ": " + t(getRepeatModeText(repeatMode)));
+        tvScrubShuffleValue.setTextColor(ThemeManager.getTextColorPrimary());
+        tvScrubRepeatValue.setTextColor(ThemeManager.getTextColorPrimary());
     }
 
     private void updateRatingScrubStars() {
@@ -11911,7 +11975,8 @@ public class MainActivity extends Activity {
             return;
         int rating = getSongRating(currentPlaylist.get(currentIndex).getAbsolutePath());
         for (int i = 0; i < tvScrubStars.length; i++) {
-            tvScrubStars[i].setText(i < rating ? "★" : "☆");
+            tvScrubStars[i].setText(i < rating ? "★" : "•");
+            tvScrubStars[i].setTextColor(ThemeManager.getTextColorPrimary());
         }
     }
 
@@ -11950,29 +12015,40 @@ public class MainActivity extends Activity {
         }
     }
 
+    private String displayedPlayerPath;
+
     public void updatePlayerUI() {
         try {
             if (!currentPlaylist.isEmpty() && currentIndex >= 0 && currentIndex < currentPlaylist.size()) {
                 File currentFile = currentPlaylist.get(currentIndex);
                 updateAudioQualityInfo(currentFile);
 
-                // 🚀 곡이 바뀔 때마다 같은 이름의 .lrc 파일이 있는지 탐색합니다!
-                loadLyrics(currentFile);
-                refreshVisualizerState();
-                updateRatingDisplay();
-                // 🚀 [iPod 스타일] 새 곡이 시작되면 항상 기본 Progress 바 상태로 리셋!
-                nowPlayingBottomState = 0;
-                updateNowPlayingBottomBarState();
+                if (!currentFile.getAbsolutePath().equals(displayedPlayerPath)) {
+                    displayedPlayerPath = currentFile.getAbsolutePath();
+                    // 🚀 곡이 바뀔 때마다 같은 이름의 .lrc 파일이 있는지 탐색합니다!
+                    loadLyrics(currentFile);
+                    refreshVisualizerState();
+                    updateRatingDisplay();
+                    // 🚀 [iPod 스타일] 새 곡이 시작되면 항상 기본 Progress 바 상태로 리셋!
+                    pendingSeekChanged = false;
+                    nowPlayingBottomState = 0;
+                    updateNowPlayingBottomBarState();
+                }
             }
             com.themoon.y1.managers.AudioPlayerManager am = com.themoon.y1.managers.AudioPlayerManager.getInstance();
 
+            int position = am.getCurrentPosition();
+            int duration = am.getDuration();
+            tvPlayerTimeCurrent.setText(formatTime(position));
+            tvPlayerTimeTotal.setText("-" + formatTime(Math.max(0, duration - position)));
             if (am.isPlaying()) {
                 ivAlbumArt.setAlpha(1.0f);
                 ivPauseOverlay.setVisibility(View.GONE);
+                progressHandler.removeCallbacks(updateProgressTask);
                 progressHandler.post(updateProgressTask);
             } else {
-                ivAlbumArt.setAlpha(0.4f);
-                ivPauseOverlay.setVisibility(View.VISIBLE);
+                ivAlbumArt.setAlpha(ThemeManager.isClassicTheme() ? 1f : 0.4f);
+                ivPauseOverlay.setVisibility(ThemeManager.isClassicTheme() ? View.GONE : View.VISIBLE);
                 progressHandler.removeCallbacks(updateProgressTask);
             }
             // 🚀 [신규 추가] 반사 이미지가 항상 현재 앨범 커버와 같은 그림을 보여주도록 동기화!
@@ -12191,6 +12267,7 @@ public class MainActivity extends Activity {
         volumeProgress.setMax(maxVol);
         volumeProgress.setProgress(currentVol);
         volumeHandler.removeCallbacks(hideVolumeTask);
+        volumeHandler.removeCallbacks(hideNowPlayingVolumeTask);
         volumeHandler.postDelayed(hideVolumeTask, 2000);
     }
 
@@ -12515,7 +12592,6 @@ public class MainActivity extends Activity {
                 clickFeedback();
                 return true;
             }
-            return true;
         }
 
         if (currentScreenState == STATE_WEBSERVER) {
@@ -12547,7 +12623,7 @@ public class MainActivity extends Activity {
 
         if (currentScreenState == STATE_MENU || currentScreenState == STATE_BROWSER
                 || currentScreenState == STATE_SETTINGS || currentScreenState == STATE_BLUETOOTH
-                || currentScreenState == STATE_WIFI) {
+                || currentScreenState == STATE_WIFI || currentScreenState == STATE_VIDEOS) {
 
             // 🚀 [순정 커버 플로우 휠 조작 대개조 완료]
             if (currentScreenState == STATE_BROWSER && currentBrowserMode == BROWSER_COVER_FLOW) {
@@ -13232,6 +13308,27 @@ public class MainActivity extends Activity {
         // 여기서 완전히 독립적으로, 가장 먼저 처리하고 return 합니다.
         // =======================================================
         if (currentScreenState == STATE_VIDEO_PLAYER) {
+            if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+                    || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY || keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE) {
+                // Consume both edges here so the shared music handler never sees video controls.
+                if (action == KeyEvent.ACTION_UP && !event.isCanceled()) {
+                    com.themoon.y1.managers.VideoPlayerManager vm = com.themoon.y1.managers.VideoPlayerManager.getInstance();
+                    if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+                            || (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY && !vm.isPlaying())
+                            || (keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE && vm.isPlaying())) {
+                        vm.togglePlayPause();
+                    }
+                    clickFeedback();
+                }
+                return true;
+            }
+            if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS) {
+                if (action == KeyEvent.ACTION_DOWN) {
+                    com.themoon.y1.managers.VideoPlayerManager.getInstance().seekRelative(
+                            keyCode == KeyEvent.KEYCODE_MEDIA_NEXT ? 10000 : -10000);
+                }
+                return true;
+            }
             if (keyCode == 21 || keyCode == 22) {
                 if (action == KeyEvent.ACTION_DOWN) {
                     if (videoSeekModeActive) {
@@ -13243,29 +13340,17 @@ public class MainActivity extends Activity {
                 }
                 return true;
             }
-            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
-                if (action == KeyEvent.ACTION_DOWN) {
-                    if (event.getRepeatCount() == 0) {
-                        videoCenterDownTime = System.currentTimeMillis();
-                        isVideoCenterLongPressed = false;
-                    } else if (System.currentTimeMillis() - videoCenterDownTime > 500 && !isVideoCenterLongPressed) {
-                        isVideoCenterLongPressed = true;
-                        clickFeedback();
-                        toggleVideoSeekMode();
-                    }
-                } else if (action == KeyEvent.ACTION_UP) {
-                    if (!isVideoCenterLongPressed) {
-                        clickFeedback();
-                        com.themoon.y1.managers.VideoPlayerManager.getInstance().togglePlayPause();
-                    }
-                    isVideoCenterLongPressed = false;
-                }
-                return true;
-            }
             if (keyCode == KeyEvent.KEYCODE_BACK) {
                 if (action == KeyEvent.ACTION_DOWN) {
                     clickFeedback();
                     changeScreen(STATE_VIDEOS);
+                }
+                return true;
+            }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+                if (action == KeyEvent.ACTION_UP) {
+                    clickFeedback();
+                    com.themoon.y1.managers.VideoPlayerManager.getInstance().togglePlayPause();
                 }
                 return true;
             }
@@ -13288,7 +13373,9 @@ public class MainActivity extends Activity {
                     isMediaLongPressConsumed = true;
                     clickFeedback();
 
-                    if (currentScreenState == STATE_BROWSER && hzIndexScroll != null) {
+                    if (currentScreenState == STATE_PLAYER && currentIndex >= 0 && currentIndex < currentPlaylist.size()) {
+                        showNowPlayingContextMenu(currentPlaylist.get(currentIndex));
+                    } else if (currentScreenState == STATE_BROWSER && hzIndexScroll != null) {
                         if (currentScrollIndexList != null && !currentScrollIndexList.isEmpty()) {
                             // 💡 [핵심 수정] 이미 떠 있으면 숨기고, 안 떠 있으면 켭니다!
                             if (hzIndexScroll.getVisibility() == View.VISIBLE) {
@@ -13322,101 +13409,6 @@ public class MainActivity extends Activity {
                     com.themoon.y1.managers.AudioPlayerManager.getInstance().playOrPauseMusic();
                 }
                 return true;
-            }
-        }
-
-        // =======================================================
-        // 🔘 2. 가운데 휠 버튼 (Center / Enter) 제어 구역
-        // =======================================================
-        if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
-
-            if (action == KeyEvent.ACTION_DOWN) {
-                if (!isCenterButtonDown) {
-                    isCenterButtonDown = true;
-                    centerButtonDownTime = System.currentTimeMillis();
-                    isCenterLongPressed = false;
-                } else if (System.currentTimeMillis() - centerButtonDownTime > 500 && !isCenterLongPressed) {
-                    // 🚀 [가운데 버튼 길게 누름!]
-                    isCenterLongPressed = true;
-                    clickFeedback();
-
-                    boolean isSongFocused = false;
-                    // 🎯 현재 라이브러리(곡 리스트)에 포커스가 있는지 확인!
-                    if (currentScreenState == STATE_BROWSER && listVirtualSongs != null
-                            && listVirtualSongs.getVisibility() == View.VISIBLE && listVirtualSongs.hasFocus()) {
-                        int position = listVirtualSongs.getSelectedItemPosition();
-                        if (position == ListView.INVALID_POSITION && listVirtualSongs.getFocusedChild() != null) {
-                            position = listVirtualSongs.getPositionForView(listVirtualSongs.getFocusedChild());
-                        }
-
-                        if (position >= 0 && position < virtualSongList.size()) {
-                            isSongFocused = true;
-                            // 🎯 1. 곡 리스트에서 길게 누름 -> 플레이리스트 등록 팝업!
-                            if (currentBrowserMode == 5) {
-                                showRemoveFromFavoritesDialog(virtualSongList.get(position));
-                            } else if (currentBrowserMode == 7) {
-                                showRemoveFromPlaylistDialog(virtualSongList.get(position));
-                            } else {
-                                showAddToPlaylistDialog(virtualSongList.get(position));
-                            }
-                        }
-                    }
-
-                    // 🚀 [iPod 스타일] Now Playing 화면에서 길게 누르면 곡 컨텍스트 메뉴!
-                    if (!isSongFocused && currentScreenState == STATE_PLAYER
-                            && !currentPlaylist.isEmpty() && currentIndex >= 0 && currentIndex < currentPlaylist.size()) {
-                        isSongFocused = true;
-                        showNowPlayingContextMenu(currentPlaylist.get(currentIndex));
-                    }
-
-                    // 🎯 [상황 D] 곡 목록이 아닐 때 -> 안드로이드 순정 롱클릭(메뉴 순서 변경 등) 강제 실행!
-                    if (!isSongFocused) {
-                        View focused = getCurrentFocus();
-                        boolean handled = false;
-                        if (focused != null) {
-                            // 🚀 [핵심 해결] 메뉴 순서 변경(Reorder) 등 뷰 자체에 등록된 롱클릭을 우선적으로 톡! 건드려 깨웁니다.
-                            handled = focused.performLongClick();
-                        }
-
-                        // 뷰에 등록된 롱클릭 기능이 없어서 처리가 안 됐다면? (handled == false)
-                        // 그때 비로소 기본값인 '가상 암전(화면 끄기)'을 발동시킵니다!
-                        if (!handled) {
-                            clickFeedback();
-                            turnOffScreen();
-                        }
-                    }
-                }
-
-                // 🚀 [핵심 방어막] 시스템으로 버튼 눌림(DOWN) 이벤트를 절대 넘기지 않고 여기서 100% 삼킵니다!
-                // 이렇게 하면 시스템이 마음대로 노래를 틀어버리는 중복 클릭 버그가 원천 차단됩니다.
-                return true;
-
-            } else if (action == KeyEvent.ACTION_UP) {
-                isCenterButtonDown = false;
-                if (isCenterLongPressed) {
-                    isCenterLongPressed = false;
-                    return true; // 롱클릭으로 팝업 띄웠다면 여기서 상황 종료! (노래 재생 안 함)
-                } else {
-                    // 🚀 [가운데 버튼 짧게 누름 또는 더블클릭!]
-                    long now = System.currentTimeMillis();
-
-                    if (currentScreenState == STATE_PLAYER) {
-                        // 🎯 [상황 E] 플레이어 화면에서는 더블클릭을 감지합니다 (300ms 이내)
-                        if (now - lastCenterUpTime < 300) {
-                            doubleClickHandler.removeCallbacks(singleClickRunnable); // 숏클릭 예약 폭파
-                            clickFeedback();
-                            toggleFavorite(); // 💖 즐겨찾기 즉시 토글!
-                        } else {
-                            // 더블클릭이 아닐 경우를 대비해 0.3초 뒤에 원래 숏클릭(스펙트럼 토글 등) 실행
-                            doubleClickHandler.postDelayed(singleClickRunnable, 300);
-                        }
-                    } else {
-                        // 다른 화면에서는 딜레이 없이 즉시 곡 재생 등 숏클릭 실행!
-                        handleCenterShortClick();
-                    }
-                    lastCenterUpTime = now;
-                    return true;
-                }
             }
         }
 
@@ -13660,6 +13652,7 @@ public class MainActivity extends Activity {
         clockHandler.removeCallbacks(clockTask);
         progressHandler.removeCallbacks(updateProgressTask);
         volumeHandler.removeCallbacks(hideVolumeTask);
+        volumeHandler.removeCallbacks(hideNowPlayingVolumeTask);
 
         // 🚀 [웹 서버 자물쇠 해제] 앱이 종료될 때 시스템 잠금 좀비 버그가 걸리지 않도록 확실하게 풀어줍니다.
         try {
@@ -14142,31 +14135,42 @@ public class MainActivity extends Activity {
                     if (!MainActivity.instance.isScreenOffControlEnabled)
                         return;
 
-                    // ⏮ 이전 곡 버튼
+                    // ⏮ 이전 곡 버튼 (비디오 재생 화면에서는 dispatchKeyEvent가 -10초 탐색으로 이미 처리하므로 무시)
                     if (keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS || keyCode == 88) {
-                        // 🚀 [스크린 오프 컨트롤 연동] 라디오가 켜져 있으면 저장된 이전 채널로 이동!
-                        if (MainActivity.instance.activePlayer == 1) {
+                        if (MainActivity.instance.currentScreenState == STATE_VIDEO_PLAYER) {
+                            // 무시 - 비디오 화면에서 담당
+                        } else if (MainActivity.instance.activePlayer == 1) {
+                            // 🚀 [스크린 오프 컨트롤 연동] 라디오가 켜져 있으면 저장된 이전 채널로 이동!
                             MainActivity.instance.tuneToNextSavedRadioChannel(false);
+                            MainActivity.instance.clickFeedback();
                         } else {
                             com.themoon.y1.managers.AudioPlayerManager.getInstance().prevTrack();
+                            MainActivity.instance.clickFeedback();
                         }
-                        MainActivity.instance.clickFeedback();
                     }
-                    // ⏭ 다음 곡 버튼
+                    // ⏭ 다음 곡 버튼 (비디오 재생 화면에서는 dispatchKeyEvent가 +10초 탐색으로 이미 처리하므로 무시)
                     else if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == 87) {
-                        // 🚀 [스크린 오프 컨트롤 연동] 라디오가 켜져 있으면 저장된 다음 채널로 이동!
-                        if (MainActivity.instance.activePlayer == 1) {
+                        if (MainActivity.instance.currentScreenState == STATE_VIDEO_PLAYER) {
+                            // 무시 - 비디오 화면에서 담당
+                        } else if (MainActivity.instance.activePlayer == 1) {
+                            // 🚀 [스크린 오프 컨트롤 연동] 라디오가 켜져 있으면 저장된 다음 채널로 이동!
                             MainActivity.instance.tuneToNextSavedRadioChannel(true);
+                            MainActivity.instance.clickFeedback();
                         } else {
                             com.themoon.y1.managers.AudioPlayerManager.getInstance().nextTrack();
+                            MainActivity.instance.clickFeedback();
                         }
-                        MainActivity.instance.clickFeedback();
                     }
                     // ⏯ 재생/일시정지 버튼
                     else if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == 85 || keyCode == 86) {
                         // 🚀 [버그 수리 2] 라디오가 켜져 있을 때(activePlayer == 1)는 수신기에서도 음악을 틀지 못하도록 철벽 방어!
-                        if (MainActivity.instance.activePlayer == 1) {
-                            // 💡 라디오 모드일 때는 하단 버튼을 눌러도 음악을 재생하지 않고 무시합니다.
+                        // 🚀 [버그 수리 3] 비디오 재생 화면에서도 마찬가지! dispatchKeyEvent가 이미 이 버튼을 받아서
+                        // VideoPlayerManager의 재생/일시정지를 정확히 처리하고 있는데, 이 방송 수신기가 (Screen Off
+                        // Control이 켜져 있을 때) 같은 물리 버튼 신호를 독립적으로 또 받아 음악까지 틀어버리는
+                        // 버그였습니다 - 영상은 그대로인데 음악이 갑자기 재생 시작되는 증상으로 나타났습니다.
+                        if (MainActivity.instance.activePlayer == 1
+                                || MainActivity.instance.currentScreenState == STATE_VIDEO_PLAYER) {
+                            // 💡 라디오/비디오 화면에서는 하단 버튼을 눌러도 음악을 재생하지 않고 무시합니다.
                         } else {
                             com.themoon.y1.managers.AudioPlayerManager.getInstance().playOrPauseMusic();
                             MainActivity.instance.clickFeedback();
@@ -15726,6 +15730,18 @@ public class MainActivity extends Activity {
                 .create();
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
 
+        // 🚀 [버그 수리] Center 롱프레스가 이제 화면 잠금 전용이 되면서, 예전에 즐겨찾기를 켜고 끄던
+        // "Center 더블클릭" 경로가 죽은 코드가 되어 즐겨찾기를 켤 방법이 아예 사라졌습니다 - 이 메뉴로 복구합니다.
+        boolean isFav = favoritePaths.contains(songFile.getAbsolutePath());
+        View btnFavorite = createListButtonWithIcon("", isFav ? t("Remove from Favorites") : t("Add to Favorites"));
+        btnFavorite.setOnKeyListener(dialogWheelListener);
+        btnFavorite.setOnClickListener(v -> {
+            clickFeedback();
+            dialog.dismiss();
+            toggleFavorite();
+        });
+        layout.addView(btnFavorite);
+
         View btnOnTheGo = createListButtonWithIcon("", t("Add to On-The-Go"));
         btnOnTheGo.setOnKeyListener(dialogWheelListener);
         btnOnTheGo.setOnClickListener(v -> {
@@ -15988,6 +16004,10 @@ public class MainActivity extends Activity {
     }
 
     public void updateAudioQualityInfo(File audioFile) {
+        if (ThemeManager.isClassicTheme()) {
+            if (layoutAudioQualityContainer != null) layoutAudioQualityContainer.setVisibility(View.GONE);
+            return;
+        }
         if (layoutAudioQualityContainer == null || audioFile == null || !audioFile.exists()) {
             if (layoutAudioQualityContainer != null)
                 layoutAudioQualityContainer.setVisibility(View.GONE);
