@@ -1040,7 +1040,7 @@ public class MainActivity extends Activity {
         }
     };
 
-    public static final int VIRTUAL_VOLUME_STEPS = 30;
+    public static final int VIRTUAL_VOLUME_STEPS = com.themoon.y1.managers.VirtualVolumeManager.VIRTUAL_VOLUME_STEPS;
     private int currentVirtualVolume = -1;
 
     private int lastTargetVolume = -1;
@@ -1089,7 +1089,7 @@ public class MainActivity extends Activity {
                         currentVirtualVolume = systemToVirtualVolume(curSys, maxVol);
                     }
                     float gain = virtualToSoftwareGain(currentVirtualVolume);
-                    com.themoon.y1.managers.AudioPlayerManager.getInstance().setMasterVolume(gain);
+                    com.themoon.y1.managers.VirtualVolumeManager.getInstance().setMasterGain(gain);
                 } catch (Exception ignored) {}
             } else if ("android.media.VOLUME_CHANGED_ACTION".equals(action)) {
                 int streamType = intent.getIntExtra("android.media.EXTRA_VOLUME_STREAM_TYPE", -1);
@@ -1150,7 +1150,7 @@ public class MainActivity extends Activity {
                             }
                             float gain = virtualToSoftwareGain(currentVirtualVolume);
                             try {
-                                com.themoon.y1.managers.AudioPlayerManager.getInstance().setMasterVolume(gain);
+                                com.themoon.y1.managers.VirtualVolumeManager.getInstance().setMasterGain(gain);
                             } catch (Exception ignored) {}
                             clickFeedback();
                             if (!isScreenSleeping && isDeviceScreenOn()) {
@@ -1160,7 +1160,7 @@ public class MainActivity extends Activity {
                             currentVirtualVolume = systemToVirtualVolume(newVol, maxVol);
                             float gain = virtualToSoftwareGain(currentVirtualVolume);
                             try {
-                                com.themoon.y1.managers.AudioPlayerManager.getInstance().setMasterVolume(gain);
+                                com.themoon.y1.managers.VirtualVolumeManager.getInstance().setMasterGain(gain);
                             } catch (Exception ignored) {}
                             clickFeedback();
                             if (!isScreenSleeping && isDeviceScreenOn()) {
@@ -1170,7 +1170,7 @@ public class MainActivity extends Activity {
                             currentVirtualVolume = systemToVirtualVolume(newVol, maxVol);
                             float gain = virtualToSoftwareGain(currentVirtualVolume);
                             try {
-                                com.themoon.y1.managers.AudioPlayerManager.getInstance().setMasterVolume(gain);
+                                com.themoon.y1.managers.VirtualVolumeManager.getInstance().setMasterGain(gain);
                             } catch (Exception ignored) {}
                             if (!isScreenSleeping && isDeviceScreenOn()) {
                                 showDynamicVolumeOverlay(currentVirtualVolume, VIRTUAL_VOLUME_STEPS);
@@ -2783,7 +2783,7 @@ public class MainActivity extends Activity {
             lastKnownSystemVolume = curSys;
             currentVirtualVolume = systemToVirtualVolume(curSys, maxSys);
             float initGain = virtualToSoftwareGain(currentVirtualVolume);
-            com.themoon.y1.managers.AudioPlayerManager.getInstance().setMasterVolume(initGain);
+            com.themoon.y1.managers.VirtualVolumeManager.getInstance().setMasterGain(initGain);
         } catch (Exception ignored) {}
     }
 
@@ -4996,10 +4996,12 @@ public class MainActivity extends Activity {
             quizPreviewPlayer = new android.media.MediaPlayer();
             quizPreviewPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
             quizPreviewPlayer.setDataSource(file.getAbsolutePath());
+            com.themoon.y1.managers.VirtualVolumeManager.getInstance().applyTo(quizPreviewPlayer);
             quizPreviewPlayer.setOnPreparedListener(new android.media.MediaPlayer.OnPreparedListener() {
                 @Override
                 public void onPrepared(android.media.MediaPlayer mp) {
                     try {
+                        com.themoon.y1.managers.VirtualVolumeManager.getInstance().applyTo(mp);
                         int duration = mp.getDuration();
                         int start = 0;
                         // 🚀 곡이 충분히 길면 도입부 대신 중간 즈음의 알아보기 쉬운 구간에서 시작!
@@ -5032,6 +5034,7 @@ public class MainActivity extends Activity {
 
     private void stopQuizPreviewPlayback() {
         if (quizPreviewPlayer != null) {
+            com.themoon.y1.managers.VirtualVolumeManager.getInstance().unregisterMediaPlayer(quizPreviewPlayer);
             try {
                 quizPreviewPlayer.stop();
             } catch (Exception e) {
@@ -12088,40 +12091,15 @@ public class MainActivity extends Activity {
     }
 
     public static float virtualToSoftwareGain(int virtualVol) {
-        if (virtualVol <= 0) return 0.0f;
-        switch (virtualVol) {
-            case 1: return 0.04f; // -28 dBFS: ultra-whisper quiet for sensitive Porta Pros in silent room
-            case 2: return 0.10f; // -20 dBFS: very quiet
-            case 3: return 0.20f; // -14 dBFS
-            case 4: return 0.35f; // -9.1 dBFS
-            case 5: return 0.60f; // -4.4 dBFS
-            default: return 1.0f; // 0 dBFS (unattenuated sys vol 1 at step 6)
-        }
+        return com.themoon.y1.managers.VirtualVolumeManager.virtualToSoftwareGain(virtualVol);
     }
 
     public static int virtualToSystemVolume(int virtualVol, int sysMaxVol) {
-        if (virtualVol <= 0) return 0;
-        if (virtualVol <= 6) return 1;
-        if (sysMaxVol <= 1) return 1;
-        int sys = 2 + Math.round((float) (virtualVol - 7) * (sysMaxVol - 2) / 23.0f);
-        if (sys > sysMaxVol) sys = sysMaxVol;
-        return sys;
+        return com.themoon.y1.managers.VirtualVolumeManager.virtualToSystemVolume(virtualVol, sysMaxVol);
     }
 
     public int systemToVirtualVolume(int sysVol, int sysMaxVol) {
-        if (sysVol <= 0) return 0;
-        if (sysVol == 1) {
-            if (currentVirtualVolume >= 1 && currentVirtualVolume <= 6) {
-                return currentVirtualVolume;
-            }
-            return 6;
-        }
-        if (sysMaxVol <= 2) return VIRTUAL_VOLUME_STEPS;
-        if (sysVol >= sysMaxVol) return VIRTUAL_VOLUME_STEPS;
-        float ratio = (float) (sysVol - 2) / (sysMaxVol - 2);
-        int v = 7 + Math.round(ratio * 23.0f);
-        if (v > VIRTUAL_VOLUME_STEPS) v = VIRTUAL_VOLUME_STEPS;
-        return v;
+        return com.themoon.y1.managers.VirtualVolumeManager.systemToVirtualVolume(sysVol, sysMaxVol, currentVirtualVolume);
     }
 
     private int getEffectiveStreamVolume(int stream) {
@@ -12173,7 +12151,7 @@ public class MainActivity extends Activity {
         lastKnownSystemVolume = targetSysVol;
 
         try {
-            com.themoon.y1.managers.AudioPlayerManager.getInstance().setMasterVolume(masterGain);
+            com.themoon.y1.managers.VirtualVolumeManager.getInstance().setMasterGain(masterGain);
         } catch (Exception ignored) {
         }
 
