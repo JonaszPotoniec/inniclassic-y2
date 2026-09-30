@@ -98,10 +98,10 @@ public class MainActivity extends Activity {
     private static final String TAG = "MainActivity";
     // OTA Update URL pointing to GitHub Releases
     private static final String UPDATE_JSON_URL = "https://github.com/JonaszPotoniec/inniclassic-y2/releases/latest/download/update.json";
-    // 🚀 [대개조 완료] 원하는 앨범 개수(홀수: 3, 5, 7 등)를 언제든 설정할 수 있는 스마트 제어판
-    private int visibleCoversCount = 7; // 💡 5개로 복귀! 테스트 시 7 등으로 여기만 바꾸면 전체 자동 연동됩니다.
+    // 🚀 [최적화 9슬롯 버퍼 엔진] 좌우 외곽 버퍼 슬롯(-4, +4)으로 팝인/사라짐 결함 완전 제거
+    private int visibleCoversCount = 9;
 
-    private FrameLayout coverFlowContainer;
+    private com.themoon.y1.views.CoverFlowLayout coverFlowContainer;
     private View[] cfViews; // 💡 크기는 아래 UI 생성기에서 동적으로 결정됩니다.
 
     private boolean isNavigatingToSubMenu = false; // 🚀 [여기에 한 줄 추가!] 다이렉트 접속 시 포커스 꼬임을 막는 방어막
@@ -167,8 +167,51 @@ public class MainActivity extends Activity {
     public List<Float> savedRadioStations = new ArrayList<>();
 
     private static final int BROWSER_COVER_FLOW = 9;
-    private List<SongItem> uniqueAlbumList = new ArrayList<>();
+    public List<SongItem> uniqueAlbumList = new ArrayList<>();
     private int currentCoverFlowIndex = 0;
+
+    /**
+     * Pre-indexes and sorts unique albums from customLibrary and audiobookLibrary.
+     * Running this on the background thread during library scan/load allows Cover Flow
+     * to open in O(1) instant time without main-thread UI freezes.
+     */
+    public void rebuildUniqueAlbumList() {
+        List<SongItem> combinedLibrary = new ArrayList<>();
+        synchronized (customLibrary) {
+            combinedLibrary.addAll(customLibrary);
+        }
+        synchronized (audiobookLibrary) {
+            combinedLibrary.addAll(audiobookLibrary);
+        }
+
+        HashSet<String> checkedAlbums = new HashSet<>();
+        List<SongItem> result = new ArrayList<>();
+
+        for (SongItem song : combinedLibrary) {
+            if (song == null || song.file == null) continue;
+            String album = (song.album != null && !song.album.trim().isEmpty()) ? song.album : "Unknown Album";
+            String parentPath = (song.file.getParentFile() != null) ? song.file.getParentFile().getAbsolutePath() : "";
+            String key = parentPath + " - " + album;
+            if (!checkedAlbums.contains(key)) {
+                checkedAlbums.add(key);
+                result.add(song);
+            }
+        }
+
+        java.util.Collections.sort(result, new java.util.Comparator<SongItem>() {
+            @Override
+            public int compare(SongItem s1, SongItem s2) {
+                int byArtist = s1.albumArtist.compareToIgnoreCase(s2.albumArtist);
+                if (byArtist != 0) return byArtist;
+                return s1.album.compareToIgnoreCase(s2.album);
+            }
+        });
+
+        synchronized (uniqueAlbumList) {
+            uniqueAlbumList.clear();
+            uniqueAlbumList.addAll(result);
+        }
+    }
 
     // 🚀 [통합 엔진] 라디오와 음악 플레이어 중 누가 켜져 있든 상태바(ivStatusPlay)를 완벽하게 동기화합니다!
     public void updateGlobalStatusPlayIcon() {
@@ -1329,6 +1372,15 @@ public class MainActivity extends Activity {
                         && listVirtualSongs.getAdapter() != null) {
                     ((android.widget.BaseAdapter) listVirtualSongs.getAdapter()).notifyDataSetChanged();
                 }
+            }
+            // 🚀 [커버 플로우] 외부 쉘 / ADB / 바로가기에서 캐시 강제 재구축 요청 수신
+            else if ("com.themoon.y1.REBUILD_COVER_CACHE".equals(action)) {
+                rebuildUniqueAlbumList();
+                com.themoon.y1.managers.AlbumCoverManager.getInstance().pregenerateThumbnails(uniqueAlbumList, true);
+                Toast.makeText(context, t("Rebuilding album cover cache..."), Toast.LENGTH_SHORT).show();
+            }
+            else if ("com.themoon.y1.RESCAN_LIBRARY".equals(action)) {
+                startMediaLibraryScan();
             }
         }
     };
@@ -2698,6 +2750,8 @@ public class MainActivity extends Activity {
         // 🚀 [여기에 신규 추가!] 다운로드 국장님이 "다운로드 끝났음!" 하고 외치는 소리를 듣습니다.
         filter.addAction(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
         filter.addAction("android.media.VOLUME_CHANGED_ACTION");
+        filter.addAction("com.themoon.y1.REBUILD_COVER_CACHE");
+        filter.addAction("com.themoon.y1.RESCAN_LIBRARY");
         if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(systemStatusReceiver, filter, Context.RECEIVER_EXPORTED);
         } else {
@@ -3165,6 +3219,8 @@ public class MainActivity extends Activity {
             org.json.JSONObject root = new org.json.JSONObject(sb.toString());
             jsonToSongList(root.optJSONArray("music"), customLibrary);
             jsonToSongList(root.optJSONArray("books"), audiobookLibrary);
+            rebuildUniqueAlbumList();
+            com.themoon.y1.managers.AlbumCoverManager.getInstance().pregenerateThumbnails(uniqueAlbumList, false);
         } catch (Throwable t) {
             Log.e(TAG, "Failed to load library cache: " + t.getMessage());
         }
@@ -3284,6 +3340,10 @@ public class MainActivity extends Activity {
 
                     // 🚀 [신규 추가] 다음 부팅 때 처음부터 다시 스캔하지 않도록, 완성된 라이브러리를 디스크에 저장!
                     saveLibraryCache();
+
+                    // 🚀 [커버 플로우 최적화] 라이브러리 스캔 직후 백그라운드에서 앨범 목록을 미리 정렬 및 색인!
+                    rebuildUniqueAlbumList();
+                    com.themoon.y1.managers.AlbumCoverManager.getInstance().pregenerateThumbnails(uniqueAlbumList);
 
                     runOnUiThread(new Runnable() {
                         @Override
@@ -9321,45 +9381,11 @@ public class MainActivity extends Activity {
             listVirtualSongs.setVisibility(View.GONE);
         containerBrowserItems.removeAllViews();
 
-        uniqueAlbumList.clear();
-
-        // 🚀 [핵심 수정] 뮤직과 오디오북 바구니의 데이터 소스를 하나의 거대한 통합 주머니로 합쳐버립니다!
-        List<SongItem> combinedLibrary = new ArrayList<>();
-        combinedLibrary.addAll(customLibrary);
-        combinedLibrary.addAll(audiobookLibrary);
-
-        HashSet<String> checkedAlbums = new HashSet<>();
-
-        // 3. 통합 주머니에서 중복 없이 온전한 데이터 수집
-        for (SongItem song : combinedLibrary) {
-            // 통합 모드이므로 /Music 폴더 계열과 /Audiobooks 폴더 계열을 모두 프리패스로 허용합니다.
-            boolean isPathMatched = song.file.getAbsolutePath().contains("/Music")
-                    || song.file.getAbsolutePath().contains("/Audiobooks");
-
-            if (isPathMatched) {
-                // 💡 [태그 복구 엔진] 앨범 이름이 없으면 음원이 든 폴더 이름으로 강제 변환!
-
-                // 🚀 [중복 앨범 파쇄기] 아티스트 이름(피처링)이 다르더라도, 같은 '폴더' 안의 같은 '앨범 이름'이라면 무조건 1장의 카드로
-                // 묶어버립니다!
-                String key = song.file.getParentFile().getAbsolutePath() + " - " + song.album;
-
-                if (!checkedAlbums.contains(key)) {
-                    checkedAlbums.add(key);
-                    uniqueAlbumList.add(song);
-                }
-            }
+        // 🚀 [O(1) 광속 장전] 미리 색인/정렬된 uniqueAlbumList 재사용 (없을 때만 빌드)
+        if (uniqueAlbumList.isEmpty()) {
+            rebuildUniqueAlbumList();
         }
-
-        // 🚀 [피드백 반영] 순수 앨범명 알파벳순이 아니라, 실제 아이팟처럼 아티스트별로 앨범을 묶어서
-        // 정렬합니다 - 아티스트 안에서는 앨범명으로 2차 정렬.
-        java.util.Collections.sort(uniqueAlbumList, new java.util.Comparator<SongItem>() {
-            @Override
-            public int compare(SongItem s1, SongItem s2) {
-                int byArtist = s1.albumArtist.compareToIgnoreCase(s2.albumArtist);
-                if (byArtist != 0) return byArtist;
-                return s1.album.compareToIgnoreCase(s2.album);
-            }
-        });
+        com.themoon.y1.managers.AlbumCoverManager.getInstance().pregenerateThumbnails(uniqueAlbumList, false);
 
         // 5. 해당 라이브러리에 앨범이 하나도 없다면 빈 화면 안내 메시지를 출력하고 탈출
         if (uniqueAlbumList.isEmpty()) {
@@ -9395,13 +9421,22 @@ public class MainActivity extends Activity {
             // 0번부터 깔끔하게 열리도록 1회성 기억 변수를 사용 후 깨끗하게 비워줍니다.
             virtualQueryType = "";
             virtualQueryValue = "";
-        } else {
-            // 일반적인 최초 진입 시에는 원래 설계대로 0번 인덱스 장전
+        } else if (currentCoverFlowIndex >= uniqueAlbumList.size()) {
             currentCoverFlowIndex = 0;
         }
 
-        // 6. 아티스트님의 '순정 고정형 배열 엔진(cfViews)'을 가동합니다.
-        coverFlowContainer = new FrameLayout(this);
+        // 6. CoverFlowLayout 컨테이너 장전 (자식 뷰 Z-인덱스 자동 관리, requestLayout 제거)
+        coverFlowContainer = new com.themoon.y1.views.CoverFlowLayout(this);
+        coverFlowContainer.setClipChildren(false);
+        coverFlowContainer.setClipToPadding(false);
+        if (containerBrowserItems != null) {
+            containerBrowserItems.setClipChildren(false);
+            containerBrowserItems.setClipToPadding(false);
+        }
+        if (scrollViewBrowser instanceof ViewGroup) {
+            ((ViewGroup) scrollViewBrowser).setClipChildren(false);
+            ((ViewGroup) scrollViewBrowser).setClipToPadding(false);
+        }
         int containerHeight = (int) (380 * getResources().getDisplayMetrics().density);
         containerBrowserItems.addView(coverFlowContainer, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, containerHeight));
@@ -9427,7 +9462,7 @@ public class MainActivity extends Activity {
         // 정중앙을 기준으로 앞뒤 인덱스를 계산하여 데이터 바인딩
         for (int i = 0; i < visibleCoversCount; i++) {
             int offsetFromCenter = i - centerIdx;
-            int targetIdx = (currentCoverFlowIndex + offsetFromCenter + total * 3) % total;
+            int targetIdx = (currentCoverFlowIndex + offsetFromCenter + total * 10) % total;
             bindCoverData(cfViews[i], targetIdx);
         }
 
@@ -9454,13 +9489,6 @@ public class MainActivity extends Activity {
 
         tvBrowserPath.setText(t("Cover Flow") + " (" + (currentCoverFlowIndex + 1) + "/" + total + ")");
     }
-    // 🚀 [알고리즘 엔진] 중앙에서부터의 거리에 따른 X축 이동 거리 계산
-    // private float getTransXForDist(int dist, float d) {
-    // if (dist == 0) return 0f;
-    // if (dist == 1) return 110 * d;
-    // if (dist == 2) return 180 * d;
-    // return 230 * d; // 거리가 3 이상일 때
-    // }
 
     private float getTransXForDist(int dist, float d) {
         if (dist == 0)
@@ -9469,22 +9497,15 @@ public class MainActivity extends Activity {
             return 130 * d;
         if (dist == 2)
             return 170 * d;
-        return 220 * d; // 거리가 3 이상일 때
+        if (dist == 3)
+            return 215 * d;
+        return 270 * d; // dist >= 4: 화면 밖 오프스크린 버퍼 슬롯
     }
 
     // 🚀 숫자를 높일수록 책장에 책을 비스듬히 꽂아둔 것처럼 각도가 팍 꺾입니다!
-    // private float getRotYForDist(int dist) {
-    // if (dist == 0) return 0f;
-    // if (dist == 1) return 60f; // 💡 45도 -> 60도로 더 깊게 꺾기!
-    // if (dist == 2) return 75f; // 💡 60도 -> 75도로 더 깊게 꺾기!
-    // return 80f;
-    // }
     private float getRotYForDist(int dist) {
         if (dist == 0)
             return 0f;
-        if (dist == 1)
-            return 65f; // 💡 45도 -> 60도로 더 깊게 꺾기!
-        // if (dist == 2) return 75f; // 💡 60도 -> 75도로 더 깊게 꺾기!
         return 65f;
     }
 
@@ -9496,51 +9517,40 @@ public class MainActivity extends Activity {
             return 0.8f;
         if (dist == 2)
             return 0.8f;
-        return 0.8f;
+        if (dist == 3)
+            return 0.8f;
+        return 0.75f; // dist >= 4
     }
 
-    // 🚀 [알고리즘 엔진] 중앙에서부터의 거리에 따른 투명도 계산
-    // private float getAlphaForDist(int dist) {
-    // if (dist == 0) return 1.0f;
-    // if (dist == 1) return 0.8f;
-    // if (dist == 2) return 0.5f;
-    // return 0.1f;
-    // }
+    // 🚀 [알고리즘 엔진] 외곽으로 갈수록 부드러운 페이드아웃 (4번 버퍼 슬롯은 alpha=0)
     private float getAlphaForDist(int dist) {
-        // if (dist == 0) return 1.0f;
-        // if (dist == 1) return 0.8f;
-        // if (dist == 2) return 0.5f;
-        return 1f;
+        if (dist <= 3) return 1.0f;
+        return 0.0f; // dist >= 4: 오프스크린 버퍼 (완전 투명)
     }
 
-    // 🚀 [순정 3D 엔진 3] 데이터 바인딩 및 캐시 폴더 강제 입체 역추적 엔진 장착!
-    private void bindCoverData(View card, int dataIndex) {
+    // 🚀 [AlbumCoverManager 통합] 비동기 LIFO 스레드풀 + 디스크 썸네일 캐시 연동
+    private void bindCoverData(final View card, int dataIndex) {
         if (uniqueAlbumList.isEmpty() || dataIndex < 0 || dataIndex >= uniqueAlbumList.size())
             return;
-        SongItem item = uniqueAlbumList.get(dataIndex);
+        final SongItem item = uniqueAlbumList.get(dataIndex);
 
         final ImageView ivCover = card.findViewById(dynamicViewId(1001));
         final ImageView ivReflection = card.findViewById(dynamicViewId(1004)); // 🚀 반사판 레이어 획득
         TextView tvTitle = card.findViewById(dynamicViewId(1002));
         TextView tvArtist = card.findViewById(dynamicViewId(1003));
 
-        tvTitle.setText(item.album);
-        tvArtist.setText(item.artist);
+        if (tvTitle != null) tvTitle.setText(item.album);
+        if (tvArtist != null) tvArtist.setText(item.artist);
 
-        final String path = item.file.getAbsolutePath();
-        ivCover.setTag(path); // 비동기 꼬임 완벽 차단
+        final String albumKey = com.themoon.y1.managers.AlbumCoverManager.getAlbumKey(item.file, item.album);
+        ivCover.setTag(albumKey); // 비동기 꼬임 완벽 차단
 
-        // 1. 초고속 RAM 캐시 금고 수색 (원본 이미지와 반사판 세트 동시 수색)
-        Bitmap cachedBmp = null;
-        Bitmap cachedRef = null;
-        if (albumArtCache != null) {
-            cachedBmp = albumArtCache.get(path);
-            cachedRef = albumArtCache.get("ref_" + path);
-        }
+        com.themoon.y1.managers.AlbumCoverManager manager = com.themoon.y1.managers.AlbumCoverManager.getInstance();
+        Bitmap cachedBmp = manager.getMemoryCover(albumKey);
+        Bitmap cachedRef = manager.getMemoryReflection(albumKey);
 
         if (cachedBmp != null) {
-            // 💡 램 금고에 둘 다 있다면? 즉시 0.0001초 만에 애니메이션 없이 즉각 바인딩!
-            ivCover.animate().cancel(); // 🚀 이전 애니메이션 잔상 파쇄
+            ivCover.animate().cancel();
             ivCover.setAlpha(1.0f);
             ivCover.setImageBitmap(cachedBmp);
             if (ivReflection != null) {
@@ -9552,8 +9562,8 @@ public class MainActivity extends Activity {
             return;
         }
 
-        // 2. 캐시에 없으면 기본 빈 도화지를 바인딩하고 일꾼(Thread) 발사
-        ivCover.animate().cancel(); // 🚀 이전 애니메이션 잔상 파쇄
+        // 2. RAM 캐시에 없으면 기본 빈 도화지를 바인딩하고 LIFO 작업 큐로 발사
+        ivCover.animate().cancel();
         ivCover.setAlpha(1.0f);
         ivCover.setImageBitmap(
                 ThemeManager.getCustomIcon("icon_default_album.png", MainActivity.this, R.drawable.default_album));
@@ -9561,106 +9571,27 @@ public class MainActivity extends Activity {
             ivReflection.animate().cancel();
             ivReflection.setAlpha(1.0f);
             ivReflection.setImageBitmap(null);
+            ivReflection.setVisibility(View.INVISIBLE);
         }
 
-        // 3. 백그라운드 로딩 엔진 발사
-        new Thread(new Runnable() {
+        manager.loadCoverAsync(item, new com.themoon.y1.managers.AlbumCoverManager.CoverCallback() {
             @Override
-            public void run() {
-                Bitmap bmp = null;
-                String cachedArtPath = prefs.getString("album_art_" + path, null);
-
-                if (cachedArtPath != null && new File(cachedArtPath).exists()) {
-                    bmp = BitmapFactory.decodeFile(cachedArtPath);
-                } else {
-                    try {
-                        String songName = item.file.getName();
-                        int dot = songName.lastIndexOf(".");
-                        if (dot > 0)
-                            songName = songName.substring(0, dot);
-
-                        // 1순위: Y1_Covers 전용 폴더 검색
-                        File fallbackFile = new File(StoragePaths.getCoversDir(), songName + ".jpg");
-                        if (fallbackFile.exists()) {
-                            bmp = BitmapFactory.decodeFile(fallbackFile.getAbsolutePath());
+            public void onCoverLoaded(String loadedKey, Bitmap cover, Bitmap reflection) {
+                if (albumKey.equals(ivCover.getTag())) {
+                    if (cover != null) {
+                        ivCover.setImageBitmap(cover);
+                    }
+                    if (ivReflection != null) {
+                        if (reflection != null) {
+                            ivReflection.setImageBitmap(reflection);
+                            ivReflection.setVisibility(View.VISIBLE);
                         } else {
-                            // 🚀 [신규 장착!] 2순위: 혹시 같은 폴더 안에 cover.jpg 가 있는지 탐색기 가동!
-                            File folderCover = findFolderCover(item.file.getParentFile());
-                            if (folderCover != null) {
-                                bmp = BitmapFactory.decodeFile(folderCover.getAbsolutePath());
-                            }
+                            ivReflection.setVisibility(View.INVISIBLE);
                         }
-                    } catch (Exception e) {
                     }
                 }
-
-                if (bmp == null) {
-                    try {
-                        byte[] embeddedArt = null;
-
-                        if (path.toLowerCase().endsWith(".opus")) {
-                            Object[] opusTags = com.themoon.y1.managers.AudioPlayerManager.getInstance()
-                                    .extractOpusMetadata(new File(path));
-                            if (opusTags[5] != null)
-                                embeddedArt = (byte[]) opusTags[5];
-                        } else if (path.toLowerCase().endsWith(".flac")) {
-                            Object[] flacTags = com.themoon.y1.managers.AudioPlayerManager.getInstance()
-                                    .extractFlacMetadata(new File(path));
-                            // 🚨 배열 방 번호를 2에서 5로 변경!
-                            if (flacTags[5] != null)
-                                embeddedArt = (byte[]) flacTags[5];
-                        } else {
-                            // MP3, WAV 등 순정 부품 사용
-                            MediaMetadataRetriever mmr = new MediaMetadataRetriever();
-                            mmr.setDataSource(path);
-                            embeddedArt = mmr.getEmbeddedPicture();
-                            mmr.release();
-                        }
-
-                        // 🚀 빼온 사진 데이터(Byte)를 예쁜 비트맵(Bitmap)으로 구워냅니다.
-                        if (embeddedArt != null) {
-                            BitmapFactory.Options opts = new BitmapFactory.Options();
-                            opts.inSampleSize = 2;
-                            bmp = BitmapFactory.decodeByteArray(embeddedArt, 0, embeddedArt.length, opts);
-                        }
-                    } catch (Exception e) {
-                    }
-                }
-
-                final Bitmap finalBmp = bmp;
-
-                // 메인 스레드가 아닌, 이 백그라운드 공간에서 반사판을 생성하므로 성능 과부하가 0%입니다!
-                final Bitmap finalRef = getReflectionBitmap(finalBmp);
-
-                // 다음번 조회를 위해 원본과 반사 이미지 나란히 RAM 금고에 입고
-                if (finalBmp != null && albumArtCache != null) {
-                    albumArtCache.put(path, finalBmp);
-                    if (finalRef != null) {
-                        albumArtCache.put("ref_" + path, finalRef);
-                    }
-                }
-
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        // 🚀 4. 휠 회전 중 다른 곡으로 타겟이 바뀌지 않았을 때만 화면에 렌더링!
-                        if (path.equals(ivCover.getTag())) {
-                            if (finalBmp != null) {
-                                ivCover.setAlpha(0f); // 💡 투명 상태에서 시작
-                                ivCover.setImageBitmap(finalBmp);
-                                ivCover.animate().alpha(1.0f).setDuration(300).start(); // 🚀 0.3초 동안 스르륵! 순차적 페이드인 연출
-                            }
-                            if (ivReflection != null && finalRef != null) {
-                                ivReflection.setAlpha(0f);
-                                ivReflection.setImageBitmap(finalRef);
-                                ivReflection.setVisibility(View.VISIBLE);
-                                ivReflection.animate().alpha(1.0f).setDuration(300).start(); // 🚀 반사판도 동시 페이드인!
-                            }
-                        }
-                    }
-                });
             }
-        }).start();
+        });
     }
 
     // 🚀 [버그 완전 처치 & 비율 최적화] 커버 이미지 잘림을 막으면서도 전체를 위로 올리고, 텍스트 가독성을 극대화합니다!
@@ -9678,6 +9609,7 @@ public class MainActivity extends Activity {
         lp.topMargin = (int) (-20 * d);
 
         card.setLayoutParams(lp);
+        card.setLayerType(View.LAYER_TYPE_NONE, null); // 🚀 KitKat 음수 translationX GPU 컬링 방지를 위해 NONE 설정
 
         ImageView ivCover = new ImageView(this);
         ivCover.setId(dynamicViewId(1001));
@@ -9820,6 +9752,8 @@ public class MainActivity extends Activity {
 
     // 🚀 [도우미 함수 1] 뷰를 순간 이동 및 변형시키는 함수
     private void applyTransform(View v, float transX, float rotY, float scale, float alpha) {
+        if (v == null) return;
+        v.animate().cancel();
         v.setTranslationX(transX);
         v.setRotationY(rotY);
         v.setScaleX(scale);
@@ -9828,45 +9762,101 @@ public class MainActivity extends Activity {
     }
 
     private void animateTransform(View v, float transX, float rotY, float scale, float alpha, int duration) {
-        v.animate().translationX(transX).rotationY(rotY).scaleX(scale).scaleY(scale).alpha(alpha).setDuration(duration)
-                .start();
+        if (v == null) return;
+        if (duration <= 0) {
+            applyTransform(v, transX, rotY, scale, alpha);
+        } else {
+            v.animate().translationX(transX).rotationY(rotY).scaleX(scale).scaleY(scale).alpha(alpha).setDuration(duration)
+                    .start();
+        }
     }
 
-    // 🚀 [뎁스 엔진] 설정된 개수에 맞추어 최외각 카드부터 정중앙 카드까지 순서대로 쌓아 올립니다.
+    // 🚀 [Z-인덱스 갱신] CoverFlowLayout이 자체 오더링을 수행하므로 requestLayout 없이 컨테이너만 invalidate!
     private void arrangeZIndex() {
-        int centerIdx = visibleCoversCount / 2;
+        if (coverFlowContainer != null) {
+            coverFlowContainer.invalidate();
+        }
+    }
 
-        // 가장 먼 거리부터 정중앙(0)까지 역순으로 앞면 배치(bringToFront) 처리
-        for (int d = centerIdx; d >= 0; d--) {
-            int leftViewIdx = centerIdx - d;
-            int rightViewIdx = centerIdx + d;
+    private int coverFlowActiveDirection = 0; // +1 for Right (22), -1 for Left (21)
+    private long coverFlowDirectionChangeTime = 0;
+    private long lastCoverFlowWheelTime = 0;
 
-            if (leftViewIdx >= 0)
-                cfViews[leftViewIdx].bringToFront();
-            if (rightViewIdx < visibleCoversCount)
-                cfViews[rightViewIdx].bringToFront();
+    private void cancelAllCoverFlowAnimations() {
+        if (cfViews != null) {
+            for (int i = 0; i < cfViews.length; i++) {
+                if (cfViews[i] != null) {
+                    cfViews[i].animate().cancel();
+                }
+            }
+        }
+    }
+
+    private void handleCoverFlowWheelInput(int keyCode, KeyEvent event) {
+        final int dir = (keyCode == 22) ? 1 : -1;
+        final long eventTime = event.getEventTime();
+        final long now = android.os.SystemClock.uptimeMillis();
+
+        // 1. 방향 역전 감지 (Direction Reversal) 및 유휴 상태 리셋
+        if (now - lastCoverFlowWheelTime > 250) {
+            coverFlowActiveDirection = dir;
+            coverFlowDirectionChangeTime = eventTime;
+        } else if (coverFlowActiveDirection != 0 && dir != coverFlowActiveDirection) {
+            // 사용자가 휠 방향을 반대로 꺾음! 즉시 이전 방향 애니메이션 올스톱 및 기준 시각 갱신
+            coverFlowActiveDirection = dir;
+            coverFlowDirectionChangeTime = eventTime;
+            cancelAllCoverFlowAnimations();
+        } else if (coverFlowActiveDirection == 0) {
+            coverFlowActiveDirection = dir;
+            coverFlowDirectionChangeTime = eventTime;
         }
 
-        for (int i = 0; i < visibleCoversCount; i++)
-            cfViews[i].invalidate();
-        coverFlowContainer.invalidate();
+        // 2. 큐에 남아있던 이전 방향 유령 이벤트(Stale phantom events) 즉시 파쇄
+        if (dir != coverFlowActiveDirection || eventTime < coverFlowDirectionChangeTime) {
+            return;
+        }
+
+        // 3. 지연 시간(Lag) 감지: 이벤트 생성 시각과 처리 시각의 차이
+        long lag = now - eventTime;
+        long diff = now - lastCoverFlowWheelTime;
+        lastCoverFlowWheelTime = now;
+
+        // 4. 회전 속도에 따른 가변 듀레이션
+        // 큐가 밀려 lag가 40ms 이상이거나, 휠을 빠르게 돌리는 중(diff < 40ms)이라면:
+        // duration = 0 (즉시 스냅)으로 처리하여 큐 누적과 지연을 완벽 분쇄!
+        int duration;
+        if (lag > 40 || diff < 40) {
+            duration = 0;
+        } else if (diff < 90) {
+            duration = 45;
+        } else {
+            duration = 160;
+        }
+
+        scrollCoverFlow(dir > 0, duration);
+
+        // 5. 큐가 밀려있을 때는 클릭 피드백(진동/오디오) 큐 누적 방지를 위해 생략
+        if (lag <= 40) {
+            clickFeedback();
+        }
     }
 
-    private long lastCoverFlowTime = 0; // 🚀 스마트 변속용 타임머신 변수
-
-    // 🚀 [순정 3D 엔진 5] 초고속 슬라이딩 엔진 (개수 가변형 연산 기하학 완비)
     private void scrollCoverFlow(boolean isNext) {
+        scrollCoverFlow(isNext, 160);
+    }
+
+    // 🚀 [순정 3D 엔진 5] 9슬롯 버퍼 고속 슬라이딩 엔진 (팝인/사라짐 완벽 차단)
+    private void scrollCoverFlow(boolean isNext, int duration) {
         int total = uniqueAlbumList.size();
         if (total == 0)
             return;
 
         float d = getResources().getDisplayMetrics().density;
-        int centerIdx = visibleCoversCount / 2;
+        int centerIdx = visibleCoversCount / 2; // 4 (visibleCoversCount = 9)
 
-        long now = System.currentTimeMillis();
-        long diff = now - lastCoverFlowTime;
-        lastCoverFlowTime = now;
-        int duration = (diff < 80) ? 30 : 180;
+        float offScreenX = getTransXForDist(centerIdx, d);
+        float offScreenRot = getRotYForDist(centerIdx);
+        float offScreenScale = getScaleForDist(centerIdx);
 
         if (isNext) {
             currentCoverFlowIndex = (currentCoverFlowIndex + 1) % total;
@@ -9877,12 +9867,9 @@ public class MainActivity extends Activity {
                 cfViews[i] = cfViews[i + 1];
             cfViews[visibleCoversCount - 1] = oldLeft;
 
-            bindCoverData(cfViews[visibleCoversCount - 1], (currentCoverFlowIndex + centerIdx + total * 3) % total);
-
-            float maxOff = getTransXForDist(centerIdx, d);
-            float maxRot = getRotYForDist(centerIdx);
-            float maxScale = getScaleForDist(centerIdx);
-            applyTransform(cfViews[visibleCoversCount - 1], maxOff * 1.5f, -maxRot, maxScale, 0f);
+            // 재활용된 카드는 화면 오른쪽 완전 투명(alpha=0) 오프스크린 버퍼 슬롯에 즉시 장전
+            bindCoverData(cfViews[visibleCoversCount - 1], (currentCoverFlowIndex + centerIdx + total * 10) % total);
+            applyTransform(cfViews[visibleCoversCount - 1], offScreenX, -offScreenRot, offScreenScale, 0f);
         } else {
             currentCoverFlowIndex = (currentCoverFlowIndex - 1 + total) % total;
             View oldRight = cfViews[visibleCoversCount - 1];
@@ -9891,17 +9878,14 @@ public class MainActivity extends Activity {
                 cfViews[i] = cfViews[i - 1];
             cfViews[0] = oldRight;
 
-            bindCoverData(cfViews[0], (currentCoverFlowIndex - centerIdx + total * 3) % total);
-
-            float maxOff = getTransXForDist(centerIdx, d);
-            float maxRot = getRotYForDist(centerIdx);
-            float maxScale = getScaleForDist(centerIdx);
-            applyTransform(cfViews[0], -maxOff * 1.5f, maxRot, maxScale, 0f);
+            // 재활용된 카드는 화면 왼쪽 완전 투명(alpha=0) 오프스크린 버퍼 슬롯에 즉시 장전
+            bindCoverData(cfViews[0], (currentCoverFlowIndex - centerIdx + total * 10) % total);
+            applyTransform(cfViews[0], -offScreenX, offScreenRot, offScreenScale, 0f);
         }
 
         arrangeZIndex();
 
-        // 🚀 전체 동적 슬롯 애니메이션 폭격 루터 가동!
+        // 🚀 전체 동적 슬롯 애니메이션: 3번 카드는 4번 버퍼로 페이드아웃(0), 4번 버퍼 카드는 3번으로 페이드인(0.45)!
         for (int i = 0; i < visibleCoversCount; i++) {
             setCardTitleAlpha(cfViews[i], i == centerIdx, duration);
 
@@ -12567,14 +12551,8 @@ public class MainActivity extends Activity {
 
             // 🚀 [순정 커버 플로우 휠 조작 대개조 완료]
             if (currentScreenState == STATE_BROWSER && currentBrowserMode == BROWSER_COVER_FLOW) {
-                if (keyCode == 21) { // 휠 위로(왼쪽) 돌릴 때
-                    scrollCoverFlow(false);
-                    clickFeedback();
-                    return true;
-                }
-                if (keyCode == 22) { // 휠 아래로(오른쪽) 돌릴 때
-                    scrollCoverFlow(true);
-                    clickFeedback();
+                if (keyCode == 21 || keyCode == 22) {
+                    handleCoverFlowWheelInput(keyCode, event);
                     return true;
                 }
             }
@@ -13113,6 +13091,20 @@ public class MainActivity extends Activity {
                 }
             }
             return true;
+        }
+
+        // 🚀 [커버 플로우 휠 조작 최우선 인터셉터]
+        // 휠 큐잉 및 반대 방향 전환 딜레이를 완벽 차단하기 위해, 이벤트 디스패치 최상단에서 직통 처리!
+        if (currentScreenState == STATE_BROWSER && currentBrowserMode == BROWSER_COVER_FLOW) {
+            if (keyCode == 21 || keyCode == 22) {
+                if (isScreenOnForLock && !isFakeScreenOff) {
+                    resetBacklightTimer();
+                    if (action == KeyEvent.ACTION_DOWN) {
+                        handleCoverFlowWheelInput(keyCode, event);
+                    }
+                }
+                return true;
+            }
         }
 
         if (action == KeyEvent.ACTION_DOWN && (keyCode == 21 || keyCode == 22)) {

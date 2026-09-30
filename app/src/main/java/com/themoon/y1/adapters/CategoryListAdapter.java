@@ -21,6 +21,7 @@ import com.themoon.y1.views.ClassicMenuStyle;
 import com.themoon.y1.R;
 import com.themoon.y1.StoragePaths;
 import com.themoon.y1.ThemeManager;
+import com.themoon.y1.managers.AlbumCoverManager;
 import com.themoon.y1.models.SongItem;
 
 import java.io.File;
@@ -249,10 +250,22 @@ public class CategoryListAdapter extends BaseAdapter {
         if (cached != null) {
             ivCover.setImageDrawable(cached);
         } else {
-            // 2. 없다면 일단 기본 이미지를 보여주고, 실제 검색/디코딩은 백그라운드 스레드로 넘깁니다.
-            ivCover.setImageResource(R.drawable.default_album);
-            ivCover.setTag(name);
-            loadAlbumArtAsync(name, coverSize, ivCover);
+            // 🚀 [초고속 썸네일 캐시 직접 확인] 디스크 썸네일이 이미 있으면 1ms 내에 즉시 표시!
+            List<File> albumFiles = albumFilesMap != null ? albumFilesMap.get(name) : null;
+            File sampleFile = (albumFiles != null && !albumFiles.isEmpty()) ? albumFiles.get(0) : null;
+            String albumKey = sampleFile != null ? AlbumCoverManager.getAlbumKey(sampleFile, name) : name;
+
+            Bitmap directBmp = AlbumCoverManager.getInstance().getThumbnailDirect(albumKey);
+            if (directBmp != null) {
+                Drawable directDrawable = new BitmapDrawable(row.getResources(), directBmp);
+                coverCache.put(name, directDrawable);
+                ivCover.setImageDrawable(directDrawable);
+            } else {
+                // 2. 없다면 일단 기본 이미지를 보여주고, 안전한 LIFO 작업 큐로 넘깁니다.
+                ivCover.setImageResource(R.drawable.default_album);
+                ivCover.setTag(name);
+                loadAlbumArtAsync(name, sampleFile, albumKey, ivCover);
+            }
         }
 
         row.setOnFocusChangeListener(new View.OnFocusChangeListener() {
@@ -289,26 +302,22 @@ public class CategoryListAdapter extends BaseAdapter {
         return row;
     }
 
-    // 🚀 [ANR 수리 3] 실제 검색+디코딩을 백그라운드 스레드에서 수행하고, 끝나면 메인 스레드에서 그 행이
-    // (재활용되어 다른 앨범으로 바뀌지 않고) 여전히 같은 앨범을 보여주고 있을 때만 이미지를 반영합니다.
-    private void loadAlbumArtAsync(final String name, final int coverSize, final ImageView targetView) {
-        new Thread(new Runnable() {
+    // 🚀 [AlbumCoverManager 통합] 전용 LIFO 큐로 위임하여 스레드 폭풍 및 ANR 원천 차단
+    private void loadAlbumArtAsync(final String name, final File sampleFile, final String albumKey, final ImageView targetView) {
+        if (sampleFile == null) return;
+        SongItem stubItem = new SongItem(sampleFile, "", "", name);
+        AlbumCoverManager.getInstance().loadCoverAsync(stubItem, new AlbumCoverManager.CoverCallback() {
             @Override
-            public void run() {
-                final Drawable result = fetchAlbumArtDrawable(name, coverSize);
-                if (result != null) {
+            public void onCoverLoaded(String loadedKey, Bitmap cover, Bitmap reflection) {
+                if (cover != null) {
+                    Drawable result = new BitmapDrawable(MainActivity.instance.getResources(), cover);
                     coverCache.put(name, result);
-                }
-                MainActivity.instance.runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (name.equals(targetView.getTag())) {
-                            targetView.setImageDrawable(result);
-                        }
+                    if (name.equals(targetView.getTag())) {
+                        targetView.setImageDrawable(result);
                     }
-                });
+                }
             }
-        }).start();
+        });
     }
 
     // 🚀 기존 동기 로직을 그대로 옮긴 것 - 순서(내려받은 커버 -> 수동 커버 폴더 -> 폴더 커버 -> 내장 아트 ->
