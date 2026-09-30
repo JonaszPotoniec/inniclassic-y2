@@ -495,6 +495,9 @@ public class MainActivity extends Activity {
     private int dtYear = 2026, dtMonth = 1, dtDay = 1, dtHour = 12, dtMinute = 0;
     private View layoutMainMenu, layoutBrowserMode, layoutSettingsMode;
     private View layoutBluetoothMode, layoutWifiMode, layoutWifiKeyboard;
+    private View layoutKeyboardOriginal;
+    private com.themoon.y1.views.QwertyKeyboardView keyboardQwertyView;
+    private boolean isBackLongPressConsumed = false;
     private View layoutMusicQuizMode;
     private View layoutPlayerMode, layoutVolumeOverlay;
     private View layoutBrightnessMode, layoutStorageMode, layoutWebServerMode;
@@ -2124,6 +2127,51 @@ public class MainActivity extends Activity {
         btnScanBt.setSoundEffectsEnabled(false);
         btnScanWifi.setSoundEffectsEnabled(false);
         layoutWifiKeyboard = findViewById(R.id.layout_wifi_keyboard);
+        layoutKeyboardOriginal = findViewById(R.id.layout_keyboard_original);
+        keyboardQwertyView = findViewById(R.id.keyboard_qwerty_view);
+        if (keyboardQwertyView != null) {
+            keyboardQwertyView.setOnKeyboardActionListener(new com.themoon.y1.views.QwertyKeyboardView.OnKeyboardActionListener() {
+                @Override
+                public void onText(String text) {
+                    clickFeedback();
+                    typedPassword += text;
+                    updateKeyboardUI();
+                }
+
+                @Override
+                public void onDelete() {
+                    clickFeedback();
+                    if (typedPassword.length() > 0) {
+                        typedPassword = typedPassword.substring(0, typedPassword.length() - 1);
+                        updateKeyboardUI();
+                    }
+                }
+
+                @Override
+                public void onClear() {
+                    clickFeedback();
+                    typedPassword = "";
+                    updateKeyboardUI();
+                }
+
+                @Override
+                public void onSubmit() {
+                    clickFeedback();
+                    submitKeyboard();
+                }
+
+                @Override
+                public void onSpecialChar(String specialChar, boolean replaceLast) {
+                    clickFeedback();
+                    if (replaceLast && typedPassword.length() > 0) {
+                        typedPassword = typedPassword.substring(0, typedPassword.length() - 1) + specialChar;
+                    } else {
+                        typedPassword += specialChar;
+                    }
+                    updateKeyboardUI();
+                }
+            });
+        }
         tvKeyboardSsid = findViewById(R.id.tv_keyboard_ssid);
         tvKeyboardInput = findViewById(R.id.tv_keyboard_input);
         tvKeyPprev = findViewById(R.id.tv_key_pprev);
@@ -5359,7 +5407,11 @@ public class MainActivity extends Activity {
             updateNowPlayingBottomBarState();
             clickFeedback();
         } else if (currentScreenState == STATE_WIFI_KEYBOARD) {
-            handleKeyboardInput();
+            if (isQwertyKeyboard()) {
+                if (keyboardQwertyView != null) keyboardQwertyView.performCenterClick();
+            } else {
+                handleKeyboardInput();
+            }
         } else if (currentScreenState != STATE_BRIGHTNESS && currentScreenState != STATE_STORAGE
                 && currentScreenState != STATE_PLAYER) {
             View c = getCurrentFocus();
@@ -5440,6 +5492,91 @@ public class MainActivity extends Activity {
         }
     }
 
+    private boolean isQwertyKeyboard() {
+        return "qwerty".equalsIgnoreCase(prefs.getString("keyboard_layout", "qwerty"));
+    }
+
+    private void exitKeyboard() {
+        if (currentKeyboardMode == 1) {
+            currentKeyboardMode = 0; // 모드 초기화
+            changeScreen(STATE_BROWSER); // 다시 팟캐스트 화면으로 복귀!
+            return;
+        }
+        if (currentKeyboardMode == 2 || currentKeyboardMode == 3) {
+            currentKeyboardMode = 0; // 모드 초기화 (로그인 취소)
+            changeScreen(STATE_SETTINGS);
+            clickFeedback();
+            return;
+        }
+        if (currentKeyboardMode == 4) {
+            currentKeyboardMode = 0; // 모드 초기화 (검색 취소)
+            currentBrowserMode = BROWSER_ROOT;
+            changeScreen(STATE_BROWSER); // 다시 Music 메뉴로 복귀!
+            clickFeedback();
+            return;
+        }
+        changeScreen(STATE_WIFI);
+        clickFeedback();
+    }
+
+    private void submitKeyboard() {
+        if (currentKeyboardMode == 1) {
+            if (typedPassword.trim().isEmpty()) {
+                Toast.makeText(this, t("Please enter a keyword."), Toast.LENGTH_SHORT).show();
+                return;
+            }
+            changeScreen(STATE_BROWSER); // 💡 검색 버튼을 누르면 키보드를 닫고 브라우저로 복귀!
+            searchPodcastFromApple(typedPassword.trim()); // 🍏 애플 검색 엔진 발사!
+        } else if (currentKeyboardMode == 4) {
+            if (typedPassword.trim().isEmpty()) {
+                Toast.makeText(this, t("Please enter a keyword."), Toast.LENGTH_SHORT).show();
+                return;
+            }
+            currentBrowserMode = BROWSER_VIRTUAL_SONGS;
+            virtualQueryType = "SEARCH";
+            virtualQueryValue = typedPassword.trim();
+            currentKeyboardMode = 0;
+            changeScreen(STATE_BROWSER);
+            buildVirtualSongs();
+        } else if (currentKeyboardMode == 2) {
+            if (typedPassword.trim().isEmpty()) {
+                Toast.makeText(this, t("Please enter a username."), Toast.LENGTH_SHORT).show();
+                return;
+            }
+            pendingLastFmUsername = typedPassword.trim();
+            currentKeyboardMode = 3; // 다음은 비밀번호 입력!
+            openKeyboard();
+        } else if (currentKeyboardMode == 3) {
+            if (typedPassword.isEmpty()) {
+                Toast.makeText(this, t("Please enter a password."), Toast.LENGTH_SHORT).show();
+                return;
+            }
+            final String username = pendingLastFmUsername;
+            final String password = typedPassword;
+            currentKeyboardMode = 0;
+            changeScreen(STATE_SETTINGS);
+            Toast.makeText(this, t("Logging in to Last.fm..."), Toast.LENGTH_SHORT).show();
+            com.themoon.y1.managers.LastFmScrobbler.getInstance(this).login(username, password,
+                    new com.themoon.y1.managers.LastFmScrobbler.LoginCallback() {
+                        @Override
+                        public void onResult(final boolean success, final String message) {
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    Toast.makeText(MainActivity.this,
+                                            success ? (t("Logged in to Last.fm as ") + "@" + message)
+                                                    : (t("Last.fm login failed: ") + message),
+                                            Toast.LENGTH_LONG).show();
+                                    if (currentScreenState == STATE_SETTINGS) buildSettingsUI();
+                                }
+                            });
+                        }
+                    });
+        } else {
+            connectToWifi(); // 기존 와이파이 접속 엔진 발사!
+        }
+    }
+
     private void openKeyboard() {
         typedPassword = "";
         keyboardIndex = 0;
@@ -5455,6 +5592,23 @@ public class MainActivity extends Activity {
         } else {
             tvKeyboardSsid.setText(t("Target") + ": " + targetWifiSsid);
         }
+
+        if (isQwertyKeyboard()) {
+            if (layoutKeyboardOriginal != null) layoutKeyboardOriginal.setVisibility(View.GONE);
+            if (keyboardQwertyView != null) {
+                keyboardQwertyView.setVisibility(View.VISIBLE);
+                String actionLabel = t("Connect");
+                if (currentKeyboardMode == 1 || currentKeyboardMode == 4) actionLabel = t("Search");
+                else if (currentKeyboardMode == 2) actionLabel = t("Next");
+                else if (currentKeyboardMode == 3) actionLabel = t("Login");
+                keyboardQwertyView.setSubmitActionLabel(actionLabel);
+                keyboardQwertyView.resetState();
+            }
+        } else {
+            if (layoutKeyboardOriginal != null) layoutKeyboardOriginal.setVisibility(View.VISIBLE);
+            if (keyboardQwertyView != null) keyboardQwertyView.setVisibility(View.GONE);
+        }
+
         updateKeyboardUI();
     }
 
@@ -5502,64 +5656,8 @@ public class MainActivity extends Activity {
             // 🚀 스페이스바 누르면 띄어쓰기 추가!
             typedPassword += " ";
         } else if (selectedChar.equals("[CONN]")) {
-            // =======================================================
-            // 🚀 [핵심 분기점] [CONN] 버튼을 눌렀을 때 발사되는 엔진 변경!
-            // =======================================================
-            if (currentKeyboardMode == 1) {
-                if (typedPassword.trim().isEmpty()) {
-                    Toast.makeText(this, t("Please enter a keyword."), Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                changeScreen(STATE_BROWSER); // 💡 검색 버튼을 누르면 키보드를 닫고 브라우저로 복귀!
-                searchPodcastFromApple(typedPassword.trim()); // 🍏 애플 검색 엔진 발사!
-            } else if (currentKeyboardMode == 4) {
-                if (typedPassword.trim().isEmpty()) {
-                    Toast.makeText(this, t("Please enter a keyword."), Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                currentBrowserMode = BROWSER_VIRTUAL_SONGS;
-                virtualQueryType = "SEARCH";
-                virtualQueryValue = typedPassword.trim();
-                currentKeyboardMode = 0;
-                changeScreen(STATE_BROWSER);
-                buildVirtualSongs();
-            } else if (currentKeyboardMode == 2) {
-                if (typedPassword.trim().isEmpty()) {
-                    Toast.makeText(this, t("Please enter a username."), Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                pendingLastFmUsername = typedPassword.trim();
-                currentKeyboardMode = 3; // 다음은 비밀번호 입력!
-                openKeyboard();
-            } else if (currentKeyboardMode == 3) {
-                if (typedPassword.isEmpty()) {
-                    Toast.makeText(this, t("Please enter a password."), Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                final String username = pendingLastFmUsername;
-                final String password = typedPassword;
-                currentKeyboardMode = 0;
-                changeScreen(STATE_SETTINGS);
-                Toast.makeText(this, t("Logging in to Last.fm..."), Toast.LENGTH_SHORT).show();
-                com.themoon.y1.managers.LastFmScrobbler.getInstance(this).login(username, password,
-                        new com.themoon.y1.managers.LastFmScrobbler.LoginCallback() {
-                            @Override
-                            public void onResult(final boolean success, final String message) {
-                                runOnUiThread(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        Toast.makeText(MainActivity.this,
-                                                success ? (t("Logged in to Last.fm as ") + "@" + message)
-                                                        : (t("Last.fm login failed: ") + message),
-                                                Toast.LENGTH_LONG).show();
-                                        if (currentScreenState == STATE_SETTINGS) buildSettingsUI();
-                                    }
-                                });
-                            }
-                        });
-            } else {
-                connectToWifi(); // 기존 와이파이 접속 엔진 발사!
-            }
+            submitKeyboard();
+            return;
         } else {
             typedPassword += selectedChar;
         }
@@ -6481,6 +6579,23 @@ public class MainActivity extends Activity {
             }
         });
         containerSettingsItems.addView(btnScreenOffCtrl);
+
+        // 🚀 [Keyboard Layout Setting] Options: "QWERTY" (default) or "Original"
+        final String currentKb = prefs.getString("keyboard_layout", "qwerty");
+        final LinearLayout btnKeyboard = createSettingRow("Keyboard Layout",
+                currentKb.equals("original") ? t("Original") : t("QWERTY"));
+        btnKeyboard.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                String cur = prefs.getString("keyboard_layout", "qwerty");
+                String next = cur.equals("qwerty") ? "original" : "qwerty";
+                prefs.edit().putString("keyboard_layout", next).commit();
+                TextView tvStatus = (TextView) btnKeyboard.getChildAt(1);
+                tvStatus.setText(next.equals("original") ? t("Original") : t("QWERTY"));
+            }
+        });
+        containerSettingsItems.addView(btnKeyboard);
 
         // 🚀 [iPod 스타일] Backlight Timer - 조작이 없을 때 화면이 자동으로 꺼지기까지의 시간
         final LinearLayout btnBacklightTimer = createSettingRow("Backlight Timer",
@@ -12428,6 +12543,82 @@ public class MainActivity extends Activity {
             return true;
         }
 
+        if (currentScreenState == STATE_WIFI_KEYBOARD) {
+            if (isQwertyKeyboard()) {
+                if (keyCode == KeyEvent.KEYCODE_BACK) {
+                    if (event.getRepeatCount() == 0) {
+                        event.startTracking();
+                    }
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == 19) {
+                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(0, -1);
+                    clickFeedback();
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == 85
+                        || keyCode == KeyEvent.KEYCODE_MEDIA_STOP || keyCode == 86
+                        || keyCode == 126 || keyCode == 127
+                        || keyCode == KeyEvent.KEYCODE_DPAD_DOWN || keyCode == 20) {
+                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(0, 1);
+                    clickFeedback();
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS || keyCode == 88) {
+                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(-1, 0);
+                    clickFeedback();
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == 87) {
+                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(1, 0);
+                    clickFeedback();
+                    return true;
+                }
+                if (keyCode == 21) { // Wheel CCW
+                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(-1, 0);
+                    clickFeedback();
+                    return true;
+                }
+                if (keyCode == 22) { // Wheel CW
+                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(1, 0);
+                    clickFeedback();
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+                    if (event.getRepeatCount() == 0) {
+                        event.startTracking();
+                    }
+                    return true;
+                }
+                return true;
+            }
+
+            // Legacy original keyboard logic
+            if (keyCode == 21) {
+                keyboardIndex = (keyboardIndex - 1 + KEYBOARD_CHARS.length) % KEYBOARD_CHARS.length;
+                updateKeyboardUI();
+                clickFeedback();
+                return true;
+            }
+            if (keyCode == 22) {
+                keyboardIndex = (keyboardIndex + 1) % KEYBOARD_CHARS.length;
+                updateKeyboardUI();
+                clickFeedback();
+                return true;
+            }
+            if (keyCode == KeyEvent.KEYCODE_BACK) {
+                exitKeyboard();
+                return true;
+            }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+                if (event.getRepeatCount() == 0) {
+                    event.startTracking();
+                }
+                return true;
+            }
+            return true;
+        }
+
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
             if (event.getRepeatCount() == 0) {
                 event.startTracking(); // 🚀 [핵심 기술] 길게 누르는지 감시(추적)를 시작합니다!
@@ -12473,46 +12664,6 @@ public class MainActivity extends Activity {
                     com.themoon.y1.managers.AudioPlayerManager.getInstance().seekRelative(-10000); // -10초 점프
                     clickFeedback();
                 }
-            }
-            return true;
-        }
-
-        if (currentScreenState == STATE_WIFI_KEYBOARD) {
-            if (keyCode == 21) {
-                keyboardIndex = (keyboardIndex - 1 + KEYBOARD_CHARS.length) % KEYBOARD_CHARS.length;
-                updateKeyboardUI();
-                clickFeedback();
-                return true;
-            }
-            if (keyCode == 22) {
-                keyboardIndex = (keyboardIndex + 1) % KEYBOARD_CHARS.length;
-                updateKeyboardUI();
-                clickFeedback();
-                return true;
-            }
-
-            if (keyCode == KeyEvent.KEYCODE_BACK) {
-                if (currentKeyboardMode == 1) {
-                    currentKeyboardMode = 0; // 모드 초기화
-                    changeScreen(STATE_BROWSER); // 다시 팟캐스트 화면으로 복귀!
-                    return true;
-                }
-                if (currentKeyboardMode == 2 || currentKeyboardMode == 3) {
-                    currentKeyboardMode = 0; // 모드 초기화 (로그인 취소)
-                    changeScreen(STATE_SETTINGS);
-                    clickFeedback();
-                    return true;
-                }
-                if (currentKeyboardMode == 4) {
-                    currentKeyboardMode = 0; // 모드 초기화 (검색 취소)
-                    currentBrowserMode = BROWSER_ROOT;
-                    changeScreen(STATE_BROWSER); // 다시 Music 메뉴로 복귀!
-                    clickFeedback();
-                    return true;
-                }
-                changeScreen(STATE_WIFI);
-                clickFeedback();
-                return true;
             }
             return true;
         }
@@ -13416,6 +13567,21 @@ public class MainActivity extends Activity {
             return true;
         }
 
+        if (currentScreenState == STATE_WIFI_KEYBOARD) {
+            if (isQwertyKeyboard() && keyCode == KeyEvent.KEYCODE_BACK) {
+                if (isBackLongPressConsumed) {
+                    isBackLongPressConsumed = false;
+                    return true;
+                }
+                if ((event.getFlags() & KeyEvent.FLAG_CANCELED_LONG_PRESS) == 0) {
+                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(0, -1);
+                    clickFeedback();
+                    return true;
+                }
+                return true;
+            }
+        }
+
         // 💡 [핵심 차단 구역] 휠 조작(21, 22)이나 뒤로가기(BACK)를 '뗄 때'
         if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == 21 || keyCode == 22) {
             return true;
@@ -13582,6 +13748,23 @@ public class MainActivity extends Activity {
 
     @Override
     public boolean onKeyLongPress(int keyCode, KeyEvent event) {
+        if (currentScreenState == STATE_WIFI_KEYBOARD) {
+            if (isQwertyKeyboard()) {
+                if (keyCode == KeyEvent.KEYCODE_BACK) {
+                    isBackLongPressConsumed = true;
+                    clickFeedback();
+                    exitKeyboard();
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+                    isLongPressConsumed = true;
+                    if (keyboardQwertyView != null) keyboardQwertyView.performCenterLongPress(typedPassword);
+                    return true;
+                }
+            }
+            return true;
+        }
+
         // 🚀 [기능 유지] 플레이어 화면에서 하단 정지/재생 버튼을 길게 누르면 플레이리스트 등록 팝업 가동!
         if (currentScreenState == STATE_PLAYER && (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == 85
                 || keyCode == KeyEvent.KEYCODE_MEDIA_STOP || keyCode == 86 || keyCode == 126 || keyCode == 127)) {
