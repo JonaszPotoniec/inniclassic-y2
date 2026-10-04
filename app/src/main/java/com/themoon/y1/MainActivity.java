@@ -39,6 +39,7 @@ import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.os.Vibrator;
 import android.provider.Settings;
@@ -606,6 +607,12 @@ public class MainActivity extends Activity {
     // 💡 미디어 스캐너가 현재 작업 중인지 추적하는 변수
     private boolean isMediaScanning = false;
     private com.themoon.y1.managers.ExternalSdMountMonitor externalSdMountMonitor;
+    private long lastUsbDialogShownMs = 0;
+    private boolean isUsbPromptEnabled = true;          // pref "usb_storage_prompt"
+    private boolean usbStateReceiverReady = false;
+    private android.app.Dialog usbStorageDialog;        // non-null while dialog showing
+    private View usbStorageOverlay;                     // non-null while shared
+    private boolean usbStorageBusy = false;             // enable/disable in flight
     private AudioManager audioManager;
     private File rootFolder = StoragePaths.getMusicDir();
     private File currentFolder = rootFolder;
@@ -1395,6 +1402,25 @@ public class MainActivity extends Activity {
             else if ("com.themoon.y1.RESCAN_LIBRARY".equals(action)) {
                 startMediaLibraryScan();
             }
+            else if ("android.hardware.usb.action.USB_STATE".equals(action)) {
+                boolean connected = intent.getBooleanExtra("connected", false);
+                if (connected) {
+                    if (!usbStateReceiverReady) return; // ignore initial sticky broadcast on launch
+                    if (!isUsbPromptEnabled || usbStorageOverlay != null || usbStorageDialog != null || usbStorageBusy) return;
+                    long now = System.currentTimeMillis();
+                    if (now - lastUsbDialogShownMs > 8000) {
+                        lastUsbDialogShownMs = now;
+                        showUsbStorageDialog();
+                    }
+                } else {
+                    if (usbStorageDialog != null) {
+                        usbStorageDialog.dismiss();
+                    }
+                    if (usbStorageOverlay != null) {
+                        onUsbCableRemovedWhileShared();
+                    }
+                }
+            }
         }
     };
 
@@ -1892,6 +1918,10 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
         }
         try {
+            isUsbPromptEnabled = prefs.getBoolean("usb_storage_prompt", true);
+        } catch (Exception e) {
+        }
+        try {
             backlightTimerIndex = prefs.getInt("backlight_timer_index", 3);
             resetBacklightTimer();
         } catch (Exception e) {
@@ -1974,6 +2004,12 @@ public class MainActivity extends Activity {
             }
         });
         externalSdMountMonitor.start();
+        new Thread(() -> {
+            if (com.themoon.y1.managers.UsbMassStorageController.isEnabled()) {
+                if (externalSdMountMonitor != null) externalSdMountMonitor.setSuspended(true);
+                runOnUiThread(this::showUsbStorageOverlay);
+            }
+        }, "y1-ums-init-check").start();
 
         layoutMainMenu = findViewById(R.id.layout_main_menu);
         ivMainBg = findViewById(R.id.iv_main_bg);
@@ -2766,6 +2802,7 @@ public class MainActivity extends Activity {
         filter.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
         filter.addAction(Intent.ACTION_SCREEN_OFF);
         filter.addAction(Intent.ACTION_SCREEN_ON);
+        filter.addAction("android.hardware.usb.action.USB_STATE");
 
 
         try {
@@ -2829,6 +2866,8 @@ public class MainActivity extends Activity {
         } else {
             registerLegacyStatusReceiver(filter);
         }
+        // Arm USB_STATE listener after initial sticky broadcast has been delivered
+        new Handler(Looper.getMainLooper()).postDelayed(() -> usbStateReceiverReady = true, 1000);
 
         try {
             int curSys = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
@@ -6600,6 +6639,23 @@ public class MainActivity extends Activity {
             }
         });
         containerSettingsItems.addView(btnScreenOffCtrl);
+
+        final LinearLayout btnUsbPrompt = createSettingRow("Ask on USB Connect",
+                isUsbPromptEnabled ? t("ON") : t("OFF"));
+        btnUsbPrompt.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                isUsbPromptEnabled = !isUsbPromptEnabled;
+                TextView tvStatus = (TextView) btnUsbPrompt.getChildAt(1);
+                tvStatus.setText(isUsbPromptEnabled ? t("ON") : t("OFF"));
+                try {
+                    prefs.edit().putBoolean("usb_storage_prompt", isUsbPromptEnabled).commit();
+                } catch (Exception e) {
+                }
+            }
+        });
+        containerSettingsItems.addView(btnUsbPrompt);
 
         // 🚀 [Keyboard Layout Setting] Options: "QWERTY" (default) or "Original"
         final String currentKb = prefs.getString("keyboard_layout", "qwerty");
@@ -13295,6 +13351,20 @@ public class MainActivity extends Activity {
     public boolean dispatchKeyEvent(KeyEvent event) {
         int keyCode = event.getKeyCode();
         int action = event.getAction();
+        if (usbStorageOverlay != null) {
+            int kc = event.getKeyCode();
+            if (kc == KeyEvent.KEYCODE_VOLUME_UP || kc == KeyEvent.KEYCODE_VOLUME_DOWN) {
+                // fall through to normal volume handling
+            } else {
+                if (event.getAction() == KeyEvent.ACTION_UP
+                        && (kc == KeyEvent.KEYCODE_DPAD_CENTER || kc == KeyEvent.KEYCODE_ENTER)) {
+                    clickFeedback();
+                    stopUsbStorage();
+                }
+                return true; // swallow wheel / BACK / media keys while the card is shared
+            }
+        }
+
         PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
         boolean isScreenOnForLock = true;
         try {
@@ -15513,6 +15583,291 @@ public class MainActivity extends Activity {
             }
         });
     }
+    // =======================================================
+    // USB storage dialog & overlay — shown when USB cable is connected
+    // =======================================================
+    public void showUsbStorageDialog() {
+        if (usbStorageDialog != null) {
+            try { usbStorageDialog.dismiss(); } catch (Exception ignored) {}
+        }
+        final android.app.Dialog dialog = new android.app.Dialog(this);
+        usbStorageDialog = dialog;
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
+        }
+        dialog.setOnDismissListener(d -> {
+            if (usbStorageDialog == dialog) {
+                usbStorageDialog = null;
+            }
+        });
+
+        float d = getResources().getDisplayMetrics().density;
+
+        final LinearLayout rootLayout = new LinearLayout(this);
+        rootLayout.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(ThemeManager.getOverlayBackgroundColor() | 0xCC000000);
+        bg.setCornerRadius(15 * d);
+        bg.setStroke((int) (1 * d), 0x33FFFFFF);
+        rootLayout.setBackground(bg);
+        rootLayout.setPadding((int) (15 * d), (int) (20 * d), (int) (15 * d), (int) (15 * d));
+
+        android.widget.ImageView ivUsb = new android.widget.ImageView(this);
+        int iconSizePx = (int) (36 * d);
+        ivUsb.setImageBitmap(com.themoon.y1.views.TablerIcons.render(
+                com.themoon.y1.views.TablerIcons.USB, iconSizePx, ThemeManager.getTextColorPrimary()));
+        LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(iconSizePx, iconSizePx);
+        iconLp.gravity = Gravity.CENTER_HORIZONTAL;
+        iconLp.bottomMargin = (int) (8 * d);
+        ivUsb.setLayoutParams(iconLp);
+        rootLayout.addView(ivUsb);
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText(t("USB Connected"));
+        tvTitle.setTextColor(ThemeManager.getTextColorPrimary());
+        tvTitle.setTextSize(17f);
+        tvTitle.setTypeface(ThemeManager.getCustomFontBold());
+        tvTitle.setGravity(Gravity.CENTER);
+        tvTitle.setPadding(0, 0, 0, (int) (6 * d));
+        rootLayout.addView(tvTitle);
+
+        TextView tvMsg = new TextView(this);
+        tvMsg.setText(t("Connect this device as USB storage to transfer files to your computer?"));
+        tvMsg.setTextColor(ThemeManager.getTextColorSecondary());
+        tvMsg.setTextSize(13f);
+        tvMsg.setTypeface(ThemeManager.getCustomFont(), Typeface.NORMAL);
+        tvMsg.setGravity(Gravity.CENTER);
+        tvMsg.setPadding((int) (4 * d), 0, (int) (4 * d), (int) (18 * d));
+        tvMsg.setLineSpacing(0, 1.3f);
+        rootLayout.addView(tvMsg);
+
+        View.OnKeyListener dialogWheelListener = new View.OnKeyListener() {
+            @Override
+            public boolean onKey(View v, int keyCode, KeyEvent event) {
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    if (keyCode == 19 || keyCode == 21) {
+                        int idx = rootLayout.indexOfChild(v);
+                        for (int i = idx - 1; i >= 0; i--) {
+                            if (rootLayout.getChildAt(i).isFocusable()) {
+                                rootLayout.getChildAt(i).requestFocus();
+                                clickFeedback();
+                                return true;
+                            }
+                        }
+                        return true;
+                    }
+                    if (keyCode == 20 || keyCode == 22) {
+                        int idx = rootLayout.indexOfChild(v);
+                        for (int i = idx + 1; i < rootLayout.getChildCount(); i++) {
+                            if (rootLayout.getChildAt(i).isFocusable()) {
+                                rootLayout.getChildAt(i).requestFocus();
+                                clickFeedback();
+                                return true;
+                            }
+                        }
+                        return true;
+                    }
+                }
+                return false;
+            }
+        };
+
+        View btnConnect = createListButtonWithIcon("", t("Connect as Storage"));
+        btnConnect.setOnKeyListener(dialogWheelListener);
+        btnConnect.setOnClickListener(v -> {
+            clickFeedback();
+            dialog.dismiss();
+            startUsbStorage();
+        });
+        rootLayout.addView(btnConnect);
+
+        View btnCharge = createListButtonWithIcon("", t("Charge Only"));
+        btnCharge.setOnKeyListener(dialogWheelListener);
+        btnCharge.setOnClickListener(v -> {
+            clickFeedback();
+            dialog.dismiss();
+        });
+        rootLayout.addView(btnCharge);
+
+        dialog.setContentView(rootLayout);
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setLayout((int) (300 * d), ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        dialog.show();
+
+        rootLayout.postDelayed(() -> {
+            if (rootLayout.getChildCount() > 0) {
+                // Focus "Connect as Storage" button
+                for (int i = 0; i < rootLayout.getChildCount(); i++) {
+                    if (rootLayout.getChildAt(i).isFocusable()) {
+                        rootLayout.getChildAt(i).requestFocus();
+                        break;
+                    }
+                }
+            }
+        }, 60);
+    }
+
+    private void pauseAllPlaybackForUsb() {
+        try {
+            com.themoon.y1.managers.AudioPlayerManager am = com.themoon.y1.managers.AudioPlayerManager.getInstance();
+            if (am != null && am.isPlaying()) {
+                am.playOrPauseMusic();
+            }
+        } catch (Exception ignored) {}
+        try {
+            com.themoon.y1.managers.VideoPlayerManager vm = com.themoon.y1.managers.VideoPlayerManager.getInstance();
+            if (vm != null && vm.isPlaying()) {
+                vm.togglePlayPause();
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private void startUsbStorage() {
+        if (usbStorageBusy) return;
+        usbStorageBusy = true;
+        pauseAllPlaybackForUsb();
+        if (externalSdMountMonitor != null) {
+            externalSdMountMonitor.setSuspended(true);
+        }
+        new Thread(() -> {
+            boolean ok = com.themoon.y1.managers.UsbMassStorageController.setEnabled(true);
+            runOnUiThread(() -> {
+                usbStorageBusy = false;
+                if (ok) {
+                    showUsbStorageOverlay();
+                } else {
+                    if (externalSdMountMonitor != null) {
+                        externalSdMountMonitor.setSuspended(false);
+                    }
+                    Toast.makeText(this, t("Couldn't connect as USB storage."), Toast.LENGTH_LONG).show();
+                }
+            });
+        }, "y1-ums-on").start();
+    }
+
+    private void stopUsbStorage() {
+        if (usbStorageBusy) return;
+        usbStorageBusy = true;
+        new Thread(() -> {
+            boolean stillOn = com.themoon.y1.managers.UsbMassStorageController.setEnabled(false);
+            runOnUiThread(() -> {
+                usbStorageBusy = false;
+                if (stillOn) {
+                    Toast.makeText(this, t("Couldn't eject USB storage."), Toast.LENGTH_LONG).show();
+                    return;
+                }
+                hideUsbStorageOverlay();
+                if (externalSdMountMonitor != null) {
+                    externalSdMountMonitor.setSuspended(false);
+                }
+            });
+        }, "y1-ums-off").start();
+    }
+
+    /** Cable pulled while shared: MountService may auto-unshare; if not, do it ourselves. */
+    private void onUsbCableRemovedWhileShared() {
+        new Handler(Looper.getMainLooper()).postDelayed(() -> new Thread(() -> {
+            if (com.themoon.y1.managers.UsbMassStorageController.isEnabled()) {
+                runOnUiThread(this::stopUsbStorage);
+            } else {
+                runOnUiThread(() -> {
+                    hideUsbStorageOverlay();
+                    if (externalSdMountMonitor != null) {
+                        externalSdMountMonitor.setSuspended(false);
+                    }
+                });
+            }
+        }, "y1-ums-unplug").start(), 1500);
+    }
+
+    private void showUsbStorageOverlay() {
+        if (usbStorageOverlay != null) return;
+        ViewGroup root = (ViewGroup) findViewById(android.R.id.content);
+        if (root == null) return;
+
+        float d = getResources().getDisplayMetrics().density;
+        FrameLayout overlay = new FrameLayout(this);
+        overlay.setClickable(true);
+        overlay.setFocusable(true);
+        overlay.setBackgroundColor(ThemeManager.getOverlayBackgroundColor() | 0xFF000000);
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setGravity(Gravity.CENTER);
+        FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        clp.gravity = Gravity.CENTER;
+        clp.leftMargin = (int) (24 * d);
+        clp.rightMargin = (int) (24 * d);
+        content.setLayoutParams(clp);
+
+        int iconSizePx = (int) (96 * d);
+        android.widget.ImageView iv = new android.widget.ImageView(this);
+        iv.setImageBitmap(com.themoon.y1.views.TablerIcons.render(
+                com.themoon.y1.views.TablerIcons.USB, iconSizePx, ThemeManager.getTextColorPrimary()));
+        LinearLayout.LayoutParams ivLp = new LinearLayout.LayoutParams(iconSizePx, iconSizePx);
+        ivLp.gravity = Gravity.CENTER_HORIZONTAL;
+        ivLp.bottomMargin = (int) (16 * d);
+        iv.setLayoutParams(ivLp);
+        content.addView(iv);
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText(t("Connected"));
+        tvTitle.setTextColor(ThemeManager.getTextColorPrimary());
+        tvTitle.setTextSize(22f);
+        tvTitle.setTypeface(ThemeManager.getCustomFontBold());
+        tvTitle.setGravity(Gravity.CENTER);
+        tvTitle.setPadding(0, 0, 0, (int) (6 * d));
+        content.addView(tvTitle);
+
+        TextView tvSubtitle = new TextView(this);
+        tvSubtitle.setText(t("Eject before disconnecting."));
+        tvSubtitle.setTextColor(ThemeManager.getTextColorSecondary());
+        tvSubtitle.setTextSize(14f);
+        tvSubtitle.setTypeface(ThemeManager.getCustomFont(), Typeface.NORMAL);
+        tvSubtitle.setGravity(Gravity.CENTER);
+        tvSubtitle.setPadding(0, 0, 0, (int) (24 * d));
+        content.addView(tvSubtitle);
+
+        View btnEject = createListButtonWithIcon("", t("Eject"));
+        btnEject.setOnClickListener(v -> {
+            clickFeedback();
+            stopUsbStorage();
+        });
+        LinearLayout.LayoutParams btnLp = new LinearLayout.LayoutParams(
+                (int) (180 * d), ViewGroup.LayoutParams.WRAP_CONTENT);
+        btnLp.gravity = Gravity.CENTER_HORIZONTAL;
+        btnEject.setLayoutParams(btnLp);
+        content.addView(btnEject);
+
+        overlay.addView(content);
+        root.addView(overlay, new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        usbStorageOverlay = overlay;
+
+        try {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        } catch (Exception ignored) {}
+
+        btnEject.postDelayed(btnEject::requestFocus, 60);
+    }
+
+    private void hideUsbStorageOverlay() {
+        if (usbStorageOverlay != null) {
+            ViewGroup root = (ViewGroup) findViewById(android.R.id.content);
+            if (root != null) {
+                root.removeView(usbStorageOverlay);
+            }
+            usbStorageOverlay = null;
+        }
+        try {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        } catch (Exception ignored) {}
+    }
+
     // =======================================================
     // 🚀 [팝업 2] 플레이리스트 목록에서 '플레이리스트 파일 자체'를 지울 때 뜨는 커스텀 팝업
     // =======================================================

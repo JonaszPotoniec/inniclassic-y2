@@ -41,12 +41,30 @@ public final class ExternalSdMountMonitor {
     private Handler bgHandler;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicBoolean mountInFlight = new AtomicBoolean(false);
+    private final AtomicBoolean suspended = new AtomicBoolean(false);
     private Listener listener;
     private BroadcastReceiver mediaReceiver;
     private BroadcastReceiver usbReceiver;
     private long lastMountAttemptMs;
     private boolean lastPriReady = false;
     private boolean lastSecReady = false;
+
+    /** While true (USB storage shared with PC) the watchdog never remounts/starts FUSE. */
+    public void setSuspended(boolean s) {
+        suspended.set(s);
+        if (!s) {
+            // Re-baseline so the remount after UMS is reported as "newly mounted" exactly once.
+            lastSecReady = false;
+            if (bgHandler != null) {
+                bgHandler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        checkAndMaybeMount("ums_resume");
+                    }
+                }, 1500);
+            }
+        }
+    }
 
     private final Runnable pollTask = new Runnable() {
         @Override
@@ -137,6 +155,8 @@ public final class ExternalSdMountMonitor {
     }
 
     private void checkAndMaybeMount(String reason) {
+        if (suspended.get())
+            return;
         boolean priReady = isPrimaryReady();
         boolean secReady = isSecondaryReady();
 
@@ -355,7 +375,7 @@ public final class ExternalSdMountMonitor {
         }
     }
 
-    private static String runSuTimed(String cmd) {
+    public static String runSuTimed(String cmd) {
         Process p = null;
         final StringBuilder out = new StringBuilder();
         try {

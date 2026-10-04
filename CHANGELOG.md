@@ -2,6 +2,16 @@
 
 All notable changes to InniClassic (formerly "JJ Launcher Classic Version") are documented here. This project is based on JJ Launcher `0.11`; this changelog covers only what changed on top of that base.
 
+## [Unreleased]
+
+### Added
+- **USB storage prompt**: connect microSD as USB Mass Storage (UMS) directly from the launcher when plugged into a PC.
+  - Custom in-style dialog: "Connect as Storage" or "Charge Only".
+  - Full-screen iPod-style "Connected – Eject before disconnecting" screen with center button "Eject" action.
+  - Setting toggle: "Ask on USB Connect" (under Settings, default ON).
+  - Suspends MicroSD watchdog during active UMS share to prevent false remounts, and automatically triggers media library rescan upon ejection or cable disconnect.
+  - Localized across all 7 supported languages.
+
 ## [1.5.0] - 2026-09-22
 
 Full support for the **Innioasis Y2** device, ported from upstream `y1_launcher`.

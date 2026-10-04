@@ -500,5 +500,15 @@
   "녹화기를 종료합니다.": "녹화기를 종료합니다.",
   "설정창을 엽니다...": "설정창을 엽니다...",
   "🚨 앱을 실행할 수 없습니다.": "🚨 앱을 실행할 수 없습니다.",
-  "🚨 앱이 설치되어 있지 않습니다.": "🚨 앱이 설치되어 있지 않습니다."
+  "🚨 앱이 설치되어 있지 않습니다.": "🚨 앱이 설치되어 있지 않습니다.",
+  "USB Connected": "USB Connected",
+  "Connect this device as USB storage to transfer files to your computer?": "Connect this device as USB storage to transfer files to your computer?",
+  "Connect as Storage": "Connect as Storage",
+  "Charge Only": "Charge Only",
+  "Couldn't connect as USB storage.": "Couldn't connect as USB storage.",
+  "Couldn't eject USB storage.": "Couldn't eject USB storage.",
+  "Connected": "Connected",
+  "Eject before disconnecting.": "Eject before disconnecting.",
+  "Eject": "Eject",
+  "Ask on USB Connect": "Ask on USB Connect"
 }

@@ -500,5 +500,15 @@
   "녹화기를 종료합니다.": "Zamykanie rejestratora ekranu.",
   "설정창을 엽니다...": "Otwieranie okna ustawień...",
   "🚨 앱을 실행할 수 없습니다.": "🚨 Nie można uruchomić aplikacji.",
-  "🚨 앱이 설치되어 있지 않습니다.": "🚨 Aplikacja nie jest zainstalowana."
+  "🚨 앱이 설치되어 있지 않습니다.": "🚨 Aplikacja nie jest zainstalowana.",
+  "USB Connected": "Podłączono USB",
+  "Connect this device as USB storage to transfer files to your computer?": "Podłączyć urządzenie jako pamięć USB, aby przesyłać pliki do komputera?",
+  "Connect as Storage": "Podłącz jako pamięć",
+  "Charge Only": "Tylko ładowanie",
+  "Couldn't connect as USB storage.": "Nie udało się połączyć jako pamięć USB.",
+  "Couldn't eject USB storage.": "Nie udało się odmontować pamięci USB.",
+  "Connected": "Połączono",
+  "Eject before disconnecting.": "Wysuń przed odłączeniem.",
+  "Eject": "Wysuń",
+  "Ask on USB Connect": "Pytaj przy podłączeniu USB"
 }
