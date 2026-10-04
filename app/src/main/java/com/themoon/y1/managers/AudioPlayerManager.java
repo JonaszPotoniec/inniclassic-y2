@@ -758,9 +758,8 @@ public class AudioPlayerManager {
 
             if (t != null && !t.trim().isEmpty()) main.tvPlayerTitle.setText(t);
             else main.tvPlayerTitle.setText(safeFileName);
-
             if (a != null && !a.trim().isEmpty()) main.tvPlayerArtist.setText(a);
-            else main.tvPlayerArtist.setText(track.getAbsolutePath().contains("/Audiobooks") || main.isAudiobookLibraryMode ? "Unknown Author" : "Unknown Artist");
+            else main.tvPlayerArtist.setText(track.getAbsolutePath().contains("/Audiobooks") || main.isAudiobookLibraryMode ? main.t("Unknown Author") : main.t("Unknown Artist"));
 
             main.tvPlayerAlbum.setText(album != null && !album.trim().isEmpty() ? album.trim() : "");
 

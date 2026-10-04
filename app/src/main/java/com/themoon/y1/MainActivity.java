@@ -1538,7 +1538,7 @@ public class MainActivity extends Activity {
             } else {
                 errorStr += " - " + e.getMessage();
             }
-            Toast.makeText(this, "Audio error: " + errorStr, Toast.LENGTH_LONG).show();
+            Toast.makeText(this, t("Audio error: ") + errorStr, Toast.LENGTH_LONG).show();
         }
     }
 
@@ -6920,14 +6920,14 @@ public class MainActivity extends Activity {
                                         if (resetDot > 0)
                                             resetTitle = resetTitle.substring(0, resetDot);
                                         tvPlayerTitle.setText(resetTitle);
-                                        tvPlayerArtist.setText("Unknown Artist");
+                                        tvPlayerArtist.setText(t("Unknown Artist"));
                                         tvPlayerAlbum.setText("");
                                     }
 
                                     updateMainMenuBackground();
                                     refreshNowPlayingPreview();
                                 } catch (Exception e) {
-                                    Toast.makeText(MainActivity.this, "Failed to clear cache.", Toast.LENGTH_SHORT)
+                                    Toast.makeText(MainActivity.this, t("Failed to clear cache."), Toast.LENGTH_SHORT)
                                             .show();
                                 }
                             }
@@ -11357,7 +11357,7 @@ public class MainActivity extends Activity {
                     switch (el.action) {
                         case "OPEN_PLAYER":
                             if (currentPlaylist.isEmpty())
-                                Toast.makeText(MainActivity.this, "No music is currently playing.", Toast.LENGTH_SHORT)
+                                Toast.makeText(MainActivity.this, t("No music is currently playing."), Toast.LENGTH_SHORT)
                                         .show();
                             else
                                 changeScreen(STATE_PLAYER);
@@ -14206,9 +14206,9 @@ public class MainActivity extends Activity {
                     // 시스템 전역에 시간이 변경되었음을 강제로 방송하여 메인 페이지 시계와 시스템 앱들을 동기화시킵니다.
                     sendBroadcast(new Intent(Intent.ACTION_TIME_CHANGED));
 
-                    Toast.makeText(MainActivity.this, "Time applied successfully!", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, t("Time applied successfully!"), Toast.LENGTH_SHORT).show();
                 } catch (Exception e) {
-                    Toast.makeText(MainActivity.this, "Failed: Root access required.", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, t("Failed: Root access required."), Toast.LENGTH_SHORT).show();
                 }
 
                 // 🚀 [포커스 버그 해결 1] 오염된 인덱스를 'Date & Time Settings' 메뉴 위치(14번째 항목)로 강제 정화
@@ -16034,7 +16034,7 @@ public class MainActivity extends Activity {
         }
 
         if (songs.isEmpty()) {
-            Toast.makeText(this, "No valid tracks found in this playlist.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, t("No valid tracks found in this playlist."), Toast.LENGTH_SHORT).show();
         }
 
         SongListAdapter adapter = new SongListAdapter(songs);
@@ -17396,7 +17396,7 @@ public class MainActivity extends Activity {
 
         // 1. 타이틀 (오렌지색 경고)
         TextView tvTitle = new TextView(this);
-        tvTitle.setText("⚠️ 10-Band Software EQ");
+        tvTitle.setText("⚠️ " + t("10-Band Software EQ"));
         tvTitle.setTextColor(0xFFFF8800);
         tvTitle.setTextSize(18f);
         tvTitle.setTypeface(ThemeManager.getCustomFontBold());
@@ -18154,7 +18154,7 @@ public class MainActivity extends Activity {
                             Toast.makeText(MainActivity.this, t("Starting: ") + pm.getApplicationLabel(appInfo),
                                     Toast.LENGTH_SHORT).show();
                         } catch (Exception e) {
-                            Toast.makeText(MainActivity.this, t("🚨 앱을 실행할 수 없습니다."), Toast.LENGTH_SHORT).show();
+                            Toast.makeText(MainActivity.this, t("🚨 Unable to launch app."), Toast.LENGTH_SHORT).show();
                         }
                     }
                 });
@@ -18198,7 +18198,7 @@ public class MainActivity extends Activity {
                     if (intent != null) {
                         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                         startActivity(intent);
-                        Toast.makeText(MainActivity.this, t("녹화 준비 중... 가만히 두세요!"), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(MainActivity.this, t("Preparing screen recording... Please wait!"), Toast.LENGTH_SHORT).show();
 
                         new Handler().postDelayed(new Runnable() {
                             @Override
@@ -18215,7 +18215,7 @@ public class MainActivity extends Activity {
                             }
                         }, 2000);
                     } else {
-                        Toast.makeText(MainActivity.this, t("🚨 앱이 설치되어 있지 않습니다."), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(MainActivity.this, t("🚨 App is not installed."), Toast.LENGTH_SHORT).show();
                     }
                 } catch (Exception e) {
                 }
@@ -18229,7 +18229,7 @@ public class MainActivity extends Activity {
             @Override
             public void onClick(View v) {
                 clickFeedback();
-                Toast.makeText(MainActivity.this, t("설정창을 엽니다..."), Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this, t("Opening settings..."), Toast.LENGTH_SHORT).show();
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
@@ -18249,7 +18249,7 @@ public class MainActivity extends Activity {
             @Override
             public void onClick(View v) {
                 clickFeedback();
-                Toast.makeText(MainActivity.this, t("녹화기를 종료합니다."), Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this, t("Closing screen recorder."), Toast.LENGTH_SHORT).show();
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
@@ -18274,7 +18274,7 @@ public class MainActivity extends Activity {
                     if (intent != null) {
                         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                         startActivity(intent);
-                        Toast.makeText(MainActivity.this, t("✅ 녹화가 안전하게 저장되었습니다!"), Toast.LENGTH_LONG).show();
+                        Toast.makeText(MainActivity.this, t("✅ Recording saved safely!"), Toast.LENGTH_LONG).show();
                     }
                 } catch (Exception e) {
                 }

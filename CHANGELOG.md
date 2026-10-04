@@ -11,6 +11,12 @@ All notable changes to InniClassic (formerly "JJ Launcher Classic Version") are 
   - Setting toggle: "Ask on USB Connect" (under Settings, default ON).
   - Suspends MicroSD watchdog during active UMS share to prevent false remounts, and automatically triggers media library rescan upon ejection or cable disconnect.
   - Localized across all 7 supported languages.
+- **Localization fixes & coverage**:
+  - Localized keyboard settings ("Keyboard Layout", "Original", "QWERTY", "Next", "Login") across all 7 supported languages.
+  - Added missing "Add to Favorites" string across all language packs.
+  - Cleaned up screen recorder strings and migrated from raw Korean keys to proper English keys.
+  - Wrapped untranslated toasts and headers in `t(...)` (Unknown Artist/Author, 10-Band EQ header, cache and playback error toasts).
+  - Note: Non-English/Polish translations are machine translated.
 
 ## [1.5.0] - 2026-09-22
 

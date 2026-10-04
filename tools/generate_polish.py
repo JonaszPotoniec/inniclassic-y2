@@ -2,7 +2,6 @@ import json
 import os
 
 polish_dict = {
-  # Time, durations, units
   " minutes": " min.",
   "1 Min": "1 min",
   "1 Minute": "1 minuta",
@@ -35,8 +34,6 @@ polish_dict = {
   "Sleep Timer": "Wyłącznik czasowy",
   "Sleep timer cancelled": "Wyłącznik czasowy anulowany",
   "Sleep timer set for ": "Wyłącznik czasowy ustawiony na ",
-
-  # Main menu & navigation
   "Now Playing": "Odtwarzane",
   "Music": "Muzyka",
   "Videos": "Wideo",
@@ -58,8 +55,6 @@ polish_dict = {
   "Wireless PC Upload": "Bezprzewodowe przesyłanie PC",
   "Main Menu Items": "Elementy menu głównego",
   "Music Menu Items": "Elementy menu Muzyka",
-
-  # Music library
   "Artists": "Wykonawcy",
   "Album Artists": "Wykonawcy albumów",
   "Albums": "Albumy",
@@ -89,8 +84,6 @@ polish_dict = {
   "Unknown Composer": "Nieznany kompozytor",
   "Browse Artist": "Przeglądaj wykonawcę",
   "Browse Album": "Przeglądaj album",
-
-  # Playlists
   "Playlists": "Playlisty",
   "Playlist": "Playlista",
   "Playlist ": "Playlista ",
@@ -111,8 +104,6 @@ polish_dict = {
   "Do you want to remove this track from the playlist?": "Czy chcesz usunąć ten utwór z playlisty?",
   "from this playlist?": "z tej playlisty?",
   "Track removed.": "Utwór usunięty.",
-
-  # Audiobooks
   "All Audiobooks": "Wszystkie audiobooki",
   "Authors": "Autorzy",
   "Authors & Books": "Autorzy i książki",
@@ -122,8 +113,6 @@ polish_dict = {
   "Unknown Book": "Nieznana książka",
   "Switch to Audiobooks": "Przełącz na audiobooki",
   "Switch to Music": "Przełącz na muzykę",
-
-  # Playback Controls & Status
   "Play (Downloaded)": "Odtwórz (Pobrane)",
   "Play All": "Odtwórz wszystko",
   "Play All Videos": "Odtwórz wszystkie filmy",
@@ -151,8 +140,6 @@ polish_dict = {
   "No music is currently playing.": "Żadna muzyka nie jest obecnie odtwarzana.",
   "No playable audio files found.": "Nie znaleziono odtwarzalnych plików audio.",
   "Corrupted File": "Uszkodzony plik",
-
-  # Equalizer & Audio Effects
   "Equalizer & Audio Effects": "Korektor i efekty dźwiękowe",
   "EQ Engine Mode": "Tryb silnika korektora",
   "10-Band Software EQ": "10-pasmowy korektor programowy",
@@ -198,13 +185,9 @@ polish_dict = {
   "Earphones": "Słuchawki",
   "Button Sound": "Dźwięk przycisków",
   "Audio & Playback": "Dźwięk i odtwarzanie",
-
-  # Videos
   "Video Browser": "Przeglądarka wideo",
   "Fill Video Screen": "Wypełnij ekran wideo",
   "No videos found.\nCopy videos into the \"Videos\" folder on your SD card.": "Nie znaleziono filmów.\nSkopiuj filmy do folderu „Videos” na karcie SD.",
-
-  # Podcasts
   "Search Podcast": "Szukaj podcastu",
   "Search New Podcasts": "Szukaj nowych podcastów",
   "Manage Subscriptions": "Zarządzaj subskrypcjami",
@@ -236,8 +219,6 @@ polish_dict = {
   "Delete Episode": "Usuń odcinek",
   "Do you want to delete this downloaded episode?": "Czy chcesz usunąć ten pobrany odcinek?",
   "Episode deleted.": "Odcinek usunięty.",
-
-  # FM Radio
   "Radio Power": "Zasilanie radia",
   "Radio Settings": "Ustawienia radia",
   "Close Settings": "Zamknij ustawienia",
@@ -262,8 +243,6 @@ polish_dict = {
   "Tuning Frequency...\n\n%.1f MHz": "Dostrajanie częstotliwości...\n\n%.1f MHz",
   "Scan Complete!\nFound": "Skanowanie zakończone!\nZnaleziono",
   "channels.\nTuning to": "stacji.\nDostrajanie do",
-
-  # Music Quiz
   "Not enough songs in your library for Music Quiz.": "Za mało utworów w bibliotece, aby uruchomić Muzyczny Quiz.",
   "Score": "Wynik",
   "What song is playing?": "Jaki utwór jest odtwarzany?",
@@ -285,8 +264,6 @@ polish_dict = {
   "You beat all 5 rounds!": "Ukończyłeś wszystkie 5 rund!",
   "Play Again": "Zagraj ponownie",
   "Exit": "Wyjdź",
-
-  # Last.fm
   "Scrobble to Last.fm": "Scrobblowanie do Last.fm",
   "Sync Scrobbles to Last.fm": "Synchronizuj scrobble z Last.fm",
   "Last.fm Scrobbling": "Scrobblowanie Last.fm",
@@ -318,8 +295,6 @@ polish_dict = {
   "Login failed: ": "Logowanie nie powiodło się: ",
   "Last.fm Login Guide": "Instrukcja logowania Last.fm",
   "Please start Wireless PC Upload (Web Server) and log in to Last.fm from your PC or smartphone browser.": "Uruchom Bezprzewodowe przesyłanie PC (Serwer WWW) i zaloguj się do Last.fm w przeglądarce komputera lub smartfona.",
-
-  # Bluetooth & Wi-Fi
   "Bluetooth Power": "Zasilanie Bluetooth",
   "Bluetooth is OFF": "Bluetooth jest wyłączony",
   "AVAILABLE DEVICES": "DOSTĘPNE URZĄDZENIA",
@@ -352,8 +327,6 @@ polish_dict = {
   "Enter Password...": "Wpisz hasło...",
   "Network Error": "Błąd sieci",
   "Network Error: ": "Błąd sieci: ",
-
-  # Web Server & Storage
   "SERVER RUNNING": "SERWER DZIAŁA",
   "SERVER STOPPED": "SERWER ZATRZYMANY",
   "START SERVER": "URUCHOM SERWER",
@@ -379,15 +352,12 @@ polish_dict = {
   "USB Disconnect Required (Tap to go back)": "Wymagane odłączenie USB (Dotknij, aby wrócić)",
   "Empty Folder (Tap to go back)": "Pusty folder (Dotknij, aby wrócić)",
   "Path": "Ścieżka",
-
-  # Scanning & Library Management
   "Scan Media Library": "Skanuj bibliotekę multimediów",
   "Scanning Media...": "Skanowanie multimediów...",
   "Scanning...": "Skanowanie...",
   "Preparing to scan...\nPlease wait.": "Przygotowanie do skanowania...\nProszę czekać.",
   "Counting files...\nPlease wait.": "Liczenie plików...\nProszę czekać.",
   "Scanning Media: %d%%\n(%d / %d)\nDo not turn off the screen.": "Skanowanie multimediów: %d%%\n(%d / %d)\nNie wyłączaj ekranu.",
-  "Scan Complete!\nFound": "Skanowanie zakończone!\nZnaleziono",
   "Scan Complete! Music": "Skanowanie zakończone! Muzyka",
   "Scan Complete (Retry)": "Skanowanie zakończone (Ponów)",
   "Rescan Library": "Przeskanuj bibliotekę",
@@ -406,8 +376,6 @@ polish_dict = {
   "No Albums Found": "Nie znaleziono albumów",
   "No albums found.": "Nie znaleziono albumów.",
   "No audio files found in subfolders.": "Nie znaleziono plików audio w podfolderach.",
-
-  # System, Settings & Themes
   "System": "System",
   "Language": "Język",
   "Display & Menu": "Ekran i menu",
@@ -466,8 +434,6 @@ polish_dict = {
   "System security prevents powering off directly from the app.": "Zabezpieczenia systemu uniemożliwiają wyłączenie z poziomu aplikacji.",
   "Network & Connections": "Sieć i połączenia",
   "Control & Feedback": "Sterowanie i reakcja",
-
-  # Rockbox & Games
   "Switch to Rockbox": "Przełącz na Rockbox",
   "Do you want to switch to Rockbox instantly without rebooting?": "Czy chcesz natychmiast przełączyć się na Rockbox bez ponownego uruchamiania?",
   "Rockbox is not installed on this device.\nPlease install the Rockbox app (.apk) first.": "Rockbox nie jest zainstalowany na tym urządzeniu.\nNajpierw zainstaluj aplikację Rockbox (.apk).",
@@ -476,8 +442,6 @@ polish_dict = {
   "Built-in Games": "Wbudowane gry",
   "No built-in games found.": "Nie znaleziono wbudowanych gier.",
   "Put game folders inside assets/games/": "Umieść foldery gier wewnątrz assets/games/",
-
-  # General Actions & UI
   "OK": "OK",
   "Cancel": "Anuluj",
   "Delete": "Usuń",
@@ -520,8 +484,6 @@ polish_dict = {
   "Widget: Now Playing Album": "Widżet: Okładka odtwarzanego albumu",
   "Do you want to remove": "Czy chcesz usunąć",
   "Turn ON": "Włącz",
-
-  # Language names
   "polish": "Polski",
   "Polish": "Polski",
   "english": "Angielski",
@@ -536,14 +498,38 @@ polish_dict = {
   "Chinese": "Chiński",
   "japanese": "Japoński",
   "Japanese": "Japoński",
-
-  # Internal studio / Dev strings
-  "✅ 녹화가 안전하게 저장되었습니다!": "✅ Nagranie zostało bezpiecznie zapisane!",
-  "녹화 준비 중... 가만히 두세요!": "Przygotowanie do nagrywania... Proszę czekać!",
-  "녹화기를 종료합니다.": "Zamykanie rejestratora ekranu.",
-  "설정창을 엽니다...": "Otwieranie okna ustawień...",
-  "🚨 앱을 실행할 수 없습니다.": "🚨 Nie można uruchomić aplikacji.",
-  "🚨 앱이 설치되어 있지 않습니다.": "🚨 Aplikacja nie jest zainstalowana."
+  "USB Connected": "Podłączono USB",
+  "Connect this device as USB storage to transfer files to your computer?": "Podłączyć urządzenie jako pamięć USB, aby przesyłać pliki do komputera?",
+  "Connect as Storage": "Podłącz jako pamięć",
+  "Charge Only": "Tylko ładowanie",
+  "Couldn't connect as USB storage.": "Nie udało się połączyć jako pamięć USB.",
+  "Couldn't eject USB storage.": "Nie udało się odmontować pamięci USB.",
+  "Connected": "Połączono",
+  "Eject before disconnecting.": "Wysuń przed odłączeniem.",
+  "Eject": "Wysuń",
+  "Ask on USB Connect": "Pytaj przy podłączeniu USB",
+  "Keyboard Layout": "Układ klawiatury",
+  "Original": "Oryginalna",
+  "QWERTY": "QWERTY",
+  "Next": "Dalej",
+  "Login": "Zaloguj",
+  "Add to Favorites": "Dodaj do ulubionych",
+  "Start Screen Record": "Rozpocznij nagrywanie ekranu",
+  "SCR Settings": "Ustawienia nagrywania",
+  "Close Screen Recorder": "Zamknij rejestrator ekranu",
+  "Stop Recording & Save": "Zatrzymaj nagrywanie i zapisz",
+  "Preparing screen recording... Please wait!": "Przygotowanie do nagrywania... Proszę czekać!",
+  "Closing screen recorder.": "Zamykanie rejestratora ekranu.",
+  "Opening settings...": "Otwieranie ustawień...",
+  "🚨 Unable to launch app.": "🚨 Nie można uruchomić aplikacji.",
+  "🚨 App is not installed.": "🚨 Aplikacja nie jest zainstalowana.",
+  "✅ Recording saved safely!": "✅ Nagranie zostało bezpiecznie zapisane!",
+  "Rebuilding album cover cache...": "Odbudowywanie pamięci podręcznej okładek...",
+  "Time applied successfully!": "Czas został pomyślnie zaktualizowany!",
+  "Failed: Root access required.": "Błąd: Wymagany dostęp Root.",
+  "No valid tracks found in this playlist.": "Brak prawidłowych utworów na tej liście odtwarzania.",
+  "Failed to clear cache.": "Nie udało się wyczyścić pamięci podręcznej.",
+  "Audio error: ": "Błąd dźwięku: "
 }
 
 def main():
