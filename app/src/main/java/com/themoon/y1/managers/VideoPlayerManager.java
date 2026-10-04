@@ -27,6 +27,8 @@ public class VideoPlayerManager {
     private SurfaceView attachedSurfaceView;
     private File currentVideoFile;
 
+    private float currentMasterVolume = 1.0f;
+
     // 🚀 [이어보기] 나중에 이 파일을 다시 열었을 때 몇 초부터 이어볼지 저장해둘 최소/최대 임계값 -
     // 너무 초반(3초 미만)이거나 이미 거의 다 봤으면(끝나기 5초 전 이내) 저장하지 않고, 대신 처음부터
     // 다시 봅니다(오디오북 북마크와 동일한 사고방식).
@@ -40,11 +42,31 @@ public class VideoPlayerManager {
 
     private VideoPlayerManager() {}
 
+    public void setMasterVolume(float volume) {
+        this.currentMasterVolume = Math.max(0.0f, Math.min(1.0f, volume));
+        applyMasterVolume();
+    }
+
+    public float getMasterVolume() {
+        return currentMasterVolume;
+    }
+
+    public void applyMasterVolume() {
+        if (mediaPlayer != null) {
+            try {
+                int percent = Math.round(currentMasterVolume * 100.0f);
+                mediaPlayer.setVolume(percent);
+            } catch (Throwable ignored) {}
+        }
+    }
+
     private void ensurePlayer(Context context) {
         if (libVLC == null) {
             ArrayList<String> options = new ArrayList<>();
             libVLC = new LibVLC(context.getApplicationContext(), options);
             mediaPlayer = new MediaPlayer(libVLC);
+            currentMasterVolume = VirtualVolumeManager.getInstance().getMasterGain();
+            applyMasterVolume();
         }
     }
 
@@ -98,6 +120,7 @@ public class VideoPlayerManager {
         // 🚀 [화면비 옵션] Best Fit(기본값): 원본 비율 유지, 화면비 강제는 위 post() 콜백에서 처리합니다.
         mediaPlayer.setScale(0);
         mediaPlayer.play();
+        applyMasterVolume();
 
         // 🚀 [이어보기] 이 파일에 저장된 위치가 있으면 재생 시작과 동시에 그 지점으로 점프합니다.
         if (MainActivity.instance != null) {

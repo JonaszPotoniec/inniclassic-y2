@@ -73,6 +73,11 @@ public class ThemeManager {
 
     public static List<ThemeData> availableThemes = new ArrayList<>();
     private static int currentThemeIndex = 0;
+    private static final ThemeData DEFAULT_FALLBACK_THEME = new ThemeData(
+            "", "iPod Classic", "", android.graphics.Typeface.DEFAULT,
+            Color.WHITE, 0xFF888888, 0xDD000000, 0xFF000000,
+            0x33444444, 0xFF0275D8, Color.WHITE, 6
+    );
 
     private static int safeParseColor(String colorStr, int defaultColor) {
         try {
@@ -378,7 +383,9 @@ public class ThemeManager {
     }
     public static int getCurrentThemeIndex() { return currentThemeIndex; }
     public static ThemeData getCurrentTheme() {
-        if (availableThemes.isEmpty()) return null;
+        if (availableThemes.isEmpty() || currentThemeIndex < 0 || currentThemeIndex >= availableThemes.size()) {
+            return DEFAULT_FALLBACK_THEME;
+        }
         ThemeData t = availableThemes.get(currentThemeIndex);
         ensureGamesMenuItem(t);
         return t;

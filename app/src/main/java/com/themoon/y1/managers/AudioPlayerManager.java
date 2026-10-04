@@ -51,6 +51,29 @@ public class AudioPlayerManager {
     private java.io.FileInputStream currentFileInputStream;
 
     private float currentSpeed = 1.0f;
+    private float currentMasterVolume = 1.0f;
+
+    public void setMasterVolume(float volume) {
+        this.currentMasterVolume = Math.max(0.0f, Math.min(1.0f, volume));
+        applyMasterVolume();
+    }
+
+    public float getMasterVolume() {
+        return currentMasterVolume;
+    }
+
+    public void applyMasterVolume() {
+        if (exoPlayer != null) {
+            try {
+                exoPlayer.setVolume(currentMasterVolume);
+            } catch (Throwable ignored) {}
+        }
+        if (legacyPlayer != null) {
+            try {
+                legacyPlayer.setVolume(currentMasterVolume, currentMasterVolume);
+            } catch (Throwable ignored) {}
+        }
+    }
 
     // Metadata for the track currently being prepared, handed to LastFmScrobbler
     // once its real duration is known (synchronously for the legacy/FLAC player,
@@ -178,9 +201,10 @@ public class AudioPlayerManager {
                                         MainActivity.instance.setupVisualizer();
 
                                         int duration = getDuration();
-                                        int s = (duration / 1000) % 60;
-                                        int m = (duration / (1000 * 60)) % 60;
-                                        MainActivity.instance.tvPlayerTimeTotal.setText(String.format(Locale.US, "%02d:%02d", m, s));
+                                        int remaining = Math.max(0, duration - getCurrentPosition());
+                                        int s = (remaining / 1000) % 60;
+                                        int m = remaining / (1000 * 60);
+                                        MainActivity.instance.tvPlayerTimeTotal.setText(String.format(Locale.US, "-%02d:%02d", m, s));
                                         com.themoon.y1.managers.LastFmScrobbler.getInstance(MainActivity.instance)
                                                 .onTrackStart(pendingScrobbleArtist, pendingScrobbleTitle, pendingScrobbleAlbum, duration, pendingScrobblePath);
                                         // 🚀 [추가!] 곡 장전이 끝나서 정확한 duration이 나왔으므로, 이 시점에 비트레이트 캡슐을 다시 업데이트합니다!
@@ -230,6 +254,7 @@ public class AudioPlayerManager {
                     });
                 }
             });
+            applyMasterVolume();
         }
     }
 
@@ -886,14 +911,16 @@ public class AudioPlayerManager {
                 }
 
                 if (!main.isPausedByHand) legacyPlayer.start();
+                applyMasterVolume();
 
                 if (AudioEffectManager.getInstance() != null) AudioEffectManager.getInstance().applyAudioEffects();
                 main.setupVisualizer();
 
                 int duration = legacyPlayer.getDuration();
-                int s = (duration / 1000) % 60;
-                int m = (duration / (1000 * 60)) % 60;
-                main.tvPlayerTimeTotal.setText(String.format(Locale.US, "%02d:%02d", m, s));
+                int remaining = Math.max(0, duration - legacyPlayer.getCurrentPosition());
+                int s = (remaining / 1000) % 60;
+                int m = remaining / (1000 * 60);
+                main.tvPlayerTimeTotal.setText(String.format(Locale.US, "-%02d:%02d", m, s));
                 com.themoon.y1.managers.LastFmScrobbler.getInstance(main)
                         .onTrackStart(pendingScrobbleArtist, pendingScrobbleTitle, pendingScrobbleAlbum, duration, pendingScrobblePath);
 
@@ -929,6 +956,7 @@ public class AudioPlayerManager {
                 exoPlayer.setPlaybackParameters(new PlaybackParameters(currentSpeed, 1.0f));
 
                 if (!main.isPausedByHand) exoPlayer.setPlayWhenReady(true);
+                applyMasterVolume();
             }
 
             main.consecutiveErrorCount = 0;

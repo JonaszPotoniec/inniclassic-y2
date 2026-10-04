@@ -156,6 +156,10 @@ public final class StoragePaths {
         return ensureDir(new File(getPrimaryRoot(), "Y1_Covers"));
     }
 
+    public static File getThumbsCacheDir() {
+        return ensureDir(new File(getPrimaryRoot(), ".y1_thumbs_cache"));
+    }
+
     public static File getThemesDir() {
         return ensureDir(new File(getPrimaryRoot(), "Y1_Themes"));
     }

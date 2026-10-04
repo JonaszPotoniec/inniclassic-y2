@@ -69,9 +69,32 @@ public class FmRadioManager {
         }
     }
 
+    private float currentMasterVolume = 1.0f;
+
     public static FmRadioManager getInstance(Context context) {
         if (instance == null) instance = new FmRadioManager(context);
         return instance;
+    }
+
+    public static FmRadioManager getInstance() {
+        return instance;
+    }
+
+    public void setMasterVolume(float volume) {
+        this.currentMasterVolume = Math.max(0.0f, Math.min(1.0f, volume));
+        applyMasterVolume();
+    }
+
+    public float getMasterVolume() {
+        return currentMasterVolume;
+    }
+
+    public void applyMasterVolume() {
+        if (fmPlayer != null) {
+            try {
+                fmPlayer.setVolume(currentMasterVolume, currentMasterVolume);
+            } catch (Throwable ignored) {}
+        }
     }
 
     /** Stream used for FM volume keys / UI (MediaPlayer path → MUSIC). */
@@ -265,8 +288,10 @@ public class FmRadioManager {
             try { streamFm = (Integer) AudioManager.class.getDeclaredField("STREAM_FM").get(null); } catch (Exception e) {}
 
             fmPlayer.setAudioStreamType(streamFm);
+            VirtualVolumeManager.getInstance().registerMediaPlayer(fmPlayer);
             fmPlayer.prepare();
             fmPlayer.start();
+            applyMasterVolume();
 
             // 🚀 [버그 수리 2] 시스템이 멋대로 스피커로 소리를 빼버리는 것을 막고, 현재 UI에 설정된 출력(isSpeakerOn) 상태로 물리적 강제 고정!
             setSpeaker(isSpeakerOn);
@@ -285,6 +310,7 @@ public class FmRadioManager {
         } catch (Exception e) {}
 
         if (fmPlayer != null) {
+            VirtualVolumeManager.getInstance().unregisterMediaPlayer(fmPlayer);
             try {
                 if (fmPlayer.isPlaying()) fmPlayer.stop();
                 fmPlayer.release();
