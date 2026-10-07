@@ -602,6 +602,7 @@ public class MainActivity extends Activity {
     private String targetWifiSsid = "";
     private String typedPassword = "";
     private boolean isTargetWifiOpen = false;
+    private boolean isPendingUpdateCheckAfterWifi = false;
     // currentKeyboardMode: 0=Wi-Fi password, 1=podcast search, 2=Last.fm username, 3=Last.fm password
     private String pendingLastFmUsername = "";
     // 💡 미디어 스캐너가 현재 작업 중인지 추적하는 변수
@@ -1276,8 +1277,21 @@ public class MainActivity extends Activity {
                 NetworkInfo networkInfo = intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
                 if (networkInfo != null && networkInfo.isConnected()) {
                     ivStatusWifi.setColorFilter(0xFF00FF00);
-                    if (currentScreenState == STATE_WIFI)
+                    if (isPendingUpdateCheckAfterWifi) {
+                        isPendingUpdateCheckAfterWifi = false;
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                isNavigatingToSubMenu = true;
+                                changeScreen(STATE_SETTINGS);
+                                buildUpdateSettingsUI();
+                                isNavigatingToSubMenu = false;
+                                startUpdateCheckWithWifi();
+                            }
+                        });
+                    } else if (currentScreenState == STATE_WIFI) {
                         startWifiScan();
+                    }
                 } else {
                     ivStatusWifi.setColorFilter(0xFFFFBB00);
                 }
@@ -6399,8 +6413,133 @@ public class MainActivity extends Activity {
         return btn;
     }
 
+    public View createTablerListButton(final String[] iconPaths, String text) {
+        final float d = getResources().getDisplayMetrics().density;
+        final LinearLayout rowButton = new LinearLayout(this);
+        rowButton.setOrientation(LinearLayout.HORIZONTAL);
+        rowButton.setGravity(Gravity.CENTER_VERTICAL);
+        rowButton.setFocusable(true);
+        rowButton.setClickable(true);
+        rowButton.setSoundEffectsEnabled(false);
+        rowButton.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
+
+        int padLeft = (int) (12 * d);
+        int padTopBottom = (int) ((ThemeManager.isClassicTheme() ? 6 : 8) * d);
+        int padRight = (int) (12 * d);
+        rowButton.setPadding(padLeft, padTopBottom, padRight, padTopBottom);
+
+        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        rowLp.setMargins(0, (int) (3 * d), 0, (int) (3 * d));
+        rowButton.setLayoutParams(rowLp);
+
+        final ImageView ivIcon = new ImageView(this);
+        final int iconSizePx = (int) (20 * d);
+        if (iconPaths != null) {
+            ivIcon.setImageBitmap(com.themoon.y1.views.TablerIcons.render(iconPaths, iconSizePx, ThemeManager.getTextColorPrimary()));
+        }
+        LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(iconSizePx, iconSizePx);
+        iconLp.rightMargin = (int) (10 * d);
+        ivIcon.setLayoutParams(iconLp);
+
+        final TextView tvText = new TextView(this);
+        tvText.setText(text);
+        tvText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, ThemeManager.getListTextSize() * d);
+        tvText.setTextColor(ThemeManager.getTextColorPrimary());
+        tvText.setTypeface(ThemeManager.getCustomFontBold());
+        tvText.setSingleLine(true);
+        tvText.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
+        tvText.setMarqueeRepeatLimit(-1);
+        tvText.setHorizontalFadingEdgeEnabled(true);
+        LinearLayout.LayoutParams textLp = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        tvText.setLayoutParams(textLp);
+
+        rowButton.addView(ivIcon);
+        rowButton.addView(tvText);
+
+        rowButton.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            @Override
+            public void onFocusChange(View v, boolean hasFocus) {
+                if (hasFocus) {
+                    rowButton.setBackground(createFocusedButtonBackground());
+                    tvText.setTextColor(ThemeManager.getListButtonFocusedTextColor());
+                    tvText.setSelected(true);
+                    if (iconPaths != null) {
+                        ivIcon.setImageBitmap(com.themoon.y1.views.TablerIcons.render(iconPaths, iconSizePx, ThemeManager.getListButtonFocusedTextColor()));
+                    }
+                    showFastScrollLetter(tvText.getText().toString());
+                } else {
+                    rowButton.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
+                    tvText.setTextColor(ThemeManager.getTextColorPrimary());
+                    tvText.setSelected(false);
+                    if (iconPaths != null) {
+                        ivIcon.setImageBitmap(com.themoon.y1.views.TablerIcons.render(iconPaths, iconSizePx, ThemeManager.getTextColorPrimary()));
+                    }
+                }
+            }
+        });
+
+        return rowButton;
+    }
+
+    public View createCustomDialogButton(String text) {
+        float d = getResources().getDisplayMetrics().density;
+        final Button btn = new Button(this);
+        btn.setText(text);
+        btn.setTextSize(15f);
+        btn.setTypeface(ThemeManager.getCustomFontBold());
+        btn.setSoundEffectsEnabled(false);
+        btn.setFocusable(true);
+        btn.setClickable(true);
+        btn.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
+        btn.setTextColor(ThemeManager.getTextColorPrimary());
+        btn.setGravity(Gravity.CENTER);
+        int padH = (int) (14 * d);
+        int padV = (int) (10 * d);
+        btn.setPadding(padH, padV, padH, padV);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(0, (int) (4 * d), 0, (int) (4 * d));
+        btn.setLayoutParams(lp);
+
+        btn.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            @Override
+            public void onFocusChange(View v, boolean hasFocus) {
+                if (hasFocus) {
+                    btn.setBackground(createFocusedButtonBackground());
+                    btn.setTextColor(ThemeManager.getListButtonFocusedTextColor());
+                } else {
+                    btn.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
+                    btn.setTextColor(ThemeManager.getTextColorPrimary());
+                }
+            }
+        });
+        return btn;
+    }
+
+    private void markDialogButtonFocused(View btn) {
+        if (btn instanceof Button) {
+            btn.setBackground(createFocusedButtonBackground());
+            ((Button) btn).setTextColor(ThemeManager.getListButtonFocusedTextColor());
+        }
+    }
+
+    private boolean isNetworkConnected() {
+        try {
+            android.net.ConnectivityManager cm = (android.net.ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm != null) {
+                NetworkInfo netInfo = cm.getActiveNetworkInfo();
+                return netInfo != null && netInfo.isConnected();
+            }
+        } catch (Exception ignored) {
+        }
+        return false;
+    }
+
     private void buildSettingsUI() {
         currentSettingsDepth = 0; // 🚀 메인 설정은 깊이 0
+        isPendingUpdateCheckAfterWifi = false;
 
         // 🚀 [안전장치] 일반 세팅 화면으로 들어오면 라디오 UI 플래그를 완벽하게 해제합니다.
         isRadioUIShowing = false;
@@ -7676,37 +7815,149 @@ public class MainActivity extends Activity {
 
         // 1. 내 기기의 현재 버전 가져오기
         String myVersionName = "1.0";
-        int tempCode = 1;
         try {
             android.content.pm.PackageInfo pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
             myVersionName = pInfo.versionName;
-            tempCode = pInfo.versionCode;
-        } catch (Exception e) {
+        } catch (Exception ignored) {
         }
-
-        final int myVersionCode = tempCode;
-        final String finalMyVersionName = myVersionName;
 
         // 2. 현재 버전 표시 줄
         LinearLayout rowCurrent = createSettingRow("Current Version", myVersionName.startsWith("v") ? myVersionName : ("v" + myVersionName));
         containerSettingsItems.addView(rowCurrent);
 
-        // 3. 서버 버전 표시 줄 (처음엔 Checking... 으로 표시)
-        final LinearLayout rowServer = createSettingRow("Latest Version", "Checking...");
-        containerSettingsItems.addView(rowServer);
-
         createCategoryHeader("━━━━━━━━━━━━━━");
 
-        // 4. 하단 업데이트 실행 버튼 (서버 확인 전까지는 숨겨둡니다)
-        final Button btnExecuteUpdate = createListButton("🚀 " + t("DOWNLOAD & UPDATE"));
-        btnExecuteUpdate.setVisibility(View.GONE);
-        containerSettingsItems.addView(btnExecuteUpdate);
+        // 3. 업데이트 확인 버튼 (Tabler refresh 아이콘 장착)
+        final View btnCheckUpdates = createTablerListButton(com.themoon.y1.views.TablerIcons.REFRESH, t("Check for Updates"));
+        btnCheckUpdates.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                startUpdateCheckWithWifi();
+            }
+        });
+        containerSettingsItems.addView(btnCheckUpdates);
 
-        // 🚀 5. 화면이 열리자마자 백그라운드에서 GitHub Release의 update.json을 읽어옵니다!
+        // 진입 시 자동으로 업데이트 확인 버튼에 포커스
+        btnCheckUpdates.post(new Runnable() {
+            @Override
+            public void run() {
+                btnCheckUpdates.requestFocus();
+            }
+        });
+    }
+
+    private void startUpdateCheckWithWifi() {
+        final float d = getResources().getDisplayMetrics().density;
+
+        final android.app.Dialog loaderDialog = new android.app.Dialog(this);
+        loaderDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        if (loaderDialog.getWindow() != null) {
+            loaderDialog.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
+        }
+
+        LinearLayout loaderLayout = new LinearLayout(this);
+        loaderLayout.setOrientation(LinearLayout.VERTICAL);
+        loaderLayout.setGravity(Gravity.CENTER);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(ThemeManager.getOverlayBackgroundColor() | 0xEE000000);
+        bg.setCornerRadius(15 * d);
+        bg.setStroke((int) (1 * d), 0x33FFFFFF);
+        loaderLayout.setBackground(bg);
+        loaderLayout.setPadding((int) (24 * d), (int) (24 * d), (int) (24 * d), (int) (24 * d));
+
+        ProgressBar progressBar = new ProgressBar(this);
+        LinearLayout.LayoutParams pbLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        pbLp.gravity = Gravity.CENTER_HORIZONTAL;
+        pbLp.bottomMargin = (int) (14 * d);
+        loaderLayout.addView(progressBar, pbLp);
+
+        final TextView tvLoaderMsg = new TextView(this);
+        tvLoaderMsg.setText(t("Connecting to Wi-Fi..."));
+        tvLoaderMsg.setTextColor(ThemeManager.getTextColorPrimary());
+        tvLoaderMsg.setTextSize(15f);
+        tvLoaderMsg.setTypeface(ThemeManager.getCustomFontBold());
+        tvLoaderMsg.setGravity(Gravity.CENTER);
+        loaderLayout.addView(tvLoaderMsg);
+
+        loaderDialog.setContentView(loaderLayout);
+        loaderDialog.setCancelable(true);
+        loaderDialog.setCanceledOnTouchOutside(false);
+
+        Window window = loaderDialog.getWindow();
+        if (window != null) {
+            window.setLayout((int) (270 * d), ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        loaderDialog.show();
+
+        final boolean[] isCancelled = new boolean[]{false};
+        loaderDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
+            @Override
+            public void onCancel(DialogInterface dialog) {
+                isCancelled[0] = true;
+            }
+        });
+        loaderDialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
+            @Override
+            public void onDismiss(DialogInterface dialog) {
+                isCancelled[0] = true;
+            }
+        });
+
         new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
+                    WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                    boolean connected = isNetworkConnected();
+
+                    if (!connected) {
+                        if (wm != null && !wm.isWifiEnabled()) {
+                            wm.setWifiEnabled(true);
+                        }
+
+                        int waitCount = 0;
+                        while (!connected && waitCount < 20) {
+                            if (isCancelled[0]) return;
+                            try {
+                                Thread.sleep(500);
+                            } catch (InterruptedException e) {
+                                return;
+                            }
+                            waitCount++;
+                            connected = isNetworkConnected();
+                        }
+                    }
+
+                    if (isCancelled[0]) return;
+
+                    if (!connected) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (loaderDialog.isShowing()) {
+                                    loaderDialog.dismiss();
+                                }
+                                Toast.makeText(MainActivity.this,
+                                        t("Wi-Fi connection required. Please connect."),
+                                        Toast.LENGTH_LONG).show();
+                                isPendingUpdateCheckAfterWifi = true;
+                                changeScreen(STATE_WIFI);
+                            }
+                        });
+                        return;
+                    }
+
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (loaderDialog.isShowing()) {
+                                tvLoaderMsg.setText(t("Checking for updates..."));
+                            }
+                        }
+                    });
+
                     okhttp3.OkHttpClient client = getUpdateHttpClient();
                     okhttp3.Request request = new okhttp3.Request.Builder()
                             .url(UPDATE_JSON_URL)
@@ -7729,75 +7980,387 @@ public class MainActivity extends Activity {
                         apkUrl = "https://github.com/JonaszPotoniec/inniclassic-y2/releases/latest/download/" + apkName;
                     }
                     final String finalDownloadUrl = apkUrl;
-                    final boolean hasUpdate = isServerVersionNewer(serverVersionCode, serverVersionName, myVersionCode, finalMyVersionName);
+
+                    String myVersionName = "1.0";
+                    int myVersionCode = 1;
+                    try {
+                        android.content.pm.PackageInfo pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
+                        myVersionName = pInfo.versionName;
+                        myVersionCode = pInfo.versionCode;
+                    } catch (Exception ignored) {}
+
+                    final boolean hasUpdate = isServerVersionNewer(serverVersionCode, serverVersionName, myVersionCode, myVersionName);
+                    final String finalMyVersionName = myVersionName;
+
+                    if (isCancelled[0]) return;
 
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
-                            TextView tvServer = (TextView) rowServer.getChildAt(1);
-                            tvServer.setText(serverVersionName.startsWith("v") ? serverVersionName : ("v" + serverVersionName));
-
-                            // 🚀 [비교] 업데이트가 필요할 때
-                            if (hasUpdate) {
-                                tvServer.setTextColor(0xFF00FF00); // 서버 버전을 눈에 띄는 초록색으로!
-
-                                btnExecuteUpdate.setVisibility(View.VISIBLE);
-                                btnExecuteUpdate.setText("🚀 " + t("DOWNLOAD & UPDATE"));
-                                btnExecuteUpdate.setTextColor(ThemeManager.getTextColorPrimary());
-                                btnExecuteUpdate.setTypeface(ThemeManager.getCustomFontBold());
-                                btnExecuteUpdate.setOnClickListener(new View.OnClickListener() {
-                                    @Override
-                                    public void onClick(View v) {
-                                        clickFeedback();
-                                        downloadAndInstallApk(finalDownloadUrl); // 다운로드 엔진 호출
-                                    }
-                                });
+                            if (loaderDialog.isShowing()) {
+                                loaderDialog.dismiss();
                             }
-                            // 🚀 [비교] 이미 최신 버전일 때
-                            else {
-                                tvServer.setTextColor(ThemeManager.getTextColorSecondary());
-
-                                btnExecuteUpdate.setText("✔ " + t("ALREADY UP TO DATE"));
-                                btnExecuteUpdate.setVisibility(View.VISIBLE);
-                                btnExecuteUpdate.setTextColor(ThemeManager.getTextColorSecondary());
-                                btnExecuteUpdate.setOnClickListener(new View.OnClickListener() {
-                                    @Override
-                                    public void onClick(View v) {
-                                        clickFeedback();
-                                        new AlertDialog.Builder(MainActivity.this,
-                                                android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                                                .setTitle(t("Reinstall Update"))
-                                                .setMessage(t("You are using the latest version. Reinstall anyway?"))
-                                                .setPositiveButton(t("REINSTALL"), new DialogInterface.OnClickListener() {
-                                                    @Override
-                                                    public void onClick(DialogInterface dialog, int which) {
-                                                        downloadAndInstallApk(finalDownloadUrl);
-                                                    }
-                                                })
-                                                .setNegativeButton(t("CANCEL"), null)
-                                                .show();
-                                    }
-                                });
+                            if (hasUpdate) {
+                                showNewVersionDialog(serverVersionName, finalMyVersionName, finalDownloadUrl);
+                            } else {
+                                showUpToDateDialog(serverVersionName, finalMyVersionName, finalDownloadUrl);
                             }
                         }
                     });
-                } catch (Exception e) {
+
+                } catch (final Exception e) {
+                    if (isCancelled[0]) return;
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
-                            TextView tvServer = (TextView) rowServer.getChildAt(1);
-                            tvServer.setText(t("Network Error"));
-                            tvServer.setTextColor(0xFFFF4444); // 빨간색 에러 표시
+                            if (loaderDialog.isShowing()) {
+                                loaderDialog.dismiss();
+                            }
+                            showUpdateErrorDialog(e.getMessage());
                         }
                     });
                 }
             }
         }).start();
+    }
 
-        // 진입 시 자동으로 두 번째 버튼(Current Version) 쪽에 포커스
-        if (containerSettingsItems.getChildCount() > 0) {
-            containerSettingsItems.getChildAt(0).requestFocus();
+    private void showNewVersionDialog(String serverVersionName, String currentVersionName, final String apkUrl) {
+        float d = getResources().getDisplayMetrics().density;
+        final android.app.Dialog dialog = new android.app.Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
         }
+
+        final LinearLayout rootLayout = new LinearLayout(this);
+        rootLayout.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(ThemeManager.getOverlayBackgroundColor() | 0xEE000000);
+        bg.setCornerRadius(15 * d);
+        bg.setStroke((int) (1 * d), 0x33FFFFFF);
+        rootLayout.setBackground(bg);
+        rootLayout.setPadding((int) (18 * d), (int) (18 * d), (int) (18 * d), (int) (14 * d));
+
+        ImageView ivIcon = new ImageView(this);
+        int iconSizePx = (int) (36 * d);
+        ivIcon.setImageBitmap(com.themoon.y1.views.TablerIcons.render(com.themoon.y1.views.TablerIcons.DOWNLOAD, iconSizePx, 0xFF00FF00));
+        LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(iconSizePx, iconSizePx);
+        iconLp.gravity = Gravity.CENTER_HORIZONTAL;
+        iconLp.bottomMargin = (int) (8 * d);
+        ivIcon.setLayoutParams(iconLp);
+        rootLayout.addView(ivIcon);
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText(t("New Version Available"));
+        tvTitle.setTextColor(ThemeManager.getTextColorPrimary());
+        tvTitle.setTextSize(17f);
+        tvTitle.setTypeface(ThemeManager.getCustomFontBold());
+        tvTitle.setGravity(Gravity.CENTER);
+        tvTitle.setPadding(0, 0, 0, (int) (6 * d));
+        rootLayout.addView(tvTitle);
+
+        String curVerStr = currentVersionName.startsWith("v") ? currentVersionName : ("v" + currentVersionName);
+        String srvVerStr = serverVersionName.startsWith("v") ? serverVersionName : ("v" + serverVersionName);
+
+        TextView tvMsg = new TextView(this);
+        tvMsg.setText(curVerStr + "  ➜  " + srvVerStr);
+        tvMsg.setTextColor(0xFF00FF00);
+        tvMsg.setTextSize(15f);
+        tvMsg.setTypeface(ThemeManager.getCustomFontBold());
+        tvMsg.setGravity(Gravity.CENTER);
+        tvMsg.setPadding(0, 0, 0, (int) (14 * d));
+        rootLayout.addView(tvMsg);
+
+        final LinearLayout btnContainer = new LinearLayout(this);
+        btnContainer.setOrientation(LinearLayout.VERTICAL);
+        btnContainer.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        View.OnKeyListener dialogWheelListener = new View.OnKeyListener() {
+            @Override
+            public boolean onKey(View v, int keyCode, KeyEvent event) {
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    if (keyCode == 19 || keyCode == 21) {
+                        int idx = btnContainer.indexOfChild(v);
+                        for (int i = idx - 1; i >= 0; i--) {
+                            if (btnContainer.getChildAt(i).isFocusable()) {
+                                btnContainer.getChildAt(i).requestFocus();
+                                clickFeedback();
+                                return true;
+                            }
+                        }
+                        return true;
+                    }
+                    if (keyCode == 20 || keyCode == 22) {
+                        int idx = btnContainer.indexOfChild(v);
+                        for (int i = idx + 1; i < btnContainer.getChildCount(); i++) {
+                            if (btnContainer.getChildAt(i).isFocusable()) {
+                                btnContainer.getChildAt(i).requestFocus();
+                                clickFeedback();
+                                return true;
+                            }
+                        }
+                        return true;
+                    }
+                }
+                return false;
+            }
+        };
+
+        final View btnDownload = createCustomDialogButton(t("Download & Update"));
+        btnDownload.setOnKeyListener(dialogWheelListener);
+        btnDownload.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                dialog.dismiss();
+                downloadAndInstallApk(apkUrl);
+            }
+        });
+        markDialogButtonFocused(btnDownload);
+        btnContainer.addView(btnDownload);
+
+        final View btnLater = createCustomDialogButton(t("Later"));
+        btnLater.setOnKeyListener(dialogWheelListener);
+        btnLater.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                dialog.dismiss();
+            }
+        });
+        btnContainer.addView(btnLater);
+
+        rootLayout.addView(btnContainer);
+        dialog.setContentView(rootLayout);
+
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setLayout((int) (290 * d), ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+
+        dialog.setOnShowListener(new DialogInterface.OnShowListener() {
+            @Override
+            public void onShow(DialogInterface dInterface) {
+                btnDownload.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        btnDownload.requestFocus();
+                    }
+                });
+            }
+        });
+        rootLayout.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                btnDownload.requestFocus();
+            }
+        }, 50);
+
+        dialog.show();
+    }
+
+    private void showUpToDateDialog(String serverVersionName, String currentVersionName, final String apkUrl) {
+        float d = getResources().getDisplayMetrics().density;
+        final android.app.Dialog dialog = new android.app.Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
+        }
+
+        final LinearLayout rootLayout = new LinearLayout(this);
+        rootLayout.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(ThemeManager.getOverlayBackgroundColor() | 0xEE000000);
+        bg.setCornerRadius(15 * d);
+        bg.setStroke((int) (1 * d), 0x33FFFFFF);
+        rootLayout.setBackground(bg);
+        rootLayout.setPadding((int) (18 * d), (int) (18 * d), (int) (18 * d), (int) (14 * d));
+
+        ImageView ivIcon = new ImageView(this);
+        int iconSizePx = (int) (36 * d);
+        ivIcon.setImageBitmap(com.themoon.y1.views.TablerIcons.render(com.themoon.y1.views.TablerIcons.CHECK, iconSizePx, ThemeManager.getTextColorPrimary()));
+        LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(iconSizePx, iconSizePx);
+        iconLp.gravity = Gravity.CENTER_HORIZONTAL;
+        iconLp.bottomMargin = (int) (8 * d);
+        ivIcon.setLayoutParams(iconLp);
+        rootLayout.addView(ivIcon);
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText(t("Up to Date"));
+        tvTitle.setTextColor(ThemeManager.getTextColorPrimary());
+        tvTitle.setTextSize(17f);
+        tvTitle.setTypeface(ThemeManager.getCustomFontBold());
+        tvTitle.setGravity(Gravity.CENTER);
+        tvTitle.setPadding(0, 0, 0, (int) (6 * d));
+        rootLayout.addView(tvTitle);
+
+        String curVerStr = currentVersionName.startsWith("v") ? currentVersionName : ("v" + currentVersionName);
+        TextView tvMsg = new TextView(this);
+        tvMsg.setText(curVerStr + "\n" + t("You are using the latest version."));
+        tvMsg.setTextColor(ThemeManager.getTextColorSecondary());
+        tvMsg.setTextSize(13f);
+        tvMsg.setGravity(Gravity.CENTER);
+        tvMsg.setPadding(0, 0, 0, (int) (14 * d));
+        rootLayout.addView(tvMsg);
+
+        final LinearLayout btnContainer = new LinearLayout(this);
+        btnContainer.setOrientation(LinearLayout.VERTICAL);
+        btnContainer.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        View.OnKeyListener dialogWheelListener = new View.OnKeyListener() {
+            @Override
+            public boolean onKey(View v, int keyCode, KeyEvent event) {
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    if (keyCode == 19 || keyCode == 21) {
+                        int idx = btnContainer.indexOfChild(v);
+                        for (int i = idx - 1; i >= 0; i--) {
+                            if (btnContainer.getChildAt(i).isFocusable()) {
+                                btnContainer.getChildAt(i).requestFocus();
+                                clickFeedback();
+                                return true;
+                            }
+                        }
+                        return true;
+                    }
+                    if (keyCode == 20 || keyCode == 22) {
+                        int idx = btnContainer.indexOfChild(v);
+                        for (int i = idx + 1; i < btnContainer.getChildCount(); i++) {
+                            if (btnContainer.getChildAt(i).isFocusable()) {
+                                btnContainer.getChildAt(i).requestFocus();
+                                clickFeedback();
+                                return true;
+                            }
+                        }
+                        return true;
+                    }
+                }
+                return false;
+            }
+        };
+
+        final View btnOk = createCustomDialogButton(t("OK"));
+        btnOk.setOnKeyListener(dialogWheelListener);
+        btnOk.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                dialog.dismiss();
+            }
+        });
+        markDialogButtonFocused(btnOk);
+        btnContainer.addView(btnOk);
+
+        final View btnReinstall = createCustomDialogButton(t("Reinstall"));
+        btnReinstall.setOnKeyListener(dialogWheelListener);
+        btnReinstall.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                dialog.dismiss();
+                downloadAndInstallApk(apkUrl);
+            }
+        });
+        btnContainer.addView(btnReinstall);
+
+        rootLayout.addView(btnContainer);
+        dialog.setContentView(rootLayout);
+
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setLayout((int) (290 * d), ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+
+        dialog.setOnShowListener(new DialogInterface.OnShowListener() {
+            @Override
+            public void onShow(DialogInterface dInterface) {
+                btnOk.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        btnOk.requestFocus();
+                    }
+                });
+            }
+        });
+        rootLayout.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                btnOk.requestFocus();
+            }
+        }, 50);
+
+        dialog.show();
+    }
+
+    private void showUpdateErrorDialog(String errorMsg) {
+        float d = getResources().getDisplayMetrics().density;
+        final android.app.Dialog dialog = new android.app.Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
+        }
+
+        final LinearLayout rootLayout = new LinearLayout(this);
+        rootLayout.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(ThemeManager.getOverlayBackgroundColor() | 0xEE000000);
+        bg.setCornerRadius(15 * d);
+        bg.setStroke((int) (1 * d), 0x33FFFFFF);
+        rootLayout.setBackground(bg);
+        rootLayout.setPadding((int) (18 * d), (int) (18 * d), (int) (18 * d), (int) (14 * d));
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText(t("Update Check Failed"));
+        tvTitle.setTextColor(0xFFFF4444);
+        tvTitle.setTextSize(17f);
+        tvTitle.setTypeface(ThemeManager.getCustomFontBold());
+        tvTitle.setGravity(Gravity.CENTER);
+        tvTitle.setPadding(0, 0, 0, (int) (6 * d));
+        rootLayout.addView(tvTitle);
+
+        TextView tvMsg = new TextView(this);
+        tvMsg.setText(t("Unable to check for updates. Check internet connection."));
+        tvMsg.setTextColor(ThemeManager.getTextColorSecondary());
+        tvMsg.setTextSize(13f);
+        tvMsg.setGravity(Gravity.CENTER);
+        tvMsg.setPadding(0, 0, 0, (int) (14 * d));
+        rootLayout.addView(tvMsg);
+
+        final View btnOk = createCustomDialogButton(t("OK"));
+        btnOk.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                dialog.dismiss();
+            }
+        });
+        markDialogButtonFocused(btnOk);
+        rootLayout.addView(btnOk);
+
+        dialog.setContentView(rootLayout);
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setLayout((int) (290 * d), ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        dialog.setOnShowListener(new DialogInterface.OnShowListener() {
+            @Override
+            public void onShow(DialogInterface dInterface) {
+                btnOk.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        btnOk.requestFocus();
+                    }
+                });
+            }
+        });
+        rootLayout.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                btnOk.requestFocus();
+            }
+        }, 50);
+        dialog.show();
     }
 
     // 💡 [신규 추가] 진동 ON/OFF와 세기 조절을 담당하는 전용 서브 메뉴!
@@ -13098,6 +13661,17 @@ public class MainActivity extends Activity {
                         }
                     }
                 } else if (currentScreenState == STATE_BLUETOOTH || currentScreenState == STATE_WIFI) {
+                    if (currentScreenState == STATE_WIFI && isPendingUpdateCheckAfterWifi) {
+                        isPendingUpdateCheckAfterWifi = false;
+                        isNavigatingToSubMenu = true;
+                        changeScreen(STATE_SETTINGS);
+                        buildUpdateSettingsUI();
+                        isNavigatingToSubMenu = false;
+                        if (isNetworkConnected()) {
+                            startUpdateCheckWithWifi();
+                        }
+                        return true;
+                    }
                     changeScreen(backTargetForUtility);
                 } else if (currentScreenState == STATE_MUSIC_QUIZ) {
                     exitMusicQuiz();

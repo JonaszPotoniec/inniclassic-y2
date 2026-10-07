@@ -181,7 +181,7 @@
   "System security prevents powering off directly from the app.": "Система безопасности запрещает выключение устройства прямо из приложения.",
   "Not Installed ⚠️": "Не установлено ⚠️",
   "Rockbox is not installed on this device.\nPlease install the Rockbox app (.apk) first.": "Rockbox не установлен на этом устройстве.\nПожалуйста, сначала установите приложение Rockbox (.apk).",
-  "OK": "OK",
+  "OK": "ОК",
   "Switch to Rockbox": "Переключиться на Rockbox",
   "Do you want to switch to Rockbox instantly without rebooting?": "Вы хотите мгновенно переключиться на Rockbox без перезагрузки?",
   "Switch": "Переключить",
@@ -335,5 +335,16 @@
   "Audio error: ": "Ошибка аудио: ",
   "Reinstall Update": "Переустановить обновление",
   "You are using the latest version. Reinstall anyway?": "У вас установлена последняя версия. Переустановить?",
-  "REINSTALL": "ПЕРЕУСТАНОВИТЬ"
+  "REINSTALL": "ПЕРЕУСТАНОВИТЬ",
+  "Check for Updates": "Проверить обновления",
+  "Connecting to Wi-Fi...": "Подключение к Wi-Fi...",
+  "Wi-Fi connection required. Please connect.": "Требуется подключение к Wi-Fi. Подключитесь к сети.",
+  "Checking for updates...": "Проверка обновлений...",
+  "New Version Available": "Доступна новая версия",
+  "Download & Update": "Загрузить и обновить",
+  "Later": "Позже",
+  "Up to Date": "Актуальная версия",
+  "Reinstall": "Переустановить",
+  "Update Check Failed": "Ошибка проверки обновлений",
+  "Unable to check for updates. Check internet connection.": "Не удалось проверить обновления. Проверьте подключение к интернету."
 }

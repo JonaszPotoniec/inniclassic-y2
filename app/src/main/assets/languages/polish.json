@@ -529,5 +529,16 @@
   "Audio error: ": "Błąd dźwięku: ",
   "Reinstall Update": "Zainstaluj ponownie",
   "You are using the latest version. Reinstall anyway?": "Posiadasz najnowszą wersję. Zainstalować ponownie?",
-  "REINSTALL": "ZAINSTALUJ PONOWNIE"
+  "REINSTALL": "ZAINSTALUJ PONOWNIE",
+  "Check for Updates": "Sprawdź aktualizacje",
+  "Connecting to Wi-Fi...": "Łączenie z Wi-Fi...",
+  "Wi-Fi connection required. Please connect.": "Wymagane połączenie Wi-Fi. Połącz się z siecią.",
+  "Checking for updates...": "Sprawdzanie aktualizacji...",
+  "New Version Available": "Dostępna nowa wersja",
+  "Download & Update": "Pobierz i zaktualizuj",
+  "Later": "Później",
+  "Up to Date": "Wersja aktualna",
+  "Reinstall": "Zainstaluj ponownie",
+  "Update Check Failed": "Błąd sprawdzania aktualizacji",
+  "Unable to check for updates. Check internet connection.": "Nie można sprawdzić aktualizacji. Sprawdź połączenie z internetem."
 }

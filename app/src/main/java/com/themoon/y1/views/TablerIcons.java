@@ -20,6 +20,24 @@ public final class TablerIcons {
         "M10 5.5h4l-2 -2.5l-2 2.5"                 // top arrow
     };
 
+    /** Tabler Icons outline/refresh.svg (MIT) */
+    public static final String[] REFRESH = {
+        "M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4",
+        "M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"
+    };
+
+    /** Tabler Icons outline/download.svg (MIT) */
+    public static final String[] DOWNLOAD = {
+        "M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2",
+        "M7 11l5 5l5 -5",
+        "M12 4l0 12"
+    };
+
+    /** Tabler Icons outline/check.svg (MIT) */
+    public static final String[] CHECK = {
+        "M5 12l5 5l10 -10"
+    };
+
     /**
      * Renders a 24x24 stroke-2 Tabler icon to an ARGB_8888 bitmap scaled to sizePx.
      */

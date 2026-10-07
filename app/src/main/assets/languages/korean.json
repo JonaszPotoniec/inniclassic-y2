@@ -335,5 +335,16 @@
   "Audio error: ": "오디오 오류: ",
   "Reinstall Update": "업데이트 재설치",
   "You are using the latest version. Reinstall anyway?": "이미 최신 버전을 사용 중입니다. 다시 설치하시겠습니까?",
-  "REINSTALL": "재설치"
+  "REINSTALL": "재설치",
+  "Check for Updates": "업데이트 확인",
+  "Connecting to Wi-Fi...": "Wi-Fi 연결 중...",
+  "Wi-Fi connection required. Please connect.": "Wi-Fi 연결이 필요합니다. 네트워크에 연결해 주세요.",
+  "Checking for updates...": "업데이트 확인 중...",
+  "New Version Available": "새 버전 사용 가능",
+  "Download & Update": "다운로드 및 업데이트",
+  "Later": "나중에",
+  "Up to Date": "최신 상태",
+  "Reinstall": "재설치",
+  "Update Check Failed": "업데이트 확인 실패",
+  "Unable to check for updates. Check internet connection.": "업데이트를 확인할 수 없습니다. 인터넷 연결을 확인하세요."
 }

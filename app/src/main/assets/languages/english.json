@@ -529,5 +529,16 @@
   "Audio error: ": "Audio error: ",
   "Reinstall Update": "Reinstall Update",
   "You are using the latest version. Reinstall anyway?": "You are using the latest version. Reinstall anyway?",
-  "REINSTALL": "REINSTALL"
+  "REINSTALL": "REINSTALL",
+  "Check for Updates": "Check for Updates",
+  "Connecting to Wi-Fi...": "Connecting to Wi-Fi...",
+  "Wi-Fi connection required. Please connect.": "Wi-Fi connection required. Please connect.",
+  "Checking for updates...": "Checking for updates...",
+  "New Version Available": "New Version Available",
+  "Download & Update": "Download & Update",
+  "Later": "Later",
+  "Up to Date": "Up to Date",
+  "Reinstall": "Reinstall",
+  "Update Check Failed": "Update Check Failed",
+  "Unable to check for updates. Check internet connection.": "Unable to check for updates. Check internet connection."
 }

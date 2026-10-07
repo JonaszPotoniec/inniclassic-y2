@@ -319,5 +319,16 @@
   "Audio error: ": "オーディオエラー: ",
   "Reinstall Update": "アップデートの再インストール",
   "You are using the latest version. Reinstall anyway?": "既に最新バージョンを使用しています。再インストールしますか？",
-  "REINSTALL": "再インストール"
+  "REINSTALL": "再インストール",
+  "Check for Updates": "アップデートを確認",
+  "Connecting to Wi-Fi...": "Wi-Fiに接続中...",
+  "Wi-Fi connection required. Please connect.": "Wi-Fi接続が必要です。接続してください。",
+  "Checking for updates...": "アップデートを確認中...",
+  "New Version Available": "新しいバージョンが利用可能です",
+  "Download & Update": "ダウンロードして更新",
+  "Later": "後で",
+  "Up to Date": "最新です",
+  "Reinstall": "再インストール",
+  "Update Check Failed": "アップデートの確認に失敗しました",
+  "Unable to check for updates. Check internet connection.": "アップデートを確認できません。インターネット接続を確認してください。"
 }
