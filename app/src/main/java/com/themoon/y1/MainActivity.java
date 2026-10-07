@@ -1994,9 +1994,6 @@ public class MainActivity extends Activity {
 
         if (customLibrary.isEmpty()) {
             loadLibraryCache();
-            // 🚨 [버그 수리] 중간 저장된 캐시에 중복곡이 남아있을 수 있으니 불러오자마자 한 번 청소!
-            filterDuplicateSongs(customLibrary);
-            filterDuplicateSongs(audiobookLibrary);
         }
 
         // 🚀 [추가된 부분] 앱이 켜질 때(혹은 튕기고 재시작될 때) 조용히 자동 스캔을 돌려 리스트를 복구합니다!
@@ -2915,51 +2912,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    // 🚀 [자체 제작 1] 확장자를 보고 음질 계급(서열)을 매기는 판독기
-    private int getAudioQualityScore(File f) {
-        String ext = f.getName().toLowerCase();
-        if (ext.endsWith(".flac"))
-            return 6; // 황제
-        if (ext.endsWith(".wav"))
-            return 5;
-        if (ext.endsWith(".ape") || ext.endsWith(".alac"))
-            return 4;
-        if (ext.endsWith(".opus"))
-            return 3;
-        if (ext.endsWith(".ogg"))
-            return 2;
-        if (ext.endsWith(".m4a") || ext.endsWith(".aac"))
-            return 1;
-        return 0; // MP3, WMA 등 평민
-    }
-
-    // 🚀 [자체 제작 2] 중복 곡을 걸러내고 최고 음질 1개만 남기는 '입구컷 필터'
-    private void filterDuplicateSongs(List<SongItem> library) {
-        java.util.HashMap<String, SongItem> bestSongs = new java.util.HashMap<>();
-
-        for (SongItem song : library) {
-            // 💡 [암호키 생성] "가수 이름 + 노래 제목" (대소문자 무시, 공백 제거로 정확도 1000% 향상!)
-            String key = (song.artist + "_" + song.title).toLowerCase().replaceAll("\\s", "");
-
-            if (bestSongs.containsKey(key)) {
-                SongItem existing = bestSongs.get(key);
-                int newScore = getAudioQualityScore(song.file);
-                int oldScore = getAudioQualityScore(existing.file);
-
-                // 새로 들어온 곡의 음질 계급이 더 높다면? 기존 곡을 쓰레기통에 버리고 왕좌 차지!
-                if (newScore > oldScore) {
-                    bestSongs.put(key, song);
-                }
-                // (음질이 같거나 낮으면 아무것도 안 하고 조용히 무시함 = 중복 제거)
-            } else {
-                bestSongs.put(key, song); // 처음 보는 곡이면 무조건 프리패스 통과!
-            }
-        }
-
-        // 도서관 바구니를 깨끗하게 비우고, 왕좌를 차지한 최고 음질 알맹이들만 다시 채워 넣습니다!
-        library.clear();
-        library.addAll(bestSongs.values());
-    }
 
     // =======================================================
     // 🚀 [자체 제작 3] 대소문자 무시! 폴더 내 'cover' 이미지 자동 탐색기
@@ -3225,12 +3177,7 @@ public class MainActivity extends Activity {
                     scannedAudioFiles++;
 
                     // 🚀 [신규 추가] 이 기기는 메모리가 적어 스캔 도중 강제 종료될 수 있습니다.
-                    // 500곡마다 중간 저장을 해두면, 죽더라도 다음 부팅 때 처음부터가 아니라
-                    // 그 이후부터 이어서 스캔하게 되어 결국엔 반드시 끝까지 도달합니다!
-                    // 🚨 [버그 수리] 중간 저장본에도 중복 제거를 적용해야, 스캔이 중간에 끊겨도
-                    // 캐시에 중복곡이 영구히 남지 않습니다!
                     if (scannedAudioFiles % 500 == 0) {
-                        filterDuplicateSongs(targetLibrary);
                         saveLibraryCache();
                     }
                     if (totalAudioFiles > 0) {
@@ -3441,9 +3388,6 @@ public class MainActivity extends Activity {
                     for (java.io.File bookDir : StoragePaths.getAudiobooksDirs())
                         buildCustomLibrary(bookDir, audiobookLibrary, existingBooks);
 
-                    // 🚀 [신규 엔진 장착] 중복 폭탄 해체! 최고 음질 1개만 남기고 다 분쇄합니다!
-                    filterDuplicateSongs(customLibrary);
-                    filterDuplicateSongs(audiobookLibrary);
 
                     // 즐겨찾기 자동 청소기
                     HashSet<String> aliveSongs = new HashSet<>();

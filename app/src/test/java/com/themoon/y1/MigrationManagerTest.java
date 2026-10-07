@@ -160,6 +160,18 @@ public class MigrationManagerTest {
         assertTrue(testContext.isCacheInvalidationRequested());
     }
 
+    @Test
+    public void testMigration001RestoreDeduplicatedSongsRegistersAndRequestsRescan() throws Exception {
+        Migration001RestoreDeduplicatedSongs m1 = new Migration001RestoreDeduplicatedSongs();
+        assertEquals(1, m1.getVersion());
+        assertEquals("001_restore_deduplicated_songs", m1.getId());
+
+        MigrationContext context = new MigrationContext(null, mockPrefs, mockPrefs, 0);
+        assertFalse(context.isMediaRescanRequested());
+        m1.migrate(context);
+        assertTrue(context.isMediaRescanRequested());
+    }
+
     // In-memory MockSharedPreferences for isolated JVM testing
     private static class MockSharedPreferences implements SharedPreferences {
         private final Map<String, Object> map = new HashMap<>();

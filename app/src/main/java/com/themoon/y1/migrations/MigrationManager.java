@@ -53,7 +53,7 @@ public class MigrationManager {
     }
 
     private void registerDefaultMigrations() {
-        // Individual migration classes will be registered here.
+        registerMigration(new Migration001RestoreDeduplicatedSongs());
     }
 
     /**
