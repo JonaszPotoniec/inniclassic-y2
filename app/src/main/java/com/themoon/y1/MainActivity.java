@@ -603,6 +603,7 @@ public class MainActivity extends Activity {
     private String typedPassword = "";
     private boolean isTargetWifiOpen = false;
     private boolean isPendingUpdateCheckAfterWifi = false;
+    private boolean isWifiConnectedStatus = false;
     // currentKeyboardMode: 0=Wi-Fi password, 1=podcast search, 2=Last.fm username, 3=Last.fm password
     private String pendingLastFmUsername = "";
     // 💡 미디어 스캐너가 현재 작업 중인지 추적하는 변수
@@ -1263,7 +1264,7 @@ public class MainActivity extends Activity {
                 int state = intent.getIntExtra(WifiManager.EXTRA_WIFI_STATE, WifiManager.WIFI_STATE_UNKNOWN);
                 if (state == WifiManager.WIFI_STATE_ENABLED) {
                     ivStatusWifi.setVisibility(View.VISIBLE);
-                    ivStatusWifi.setColorFilter(0xFFFFBB00);
+                    updateStatusBarWifi(false);
                 } else {
                     ivStatusWifi.setVisibility(View.GONE);
                 }
@@ -1276,7 +1277,7 @@ public class MainActivity extends Activity {
             } else if (WifiManager.NETWORK_STATE_CHANGED_ACTION.equals(action)) {
                 NetworkInfo networkInfo = intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
                 if (networkInfo != null && networkInfo.isConnected()) {
-                    ivStatusWifi.setColorFilter(0xFF00FF00);
+                    updateStatusBarWifi(true);
                     if (isPendingUpdateCheckAfterWifi) {
                         isPendingUpdateCheckAfterWifi = false;
                         runOnUiThread(new Runnable() {
@@ -1293,7 +1294,7 @@ public class MainActivity extends Activity {
                         startWifiScan();
                     }
                 } else {
-                    ivStatusWifi.setColorFilter(0xFFFFBB00);
+                    updateStatusBarWifi(false);
                 }
             } else if (BluetoothDevice.ACTION_FOUND.equals(action)) {
                 BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
@@ -2847,10 +2848,10 @@ public class MainActivity extends Activity {
             if (wm != null && wm.isWifiEnabled()) {
                 ivStatusWifi.setVisibility(View.VISIBLE);
                 WifiInfo info = wm.getConnectionInfo();
-                if (info != null && info.getNetworkId() != -1)
-                    ivStatusWifi.setColorFilter(0xFF00FF00);
-                else
-                    ivStatusWifi.setColorFilter(0xFFFFBB00);
+                boolean isConnected = (info != null && info.getNetworkId() != -1);
+                updateStatusBarWifi(isConnected);
+            } else if (ivStatusWifi != null) {
+                ivStatusWifi.setVisibility(View.GONE);
             }
         } catch (Exception e) {
         }
@@ -3983,6 +3984,8 @@ public class MainActivity extends Activity {
                 tvStatusBattery.setTextColor(primary);
             if (batteryIconView != null)
                 batteryIconView.setColor(primary);
+            if (ivStatusWifi != null && ivStatusWifi.getVisibility() == View.VISIBLE)
+                updateStatusBarWifi(isWifiConnectedStatus);
 
             int themeFocusColor = ThemeManager.getListButtonFocusedBg() | 0xFF000000;
             if (playerProgress != null) {
@@ -4470,6 +4473,31 @@ public class MainActivity extends Activity {
             title = "";
         }
         tvStatusClock.setText(title);
+    }
+
+    private boolean isLightStatusBar() {
+        if (ThemeManager.isClassicLightTheme()) return true;
+        int primaryText = ThemeManager.getTextColorPrimary();
+        int r = (primaryText >> 16) & 0xFF;
+        int g = (primaryText >> 8) & 0xFF;
+        int b = primaryText & 0xFF;
+        double luminance = (0.299 * r + 0.587 * g + 0.114 * b);
+        return luminance < 128;
+    }
+
+    private void updateStatusBarWifi(boolean isConnected) {
+        isWifiConnectedStatus = isConnected;
+        if (ivStatusWifi == null) return;
+        ivStatusWifi.setColorFilter(null);
+        float density = getResources().getDisplayMetrics().density;
+        int iconSizePx = (int) (18 * density);
+        boolean light = isLightStatusBar();
+        int color = isConnected 
+                ? (light ? 0xFF006425 : 0xFF34C759)
+                : (light ? 0xFF9E4800 : 0xFFFFB300);
+
+        ivStatusWifi.setImageBitmap(com.themoon.y1.views.TablerIcons.render(
+                com.themoon.y1.views.TablerIcons.WIFI, iconSizePx, color));
     }
 
     public void changeScreen(int state) {

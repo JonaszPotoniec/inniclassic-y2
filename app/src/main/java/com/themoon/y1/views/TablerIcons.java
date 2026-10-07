@@ -38,6 +38,14 @@ public final class TablerIcons {
         "M5 12l5 5l10 -10"
     };
 
+    /** Tabler Icons outline/wifi.svg (MIT) */
+    public static final String[] WIFI = {
+        "M12 18l0.01 0",
+        "M9.172 15.172a4 4 0 0 1 5.656 0",
+        "M6.343 12.343a8 8 0 0 1 11.314 0",
+        "M3.515 9.515c4.686 -4.687 12.284 -4.687 17 0"
+    };
+
     /**
      * Renders a 24x24 stroke-2 Tabler icon to an ARGB_8888 bitmap scaled to sizePx.
      */
