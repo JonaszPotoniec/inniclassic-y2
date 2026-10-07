@@ -1785,6 +1785,9 @@ public class MainActivity extends Activity {
         initRemoteControlClient(this);
         prefs = getSharedPreferences("Y1_SETTINGS", MODE_PRIVATE);
 
+        // 🚀 [마이그레이션 엔진] 앱 업데이트 시 필요한 마이그레이션 일괄 수행
+        com.themoon.y1.migrations.MigrationManager.getInstance(this).applyPendingMigrations();
+
         // 🚀 1. 가장 먼저! APK 안에 숨겨둔 언어팩(.json)들을 기기로 싹 풀어줍니다.
         installBundledLanguages();
 
@@ -1977,6 +1980,18 @@ public class MainActivity extends Activity {
             rootFolder.mkdirs();
 
         // 🚀 [신규 추가] 디스크에 저장된 라이브러리 캐시를 먼저 불러와서, 매번 처음부터 스캔하지 않도록!
+        com.themoon.y1.migrations.MigrationContext migrationCtx =
+                com.themoon.y1.migrations.MigrationManager.getInstance(this).getMigrationContext();
+        boolean forceRescanFromMigration = (migrationCtx != null && migrationCtx.isMediaRescanRequested());
+        boolean invalidateCacheFromMigration = (migrationCtx != null && migrationCtx.isCacheInvalidationRequested());
+
+        if (invalidateCacheFromMigration) {
+            File cacheFile = StoragePaths.primaryFile(".y1_library_cache.json");
+            if (cacheFile.exists()) {
+                cacheFile.delete();
+            }
+        }
+
         if (customLibrary.isEmpty()) {
             loadLibraryCache();
             // 🚨 [버그 수리] 중간 저장된 캐시에 중복곡이 남아있을 수 있으니 불러오자마자 한 번 청소!
@@ -1985,7 +2000,7 @@ public class MainActivity extends Activity {
         }
 
         // 🚀 [추가된 부분] 앱이 켜질 때(혹은 튕기고 재시작될 때) 조용히 자동 스캔을 돌려 리스트를 복구합니다!
-        if (customLibrary.isEmpty() && !isCustomScanning) {
+        if ((customLibrary.isEmpty() || forceRescanFromMigration) && !isCustomScanning) {
             startMediaLibraryScan();
         }
 
