@@ -526,5 +526,8 @@
   "Failed: Root access required.": "Failed: Root access required.",
   "No valid tracks found in this playlist.": "No valid tracks found in this playlist.",
   "Failed to clear cache.": "Failed to clear cache.",
-  "Audio error: ": "Audio error: "
+  "Audio error: ": "Audio error: ",
+  "Reinstall Update": "Reinstall Update",
+  "You are using the latest version. Reinstall anyway?": "You are using the latest version. Reinstall anyway?",
+  "REINSTALL": "REINSTALL"
 }

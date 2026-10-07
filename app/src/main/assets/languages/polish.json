@@ -526,5 +526,8 @@
   "Failed: Root access required.": "Błąd: Wymagany dostęp Root.",
   "No valid tracks found in this playlist.": "Brak prawidłowych utworów na tej liście odtwarzania.",
   "Failed to clear cache.": "Nie udało się wyczyścić pamięci podręcznej.",
-  "Audio error: ": "Błąd dźwięku: "
+  "Audio error: ": "Błąd dźwięku: ",
+  "Reinstall Update": "Zainstaluj ponownie",
+  "You are using the latest version. Reinstall anyway?": "Posiadasz najnowszą wersję. Zainstalować ponownie?",
+  "REINSTALL": "ZAINSTALUJ PONOWNIE"
 }

@@ -316,5 +316,8 @@
   "Failed: Root access required.": "失敗: Root権限が必要です。",
   "No valid tracks found in this playlist.": "このプレイリストに有効な曲がありません。",
   "Failed to clear cache.": "キャッシュのクリアに失敗しました。",
-  "Audio error: ": "オーディオエラー: "
+  "Audio error: ": "オーディオエラー: ",
+  "Reinstall Update": "アップデートの再インストール",
+  "You are using the latest version. Reinstall anyway?": "既に最新バージョンを使用しています。再インストールしますか？",
+  "REINSTALL": "再インストール"
 }

@@ -7573,6 +7573,103 @@ public class MainActivity extends Activity {
         }
     }
 
+    static int extractBuildNumber(String suffix) {
+        if (suffix == null || suffix.isEmpty()) {
+            return 0;
+        }
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(\\d+)").matcher(suffix);
+        if (m.find()) {
+            try {
+                return Integer.parseInt(m.group(1));
+            } catch (Exception e) {
+                return 0;
+            }
+        }
+        return 0;
+    }
+
+    static int compareVersionStrings(String s1, String s2) {
+        if (s1 == null) s1 = "";
+        if (s2 == null) s2 = "";
+        s1 = s1.trim();
+        s2 = s2.trim();
+        if (s1.startsWith("v") || s1.startsWith("V")) s1 = s1.substring(1);
+        if (s2.startsWith("v") || s2.startsWith("V")) s2 = s2.substring(1);
+        if (s1.equals(s2)) {
+            return 0;
+        }
+
+        java.util.regex.Pattern datePattern = java.util.regex.Pattern.compile("^(\\d{8})(.*)$");
+        java.util.regex.Matcher m1 = datePattern.matcher(s1);
+        java.util.regex.Matcher m2 = datePattern.matcher(s2);
+
+        if (m1.matches() && m2.matches()) {
+            long d1 = Long.parseLong(m1.group(1));
+            long d2 = Long.parseLong(m2.group(1));
+            if (d1 != d2) {
+                return d1 > d2 ? 1 : -1;
+            }
+            int b1 = extractBuildNumber(m1.group(2));
+            int b2 = extractBuildNumber(m2.group(2));
+            if (b1 != b2) {
+                return b1 > b2 ? 1 : -1;
+            }
+            return 0;
+        }
+
+        if (m1.matches() && !m2.matches()) {
+            return 1;
+        }
+        if (!m1.matches() && m2.matches()) {
+            return -1;
+        }
+
+        String[] parts1 = s1.split("[.\\-_]");
+        String[] parts2 = s2.split("[.\\-_]");
+        int len = Math.min(parts1.length, parts2.length);
+        for (int i = 0; i < len; i++) {
+            String p1 = parts1[i];
+            String p2 = parts2[i];
+            boolean isNum1 = p1.matches("\\d+");
+            boolean isNum2 = p2.matches("\\d+");
+            if (isNum1 && isNum2) {
+                long num1 = Long.parseLong(p1);
+                long num2 = Long.parseLong(p2);
+                if (num1 != num2) {
+                    return num1 > num2 ? 1 : -1;
+                }
+            } else {
+                int cmp = p1.compareToIgnoreCase(p2);
+                if (cmp != 0) {
+                    return cmp > 0 ? 1 : -1;
+                }
+            }
+        }
+        if (parts1.length != parts2.length) {
+            return parts1.length > parts2.length ? 1 : -1;
+        }
+        return 0;
+    }
+
+    static boolean isServerVersionNewer(int serverCode, String serverName, int myCode, String myName) {
+        int nameCompare = compareVersionStrings(serverName, myName);
+        if (nameCompare > 0) {
+            return true;
+        } else if (nameCompare < 0) {
+            return false;
+        }
+
+        long normServer = serverCode;
+        long normMy = myCode;
+        if (normServer > 1000000000L && normMy < 100000000L) {
+            normServer /= 100;
+        } else if (normMy > 1000000000L && normServer < 100000000L) {
+            normMy /= 100;
+        }
+
+        return normServer > normMy;
+    }
+
     private void buildUpdateSettingsUI() {
         currentSettingsDepth = 1; // 🚀 메인 설정은 깊이 0
         containerSettingsItems.removeAllViews();
@@ -7588,6 +7685,7 @@ public class MainActivity extends Activity {
         }
 
         final int myVersionCode = tempCode;
+        final String finalMyVersionName = myVersionName;
 
         // 2. 현재 버전 표시 줄
         LinearLayout rowCurrent = createSettingRow("Current Version", myVersionName.startsWith("v") ? myVersionName : ("v" + myVersionName));
@@ -7631,6 +7729,7 @@ public class MainActivity extends Activity {
                         apkUrl = "https://github.com/JonaszPotoniec/inniclassic-y2/releases/latest/download/" + apkName;
                     }
                     final String finalDownloadUrl = apkUrl;
+                    final boolean hasUpdate = isServerVersionNewer(serverVersionCode, serverVersionName, myVersionCode, finalMyVersionName);
 
                     runOnUiThread(new Runnable() {
                         @Override
@@ -7639,12 +7738,12 @@ public class MainActivity extends Activity {
                             tvServer.setText(serverVersionName.startsWith("v") ? serverVersionName : ("v" + serverVersionName));
 
                             // 🚀 [비교] 업데이트가 필요할 때
-                            if (serverVersionCode > myVersionCode) {
+                            if (hasUpdate) {
                                 tvServer.setTextColor(0xFF00FF00); // 서버 버전을 눈에 띄는 초록색으로!
 
                                 btnExecuteUpdate.setVisibility(View.VISIBLE);
                                 btnExecuteUpdate.setText("🚀 " + t("DOWNLOAD & UPDATE"));
-                                btnExecuteUpdate.setTextColor(0xFFFFFFFF);
+                                btnExecuteUpdate.setTextColor(ThemeManager.getTextColorPrimary());
                                 btnExecuteUpdate.setTypeface(ThemeManager.getCustomFontBold());
                                 btnExecuteUpdate.setOnClickListener(new View.OnClickListener() {
                                     @Override
@@ -7665,8 +7764,18 @@ public class MainActivity extends Activity {
                                     @Override
                                     public void onClick(View v) {
                                         clickFeedback();
-                                        Toast.makeText(MainActivity.this, t("You are using the latest version."),
-                                                Toast.LENGTH_SHORT).show();
+                                        new AlertDialog.Builder(MainActivity.this,
+                                                android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                                                .setTitle(t("Reinstall Update"))
+                                                .setMessage(t("You are using the latest version. Reinstall anyway?"))
+                                                .setPositiveButton(t("REINSTALL"), new DialogInterface.OnClickListener() {
+                                                    @Override
+                                                    public void onClick(DialogInterface dialog, int which) {
+                                                        downloadAndInstallApk(finalDownloadUrl);
+                                                    }
+                                                })
+                                                .setNegativeButton(t("CANCEL"), null)
+                                                .show();
                                     }
                                 });
                             }
@@ -11612,21 +11721,34 @@ public class MainActivity extends Activity {
             Process process = Runtime.getRuntime().exec("su");
             java.io.DataOutputStream os = new java.io.DataOutputStream(process.getOutputStream());
 
-            // 1. [타이밍 버그 해결] 패키지 매니저가 접근할 수 있게 폴더와 파일의 권한을 엽니다.
-            os.writeBytes("chmod 777 " + apkFile.getParentFile().getAbsolutePath() + "\n");
-            os.writeBytes("chmod 777 " + apkFile.getAbsolutePath() + "\n");
+            String apkPath = apkFile.getAbsolutePath();
+            String logPath = StoragePaths.primaryFile("y1_update_log.txt").getAbsolutePath();
 
-            // 2. 안드로이드 시스템(디스크)이 권한 변경을 완전히 알아차릴 때까지 확실히 동기화(sync)시킵니다!
+            // 1. 패키지 매니저가 접근할 수 있게 폴더와 파일의 권한을 엽니다.
+            os.writeBytes("chmod 777 " + apkFile.getParentFile().getAbsolutePath() + "\n");
+            os.writeBytes("chmod 777 " + apkPath + "\n");
+
+            // 2. Y1/Y2 기기는 InniClassic이 /system/app/com.themoon.y1.apk 시스템 앱으로 동작합니다.
+            //    /system을 rw로 리마운트하고 새 APK를 /system/app으로 복사합니다.
+            os.writeBytes("mount -o remount,rw /system 2>/dev/null\n");
+            os.writeBytes("if [ -f /system/app/com.themoon.y1.apk ]; then\n");
+            os.writeBytes("  cp " + apkPath + " /system/app/com.themoon.y1.apk >> " + logPath + " 2>&1\n");
+            os.writeBytes("  chmod 644 /system/app/com.themoon.y1.apk\n");
+            os.writeBytes("  rm -f /data/dalvik-cache/*com.themoon.y1* 2>/dev/null\n");
+            os.writeBytes("  rm -f /data/app/com.themoon.y1* 2>/dev/null\n");
+            os.writeBytes("fi\n");
+
+            // 3. 사용자 앱 오버레이 설치도 시도 (-r -d 플래그로 다운그레이드/버전코드 충돌 방지)
+            os.writeBytes("pm install -r -d " + apkPath + " >> " + logPath + " 2>&1\n");
+
+            // 4. 디스크 동기화
             os.writeBytes("sync\n");
 
-            // 3. 백그라운드 설치 실행 (로그 기록 포함)
-            os.writeBytes(
-                    "pm install -r " + apkFile.getAbsolutePath() + " > " + StoragePaths.primaryFile("y1_update_log.txt").getAbsolutePath() + " 2>&1 \n");
+            // 5. 시스템 앱 및 새 dex를 온전히 로드하기 위해 기기를 재부팅합니다.
+            os.writeBytes("reboot\n");
 
-            // 4. 설치가 끝날 때까지 넉넉하게 3초 대기 (이제 백그라운드 스레드라 화면이 안 멈춥니다!)
+            // 재부팅 명령이 즉각 실행되지 않는 경우를 대비한 대체 복귀
             os.writeBytes("sleep 3\n");
-
-            // 5. 설치가 완료되면 런처(앱)를 곧바로 다시 실행시켜서 화면으로 복귀!
             os.writeBytes("am start -n " + getPackageName() + "/.MainActivity\n");
 
             os.writeBytes("exit\n");

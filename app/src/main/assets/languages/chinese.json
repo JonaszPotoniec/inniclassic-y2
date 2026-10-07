@@ -332,5 +332,8 @@
   "Failed: Root access required.": "失败：需要Root权限。",
   "No valid tracks found in this playlist.": "此播放列表中没有有效的曲目。",
   "Failed to clear cache.": "清除缓存失败。",
-  "Audio error: ": "音频错误: "
+  "Audio error: ": "音频错误: ",
+  "Reinstall Update": "重新安装更新",
+  "You are using the latest version. Reinstall anyway?": "您已在使用最新版本。仍要重新安装吗？",
+  "REINSTALL": "重新安装"
 }

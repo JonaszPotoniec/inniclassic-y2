@@ -51,19 +51,40 @@ jobs:
             TAG_NAME="${{ github.ref_name }}"
             RELEASE_NAME="${{ github.ref_name }}"
             VERSION_NAME="${{ github.ref_name }}"
-            VERSION_CODE="${DEFAULT_CODE}"
+            TAG_DATE=$(echo "${TAG_NAME}" | grep -oE '[0-9]{8}' | head -1 || true)
+            if [ -n "$TAG_DATE" ]; then
+              VERSION_CODE="${TAG_DATE}"
+            else
+              VERSION_CODE="${DEFAULT_CODE}"
+            fi
           else
             git fetch --tags origin || true
             if git rev-parse "${DATE}" >/dev/null 2>&1; then
-              TAG_NAME="${DATE}-build.${{ github.run_number }}"
-              RELEASE_NAME="${DATE} (Build ${{ github.run_number }})"
-              VERSION_NAME="${DATE}-build.${{ github.run_number }}"
+              HIGHEST=1
+              for tag in $(git tag -l "${DATE}*"); do
+                if [[ "$tag" =~ ^${DATE}-v([0-9]+)$ ]]; then
+                  v="${BASH_REMATCH[1]}"
+                  if [ "$v" -gt "$HIGHEST" ]; then
+                    HIGHEST="$v"
+                  fi
+                elif [[ "$tag" =~ ^${DATE}-build\.([0-9]+)$ ]]; then
+                  v="${BASH_REMATCH[1]}"
+                  if [ "$v" -gt "$HIGHEST" ]; then
+                    HIGHEST="$v"
+                  fi
+                fi
+              done
+              REV=$((HIGHEST + 1))
+              TAG_NAME="${DATE}-v${REV}"
+              RELEASE_NAME="${DATE} (v${REV})"
+              VERSION_NAME="${DATE}-v${REV}"
+              VERSION_CODE="${DATE}$(printf '%02d' "$REV")"
             else
               TAG_NAME="${DATE}"
               RELEASE_NAME="${DATE}"
               VERSION_NAME="${DATE}"
+              VERSION_CODE="${DATE}"
             fi
-            VERSION_CODE="${DATE}"
           fi
 
           APK_NAME="InniClassic-${TAG_NAME}.apk"

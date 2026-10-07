@@ -332,5 +332,8 @@
   "Failed: Root access required.": "Ошибка: требуется доступ Root.",
   "No valid tracks found in this playlist.": "В этом плейлисте нет доступных треков.",
   "Failed to clear cache.": "Не удалось очистить кэш.",
-  "Audio error: ": "Ошибка аудио: "
+  "Audio error: ": "Ошибка аудио: ",
+  "Reinstall Update": "Переустановить обновление",
+  "You are using the latest version. Reinstall anyway?": "У вас установлена последняя версия. Переустановить?",
+  "REINSTALL": "ПЕРЕУСТАНОВИТЬ"
 }
