@@ -1,37 +1,71 @@
 package com.themoon.y1.adapters;
 
+import android.graphics.Bitmap;
+import android.graphics.Typeface;
+import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AbsListView;
 import android.widget.BaseAdapter;
 import android.widget.Button;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import com.themoon.y1.MainActivity;
 import com.themoon.y1.StoragePaths;
 import com.themoon.y1.ThemeManager;
 import com.themoon.y1.models.SongItem;
+import com.themoon.y1.views.ClassicMenuStyle;
+import com.themoon.y1.views.TablerIcons;
 
 import java.util.List;
 
 public class SongListAdapter extends BaseAdapter {
-    private List<SongItem> items;
+    private final List<SongItem> items;
+    private final boolean showShuffleRow;
 
     public SongListAdapter(List<SongItem> items) {
         this.items = items;
+        this.showShuffleRow = determineShuffleRow(items);
     }
 
+    private static boolean determineShuffleRow(List<SongItem> items) {
+        if (items == null || items.isEmpty()) return false;
+        if (MainActivity.instance == null) return false;
+        String type = MainActivity.instance.virtualQueryType;
+        return "ALL".equals(type) || "GENRE".equals(type) || "GENRE_ARTIST_SONGS".equals(type)
+                || "ARTIST".equals(type) || "ARTIST_ALL_ALBUMS".equals(type);
+    }
+
+    public static final int VIEW_TYPE_SHUFFLE = 0;
+    public static final int VIEW_TYPE_SONG = 1;
+
     // 🚀 [iPod 스타일] "All Songs" 목록 맨 위에 순정 기기처럼 "Shuffle" 항목을 하나 더 보여줍니다.
-    private boolean hasShuffleRow() {
-        return "ALL".equals(MainActivity.instance.virtualQueryType) && !items.isEmpty();
+    public boolean hasShuffleRow() {
+        return showShuffleRow;
     }
 
     @Override
-    public int getCount() { return items.size() + (hasShuffleRow() ? 1 : 0); }
+    public int getViewTypeCount() {
+        return 2;
+    }
+
+    @Override
+    public int getItemViewType(int position) {
+        if (showShuffleRow && position == 0) {
+            return VIEW_TYPE_SHUFFLE;
+        }
+        return VIEW_TYPE_SONG;
+    }
+
+    @Override
+    public int getCount() { return items.size() + (showShuffleRow ? 1 : 0); }
 
     @Override
     public Object getItem(int position) {
-        if (hasShuffleRow()) {
+        if (showShuffleRow) {
             if (position == 0) return null;
             return items.get(position - 1);
         }
@@ -132,22 +166,29 @@ public class SongListAdapter extends BaseAdapter {
             }
         }
 
-        // 🚀 UI 그리기 (계산된 텍스트와 색상을 여기서 한 번에 입힙니다)
-        if (convertView == null) {
+        // 🚀 UI 그리기: song_row 유효성 엄격 검증 (shuffle_banner_row와 혼용 방지)
+        final boolean isSongRowValid = convertView instanceof android.widget.LinearLayout
+                && "song_row".equals(convertView.getTag())
+                && ((android.widget.LinearLayout) convertView).getChildCount() > 1
+                && (((android.widget.LinearLayout) convertView).getChildAt(0) instanceof android.widget.TextView);
+
+        if (!isSongRowValid) {
             btn = MainActivity.instance.createListButtonWithIcon(iconCode, displayTitle, customColor);
-            btn.setLayoutParams(new android.widget.AbsListView.LayoutParams(android.widget.AbsListView.LayoutParams.MATCH_PARENT, android.widget.AbsListView.LayoutParams.WRAP_CONTENT));
+            btn.setTag("song_row");
+            btn.setLayoutParams(new android.widget.AbsListView.LayoutParams(
+                    android.widget.AbsListView.LayoutParams.MATCH_PARENT,
+                    android.widget.AbsListView.LayoutParams.WRAP_CONTENT));
         } else {
             btn = convertView;
-            if (btn instanceof android.widget.LinearLayout) {
-                android.widget.LinearLayout layout = (android.widget.LinearLayout) btn;
-                if (layout.getChildCount() > 1) {
-                    android.widget.TextView tvIcon = (android.widget.TextView) layout.getChildAt(0);
-                    android.widget.TextView tvText = (android.widget.TextView) layout.getChildAt(1);
-                    tvIcon.setText(iconCode);
-                    tvText.setText(displayTitle);
-                    int applyColor = (customColor != 0) ? customColor : com.themoon.y1.ThemeManager.getTextColorPrimary();
-                    if (!btn.hasFocus()) { tvIcon.setTextColor(applyColor); tvText.setTextColor(applyColor); }
-                }
+            android.widget.LinearLayout layout = (android.widget.LinearLayout) btn;
+            android.widget.TextView tvIcon = (android.widget.TextView) layout.getChildAt(0);
+            android.widget.TextView tvText = (android.widget.TextView) layout.getChildAt(1);
+            tvIcon.setText(iconCode);
+            tvText.setText(displayTitle);
+            int applyColor = (customColor != 0) ? customColor : com.themoon.y1.ThemeManager.getTextColorPrimary();
+            if (!btn.hasFocus()) {
+                tvIcon.setTextColor(applyColor);
+                tvText.setTextColor(applyColor);
             }
         }
 
@@ -187,13 +228,16 @@ public class SongListAdapter extends BaseAdapter {
             }
         }
         if (!hasProgress) {
-            applyDefaultFocusListener(btn, song.title, customColor);
+            applyDefaultFocusListener(btn, position, song.title, customColor);
         }
 
         // 🚀 [클릭 이벤트 처리]
         btn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.virtualListSelectedIndex = position;
+                }
                 MainActivity.instance.clickFeedback();
 
                 // 팟캐스트 인터셉터
@@ -278,22 +322,164 @@ public class SongListAdapter extends BaseAdapter {
     }
 
     // 🚀 [iPod 스타일] "All Songs" 맨 위 고정 "Shuffle" 항목 - 라이브러리 전체를 섞어서 바로 재생 시작!
+    private static Bitmap shuffleTileBitmap = null;
+
     private View getShuffleRowView(View convertView) {
-        View row;
-        if (convertView != null && "shuffle_row".equals(convertView.getTag())) {
-            row = convertView;
+        final float d = MainActivity.instance.getResources().getDisplayMetrics().density;
+        final int coverSize = (int) (52 * d);
+
+        final LinearLayout row;
+        final ImageView ivCover;
+        final LinearLayout textStack;
+        final TextView tvTitle;
+        final TextView tvSubtitle;
+        final TextView tvArrow;
+
+        final boolean isShuffleRowValid = convertView instanceof LinearLayout
+                && "shuffle_banner_row".equals(convertView.getTag())
+                && ((LinearLayout) convertView).getChildCount() > 2
+                && (((LinearLayout) convertView).getChildAt(0) instanceof ImageView);
+
+        if (isShuffleRowValid) {
+            row = (LinearLayout) convertView;
+            ivCover = (ImageView) row.getChildAt(0);
+            textStack = (LinearLayout) row.getChildAt(1);
+            tvTitle = (TextView) textStack.getChildAt(0);
+            tvSubtitle = (TextView) textStack.getChildAt(1);
+            tvArrow = (TextView) row.getChildAt(2);
         } else {
-            row = MainActivity.instance.createListButtonWithIcon("", MainActivity.instance.t("Shuffle"));
-            row.setTag("shuffle_row");
+            row = new LinearLayout(MainActivity.instance);
+            row.setTag("shuffle_banner_row");
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setFocusable(true);
+            row.setClickable(true);
+            row.setSoundEffectsEnabled(false);
+            row.setPadding((int) (8 * d), (int) (6 * d), (int) (10 * d), (int) (6 * d));
+            row.setBackground(MainActivity.instance.createButtonBackground(ThemeManager.getListButtonNormalBg()));
             row.setLayoutParams(new AbsListView.LayoutParams(
-                    AbsListView.LayoutParams.MATCH_PARENT, AbsListView.LayoutParams.WRAP_CONTENT));
+                    AbsListView.LayoutParams.MATCH_PARENT,
+                    AbsListView.LayoutParams.WRAP_CONTENT));
+
+            ivCover = new ImageView(MainActivity.instance);
+            ivCover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            LinearLayout.LayoutParams coverLp = new LinearLayout.LayoutParams(coverSize, coverSize);
+            ivCover.setLayoutParams(coverLp);
+            row.addView(ivCover);
+
+            textStack = new LinearLayout(MainActivity.instance);
+            textStack.setOrientation(LinearLayout.VERTICAL);
+            LinearLayout.LayoutParams textLp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            textLp.leftMargin = (int) (10 * d);
+            textStack.setLayoutParams(textLp);
+
+            tvTitle = new TextView(MainActivity.instance);
+            tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, ThemeManager.getListTextSize() * d);
+            tvTitle.setTypeface(ThemeManager.getCustomFontBold());
+            tvTitle.setSingleLine(true);
+            tvTitle.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
+            tvTitle.setMarqueeRepeatLimit(-1);
+            tvTitle.setHorizontalFadingEdgeEnabled(true);
+            textStack.addView(tvTitle);
+
+            tvSubtitle = new TextView(MainActivity.instance);
+            tvSubtitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 15f * d);
+            tvSubtitle.setTypeface(ThemeManager.getCustomFont(), Typeface.NORMAL);
+            tvSubtitle.setSingleLine(true);
+            tvSubtitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            subLp.topMargin = (int) (1 * d);
+            tvSubtitle.setLayoutParams(subLp);
+            textStack.addView(tvSubtitle);
+
+            row.addView(textStack);
+
+            tvArrow = new TextView(MainActivity.instance);
+            tvArrow.setText("〉");
+            tvArrow.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 18f * d);
+            tvArrow.setVisibility(View.GONE);
+            LinearLayout.LayoutParams lpArrow = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lpArrow.leftMargin = (int) (6 * d);
+            tvArrow.setLayoutParams(lpArrow);
+            row.addView(tvArrow);
         }
+
+        tvArrow.setTextColor(0xFFFFFFFF);
+        tvArrow.setVisibility(row.isFocused() ? View.VISIBLE : View.GONE);
+        ClassicMenuStyle.apply(row, tvTitle, tvArrow, 64);
+
+        tvTitle.setText(MainActivity.instance.t("Shuffle"));
+
+        if (shuffleTileBitmap == null || shuffleTileBitmap.getWidth() != coverSize) {
+            shuffleTileBitmap = TablerIcons.renderTile(
+                    TablerIcons.SHUFFLE,
+                    coverSize,
+                    (int) (28 * d),
+                    0xFFFFFFFF,
+                    0xFF1C1C1E,
+                    8 * d
+            );
+        }
+        ivCover.setImageBitmap(shuffleTileBitmap);
+
+        int count = (MainActivity.instance.virtualSongList != null && !MainActivity.instance.virtualSongList.isEmpty())
+                ? MainActivity.instance.virtualSongList.size()
+                : items.size();
+        String countStr = (count == 1)
+                ? ("1 " + MainActivity.instance.t("Song"))
+                : (count + " " + MainActivity.instance.t("Songs"));
+        tvSubtitle.setText(countStr);
+
+        boolean focusedNow = row.isFocused();
+        row.setBackground(focusedNow ? MainActivity.instance.createFocusedButtonBackground()
+                : MainActivity.instance.createButtonBackground(ThemeManager.getListButtonNormalBg()));
+        tvTitle.setTextColor(focusedNow ? ThemeManager.getListButtonFocusedTextColor() : ThemeManager.getTextColorPrimary());
+        tvSubtitle.setTextColor(focusedNow ? ThemeManager.getListButtonFocusedTextColor() : ThemeManager.getTextColorSecondary());
+        tvTitle.setSelected(focusedNow);
+
+        row.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            @Override
+            public void onFocusChange(View v, boolean hasFocus) {
+                if (hasFocus) {
+                    if (MainActivity.instance != null) {
+                        MainActivity.instance.virtualListSelectedIndex = 0;
+                    }
+                    row.setBackground(MainActivity.instance.createFocusedButtonBackground());
+                    tvTitle.setTextColor(ThemeManager.getListButtonFocusedTextColor());
+                    tvSubtitle.setTextColor(ThemeManager.getListButtonFocusedTextColor());
+                    tvArrow.setVisibility(View.VISIBLE);
+                    tvTitle.setSelected(true);
+                    MainActivity.instance.showFastScrollLetter(MainActivity.instance.t("Shuffle"));
+                } else {
+                    row.setBackground(MainActivity.instance.createButtonBackground(ThemeManager.getListButtonNormalBg()));
+                    tvTitle.setTextColor(ThemeManager.getTextColorPrimary());
+                    tvSubtitle.setTextColor(ThemeManager.getTextColorSecondary());
+                    tvArrow.setVisibility(View.GONE);
+                    tvTitle.setSelected(false);
+                }
+            }
+        });
 
         row.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.virtualListSelectedIndex = 0;
+                }
                 MainActivity.instance.clickFeedback();
-                java.util.List<java.io.File> shuffled = new java.util.ArrayList<>(MainActivity.instance.virtualSongList);
+                java.util.List<java.io.File> listToShuffle;
+                if (MainActivity.instance.virtualSongList != null && !MainActivity.instance.virtualSongList.isEmpty()) {
+                    listToShuffle = MainActivity.instance.virtualSongList;
+                } else {
+                    listToShuffle = new java.util.ArrayList<>();
+                    for (SongItem item : items) {
+                        if (item.file != null) listToShuffle.add(item.file);
+                    }
+                }
+                java.util.List<java.io.File> shuffled = new java.util.ArrayList<>(listToShuffle);
                 java.util.Collections.shuffle(shuffled);
                 com.themoon.y1.managers.AudioPlayerManager.getInstance().playTrackList(shuffled, 0);
                 MainActivity.instance.changeScreen(3);
@@ -305,7 +491,7 @@ public class SongListAdapter extends BaseAdapter {
     }
 
     // 🚀 [신규] 유니코드 아이콘 뷰(LinearLayout)와 순정 버튼(Button)을 모두 지원하는 하이브리드 포커스 리스너!
-    private void applyDefaultFocusListener(final android.view.View btn, final String title, final int customColor) {
+    private void applyDefaultFocusListener(final android.view.View btn, final int position, final String title, final int customColor) {
         final int normalColor = (customColor != 0) ? customColor : com.themoon.y1.ThemeManager.getTextColorPrimary();
 
         // 1. 리스너를 미리 변수(listener)에 담아둡니다.
@@ -313,6 +499,9 @@ public class SongListAdapter extends BaseAdapter {
             @Override
             public void onFocusChange(android.view.View v, boolean hasFocus) {
                 if (hasFocus) {
+                    if (MainActivity.instance != null) {
+                        MainActivity.instance.virtualListSelectedIndex = position;
+                    }
                     btn.setBackground(MainActivity.instance.createFocusedButtonBackground());
 
                     if (v instanceof android.widget.LinearLayout) {
@@ -352,16 +541,8 @@ public class SongListAdapter extends BaseAdapter {
 
         // 2. 버튼에 리스너를 장착!
         btn.setOnFocusChangeListener(listener);
-
-        // =======================================================
-        // 🚀 [마키 버그 완벽 수리] 리스트 뷰 재활용 시 포커스 증발 방지 엔진!
-        // =======================================================
-        btn.post(new Runnable() {
-            @Override
-            public void run() {
-                // UI가 화면에 완전히 그려진 직후, 포커스를 쥐고 있다면 억지로 한 번 이벤트를 쏴서 깨워줍니다!
-                listener.onFocusChange(btn, btn.isFocused());
-            }
-        });
+        if (btn.isFocused()) {
+            listener.onFocusChange(btn, true);
+        }
     }
 }

@@ -46,6 +46,32 @@ public final class TablerIcons {
         "M3.515 9.515c4.686 -4.687 12.284 -4.687 17 0"
     };
 
+    /** Tabler Icons outline/arrows-shuffle.svg (MIT) */
+    public static final String[] SHUFFLE = {
+        "M18 4l3 3l-3 3",
+        "M18 20l3 -3l-3 -3",
+        "M3 7h3a5 5 0 0 1 5 5a5 5 0 0 0 5 5h5",
+        "M21 7h-5a4.978 4.978 0 0 0 -3 1m-4 8a4.984 4.984 0 0 1 -3 1h-3"
+    };
+
+    /**
+     * Renders a Tabler icon centered on a rounded card tile.
+     */
+    public static Bitmap renderTile(String[] paths, int tileSizePx, int iconSizePx, int iconColor, int bgColor, float radiusPx) {
+        Bitmap bmp = Bitmap.createBitmap(tileSizePx, tileSizePx, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bmp);
+        Paint bgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        bgPaint.setColor(bgColor);
+        bgPaint.setStyle(Paint.Style.FILL);
+        android.graphics.RectF rect = new android.graphics.RectF(0, 0, tileSizePx, tileSizePx);
+        canvas.drawRoundRect(rect, radiusPx, radiusPx, bgPaint);
+
+        Bitmap iconBmp = render(paths, iconSizePx, iconColor);
+        float offset = (tileSizePx - iconSizePx) / 2f;
+        canvas.drawBitmap(iconBmp, offset, offset, null);
+        return bmp;
+    }
+
     /**
      * Renders a 24x24 stroke-2 Tabler icon to an ARGB_8888 bitmap scaled to sizePx.
      */

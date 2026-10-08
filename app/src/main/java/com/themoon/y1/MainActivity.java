@@ -401,6 +401,9 @@ public class MainActivity extends Activity {
     public String categoryArtistFilter = "";
     // 🚀 [Album Artists vs Artists] categoryArtistFilter가 albumArtist 기준인지 트랙 artist 기준인지 구분
     public boolean categoryArtistFilterIsTrackArtist = false;
+    // 🚀 [Genres] 장르별 아티스트 및 앨범 필터링용
+    public String categoryGenreFilter = "";
+    public int virtualListSelectedIndex = 0;
     public List<File> virtualSongList = new ArrayList<>();
     // 💡 백그라운드 미디어 제어권(스크린 오프) 변수
     // 🚀 [팟캐스트 전용] 다운로드 고유 ID와 진행률(%)을 실시간으로 추적하는 지능형 메모장
@@ -417,7 +420,9 @@ public class MainActivity extends Activity {
     private static final int BROWSER_AUDIOBOOKS = 8; // 🚀 [추가] 오디오북 브라우저 상태 가동
     // 🚀 [신규 상수 등록] 겹치지 않는 고유 번호로 연도와 장르 상태 스위치를 장전합니다.
     private static final int BROWSER_YEARS = 10;
-    private static final int BROWSER_GENRES = 11;
+    public static final int BROWSER_GENRES = 11;
+    public static final int BROWSER_GENRE_ARTISTS = 23;
+    public static final int BROWSER_GENRE_ALBUMS = 24;
     private static final int BROWSER_COMPOSERS = 21;
     private static final int BROWSER_TRACK_ARTISTS = 22; // 🚀 [신규] "Artists" - 트랙 아티스트 기준 (Album Artists와 별개)
     private static final int BROWSER_RECENTLY_ADDED = 12; // 🚀 [신규 장착] 최근 추가된 곡 상태
@@ -3900,6 +3905,44 @@ public class MainActivity extends Activity {
         hzIndexScroll.setVisibility(View.GONE);
     }
 
+    public void navigateVirtualListTo(final int targetPos) {
+        if (listVirtualSongs == null || listVirtualSongs.getCount() == 0) return;
+        final int pos = Math.max(0, Math.min(targetPos, listVirtualSongs.getCount() - 1));
+        virtualListSelectedIndex = pos;
+
+        int first = listVirtualSongs.getFirstVisiblePosition();
+        int last = listVirtualSongs.getLastVisiblePosition();
+
+        if (pos >= first && pos <= last) {
+            View child = listVirtualSongs.getChildAt(pos - first);
+            if (child != null) {
+                child.requestFocus();
+                return;
+            }
+        }
+
+        if (pos <= first) {
+            listVirtualSongs.setSelectionFromTop(pos, 0);
+        } else {
+            listVirtualSongs.setSelection(pos);
+        }
+
+        listVirtualSongs.post(new Runnable() {
+            @Override
+            public void run() {
+                if (listVirtualSongs == null) return;
+                int curFirst = listVirtualSongs.getFirstVisiblePosition();
+                int visibleIdx = pos - curFirst;
+                if (visibleIdx >= 0 && visibleIdx < listVirtualSongs.getChildCount()) {
+                    View targetView = listVirtualSongs.getChildAt(visibleIdx);
+                    if (targetView != null) {
+                        targetView.requestFocus();
+                    }
+                }
+            }
+        });
+    }
+
     public void showFastScrollLetter(String rawText) {
         // Letter jump feedback belongs to rapid wheel scrolling, not ordinary menu focus.
         if (ThemeManager.isClassicTheme() && (currentBrowserMode == BROWSER_ROOT || classicWheelStreak < 6)) return;
@@ -4609,7 +4652,18 @@ public class MainActivity extends Activity {
             } else if (currentBrowserMode == BROWSER_ALBUMS) {
                 buildVirtualCategories("ALBUM");
             } else if (currentBrowserMode == BROWSER_VIRTUAL_SONGS) {
-                buildVirtualSongs();
+                if (listVirtualSongs != null && listVirtualSongs.getAdapter() != null) {
+                    ((android.widget.BaseAdapter) listVirtualSongs.getAdapter()).notifyDataSetChanged();
+                    navigateVirtualListTo(virtualListSelectedIndex);
+                } else {
+                    buildVirtualSongs();
+                }
+            } else if (currentBrowserMode == BROWSER_GENRES) {
+                buildVirtualCategories("GENRE");
+            } else if (currentBrowserMode == BROWSER_GENRE_ARTISTS) {
+                buildVirtualCategories("GENRE_ARTIST");
+            } else if (currentBrowserMode == BROWSER_GENRE_ALBUMS) {
+                buildVirtualCategories("GENRE_ALBUM");
             } else if (currentBrowserMode == BROWSER_PODCAST_CHANNELS) {
                 buildPodcastChannelsUI();
             }
@@ -5468,8 +5522,17 @@ public class MainActivity extends Activity {
         } else if (currentScreenState != STATE_BRIGHTNESS && currentScreenState != STATE_STORAGE
                 && currentScreenState != STATE_PLAYER) {
             View c = getCurrentFocus();
-            if (c != null)
+            if (c != null) {
                 c.performClick();
+            } else if (currentScreenState == STATE_BROWSER && listVirtualSongs != null
+                    && listVirtualSongs.getVisibility() == View.VISIBLE) {
+                int curFirst = listVirtualSongs.getFirstVisiblePosition();
+                int visibleIdx = virtualListSelectedIndex - curFirst;
+                if (visibleIdx >= 0 && visibleIdx < listVirtualSongs.getChildCount()) {
+                    View v = listVirtualSongs.getChildAt(visibleIdx);
+                    if (v != null) v.performClick();
+                }
+            }
         }
     }
 
@@ -9226,6 +9289,9 @@ public class MainActivity extends Activity {
                         clickFeedback();
                         currentBrowserMode = BROWSER_GENRES;
                         virtualQueryValue = "";
+                        categoryGenreFilter = "";
+                        categoryArtistFilter = "";
+                        categoryArtistFilterIsTrackArtist = false;
                         buildVirtualCategories("GENRE");
                     });
                     containerBrowserItems.addView(btnGenre);
@@ -10144,6 +10210,10 @@ public class MainActivity extends Activity {
         if (type.equals("ALBUM") && !categoryArtistFilter.isEmpty()) {
             // 🚀 [추가] 특정 아티스트의 앨범 목록일 때는 그 아티스트 이름을 타이틀로!
             tvBrowserPath.setText(categoryArtistFilter);
+        } else if (type.equals("GENRE_ALBUM") && !categoryArtistFilter.isEmpty()) {
+            tvBrowserPath.setText(categoryArtistFilter);
+        } else if (type.equals("GENRE_ARTIST") && !categoryGenreFilter.isEmpty()) {
+            tvBrowserPath.setText(categoryGenreFilter);
         } else if (isAudiobookLibraryMode) {
             tvBrowserPath.setText((type.equals("ARTIST") ? t("Authors") : t("Books")));
         } else if (type.equals("GENRE")) {
@@ -10170,15 +10240,29 @@ public class MainActivity extends Activity {
                 if (!categoryArtistFilter.equals(matchField)) {
                     continue;
                 }
+            } else if (type.equals("GENRE_ARTIST")) {
+                if (song.genre == null || !song.genre.equalsIgnoreCase(categoryGenreFilter)) {
+                    continue;
+                }
+            } else if (type.equals("GENRE_ALBUM")) {
+                if (song.genre == null || !song.genre.equalsIgnoreCase(categoryGenreFilter)) {
+                    continue;
+                }
+                if (!categoryArtistFilter.isEmpty()) {
+                    String matchField = categoryArtistFilterIsTrackArtist ? song.artist : song.albumArtist;
+                    if (!categoryArtistFilter.equalsIgnoreCase(matchField)) {
+                        continue;
+                    }
+                }
             }
 
             // 🟢 [완벽 수정] YEAR와 GENRE 분기를 추가하여 중복 없는 알맹이 명단을 긁어모읍니다.
             String val = "Unknown";
             if (type.equals("ARTIST"))
                 val = song.albumArtist; // 🚀 Album Artists: 앨범 아티스트 기준으로 그룹핑
-            else if (type.equals("TRACK_ARTIST"))
+            else if (type.equals("TRACK_ARTIST") || type.equals("GENRE_ARTIST"))
                 val = song.artist; // 🚀 Artists: 트랙에 찍힌 실제 아티스트 기준으로 그룹핑 (feat. 등도 전부 개별 등장)
-            else if (type.equals("ALBUM"))
+            else if (type.equals("ALBUM") || type.equals("GENRE_ALBUM"))
                 val = song.album;
             else if (type.equals("YEAR"))
                 val = song.year;
@@ -10194,8 +10278,9 @@ public class MainActivity extends Activity {
         // 🚀 [수정] 대소문자 구분 없이 완벽하게 알파벳순으로 섞어서 정렬합니다!
         java.util.Collections.sort(categories, String.CASE_INSENSITIVE_ORDER);
 
-        // 🚀 [신규 추가] 특정 아티스트의 앨범 목록이라면, 맨 위에 "전체 곡" 항목을 하나 꽂아 넣습니다!
-        if (type.equals("ALBUM") && !categoryArtistFilter.isEmpty()) {
+        // 🚀 [신규 추가] 특정 아티스트의 앨범 목록이나 장르 하위 목록이라면, 맨 위에 "전체 곡" 항목을 하나 꽂아 넣습니다!
+        if ((type.equals("ALBUM") && !categoryArtistFilter.isEmpty()) ||
+                type.equals("GENRE_ARTIST") || type.equals("GENRE_ALBUM")) {
             categories.add(0, ALL_SONGS_SENTINEL);
         }
         // 🚀 [추가] 점프를 위해 아티스트/앨범 이름 기억
@@ -10206,32 +10291,14 @@ public class MainActivity extends Activity {
         CategoryListAdapter adapter = new CategoryListAdapter(categories, type);
         listVirtualSongs.setAdapter(adapter);
 
-        // 🚀 [여기서부터 덮어쓰기!] 이전에 들어갔던 아티스트/앨범의 이름을 찾아 인덱스를 계산합니다.
-        // 🚀 [수정] 이전에 들어갔던 아티스트/앨범의 이름을 찾아 인덱스를 계산합니다.
         final int targetIndex = categories.indexOf(virtualQueryValue);
-
-        listVirtualSongs.postDelayed(new Runnable() {
+        virtualListSelectedIndex = (targetIndex >= 0) ? targetIndex : 0;
+        listVirtualSongs.post(new Runnable() {
             @Override
             public void run() {
-                if (targetIndex >= 0) {
-                    // 1. 단번에 해당 위치를 화면 최상단으로 쫙 끌어옵니다! (완벽 고정)
-                    listVirtualSongs.setSelectionFromTop(targetIndex, 0);
-
-                    // 2. 약간의 딜레이를 주어 화면 배치가 끝나면, 정확히 그 칸에 휠 포커스를 꽂습니다.
-                    listVirtualSongs.postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            int visiblePos = targetIndex - listVirtualSongs.getFirstVisiblePosition();
-                            if (visiblePos >= 0 && visiblePos < listVirtualSongs.getChildCount()) {
-                                listVirtualSongs.getChildAt(visiblePos).requestFocus();
-                            }
-                        }
-                    }, 50);
-                } else if (listVirtualSongs.getChildCount() > 0) {
-                    listVirtualSongs.getChildAt(0).requestFocus();
-                }
+                navigateVirtualListTo(virtualListSelectedIndex);
             }
-        }, 50);
+        });
         buildAlphabetIndexBar();
     } // buildVirtualCategories 함수 끝
       // 💡 [추가] 이름에서 앞의 특수문자를 무시하고 순수 '첫 글자(알파벳)'만 뽑아내는 함수
@@ -10886,15 +10953,42 @@ public class MainActivity extends Activity {
                             (song.album != null && song.album.toLowerCase().contains(q)));
                 }
 
-                if (isRecentPassed && (virtualQueryType.equals("ALL") || virtualQueryType.equals("RECENT") ||
-                        (virtualQueryType.equals("ARTIST") && song.artist.equals(virtualQueryValue)) ||
-                        (virtualQueryType.equals("ARTIST_ALL_ALBUMS") && song.albumArtist.equals(virtualQueryValue)) ||
-                        (virtualQueryType.equals("ALBUM") && song.album.equals(virtualQueryValue)) ||
-                        (virtualQueryType.equals("COVER_FLOW_ALBUM") && song.album.equals(virtualQueryValue)) ||
-                        (virtualQueryType.equals("YEAR") && song.year.equals(virtualQueryValue)) ||
-                        (virtualQueryType.equals("GENRE") && song.genre.equals(virtualQueryValue)) ||
-                        (virtualQueryType.equals("COMPOSER") && song.composer.equals(virtualQueryValue)) ||
-                        isSearchMatch)) {
+                boolean isMatch = false;
+                if (virtualQueryType.equals("ALL") || virtualQueryType.equals("RECENT")) {
+                    isMatch = true;
+                } else if (virtualQueryType.equals("ARTIST") && song.artist.equals(virtualQueryValue)) {
+                    isMatch = true;
+                } else if (virtualQueryType.equals("ARTIST_ALL_ALBUMS") && song.albumArtist.equals(virtualQueryValue)) {
+                    isMatch = true;
+                } else if (virtualQueryType.equals("ALBUM") && song.album.equals(virtualQueryValue)) {
+                    if (!categoryArtistFilter.isEmpty()) {
+                        String matchField = categoryArtistFilterIsTrackArtist ? song.artist : song.albumArtist;
+                        isMatch = categoryArtistFilter.equals(matchField);
+                    } else {
+                        isMatch = true;
+                    }
+                } else if (virtualQueryType.equals("COVER_FLOW_ALBUM") && song.album.equals(virtualQueryValue)) {
+                    isMatch = true;
+                } else if (virtualQueryType.equals("YEAR") && song.year.equals(virtualQueryValue)) {
+                    isMatch = true;
+                } else if (virtualQueryType.equals("GENRE") && song.genre != null && song.genre.equalsIgnoreCase(virtualQueryValue)) {
+                    isMatch = true;
+                } else if (virtualQueryType.equals("GENRE_ARTIST_SONGS")) {
+                    String matchField = categoryArtistFilterIsTrackArtist ? song.artist : song.albumArtist;
+                    isMatch = song.genre != null && song.genre.equalsIgnoreCase(categoryGenreFilter)
+                            && (categoryArtistFilter.isEmpty() || categoryArtistFilter.equalsIgnoreCase(matchField));
+                } else if (virtualQueryType.equals("GENRE_ALBUM_SONGS")) {
+                    String matchField = categoryArtistFilterIsTrackArtist ? song.artist : song.albumArtist;
+                    isMatch = song.album.equalsIgnoreCase(virtualQueryValue)
+                            && song.genre != null && song.genre.equalsIgnoreCase(categoryGenreFilter)
+                            && (categoryArtistFilter.isEmpty() || categoryArtistFilter.equalsIgnoreCase(matchField));
+                } else if (virtualQueryType.equals("COMPOSER") && song.composer.equals(virtualQueryValue)) {
+                    isMatch = true;
+                } else if (isSearchMatch) {
+                    isMatch = true;
+                }
+
+                if (isRecentPassed && isMatch) {
                     targetSongs.add(song);
                 }
             }
@@ -10907,7 +11001,8 @@ public class MainActivity extends Activity {
             @Override
             public int compare(SongItem s1, SongItem s2) {
                 // 앨범 모드이거나 커버 플로우에서 넘어왔을 때만 트랙 번호로 정렬!
-                if ("ALBUM".equals(virtualQueryType) || "COVER_FLOW_ALBUM".equals(virtualQueryType)) {
+                if ("ALBUM".equals(virtualQueryType) || "COVER_FLOW_ALBUM".equals(virtualQueryType)
+                        || "GENRE_ALBUM_SONGS".equals(virtualQueryType)) {
                     int t1 = trackNumberMap.containsKey(s1.file.getAbsolutePath())
                             ? trackNumberMap.get(s1.file.getAbsolutePath())
                             : 0;
@@ -10950,40 +11045,11 @@ public class MainActivity extends Activity {
         SongListAdapter adapter = new SongListAdapter(displaySongs);
         listVirtualSongs.setAdapter(adapter);
 
-        // 🚀 [스마트 포커스] 현재 재생 중인 곡이 리스트에 있다면 그 인덱스를 찾아냅니다!
-        int targetIndex = -1;
-        if (currentPlaylist != null && !currentPlaylist.isEmpty() && currentIndex >= 0
-                && currentIndex < currentPlaylist.size()) {
-            File playingFile = currentPlaylist.get(currentIndex);
-            for (int i = 0; i < targetSongs.size(); i++) {
-                if (targetSongs.get(i).file.getAbsolutePath().equals(playingFile.getAbsolutePath())) {
-                    targetIndex = i;
-                    break;
-                }
-            }
-        }
-
-        final int finalTargetIdx = targetIndex;
+        virtualListSelectedIndex = 0;
         listVirtualSongs.post(new Runnable() {
             @Override
             public void run() {
-                // 재생 중인 곡이 확인되면 해당 위치로 자동 스크롤 후 포커스 록온!
-                if (finalTargetIdx >= 0 && finalTargetIdx < listVirtualSongs.getCount()) {
-                    listVirtualSongs.setSelectionFromTop(finalTargetIdx, 0);
-                    listVirtualSongs.postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            int visiblePos = finalTargetIdx - listVirtualSongs.getFirstVisiblePosition();
-                            if (visiblePos >= 0 && visiblePos < listVirtualSongs.getChildCount()) {
-                                listVirtualSongs.getChildAt(visiblePos).requestFocus();
-                            }
-                        }
-                    }, 50);
-                } else {
-                    if (listVirtualSongs.getChildCount() > 0) {
-                        listVirtualSongs.getChildAt(0).requestFocus();
-                    }
-                }
+                navigateVirtualListTo(0);
             }
         });
         buildAlphabetIndexBar();
@@ -13580,6 +13646,17 @@ public class MainActivity extends Activity {
                             if (virtualQueryType.equals("COVER_FLOW_ALBUM")) {
                                 currentBrowserMode = BROWSER_COVER_FLOW;
                                 buildCoverFlowUI();
+                            } else if (virtualQueryType.equals("GENRE_ALBUM_SONGS")) {
+                                currentBrowserMode = BROWSER_GENRE_ALBUMS;
+                                buildVirtualCategories("GENRE_ALBUM");
+                            } else if (virtualQueryType.equals("GENRE_ARTIST_SONGS")) {
+                                currentBrowserMode = BROWSER_GENRE_ALBUMS;
+                                virtualQueryValue = ALL_SONGS_SENTINEL;
+                                buildVirtualCategories("GENRE_ALBUM");
+                            } else if (virtualQueryType.equals("GENRE")) {
+                                currentBrowserMode = BROWSER_GENRE_ARTISTS;
+                                virtualQueryValue = ALL_SONGS_SENTINEL;
+                                buildVirtualCategories("GENRE_ARTIST");
                             } else {
                                 currentBrowserMode = virtualQueryType.equals("ALL") ? BROWSER_ROOT
                                         : (virtualQueryType.equals("ARTIST") ? BROWSER_ARTISTS : BROWSER_ALBUMS);
@@ -13646,12 +13723,26 @@ public class MainActivity extends Activity {
                             }
                         }
                         // 🚀 [여기에 아래 코드를 추가하여 퇴근 경로를 뚫어줍니다!]
-                        else if (currentBrowserMode == BROWSER_YEARS) {
+                        else if (currentBrowserMode == BROWSER_GENRE_ALBUMS) {
+                            currentBrowserMode = BROWSER_GENRE_ARTISTS;
+                            String exitedArtist = categoryArtistFilter;
+                            categoryArtistFilter = "";
+                            virtualQueryValue = exitedArtist;
+                            buildVirtualCategories("GENRE_ARTIST");
+                        } else if (currentBrowserMode == BROWSER_GENRE_ARTISTS) {
+                            currentBrowserMode = BROWSER_GENRES;
+                            String exitedGenre = categoryGenreFilter;
+                            categoryGenreFilter = "";
+                            virtualQueryValue = exitedGenre;
+                            buildVirtualCategories("GENRE");
+                        } else if (currentBrowserMode == BROWSER_YEARS) {
                             currentBrowserMode = BROWSER_ROOT;
                             lastBrowserFocusText = t("Years"); // 💡 나갔을 때 휠 포커스가 자동으로 'Years' 버튼에 록온되도록 세팅!
                             buildFileBrowserUI();
                         } else if (currentBrowserMode == BROWSER_GENRES) {
                             currentBrowserMode = BROWSER_ROOT;
+                            categoryGenreFilter = "";
+                            categoryArtistFilter = "";
                             lastBrowserFocusText = t("Genres"); // 💡 나갔을 때 휠 포커스가 자동으로 'Genres' 버튼에 록온되도록 세팅!
                             buildFileBrowserUI();
                         } else if (currentBrowserMode == BROWSER_COMPOSERS) {
@@ -13753,8 +13844,8 @@ public class MainActivity extends Activity {
                 return true;
             }
             // 🚀 [여기서부터 덮어쓰기!] 초고속 리스트뷰가 켜져있을 때는, 시스템 본연의 부드러운 스크롤 엔진에 휠 신호를 넘깁니다!
-            if (currentScreenState == STATE_BROWSER && listVirtualSongs != null
-                    && listVirtualSongs.getVisibility() == View.VISIBLE) {
+            if ((keyCode == 21 || keyCode == 22) && currentScreenState == STATE_BROWSER
+                    && listVirtualSongs != null && listVirtualSongs.getVisibility() == View.VISIBLE) {
 
                 long now = System.currentTimeMillis();
                 if (now - lastWheelTime < 15 && wheelFastCount < 2) {
@@ -13762,104 +13853,111 @@ public class MainActivity extends Activity {
                     return true;
                 }
                 boolean isFastScroll = false;
-
-                // 💡 [iPod 스타일 가속] 0.1초(100ms) 이내에 연속으로 휠이 3칸 이상 돌아가야 '고속 점프 모드' 발동!
-                // (150ms/2칸은 너무 쉽게 튀어서, 진짜 빠르게 돌릴 때만 반응하도록 문턱을 다시 살짝 높임)
                 if (now - lastWheelTime < 100) {
                     wheelFastCount++;
                     if (wheelFastCount >= 3)
                         isFastScroll = true;
                 } else {
-                    wheelFastCount = 0; // 천천히 돌리면 즉시 초기화
+                    wheelFastCount = 0;
                 }
                 lastWheelTime = now;
 
-                if (isFastScroll && !currentScrollIndexList.isEmpty()) {
-                    // 🚀🚀 [고속 점프 모드] 알파벳(첫 글자) 단위로 뭉텅뭉텅 스크롤!
-                    int currentPos = listVirtualSongs.getSelectedItemPosition();
-                    if (currentPos < 0)
-                        currentPos = 0;
-                    char currentChar = getInitialChar(currentScrollIndexList.get(currentPos));
-                    int targetPos = currentPos;
+                int totalCount = listVirtualSongs.getCount();
+                if (totalCount <= 0)
+                    return true;
 
-                    if (keyCode == 22) { // 휠 아래로 휙! 돌릴 때 (다음 알파벳 찾기)
-                        for (int i = currentPos + 1; i < currentScrollIndexList.size(); i++) {
-                            if (getInitialChar(currentScrollIndexList.get(i)) != currentChar) {
-                                targetPos = i;
-                                break;
-                            }
+                View curFocused = listVirtualSongs.findFocus();
+                if (curFocused != null) {
+                    int p = listVirtualSongs.getPositionForView(curFocused);
+                    if (p >= 0 && p < totalCount)
+                        virtualListSelectedIndex = p;
+                }
+                if (virtualListSelectedIndex < 0)
+                    virtualListSelectedIndex = 0;
+                if (virtualListSelectedIndex >= totalCount)
+                    virtualListSelectedIndex = totalCount - 1;
+
+                if (isFastScroll && !currentScrollIndexList.isEmpty()) {
+                    boolean hasShuffle = (listVirtualSongs.getAdapter() instanceof com.themoon.y1.adapters.SongListAdapter
+                            && ((com.themoon.y1.adapters.SongListAdapter) listVirtualSongs.getAdapter()).hasShuffleRow());
+                    int targetPos = virtualListSelectedIndex;
+                    if (hasShuffle && virtualListSelectedIndex == 0) {
+                        if (keyCode == 22) {
+                            targetPos = 1;
+                        } else if (keyCode == 21 && isLoopScrollOn) {
+                            targetPos = totalCount - 1;
                         }
-                    } else if (keyCode == 21) { // 휠 위로 휙! 돌릴 때 (이전 알파벳 시작점 찾기)
-                        char targetChar = currentChar;
-                        boolean foundPrevChar = false;
-                        for (int i = currentPos - 1; i >= 0; i--) {
-                            char c = getInitialChar(currentScrollIndexList.get(i));
-                            if (!foundPrevChar && c != currentChar) {
-                                foundPrevChar = true;
-                                targetChar = c;
+                    } else {
+                        int dataIdx = hasShuffle ? (virtualListSelectedIndex - 1) : virtualListSelectedIndex;
+                        dataIdx = Math.max(0, Math.min(dataIdx, currentScrollIndexList.size() - 1));
+                        char currentChar = getInitialChar(currentScrollIndexList.get(dataIdx));
+                        if (keyCode == 22) {
+                            int foundIdx = -1;
+                            for (int i = dataIdx + 1; i < currentScrollIndexList.size(); i++) {
+                                if (getInitialChar(currentScrollIndexList.get(i)) != currentChar) {
+                                    foundIdx = i;
+                                    break;
+                                }
                             }
-                            if (foundPrevChar && c != targetChar) {
-                                targetPos = i + 1;
-                                break;
-                            }
-                            if (i == 0)
+                            if (foundIdx >= 0) {
+                                targetPos = hasShuffle ? (foundIdx + 1) : foundIdx;
+                            } else if (isLoopScrollOn) {
                                 targetPos = 0;
+                            } else {
+                                targetPos = totalCount - 1;
+                            }
+                        } else if (keyCode == 21) {
+                            char targetChar = currentChar;
+                            boolean foundPrevChar = false;
+                            int foundIdx = -1;
+                            for (int i = dataIdx - 1; i >= 0; i--) {
+                                char c = getInitialChar(currentScrollIndexList.get(i));
+                                if (!foundPrevChar && c != currentChar) {
+                                    foundPrevChar = true;
+                                    targetChar = c;
+                                }
+                                if (foundPrevChar && c != targetChar) {
+                                    foundIdx = i + 1;
+                                    break;
+                                }
+                                if (i == 0)
+                                    foundIdx = 0;
+                            }
+                            if (foundIdx >= 0) {
+                                targetPos = hasShuffle ? (foundIdx + 1) : foundIdx;
+                            } else {
+                                targetPos = 0;
+                            }
                         }
                     }
-                    listVirtualSongs.setSelection(targetPos);
+                    targetPos = Math.max(0, Math.min(targetPos, totalCount - 1));
+                    navigateVirtualListTo(targetPos);
+                    int letterIdx = (hasShuffle && targetPos > 0) ? (targetPos - 1) : targetPos;
+                    if (letterIdx >= 0 && letterIdx < currentScrollIndexList.size()) {
+                        showFastScrollLetter(currentScrollIndexList.get(letterIdx));
+                    }
                     clickFeedback();
                     return true;
                 } else {
-                    // 🐢🐢 [일반 주행 모드] 평소처럼 천천히 정확하게 1곡씩 이동!
+                    int targetPos = virtualListSelectedIndex;
                     if (keyCode == 21) {
-                        int currentPos = listVirtualSongs.getSelectedItemPosition();
-                        if (currentPos <= 0) {
-                            // 🚀 [루프 스크롤 조건 제어] 오직 활성화 상태일 때만 맨 아래 끝단 트랙으로 순간이동합니다.
-                            if (isLoopScrollOn) {
-                                final int lastPos = listVirtualSongs.getCount() - 1;
-                                listVirtualSongs.setSelection(lastPos);
-                                listVirtualSongs.post(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        int visiblePos = lastPos - listVirtualSongs.getFirstVisiblePosition();
-                                        if (visiblePos >= 0 && visiblePos < listVirtualSongs.getChildCount()) {
-                                            listVirtualSongs.getChildAt(visiblePos).requestFocus();
-                                        }
-                                    }
-                                });
-                            }
-                        } else {
-                            listVirtualSongs
-                                    .dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_UP));
-                            listVirtualSongs
-                                    .dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_UP));
+                        if (virtualListSelectedIndex > 0) {
+                            targetPos = virtualListSelectedIndex - 1;
+                        } else if (isLoopScrollOn) {
+                            targetPos = totalCount - 1;
                         }
-                        clickFeedback();
-                        return true;
-                    }
-                    if (keyCode == 22) {
-                        int currentPos = listVirtualSongs.getSelectedItemPosition();
-                        if (currentPos == listVirtualSongs.getCount() - 1) {
-                            // 🚀 [루프 스크롤 조건 제어] 오직 활성화 상태일 때만 맨 첫 트랙으로 순간이동 복귀합니다.
-                            if (isLoopScrollOn) {
-                                listVirtualSongs.setSelection(0);
-                                listVirtualSongs.post(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        if (listVirtualSongs.getChildCount() > 0)
-                                            listVirtualSongs.getChildAt(0).requestFocus();
-                                    }
-                                });
-                            }
-                        } else {
-                            listVirtualSongs
-                                    .dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_DOWN));
-                            listVirtualSongs
-                                    .dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_DOWN));
+                    } else if (keyCode == 22) {
+                        if (virtualListSelectedIndex < totalCount - 1) {
+                            targetPos = virtualListSelectedIndex + 1;
+                        } else if (isLoopScrollOn) {
+                            targetPos = 0;
                         }
-                        clickFeedback();
-                        return true;
                     }
+                    if (targetPos != virtualListSelectedIndex) {
+                        navigateVirtualListTo(targetPos);
+                    }
+                    clickFeedback();
+                    return true;
                 }
             }
             View c = getCurrentFocus();

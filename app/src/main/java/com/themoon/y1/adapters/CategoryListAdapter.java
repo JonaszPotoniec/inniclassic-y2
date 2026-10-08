@@ -41,6 +41,7 @@ public class CategoryListAdapter extends BaseAdapter {
     // 🚀 [ANR 수리 1] 앨범당 파일 목록도 한 번만 모아서 보관 - 예전엔 getView()가 불릴 때마다(=매 스크롤마다)
     // 전체 라이브러리를 처음부터 다시 훑었는데, 곡이 많을수록 매 행 렌더링마다 그 비용이 반복됐습니다.
     private Map<String, List<File>> albumFilesMap;
+    private int cachedAllSongsCount = -1;
 
     public CategoryListAdapter(List<String> items, String type) {
         this.items = items;
@@ -50,10 +51,29 @@ public class CategoryListAdapter extends BaseAdapter {
             coverCache = new LruCache<>(50); // 최대 50개의 앨범 아트를 메모리에 안전하게 기억
         }
 
-        if (type.equals("ALBUM")) {
+        if (type.equals("ALBUM") || type.equals("GENRE_ALBUM")) {
             albumSongCounts = new HashMap<>();
             albumFilesMap = new HashMap<>();
             for (SongItem song : MainActivity.customLibrary) {
+                if (type.equals("GENRE_ALBUM")) {
+                    if (song.genre == null || !song.genre.equalsIgnoreCase(MainActivity.instance.categoryGenreFilter)) {
+                        continue;
+                    }
+                    if (!MainActivity.instance.categoryArtistFilter.isEmpty()) {
+                        String matchField = MainActivity.instance.categoryArtistFilterIsTrackArtist
+                                ? song.artist : song.albumArtist;
+                        if (!MainActivity.instance.categoryArtistFilter.equalsIgnoreCase(matchField)) {
+                            continue;
+                        }
+                    }
+                } else if (!MainActivity.instance.categoryArtistFilter.isEmpty()) {
+                    String matchField = MainActivity.instance.categoryArtistFilterIsTrackArtist
+                            ? song.artist : song.albumArtist;
+                    if (!MainActivity.instance.categoryArtistFilter.equalsIgnoreCase(matchField)) {
+                        continue;
+                    }
+                }
+
                 Integer c = albumSongCounts.get(song.album);
                 albumSongCounts.put(song.album, c == null ? 1 : c + 1);
 
@@ -77,14 +97,250 @@ public class CategoryListAdapter extends BaseAdapter {
     public long getItemId(int position) { return position; }
 
     @Override
+    public int getViewTypeCount() {
+        return 3;
+    }
+
+    @Override
+    public int getItemViewType(int position) {
+        String name = items.get(position);
+        if (MainActivity.ALL_SONGS_SENTINEL.equals(name)) {
+            return 0;
+        } else if (type.equals("ALBUM") || type.equals("GENRE_ALBUM")) {
+            return 1;
+        } else {
+            return 2;
+        }
+    }
+
+    @Override
     public View getView(final int position, View convertView, ViewGroup parent) {
         final String name = items.get(position);
 
-        if (type.equals("ALBUM")) {
+        if (MainActivity.ALL_SONGS_SENTINEL.equals(name)) {
+            return getAllSongsRowView(position, convertView);
+        } else if (type.equals("ALBUM") || type.equals("GENRE_ALBUM")) {
             return getAlbumRowView(position, convertView, name);
         } else {
             return getSimpleRowView(position, convertView, name);
         }
+    }
+
+    // 🚀 [iPod 스타일] "All Songs" 상단 고정 행: 검정 배경 + 음표 아이콘, 전체 곡 수 표시 및 셔플 지원
+    private View getAllSongsRowView(final int position, View convertView) {
+        final float d = MainActivity.instance.getResources().getDisplayMetrics().density;
+        final int coverSize = (int) (52 * d);
+
+        final LinearLayout row;
+        final ImageView ivCover;
+        final LinearLayout textStack;
+        final TextView tvTitle;
+        final TextView tvSubtitle;
+        final TextView tvArrow;
+
+        final boolean isAllSongsValid = convertView instanceof LinearLayout
+                && "all_songs_row".equals(convertView.getTag())
+                && ((LinearLayout) convertView).getChildCount() > 2
+                && (((LinearLayout) convertView).getChildAt(0) instanceof ImageView);
+
+        if (isAllSongsValid) {
+            row = (LinearLayout) convertView;
+            ivCover = (ImageView) row.getChildAt(0);
+            textStack = (LinearLayout) row.getChildAt(1);
+            tvTitle = (TextView) textStack.getChildAt(0);
+            tvSubtitle = (TextView) textStack.getChildAt(1);
+            tvArrow = (TextView) row.getChildAt(2);
+        } else {
+            row = new LinearLayout(MainActivity.instance);
+            row.setTag("all_songs_row");
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setFocusable(true);
+            row.setClickable(true);
+            row.setSoundEffectsEnabled(false);
+            row.setPadding((int) (8 * d), (int) (6 * d), (int) (10 * d), (int) (6 * d));
+            row.setBackground(MainActivity.instance.createButtonBackground(ThemeManager.getListButtonNormalBg()));
+            row.setLayoutParams(new AbsListView.LayoutParams(
+                    AbsListView.LayoutParams.MATCH_PARENT,
+                    AbsListView.LayoutParams.WRAP_CONTENT));
+
+            ivCover = new ImageView(MainActivity.instance);
+            ivCover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            LinearLayout.LayoutParams coverLp = new LinearLayout.LayoutParams(coverSize, coverSize);
+            ivCover.setLayoutParams(coverLp);
+            row.addView(ivCover);
+
+            textStack = new LinearLayout(MainActivity.instance);
+            textStack.setOrientation(LinearLayout.VERTICAL);
+            LinearLayout.LayoutParams textLp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            textLp.leftMargin = (int) (10 * d);
+            textStack.setLayoutParams(textLp);
+
+            tvTitle = new TextView(MainActivity.instance);
+            tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, ThemeManager.getListTextSize() * d);
+            tvTitle.setTypeface(ThemeManager.getCustomFontBold());
+            tvTitle.setSingleLine(true);
+            tvTitle.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
+            tvTitle.setMarqueeRepeatLimit(-1);
+            tvTitle.setHorizontalFadingEdgeEnabled(true);
+            textStack.addView(tvTitle);
+
+            tvSubtitle = new TextView(MainActivity.instance);
+            tvSubtitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 15f * d);
+            tvSubtitle.setTypeface(ThemeManager.getCustomFont(), Typeface.NORMAL);
+            tvSubtitle.setSingleLine(true);
+            tvSubtitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            subLp.topMargin = (int) (1 * d);
+            tvSubtitle.setLayoutParams(subLp);
+            textStack.addView(tvSubtitle);
+
+            row.addView(textStack);
+
+            tvArrow = new TextView(MainActivity.instance);
+            tvArrow.setText("〉");
+            tvArrow.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 18f * d);
+            tvArrow.setVisibility(View.GONE);
+            LinearLayout.LayoutParams lpArrow = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lpArrow.leftMargin = (int) (6 * d);
+            tvArrow.setLayoutParams(lpArrow);
+            row.addView(tvArrow);
+        }
+
+        tvArrow.setTextColor(0xFFFFFFFF);
+        tvArrow.setVisibility(row.isFocused() ? View.VISIBLE : View.GONE);
+        ClassicMenuStyle.apply(row, tvTitle, tvArrow, 64);
+
+        tvTitle.setText(MainActivity.instance.t("All Songs"));
+        ivCover.setImageResource(R.drawable.icon_all_songs);
+
+        if (cachedAllSongsCount < 0) {
+            int allCount = 0;
+            if (type.equals("GENRE_ARTIST")) {
+                for (SongItem song : MainActivity.customLibrary) {
+                    if (song.genre != null && song.genre.equalsIgnoreCase(MainActivity.instance.categoryGenreFilter)) {
+                        allCount++;
+                    }
+                }
+            } else if (type.equals("GENRE_ALBUM")) {
+                boolean isTrack = MainActivity.instance.categoryArtistFilterIsTrackArtist;
+                for (SongItem song : MainActivity.customLibrary) {
+                    if (song.genre != null && song.genre.equalsIgnoreCase(MainActivity.instance.categoryGenreFilter)) {
+                        String matchField = isTrack ? song.artist : song.albumArtist;
+                        if (MainActivity.instance.categoryArtistFilter.equalsIgnoreCase(matchField)) {
+                            allCount++;
+                        }
+                    }
+                }
+            } else {
+                boolean isTrackArtistMode = MainActivity.instance.categoryArtistFilterIsTrackArtist;
+                for (SongItem song : MainActivity.customLibrary) {
+                    String matchField = isTrackArtistMode ? song.artist : song.albumArtist;
+                    if (MainActivity.instance.categoryArtistFilter.equals(matchField))
+                        allCount++;
+                }
+            }
+            cachedAllSongsCount = allCount;
+        }
+
+        int allCount = cachedAllSongsCount;
+        tvSubtitle.setText(allCount == 1 ? t1Song() : (allCount + " " + tSongs()));
+        boolean focusedNow = row.isFocused();
+        row.setBackground(focusedNow ? MainActivity.instance.createFocusedButtonBackground()
+                : MainActivity.instance.createButtonBackground(ThemeManager.getListButtonNormalBg()));
+        tvTitle.setTextColor(focusedNow ? ThemeManager.getListButtonFocusedTextColor() : ThemeManager.getTextColorPrimary());
+        tvSubtitle.setTextColor(focusedNow ? ThemeManager.getListButtonFocusedTextColor() : ThemeManager.getTextColorSecondary());
+        tvTitle.setSelected(focusedNow);
+
+        row.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            @Override
+            public void onFocusChange(View v, boolean hasFocus) {
+                if (hasFocus) {
+                    if (MainActivity.instance != null) {
+                        MainActivity.instance.virtualListSelectedIndex = position;
+                    }
+                    row.setBackground(MainActivity.instance.createFocusedButtonBackground());
+                    tvTitle.setTextColor(ThemeManager.getListButtonFocusedTextColor());
+                    tvSubtitle.setTextColor(ThemeManager.getListButtonFocusedTextColor());
+                    tvArrow.setVisibility(View.VISIBLE);
+                    tvTitle.setSelected(true);
+                } else {
+                    row.setBackground(MainActivity.instance.createButtonBackground(ThemeManager.getListButtonNormalBg()));
+                    tvTitle.setTextColor(ThemeManager.getTextColorPrimary());
+                    tvSubtitle.setTextColor(ThemeManager.getTextColorSecondary());
+                    tvArrow.setVisibility(View.GONE);
+                    tvTitle.setSelected(false);
+                }
+            }
+        });
+
+        row.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.virtualListSelectedIndex = position;
+                }
+                MainActivity.instance.clickFeedback();
+                if (type.equals("GENRE_ARTIST")) {
+                    MainActivity.instance.virtualQueryType = "GENRE";
+                    MainActivity.instance.virtualQueryValue = MainActivity.instance.categoryGenreFilter;
+                } else if (type.equals("GENRE_ALBUM")) {
+                    MainActivity.instance.virtualQueryType = "GENRE_ARTIST_SONGS";
+                    MainActivity.instance.virtualQueryValue = MainActivity.instance.categoryArtistFilter;
+                } else {
+                    MainActivity.instance.virtualQueryType = MainActivity.instance.categoryArtistFilterIsTrackArtist
+                            ? "ARTIST" : "ARTIST_ALL_ALBUMS";
+                    MainActivity.instance.virtualQueryValue = MainActivity.instance.categoryArtistFilter;
+                }
+                MainActivity.instance.currentBrowserMode = MainActivity.BROWSER_VIRTUAL_SONGS;
+                MainActivity.instance.buildVirtualSongs();
+            }
+        });
+
+        row.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                MainActivity.instance.clickFeedback();
+                MainActivity.instance.isLongPressConsumed = true;
+                List<File> tracks = new java.util.ArrayList<>();
+                if (type.equals("GENRE_ARTIST")) {
+                    for (SongItem song : MainActivity.customLibrary) {
+                        if (song.genre != null && song.genre.equalsIgnoreCase(MainActivity.instance.categoryGenreFilter)) {
+                            tracks.add(song.file);
+                        }
+                    }
+                } else if (type.equals("GENRE_ALBUM")) {
+                    boolean isTrack = MainActivity.instance.categoryArtistFilterIsTrackArtist;
+                    for (SongItem song : MainActivity.customLibrary) {
+                        if (song.genre != null && song.genre.equalsIgnoreCase(MainActivity.instance.categoryGenreFilter)) {
+                            String matchField = isTrack ? song.artist : song.albumArtist;
+                            if (MainActivity.instance.categoryArtistFilter.equalsIgnoreCase(matchField)) {
+                                tracks.add(song.file);
+                            }
+                        }
+                    }
+                } else {
+                    boolean isTrack = MainActivity.instance.categoryArtistFilterIsTrackArtist;
+                    for (SongItem song : MainActivity.customLibrary) {
+                        String matchField = isTrack ? song.artist : song.albumArtist;
+                        if (MainActivity.instance.categoryArtistFilter.equals(matchField)) {
+                            tracks.add(song.file);
+                        }
+                    }
+                }
+                if (!tracks.isEmpty()) {
+                    java.util.Collections.shuffle(tracks);
+                    com.themoon.y1.managers.AudioPlayerManager.getInstance().playTrackList(tracks, 0);
+                    MainActivity.instance.changeScreen(3);
+                }
+                return true;
+            }
+        });
+
+        return row;
     }
 
     // 🚀 [iPod 스타일] 앨범 행: 작은 정사각형 커버 + 굵은 앨범명 + 얇은 곡 수 서브타이틀 2줄 구성
@@ -100,7 +356,12 @@ public class CategoryListAdapter extends BaseAdapter {
         final TextView tvSubtitle;
         final TextView tvArrow;
 
-        if (convertView instanceof LinearLayout && convertView.getTag() != null && "album_row".equals(convertView.getTag())) {
+        final boolean isAlbumRowValid = convertView instanceof LinearLayout
+                && "album_row".equals(convertView.getTag())
+                && ((LinearLayout) convertView).getChildCount() > 2
+                && (((LinearLayout) convertView).getChildAt(0) instanceof ImageView);
+
+        if (isAlbumRowValid) {
             row = (LinearLayout) convertView;
             ivCover = (ImageView) row.getChildAt(0);
             textStack = (LinearLayout) row.getChildAt(1);
@@ -179,61 +440,6 @@ public class CategoryListAdapter extends BaseAdapter {
                 : MainActivity.instance.createButtonBackground(ThemeManager.getListButtonNormalBg()));
         tvTitle.setSelected(row.isFocused());
 
-        final boolean isAllSongsRow = MainActivity.ALL_SONGS_SENTINEL.equals(name);
-
-        if (isAllSongsRow) {
-            // 🚀 [신규 추가] 아티스트의 앨범 목록 맨 위 "전체 곡" 항목: 검정 배경 + 음표 아이콘, 전체 곡 수 표시
-            tvTitle.setText(MainActivity.instance.t("All Songs"));
-            int allCount = 0;
-            boolean isTrackArtistMode = MainActivity.instance.categoryArtistFilterIsTrackArtist;
-            for (SongItem song : MainActivity.customLibrary) {
-                String matchField = isTrackArtistMode ? song.artist : song.albumArtist;
-                if (MainActivity.instance.categoryArtistFilter.equals(matchField))
-                    allCount++;
-            }
-            tvSubtitle.setText(allCount == 1 ? t1Song() : (allCount + " " + tSongs()));
-            // 🚀 [버그 수정] 포커스 리스너가 아직 한 번도 안 불렸을 때도 기본 글자색이 정확히 보이도록 항상 명시적으로 지정!
-            boolean focusedNow = row.isFocused();
-            tvTitle.setTextColor(focusedNow ? ThemeManager.getListButtonFocusedTextColor() : ThemeManager.getTextColorPrimary());
-            tvSubtitle.setTextColor(focusedNow ? ThemeManager.getListButtonFocusedTextColor() : ThemeManager.getTextColorSecondary());
-            ivCover.setImageResource(R.drawable.icon_all_songs);
-
-            row.setOnFocusChangeListener(new View.OnFocusChangeListener() {
-                @Override
-                public void onFocusChange(View v, boolean hasFocus) {
-                    if (hasFocus) {
-                        row.setBackground(MainActivity.instance.createFocusedButtonBackground());
-                        tvTitle.setTextColor(ThemeManager.getListButtonFocusedTextColor());
-                        tvSubtitle.setTextColor(ThemeManager.getListButtonFocusedTextColor());
-                        tvArrow.setVisibility(View.VISIBLE);
-                        tvTitle.setSelected(true);
-                    } else {
-                        row.setBackground(MainActivity.instance.createButtonBackground(ThemeManager.getListButtonNormalBg()));
-                        tvTitle.setTextColor(ThemeManager.getTextColorPrimary());
-                        tvSubtitle.setTextColor(ThemeManager.getTextColorSecondary());
-                        tvArrow.setVisibility(View.GONE);
-                        tvTitle.setSelected(false);
-                    }
-                }
-            });
-
-            row.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    MainActivity.instance.clickFeedback();
-                    // 🚀 Artists(트랙 아티스트)에서 들어왔으면 "ARTIST"(song.artist 기준), Album Artists에서
-                    // 들어왔으면 기존처럼 "ARTIST_ALL_ALBUMS"(song.albumArtist 기준)로 필터링합니다.
-                    MainActivity.instance.virtualQueryType = MainActivity.instance.categoryArtistFilterIsTrackArtist
-                            ? "ARTIST" : "ARTIST_ALL_ALBUMS";
-                    MainActivity.instance.virtualQueryValue = MainActivity.instance.categoryArtistFilter;
-                    MainActivity.instance.currentBrowserMode = MainActivity.BROWSER_VIRTUAL_SONGS;
-                    MainActivity.instance.buildVirtualSongs();
-                }
-            });
-
-            return row;
-        }
-
         tvTitle.setText(name);
         // 🚀 [버그 수정] 포커스 리스너가 아직 한 번도 안 불렸을 때도 기본 글자색이 정확히 보이도록 항상 명시적으로 지정!
         tvTitle.setTextColor(row.isFocused() ? ThemeManager.getListButtonFocusedTextColor() : ThemeManager.getTextColorPrimary());
@@ -272,6 +478,9 @@ public class CategoryListAdapter extends BaseAdapter {
             @Override
             public void onFocusChange(View v, boolean hasFocus) {
                 if (hasFocus) {
+                    if (MainActivity.instance != null) {
+                        MainActivity.instance.virtualListSelectedIndex = position;
+                    }
                     row.setBackground(MainActivity.instance.createFocusedButtonBackground());
                     tvTitle.setTextColor(ThemeManager.getListButtonFocusedTextColor());
                     tvSubtitle.setTextColor(ThemeManager.getListButtonFocusedTextColor());
@@ -291,8 +500,15 @@ public class CategoryListAdapter extends BaseAdapter {
         row.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.virtualListSelectedIndex = position;
+                }
                 MainActivity.instance.clickFeedback();
-                MainActivity.instance.virtualQueryType = type;
+                if (type.equals("GENRE_ALBUM")) {
+                    MainActivity.instance.virtualQueryType = "GENRE_ALBUM_SONGS";
+                } else {
+                    MainActivity.instance.virtualQueryType = type;
+                }
                 MainActivity.instance.virtualQueryValue = name;
                 MainActivity.instance.currentBrowserMode = MainActivity.BROWSER_VIRTUAL_SONGS;
                 MainActivity.instance.buildVirtualSongs();
@@ -437,7 +653,12 @@ public class CategoryListAdapter extends BaseAdapter {
         final TextView tvMain;
         final TextView tvArrow;
 
-        if (convertView instanceof LinearLayout && "simple_row".equals(convertView.getTag())) {
+        final boolean isSimpleRowValid = convertView instanceof LinearLayout
+                && "simple_row".equals(convertView.getTag())
+                && ((LinearLayout) convertView).getChildCount() > 1
+                && (((LinearLayout) convertView).getChildAt(0) instanceof TextView);
+
+        if (isSimpleRowValid) {
             row = (LinearLayout) convertView;
             tvMain = (TextView) row.getChildAt(0);
             tvArrow = (TextView) row.getChildAt(1);
@@ -500,6 +721,9 @@ public class CategoryListAdapter extends BaseAdapter {
             @Override
             public void onFocusChange(View v, boolean hasFocus) {
                 if (hasFocus) {
+                    if (MainActivity.instance != null) {
+                        MainActivity.instance.virtualListSelectedIndex = position;
+                    }
                     row.setBackground(MainActivity.instance.createFocusedButtonBackground());
                     tvMain.setTextColor(ThemeManager.getListButtonFocusedTextColor());
                     tvArrow.setVisibility(View.VISIBLE);
@@ -517,10 +741,24 @@ public class CategoryListAdapter extends BaseAdapter {
         row.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                if (MainActivity.instance != null) {
+                    MainActivity.instance.virtualListSelectedIndex = position;
+                }
                 MainActivity.instance.clickFeedback();
-                // 🚀 [수정] 아티스트를 클릭하면 바로 곡 목록이 아니라, 그 아티스트의 앨범 목록을 먼저 보여줍니다!
-                // (Album Artists든 Artists든 동일한 드릴다운 - 필터링 기준만 다릅니다)
-                if (type.equals("ARTIST") || type.equals("TRACK_ARTIST")) {
+                if (type.equals("GENRE")) {
+                    MainActivity.instance.categoryGenreFilter = name;
+                    MainActivity.instance.categoryArtistFilter = "";
+                    MainActivity.instance.categoryArtistFilterIsTrackArtist = true;
+                    MainActivity.instance.currentBrowserMode = MainActivity.BROWSER_GENRE_ARTISTS;
+                    MainActivity.instance.virtualQueryValue = "";
+                    MainActivity.instance.buildVirtualCategories("GENRE_ARTIST");
+                } else if (type.equals("GENRE_ARTIST")) {
+                    MainActivity.instance.categoryArtistFilter = name;
+                    MainActivity.instance.categoryArtistFilterIsTrackArtist = true;
+                    MainActivity.instance.currentBrowserMode = MainActivity.BROWSER_GENRE_ALBUMS;
+                    MainActivity.instance.virtualQueryValue = "";
+                    MainActivity.instance.buildVirtualCategories("GENRE_ALBUM");
+                } else if (type.equals("ARTIST") || type.equals("TRACK_ARTIST")) {
                     MainActivity.instance.categoryArtistFilter = name;
                     MainActivity.instance.categoryArtistFilterIsTrackArtist = type.equals("TRACK_ARTIST");
                     MainActivity.instance.virtualQueryValue = "";
