@@ -349,5 +349,17 @@
   "Up to Date": "Actualizado",
   "Reinstall": "Reinstalar",
   "Update Check Failed": "Error al buscar actualizaciones",
-  "Unable to check for updates. Check internet connection.": "No se pudo buscar actualizaciones. Comprueba la conexión a internet."
+  "Unable to check for updates. Check internet connection.": "No se pudo buscar actualizaciones. Comprueba la conexión a internet.",
+  "About": "Información",
+  "Name": "Nombre",
+  "Videos": "Vídeos",
+  "Internal Capacity": "Capacidad interna",
+  "Internal Available": "Disponible interno",
+  "SD Card Capacity": "Capacidad tarjeta SD",
+  "SD Card Available": "Disponible tarjeta SD",
+  "SD Card": "Tarjeta SD",
+  "Not Inserted": "No insertada",
+  "Software Version": "Versión del software",
+  "Model": "Modelo",
+  "Format": "Formato"
 }

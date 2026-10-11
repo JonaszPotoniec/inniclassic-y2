@@ -349,5 +349,17 @@
   "Up to Date": "Актуальная версия",
   "Reinstall": "Переустановить",
   "Update Check Failed": "Ошибка проверки обновлений",
-  "Unable to check for updates. Check internet connection.": "Не удалось проверить обновления. Проверьте подключение к интернету."
+  "Unable to check for updates. Check internet connection.": "Не удалось проверить обновления. Проверьте подключение к интернету.",
+  "About": "Об устройстве",
+  "Name": "Имя",
+  "Videos": "Видео",
+  "Internal Capacity": "Внутренняя память",
+  "Internal Available": "Внутренняя свободно",
+  "SD Card Capacity": "Емкость SD-карты",
+  "SD Card Available": "Свободно на SD-карте",
+  "SD Card": "SD-карта",
+  "Not Inserted": "Не вставлена",
+  "Software Version": "Версия ПО",
+  "Model": "Модель",
+  "Format": "Формат"
 }

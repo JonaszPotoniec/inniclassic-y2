@@ -349,5 +349,17 @@
   "Up to Date": "已是最新",
   "Reinstall": "重新安装",
   "Update Check Failed": "检查更新失败",
-  "Unable to check for updates. Check internet connection.": "无法检查更新。请检查网络连接。"
+  "Unable to check for updates. Check internet connection.": "无法检查更新。请检查网络连接。",
+  "About": "关于本机",
+  "Name": "名称",
+  "Videos": "视频",
+  "Internal Capacity": "内置容量",
+  "Internal Available": "内置可用空间",
+  "SD Card Capacity": "SD卡容量",
+  "SD Card Available": "SD卡可用空间",
+  "SD Card": "SD卡",
+  "Not Inserted": "未插入",
+  "Software Version": "软件版本",
+  "Model": "机型",
+  "Format": "格式"
 }

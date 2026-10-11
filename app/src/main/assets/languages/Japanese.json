@@ -333,5 +333,17 @@
   "Up to Date": "最新です",
   "Reinstall": "再インストール",
   "Update Check Failed": "アップデートの確認に失敗しました",
-  "Unable to check for updates. Check internet connection.": "アップデートを確認できません。インターネット接続を確認してください。"
+  "Unable to check for updates. Check internet connection.": "アップデートを確認できません。インターネット接続を確認してください。",
+  "About": "情報",
+  "Name": "名前",
+  "Videos": "ビデオ",
+  "Internal Capacity": "内蔵容量",
+  "Internal Available": "内蔵空き容量",
+  "SD Card Capacity": "SDカード容量",
+  "SD Card Available": "SDカード空き容量",
+  "SD Card": "SDカード",
+  "Not Inserted": "未挿入",
+  "Software Version": "ソフトウェアバージョン",
+  "Model": "モデル",
+  "Format": "フォーマット"
 }

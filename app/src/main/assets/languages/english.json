@@ -540,5 +540,13 @@
   "Up to Date": "Up to Date",
   "Reinstall": "Reinstall",
   "Update Check Failed": "Update Check Failed",
-  "Unable to check for updates. Check internet connection.": "Unable to check for updates. Check internet connection."
+  "Unable to check for updates. Check internet connection.": "Unable to check for updates. Check internet connection.",
+  "Name": "Name",
+  "Internal Capacity": "Internal Capacity",
+  "Internal Available": "Internal Available",
+  "SD Card Capacity": "SD Card Capacity",
+  "SD Card Available": "SD Card Available",
+  "SD Card": "SD Card",
+  "Not Inserted": "Not Inserted",
+  "Format": "Format"
 }

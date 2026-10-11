@@ -805,8 +805,10 @@ public class MainActivity extends Activity {
     private SeekBar seekPlayerScrub;
     private TextView tvScrubShuffleValue, tvScrubRepeatValue;
     private TextView[] tvScrubStars;
-    private ProgressBar volumeProgress, pbBrightness, pbStorage;
-    private TextView tvBrightnessVal, tvStorageDetails;
+    private ProgressBar volumeProgress, pbBrightness;
+    private TextView tvBrightnessVal, tvStorageHeader;
+    private LinearLayout containerStorageItems;
+    private ScrollView scrollStorage;
     // 💡 [수정] 수동 APP_VERSION 변수는 지우고 서버 폴더 주소만 적습니다.
     public boolean is24HourFormat = false;
     public boolean isTimeInTitleBar = false;
@@ -2539,8 +2541,9 @@ public class MainActivity extends Activity {
         tvBrightnessVal = findViewById(R.id.tv_brightness_val);
 
         layoutStorageMode = findViewById(R.id.layout_storage_mode);
-        pbStorage = findViewById(R.id.pb_storage);
-        tvStorageDetails = findViewById(R.id.tv_storage_details);
+        tvStorageHeader = findViewById(R.id.tv_storage_header);
+        scrollStorage = findViewById(R.id.scroll_storage);
+        containerStorageItems = findViewById(R.id.container_storage_items);
 
         layoutWebServerMode = findViewById(R.id.layout_webserver_mode);
         tvServerStatus = findViewById(R.id.tv_server_status);
@@ -2577,10 +2580,11 @@ public class MainActivity extends Activity {
             TextView tvBrightTitle = (TextView) ((ViewGroup) layoutBrightnessMode).getChildAt(0);
             tvBrightTitle.setText(t("Display Brightness"));
             tvBrightTitle.setTextColor(settingsTitleColor);
-            // 5. Storage (저장소)
-            TextView tvStorageTitle = (TextView) ((ViewGroup) layoutStorageMode).getChildAt(0);
-            tvStorageTitle.setText(t("Storage"));
-            tvStorageTitle.setTextColor(settingsTitleColor);
+            // 5. About (정보)
+            if (tvStorageHeader != null) {
+                tvStorageHeader.setText(t("About"));
+                tvStorageHeader.setTextColor(settingsTitleColor);
+            }
             // 6. Web Server (웹 서버)
             TextView tvWebTitle = (TextView) ((ViewGroup) layoutWebServerMode).getChildAt(0);
             tvWebTitle.setText(t("Wireless PC Upload"));
@@ -4797,6 +4801,8 @@ public class MainActivity extends Activity {
             title = t("Music Quiz");
         } else if (currentScreenState == STATE_VIDEOS) {
             title = t("Videos");
+        } else if (currentScreenState == STATE_STORAGE) {
+            title = t("About");
         } else if (currentScreenState == STATE_MENU) {
             // 🚀 [iPod 스타일] 실제 아이팟처럼 메인 메뉴 좌상단에 "iPod"라고 표시합니다
             title = "iPod";
@@ -5696,74 +5702,143 @@ public class MainActivity extends Activity {
         }
     }
 
-    // 💡 [수정] 기존 막대바를 숨기고 우리가 만든 원형 차트를 동적으로 띄워주는 로직
-    // 💡 [수정] 스토리지 상세 정보 텍스트 적용
-    // 💡 [완벽 수정] 스토리지 용량 계산 에러(오버플로우) 방지 및 진짜 테마 색상 적용
+    private String formatStorageSize(long bytes) {
+        if (bytes <= 0) return "0 MB";
+        double gb = (double) bytes / (1024.0 * 1024.0 * 1024.0);
+        if (gb >= 1.0) {
+            return String.format(java.util.Locale.US, "%.1f GB", gb);
+        }
+        long mb = bytes / (1024 * 1024);
+        return mb + " MB";
+    }
+
+    // 🚀 [iPod 스타일 About] 클래식 iPod의 Two-Column 정보 리스트 구현 (내장 메모리 & SD 카드 분리)
     private void loadStorageUI() {
+        if (containerStorageItems == null) return;
+        containerStorageItems.removeAllViews();
+
+        if (layoutStorageMode != null) {
+            layoutStorageMode.setBackgroundColor(ThemeManager.getOverlayBackgroundColor());
+        }
+        if (tvStorageHeader != null) {
+            tvStorageHeader.setText(t("About"));
+            tvStorageHeader.setTextColor(ThemeManager.getTextColorPrimary());
+        }
+
         try {
-            android.os.StatFs stat = new android.os.StatFs(StoragePaths.getPrimaryRoot().getAbsolutePath());
+            // 1. Name
+            LinearLayout rowName = createSettingRow("Name", "iPod");
+            rowName.setOnClickListener(v -> clickFeedback());
+            containerStorageItems.addView(rowName);
 
-            // 🚀 [버그 1 해결] 기기 용량이 클 때 숫자가 폭발(오버플로우)해서 에러가 나는 것을 막기 위해 (long)으로 강제 변환하여
-            // 계산합니다!
-            long blockSize = (long) stat.getBlockSize();
-            long total = ((long) stat.getBlockCount() * blockSize) / (1024 * 1024);
-            long free = ((long) stat.getAvailableBlocks() * blockSize) / (1024 * 1024);
-            long used = total - free;
+            // 2. Songs
+            int songCount = (customLibrary != null) ? customLibrary.size() : 0;
+            LinearLayout rowSongs = createSettingRow("Songs", String.valueOf(songCount));
+            rowSongs.setOnClickListener(v -> clickFeedback());
+            containerStorageItems.addView(rowSongs);
 
-            if (pbStorage != null)
-                pbStorage.setVisibility(View.GONE);
+            // 3. Videos
+            int videoCount = (videoLibrary != null) ? videoLibrary.size() : 0;
+            LinearLayout rowVideos = createSettingRow("Videos", String.valueOf(videoCount));
+            rowVideos.setOnClickListener(v -> clickFeedback());
+            containerStorageItems.addView(rowVideos);
 
-            LinearLayout storageLayout = findViewById(R.id.layout_storage_mode);
-            PieChartView pieChart = (PieChartView) storageLayout.findViewWithTag("pie_chart");
-
-            if (pieChart == null) {
-                pieChart = new PieChartView(this);
-                pieChart.setTag("pie_chart");
-
-                // 🚀 [버그 2 해결] 차트가 너무 커서 아래 글씨를 화면 밖으로 밀어내지 않도록 크기를 140dp로 최적화합니다.
-                int size = (int) (140 * getResources().getDisplayMetrics().density);
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
-                lp.setMargins(0, 0, 0, 30);
-                pieChart.setLayoutParams(lp);
-
-                storageLayout.addView(pieChart, 1);
-            }
-
-            // 🚀 [버그 3 해결] 밋밋한 흰색(글자색) 대신, 테마의 진짜 강조 색상(버튼 포커스 색상)을 뽑아와서 투명도를 뺀 원색으로 칠합니다!
-            int themeColor = ThemeManager.getListButtonFocusedBg() | 0xFF000000;
-            pieChart.setStorageData(used, total, themeColor);
-
-            // 🚀 [iPod 스타일 About] 곡/앨범/아티스트 개수 + 앱 버전 + 기기 모델을 함께 표시합니다!
+            // 4. Albums & Artists
             HashSet<String> uniqueAlbums = new HashSet<>();
             HashSet<String> uniqueArtists = new HashSet<>();
-            for (SongItem song : customLibrary) {
-                if (song.album != null) uniqueAlbums.add(song.album);
-                if (song.albumArtist != null) uniqueArtists.add(song.albumArtist);
+            if (customLibrary != null) {
+                for (SongItem song : customLibrary) {
+                    if (song.album != null && !song.album.trim().isEmpty()) uniqueAlbums.add(song.album);
+                    if (song.albumArtist != null && !song.albumArtist.trim().isEmpty()) uniqueArtists.add(song.albumArtist);
+                }
+            }
+            LinearLayout rowAlbums = createSettingRow("Albums", String.valueOf(uniqueAlbums.size()));
+            rowAlbums.setOnClickListener(v -> clickFeedback());
+            containerStorageItems.addView(rowAlbums);
+
+            LinearLayout rowArtists = createSettingRow("Artists", String.valueOf(uniqueArtists.size()));
+            rowArtists.setOnClickListener(v -> clickFeedback());
+            containerStorageItems.addView(rowArtists);
+
+            // 5. Internal Storage (내장 메모리)
+            try {
+                android.os.StatFs statInternal = new android.os.StatFs(StoragePaths.getPrimaryRoot().getAbsolutePath());
+                long blockSize = (long) statInternal.getBlockSize();
+                long totalInternal = (long) statInternal.getBlockCount() * blockSize;
+                long freeInternal = (long) statInternal.getAvailableBlocks() * blockSize;
+
+                LinearLayout rowIntCap = createSettingRow("Internal Capacity", formatStorageSize(totalInternal));
+                rowIntCap.setOnClickListener(v -> clickFeedback());
+                containerStorageItems.addView(rowIntCap);
+
+                LinearLayout rowIntAvail = createSettingRow("Internal Available", formatStorageSize(freeInternal));
+                rowIntAvail.setOnClickListener(v -> clickFeedback());
+                containerStorageItems.addView(rowIntAvail);
+            } catch (Exception e) {
+                LinearLayout rowIntCap = createSettingRow("Internal Capacity", "0 MB");
+                rowIntCap.setOnClickListener(v -> clickFeedback());
+                containerStorageItems.addView(rowIntCap);
             }
 
+            // 6. MicroSD Card (SD 카드)
+            boolean hasSecondary = StoragePaths.hasSecondaryStorage();
+            if (hasSecondary) {
+                try {
+                    android.os.StatFs statSd = new android.os.StatFs(StoragePaths.SECONDARY_PATH);
+                    long sdBlockSize = (long) statSd.getBlockSize();
+                    long totalSd = (long) statSd.getBlockCount() * sdBlockSize;
+                    long freeSd = (long) statSd.getAvailableBlocks() * sdBlockSize;
+
+                    LinearLayout rowSdCap = createSettingRow("SD Card Capacity", formatStorageSize(totalSd));
+                    rowSdCap.setOnClickListener(v -> clickFeedback());
+                    containerStorageItems.addView(rowSdCap);
+
+                    LinearLayout rowSdAvail = createSettingRow("SD Card Available", formatStorageSize(freeSd));
+                    rowSdAvail.setOnClickListener(v -> clickFeedback());
+                    containerStorageItems.addView(rowSdAvail);
+                } catch (Exception e) {
+                    LinearLayout rowSd = createSettingRow("SD Card", t("Not Inserted"));
+                    rowSd.setOnClickListener(v -> clickFeedback());
+                    containerStorageItems.addView(rowSd);
+                }
+            } else {
+                LinearLayout rowSd = createSettingRow("SD Card", t("Not Inserted"));
+                rowSd.setOnClickListener(v -> clickFeedback());
+                containerStorageItems.addView(rowSd);
+            }
+
+            // 7. Software Version
             String versionName = "";
             try {
                 versionName = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
-            } catch (Exception e) {
+            } catch (Exception ignored) {
             }
+            LinearLayout rowVer = createSettingRow("Software Version", versionName);
+            rowVer.setOnClickListener(v -> clickFeedback());
+            containerStorageItems.addView(rowVer);
 
-            // 텍스트 정보 세팅 및 화면 강제 노출
-            tvStorageDetails.setText(
-                    t("Total Capacity") + " :  " + total + " MB\n" +
-                            t("Used Space") + " :  " + used + " MB\n" +
-                            t("Free Space") + " :  " + free + " MB\n\n" +
-                            t("Songs") + " :  " + customLibrary.size() + "\n" +
-                            t("Albums") + " :  " + uniqueAlbums.size() + "\n" +
-                            t("Artists") + " :  " + uniqueArtists.size() + "\n\n" +
-                            t("Model") + " :  " + android.os.Build.MODEL + "\n" +
-                            t("Software Version") + " :  " + versionName);
-            tvStorageDetails.setGravity(Gravity.CENTER);
-            tvStorageDetails.setLineSpacing(15f, 1f);
-            tvStorageDetails.setVisibility(View.VISIBLE);
+            // 8. Model
+            LinearLayout rowModel = createSettingRow("Model", android.os.Build.MODEL);
+            rowModel.setOnClickListener(v -> clickFeedback());
+            containerStorageItems.addView(rowModel);
+
+            // 9. Format
+            LinearLayout rowFormat = createSettingRow("Format", "FAT32");
+            rowFormat.setOnClickListener(v -> clickFeedback());
+            containerStorageItems.addView(rowFormat);
+
+            // 첫 번째 항목으로 포커스 자동 지정
+            containerStorageItems.post(new Runnable() {
+                @Override
+                public void run() {
+                    if (containerStorageItems != null && containerStorageItems.getChildCount() > 0) {
+                        containerStorageItems.getChildAt(0).requestFocus();
+                    }
+                }
+            });
 
         } catch (Exception e) {
-            tvStorageDetails.setText(t("Storage Error: Failed to calculate space."));
-            tvStorageDetails.setVisibility(View.VISIBLE);
+            e.printStackTrace();
         }
     }
 
@@ -5808,8 +5883,7 @@ public class MainActivity extends Activity {
             } else {
                 handleKeyboardInput();
             }
-        } else if (currentScreenState != STATE_BRIGHTNESS && currentScreenState != STATE_STORAGE
-                && currentScreenState != STATE_PLAYER) {
+        } else if (currentScreenState != STATE_BRIGHTNESS && currentScreenState != STATE_PLAYER) {
             if (isRadioUIShowing && !isRadioSettingsMode) {
                 View c = getCurrentFocus();
                 if (c != null && "radio_settings_button".equals(c.getTag())) {
@@ -13722,7 +13796,6 @@ public class MainActivity extends Activity {
                 clickFeedback();
                 return true;
             }
-            return true;
         }
 
         if (currentScreenState == STATE_VIDEOS) {
@@ -13762,7 +13835,8 @@ public class MainActivity extends Activity {
 
         if (currentScreenState == STATE_MENU || currentScreenState == STATE_BROWSER
                 || currentScreenState == STATE_SETTINGS || currentScreenState == STATE_BLUETOOTH
-                || currentScreenState == STATE_WIFI || currentScreenState == STATE_VIDEOS) {
+                || currentScreenState == STATE_WIFI || currentScreenState == STATE_VIDEOS
+                || currentScreenState == STATE_STORAGE) {
 
             // 🚀 [순정 커버 플로우 휠 조작 대개조 완료]
             if (currentScreenState == STATE_BROWSER && currentBrowserMode == BROWSER_COVER_FLOW) {
@@ -14307,6 +14381,11 @@ public class MainActivity extends Activity {
                 // 🚀 [포커스 점프 버그 완벽 해결] 처음 화면 진입 직후 포커스가 일시적으로 없는 상태(null)에서
                 // 사용자가 휠을 처음 딸깍 돌렸을 때, 시스템이 애매하게 걸린 하단 버튼으로 워프하는 현상을 원천 차단합니다!
                 if (keyCode == 21 || keyCode == 22) {
+                    if (currentScreenState == STATE_STORAGE && containerStorageItems != null && containerStorageItems.getChildCount() > 0) {
+                        containerStorageItems.getChildAt(0).requestFocus();
+                        clickFeedback();
+                        return true;
+                    }
                     View firstBtn = findViewById(dynamicViewId(10000)); // 0번 버튼(Now Playing)의 고유 ID 저격
                     if (firstBtn != null) {
                         firstBtn.requestFocus(); // 0번으로 강제 귀환!

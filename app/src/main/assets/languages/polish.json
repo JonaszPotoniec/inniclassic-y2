@@ -540,5 +540,13 @@
   "Up to Date": "Wersja aktualna",
   "Reinstall": "Zainstaluj ponownie",
   "Update Check Failed": "Błąd sprawdzania aktualizacji",
-  "Unable to check for updates. Check internet connection.": "Nie można sprawdzić aktualizacji. Sprawdź połączenie z internetem."
+  "Unable to check for updates. Check internet connection.": "Nie można sprawdzić aktualizacji. Sprawdź połączenie z internetem.",
+  "Name": "Nazwa",
+  "Internal Capacity": "Pojemność wbudowana",
+  "Internal Available": "Dostępne wbudowane",
+  "SD Card Capacity": "Pojemność karty SD",
+  "SD Card Available": "Dostępne na karcie SD",
+  "SD Card": "Karta SD",
+  "Not Inserted": "Brak karty",
+  "Format": "Format"
 }
