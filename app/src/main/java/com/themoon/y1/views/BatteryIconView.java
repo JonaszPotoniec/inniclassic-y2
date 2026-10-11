@@ -6,6 +6,7 @@ import android.graphics.Color;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.Typeface;
@@ -15,14 +16,27 @@ public class BatteryIconView extends View {
     private int level = 100;
     private boolean isCharging = false;
     private int color = Color.WHITE;
+    private boolean showPercentage = false;
 
     private Paint paintFill, paintStroke, paintTerminal, paintText, paintBolt;
     private RectF rectShell, rectFill, rectTerminal;
+    private Rect textBounds = new Rect();
     private Path boltPath = new Path();
 
     public BatteryIconView(Context context) {
         super(context);
         init();
+    }
+
+    public void setShowPercentage(boolean showPercentage) {
+        if (this.showPercentage != showPercentage) {
+            this.showPercentage = showPercentage;
+            invalidate();
+        }
+    }
+
+    public boolean isShowPercentage() {
+        return showPercentage;
     }
 
     private void init() {
@@ -40,8 +54,17 @@ public class BatteryIconView extends View {
 
         // 중앙 숫자용 페인트
         paintText = new Paint(Paint.ANTI_ALIAS_FLAG);
-        paintText.setTextAlign(Paint.Align.CENTER);
-        paintText.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+        paintText.setTextAlign(Paint.Align.LEFT);
+        try {
+            Typeface tf = com.themoon.y1.ThemeManager.getCustomFontBold();
+            if (tf != null) {
+                paintText.setTypeface(tf);
+            } else {
+                paintText.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+            }
+        } catch (Exception e) {
+            paintText.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+        }
 
         // 🚀 [충전 표시] 충전 중일 때 배터리 안에 그려 넣는 작은 번개 아이콘용 페인트
         paintBolt = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -106,34 +129,122 @@ public class BatteryIconView extends View {
         canvas.drawRoundRect(rectTerminal, 2f, 2f, paintTerminal);
 
         // 🚀 4. 남은 용량만큼 안쪽 알맹이 차오르게 하기!
-        float padding = 5f; // 테두리와 알맹이 사이의 숨통(여백)
-        float maxFillWidth = shellWidth - (padding * 2f); // 100%일 때의 가로 길이
+        float padX = 4f;
+        float padY = 3.5f;
+        float maxFillWidth = shellWidth - (padX * 2f); // 100%일 때의 가로 길이
         float currentFillWidth = maxFillWidth * (level / 100f); // 현재 퍼센트만큼 길이 자르기
 
         // 잔량이 0보다 클 때만 알맹이를 그립니다.
         if (currentFillWidth > 0) {
-            rectFill.set(padding, padding, padding + currentFillWidth, h - padding);
-            canvas.drawRoundRect(rectFill, Math.max(0f, pillRadius - padding), Math.max(0f, pillRadius - padding), paintFill);
+            rectFill.set(padX, padY, padX + currentFillWidth, h - padY);
+            canvas.drawRoundRect(rectFill, Math.max(0f, pillRadius - 1f), Math.max(0f, pillRadius - 1f), paintFill);
         }
 
-        // 🚀 5. 충전 중이면 배터리 정중앙에 작은 번개 아이콘을 그려 넣습니다!
-        if (isCharging) {
+        // 🚀 5. 퍼센트 표시 모드 vs 기본 충전 번개 아이콘 표시
+        if (showPercentage) {
+            try {
+                Typeface tf = com.themoon.y1.ThemeManager.getCustomFontBold();
+                if (tf != null) paintText.setTypeface(tf);
+            } catch (Exception ignored) {}
+
+            String text = String.valueOf(level);
+            float baseTextSize = isCharging ? (h * 0.50f) : (h * 0.58f);
+            paintText.setTextSize(baseTextSize);
+
+            float maxContentWidth = shellWidth - (padX * 2f);
+
+            if (isCharging) {
+                float boltW = h * 0.28f;
+                float boltH = h * 0.52f;
+                float gap = 2f;
+
+                paintText.getTextBounds(text, 0, text.length(), textBounds);
+                float availableForText = maxContentWidth - boltW - gap;
+                if (textBounds.width() > availableForText && textBounds.width() > 0) {
+                    paintText.setTextSize(paintText.getTextSize() * (availableForText / textBounds.width()));
+                    paintText.getTextBounds(text, 0, text.length(), textBounds);
+                }
+
+                float totalWidth = boltW + gap + textBounds.width();
+                float startX = rectShell.centerX() - (totalWidth / 2f);
+                float boltLeft = startX;
+                float boltTop = rectShell.centerY() - (boltH / 2f);
+
+                buildBoltPath(boltLeft, boltTop, boltW, boltH);
+
+                float textX = startX + boltW + gap - textBounds.left;
+                float textY = rectShell.centerY() - textBounds.exactCenterY();
+
+                // 1. 미충전(빈 배경) 영역에 맞춰 테마 텍스트 색상으로 렌더링
+                int emptyColor = color;
+                if (color == Color.WHITE || Color.red(color) > 200) {
+                    emptyColor = 0xFF1C1C1E;
+                }
+                paintText.setColor(emptyColor);
+                paintBolt.setColor(emptyColor);
+                canvas.drawPath(boltPath, paintBolt);
+                canvas.drawText(text, textX, textY, paintText);
+
+                // 2. 충전된 알맹이(fill) 영역에 맞춰 클리핑 렌더링
+                if (currentFillWidth > 0) {
+                    int filledColor = 0xFF1C1C1E;
+                    paintText.setColor(filledColor);
+                    paintBolt.setColor(filledColor);
+                    canvas.save();
+                    canvas.clipRect(padX, 0, padX + currentFillWidth, h);
+                    canvas.drawPath(boltPath, paintBolt);
+                    canvas.drawText(text, textX, textY, paintText);
+                    canvas.restore();
+                }
+            } else {
+                float textWidth = paintText.measureText(text);
+                if (textWidth > maxContentWidth && textWidth > 0) {
+                    paintText.setTextSize(paintText.getTextSize() * (maxContentWidth / textWidth));
+                }
+
+                paintText.getTextBounds(text, 0, text.length(), textBounds);
+                float textX = rectShell.centerX() - textBounds.exactCenterX();
+                float textY = rectShell.centerY() - textBounds.exactCenterY();
+
+                // 1. 미충전(빈 배경) 영역에 맞춰 테마 텍스트 색상으로 기본 텍스트 렌더링
+                int emptyTextColor = color;
+                if (color == Color.WHITE || Color.red(color) > 200) {
+                    emptyTextColor = 0xFF1C1C1E;
+                }
+                paintText.setColor(emptyTextColor);
+                canvas.drawText(text, textX, textY, paintText);
+
+                // 2. 충전된 알맹이(fill) 영역에 맞춰 대비되는 색상으로 클리핑 렌더링
+                if (currentFillWidth > 0) {
+                    int filledTextColor = (level <= 20) ? Color.WHITE : 0xFF1C1C1E;
+                    paintText.setColor(filledTextColor);
+                    canvas.save();
+                    canvas.clipRect(padX, 0, padX + currentFillWidth, h);
+                    canvas.drawText(text, textX, textY, paintText);
+                    canvas.restore();
+                }
+            }
+        } else if (isCharging) {
             float boltW = shellWidth * 0.34f;
             float boltH = h * 0.72f;
             float boltLeft = (shellWidth - boltW) / 2f;
             float boltTop = (h - boltH) / 2f;
 
-            boltPath.reset();
-            // 표준 번개 모양 (지그재그) - 정규화된 0~1 좌표를 아이콘 크기에 맞춰 배치
-            boltPath.moveTo(boltLeft + boltW * 0.62f, boltTop);
-            boltPath.lineTo(boltLeft + boltW * 0.10f, boltTop + boltH * 0.58f);
-            boltPath.lineTo(boltLeft + boltW * 0.42f, boltTop + boltH * 0.58f);
-            boltPath.lineTo(boltLeft + boltW * 0.38f, boltTop + boltH);
-            boltPath.lineTo(boltLeft + boltW * 0.90f, boltTop + boltH * 0.42f);
-            boltPath.lineTo(boltLeft + boltW * 0.58f, boltTop + boltH * 0.42f);
-            boltPath.close();
+            buildBoltPath(boltLeft, boltTop, boltW, boltH);
 
+            paintBolt.setColor(0xFF2E7D32);
             canvas.drawPath(boltPath, paintBolt);
         }
+    }
+
+    private void buildBoltPath(float boltLeft, float boltTop, float boltW, float boltH) {
+        boltPath.reset();
+        boltPath.moveTo(boltLeft + boltW * 0.62f, boltTop);
+        boltPath.lineTo(boltLeft + boltW * 0.10f, boltTop + boltH * 0.58f);
+        boltPath.lineTo(boltLeft + boltW * 0.42f, boltTop + boltH * 0.58f);
+        boltPath.lineTo(boltLeft + boltW * 0.38f, boltTop + boltH);
+        boltPath.lineTo(boltLeft + boltW * 0.90f, boltTop + boltH * 0.42f);
+        boltPath.lineTo(boltLeft + boltW * 0.58f, boltTop + boltH * 0.42f);
+        boltPath.close();
     }
 }

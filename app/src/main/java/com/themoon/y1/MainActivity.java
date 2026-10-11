@@ -898,6 +898,7 @@ public class MainActivity extends Activity {
     private long lastScreenOnTime = 0;
     // 💡 [추가] 커스텀 배터리 뷰 변수
     private BatteryIconView batteryIconView;
+    private boolean isShowBatteryPercentage = false;
     private int currentTimeoutIndex = 1;
     private final int[] TIMEOUT_VALUES = { 15000, 30000, 60000, 300000 };
     private final String[] TIMEOUT_NAMES = { "15 Sec", "30 Sec", "1 Min", "5 Min" };
@@ -1475,14 +1476,25 @@ public class MainActivity extends Activity {
                         }
                     }
                 }
-            } else if (Intent.ACTION_BATTERY_CHANGED.equals(action)) {
+            } else if (Intent.ACTION_BATTERY_CHANGED.equals(action)
+                    || Intent.ACTION_POWER_CONNECTED.equals(action)
+                    || Intent.ACTION_POWER_DISCONNECTED.equals(action)) {
+                if (Intent.ACTION_POWER_CONNECTED.equals(action) || Intent.ACTION_POWER_DISCONNECTED.equals(action)) {
+                    Intent bi = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+                    if (bi != null) intent = bi;
+                }
                 int level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
                 int scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
 
                 // 🚀 [추가] 배터리 충전 상태 확인
                 int status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+                int plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1);
                 boolean isCharging = (status == BatteryManager.BATTERY_STATUS_CHARGING
-                        || status == BatteryManager.BATTERY_STATUS_FULL);
+                        || status == BatteryManager.BATTERY_STATUS_FULL
+                        || plugged > 0);
+                if (Intent.ACTION_POWER_DISCONNECTED.equals(action)) {
+                    isCharging = false;
+                }
 
                 int batteryPct = (int) ((level / (float) scale) * 100);
                 tvStatusBattery.setText(batteryPct + "%");
@@ -2251,6 +2263,7 @@ public class MainActivity extends Activity {
             // 금고(SharedPreferences)에서 기존에 저장된 포맷 설정을 불러옵니다. (기본값은 12시간 포맷)
             is24HourFormat = prefs.getBoolean("is_24h_format", false);
             isTimeInTitleBar = prefs.getBoolean("time_in_title_bar", false);
+            isShowBatteryPercentage = prefs.getBoolean("show_battery_percentage", false);
             volumeLimitMax = prefs.getInt("volume_limit_max", -1);
             isSoundCheckEnabled = prefs.getBoolean("sound_check_enabled", false);
             isAlbumTiltEnabled = prefs.getBoolean("album_tilt_enabled", true);
@@ -2657,6 +2670,23 @@ public class MainActivity extends Activity {
         // 🚀 [여기에 새로 추가!] 기존 배터리 숫자(텍스트)를 숨기고 그 자리에 플랫 아이콘을 끼워 넣습니다.
         tvStatusBattery.setVisibility(View.GONE);
         batteryIconView = new BatteryIconView(this);
+        batteryIconView.setShowPercentage(isShowBatteryPercentage);
+        batteryIconView.setColor(ThemeManager.getTextColorPrimary());
+        try {
+            Intent initBattery = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+            if (initBattery != null) {
+                int initL = initBattery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+                int initS = initBattery.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+                int initStatus = initBattery.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+                int initPlugged = initBattery.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1);
+                boolean initCharging = (initStatus == BatteryManager.BATTERY_STATUS_CHARGING
+                        || initStatus == BatteryManager.BATTERY_STATUS_FULL
+                        || initPlugged > 0);
+                if (initL >= 0 && initS > 0) {
+                    batteryIconView.setBatteryLevel((int) ((initL / (float) initS) * 100), initCharging);
+                }
+            }
+        } catch (Exception ignored) {}
         ViewGroup statusParent = (ViewGroup) tvStatusBattery.getParent();
         int bIdx = statusParent.indexOfChild(tvStatusBattery);
 
@@ -3107,6 +3137,8 @@ public class MainActivity extends Activity {
         filter.addAction(Intent.ACTION_MEDIA_SCANNER_STARTED);
         filter.addAction(Intent.ACTION_MEDIA_SCANNER_FINISHED);
         filter.addAction(Intent.ACTION_BATTERY_CHANGED);
+        filter.addAction(Intent.ACTION_POWER_CONNECTED);
+        filter.addAction(Intent.ACTION_POWER_DISCONNECTED);
         filter.addAction(Intent.ACTION_HEADSET_PLUG);
         filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
         filter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
@@ -7558,6 +7590,23 @@ public class MainActivity extends Activity {
             }
         });
         containerSettingsItems.addView(btnBrightMenu);
+
+        final LinearLayout btnBatteryPct = createSettingRow("Battery Percentage",
+                isShowBatteryPercentage ? t("ON") : t("OFF"));
+        btnBatteryPct.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                isShowBatteryPercentage = !isShowBatteryPercentage;
+                prefs.edit().putBoolean("show_battery_percentage", isShowBatteryPercentage).commit();
+                TextView tvStatus = (TextView) btnBatteryPct.getChildAt(1);
+                tvStatus.setText(isShowBatteryPercentage ? t("ON") : t("OFF"));
+                if (batteryIconView != null) {
+                    batteryIconView.setShowPercentage(isShowBatteryPercentage);
+                }
+            }
+        });
+        containerSettingsItems.addView(btnBatteryPct);
 
         LinearLayout btnStorageMenu = createSettingRow("About", "〉 ");
         btnStorageMenu.setOnClickListener(new View.OnClickListener() {
@@ -15332,6 +15381,7 @@ public class MainActivity extends Activity {
             prefs.edit()
                     .remove("is_24h_format")
                     .remove("time_in_title_bar")
+                    .remove("show_battery_percentage")
                     .remove("volume_limit_max")
                     .remove("sound_check_enabled")
                     .remove("video_stretch_fill")
@@ -15350,6 +15400,10 @@ public class MainActivity extends Activity {
 
         is24HourFormat = false;
         isTimeInTitleBar = false;
+        isShowBatteryPercentage = false;
+        if (batteryIconView != null) {
+            batteryIconView.setShowPercentage(false);
+        }
         volumeLimitMax = -1;
         isSoundCheckEnabled = false;
         isAlbumTiltEnabled = true;
