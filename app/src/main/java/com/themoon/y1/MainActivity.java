@@ -687,12 +687,42 @@ public class MainActivity extends Activity {
         }
     };
 
+    public void updateKeepScreenOnState() {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    // 화면을 켜두어야 하는 조건:
+                    // 1. 커스텀 라이브러리 스캔 중이거나 라디오 스캔 중
+                    // 2. 웹 서버 구동 중
+                    // 3. 팟캐스트 다운로드 진행 중
+                    // 4. 비디오 재생 모드
+                    // 5. 백라이트 타이머가 "Always On" (0ms)
+                    // 6. USB 마스 스토리지 오버레이 표시 중
+                    boolean needed = isCustomScanning || isRadioScanning || isServerRunning
+                            || currentScreenState == STATE_VIDEO_PLAYER
+                            || (BACKLIGHT_TIMER_OPTIONS_MS[backlightTimerIndex] == 0)
+                            || (activePodcastDownloads != null && !activePodcastDownloads.isEmpty())
+                            || (usbStorageOverlay != null);
+
+                    if (needed) {
+                        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                    } else {
+                        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+        });
+    }
+
     private void resetBacklightTimer() {
         backlightHandler.removeCallbacks(backlightTimeoutRunnable);
         long ms = BACKLIGHT_TIMER_OPTIONS_MS[backlightTimerIndex];
         if (ms > 0) {
             backlightHandler.postDelayed(backlightTimeoutRunnable, ms);
         }
+        updateKeepScreenOnState();
     }
     public boolean isAutoFetchEnabled = true; // 🚀 [추가] 인터넷 자동 검색 스위치 기본값
     public static List<SongItem> customLibrary = new ArrayList<>();
@@ -4856,6 +4886,7 @@ public class MainActivity extends Activity {
             videoSeekModeActive = false;
             if (tvVideoModeHint != null) tvVideoModeHint.setVisibility(View.GONE);
         }
+        updateKeepScreenOnState();
         layoutVolumeOverlay.setVisibility(View.GONE);
 
         View statusBar = findViewById(R.id.layout_status_bar);
@@ -14294,6 +14325,22 @@ public class MainActivity extends Activity {
     public boolean dispatchKeyEvent(KeyEvent event) {
         int keyCode = event.getKeyCode();
         int action = event.getAction();
+
+        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        boolean isScreenOnForLock = true;
+        try {
+            if (Build.VERSION.SDK_INT >= 20)
+                isScreenOnForLock = pm.isInteractive();
+            else
+                isScreenOnForLock = pm.isScreenOn();
+        } catch (Exception e) {
+        }
+
+        // 🚀 [백라이트 타이머 리셋] 화면이 켜져 있을 때 모든 키 입력에서 타이머를 최우선 리셋
+        if (isScreenOnForLock && !isFakeScreenOff) {
+            resetBacklightTimer();
+        }
+
         if (usbStorageOverlay != null) {
             int kc = event.getKeyCode();
             if (kc == KeyEvent.KEYCODE_VOLUME_UP || kc == KeyEvent.KEYCODE_VOLUME_DOWN) {
@@ -14308,21 +14355,8 @@ public class MainActivity extends Activity {
             }
         }
 
-        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-        boolean isScreenOnForLock = true;
-        try {
-            if (Build.VERSION.SDK_INT >= 20)
-                isScreenOnForLock = pm.isInteractive();
-            else
-                isScreenOnForLock = pm.isScreenOn();
-        } catch (Exception e) {
-        }
-
         // 🔊 [하드웨어 볼륨 버튼 인터셉트] 시스템 볼륨 UI 충돌 차단 및 전 화면 iPod 볼륨 오버레이 표출
         if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
-            if (isScreenOnForLock && !isFakeScreenOff) {
-                resetBacklightTimer();
-            }
             if (action == KeyEvent.ACTION_DOWN) {
                 if (event.getRepeatCount() == 0 || (event.getRepeatCount() % 2 == 0)) {
                     adjustVolume(keyCode == KeyEvent.KEYCODE_VOLUME_UP);
@@ -14337,7 +14371,6 @@ public class MainActivity extends Activity {
         if (currentScreenState == STATE_BROWSER && currentBrowserMode == BROWSER_COVER_FLOW) {
             if (keyCode == 21 || keyCode == 22) {
                 if (isScreenOnForLock && !isFakeScreenOff) {
-                    resetBacklightTimer();
                     if (action == KeyEvent.ACTION_DOWN) {
                         handleCoverFlowWheelInput(keyCode, event);
                     }
@@ -14350,12 +14383,6 @@ public class MainActivity extends Activity {
             long now = android.os.SystemClock.uptimeMillis();
             classicWheelStreak = now - lastClassicWheelTime < 200 ? classicWheelStreak + 1 : 1;
             lastClassicWheelTime = now;
-        }
-
-        // 🚀 [백라이트 타이머 버그 수정] 화면이 켜져 있을 때만 타이머를 리셋하여, 꺼진 화면(주머니)에서 휠을 돌렸을 때
-        // 뒤늦게 전원 토글이 실행되어 화면이 켜지는 부작용을 방지합니다.
-        if (isScreenOnForLock && !isFakeScreenOff) {
-            resetBacklightTimer();
         }
 
         // 🚀 [가상 암전 깨우기] 라디오/웹서버 재생 중이라 진짜 화면 전원은 안 끄고 검은 오버레이+밝기
@@ -14617,6 +14644,23 @@ public class MainActivity extends Activity {
 
         // 우리가 낚아챈 버튼 외에 방향키/볼륨 등은 원래 시스템대로 흘려보냅니다.
         return super.dispatchKeyEvent(event);
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent event) {
+        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        boolean isScreenOn = true;
+        try {
+            if (Build.VERSION.SDK_INT >= 20)
+                isScreenOn = pm.isInteractive();
+            else
+                isScreenOn = pm.isScreenOn();
+        } catch (Exception ignored) {
+        }
+        if (isScreenOn && !isFakeScreenOff) {
+            resetBacklightTimer();
+        }
+        return super.dispatchTouchEvent(event);
     }
 
     @Override
