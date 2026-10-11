@@ -11,6 +11,11 @@ All notable changes to InniClassic (formerly "JJ Launcher Classic Version") are 
   - Setting toggle: "Ask on USB Connect" (under Settings, default ON).
   - Suspends MicroSD watchdog during active UMS share to prevent false remounts, and automatically triggers media library rescan upon ejection or cable disconnect.
   - Localized across all 7 supported languages.
+- **Fix OEM demo albums appearing in music library**:
+  - Removed `custom_media` from media scanning roots to prevent stock OEM demo files (`Luis-Fonsi-Daddy-Yankee-Despacito.MP3`, `Matteo-Panama.mp3`, `A-Pink-Hush-1080p-demo.mp4`) from showing up in user music libraries.
+  - Added `Migration002PurgeOemDemoMedia` to delete lingering preloaded OEM demo media files and prune them from cached libraries.
+  - Stripped `/system/media/custom_media` and `/system/xbin/preloadfiles.sh` in ROM build script `scripts/build-rom.sh`.
+  - Added strict directory path verification in cache loading and library scanning so cached items outside valid `Music/` and `Audiobooks/` paths are pruned.
 - **Localization fixes & coverage**:
   - Localized keyboard settings ("Keyboard Layout", "Original", "QWERTY", "Next", "Login") across all 7 supported languages.
   - Added missing "Add to Favorites" string across all language packs.

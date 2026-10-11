@@ -172,6 +172,18 @@ public class MigrationManagerTest {
         assertTrue(context.isMediaRescanRequested());
     }
 
+    @Test
+    public void testMigration002PurgeOemDemoMediaRegistersAndRequestsRescan() throws Exception {
+        Migration002PurgeOemDemoMedia m2 = new Migration002PurgeOemDemoMedia();
+        assertEquals(2, m2.getVersion());
+        assertEquals("002_purge_oem_demo_media", m2.getId());
+
+        MigrationContext context = new MigrationContext(null, mockPrefs, mockPrefs, 0);
+        assertFalse(context.isMediaRescanRequested());
+        m2.migrate(context);
+        assertTrue(context.isMediaRescanRequested());
+    }
+
     // In-memory MockSharedPreferences for isolated JVM testing
     private static class MockSharedPreferences implements SharedPreferences {
         private final Map<String, Object> map = new HashMap<>();

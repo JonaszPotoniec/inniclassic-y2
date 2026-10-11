@@ -60,7 +60,7 @@ This is **not** a GitHub "Fork" in the technical sense (it's a separate reposito
 - **Wireless PC Upload** — a small web server for copying music onto the device over Wi-Fi, no cable needed
 
 ### Innioasis Y2 support
-- **Dual storage & multi-volume scanning**: seamlessly indexes Music, Audiobooks, and Videos across internal storage (`/storage/sdcard0`), external MicroSD (`/storage/sdcard1`), and custom media directories (`custom_media`).
+- **Dual storage & multi-volume scanning**: seamlessly indexes Music, Audiobooks, and Videos across internal storage (`/storage/sdcard0`) and external MicroSD (`/storage/sdcard1`).
 - **MicroSD watchdog & self-healing engine**: background monitor that automatically detects unmounted or degraded FAT/exFAT filesystems, runs self-healing repair tools, remounts `fuse_sdcard1`, and triggers a library rescan when storage is ready.
 - **Hardware FM Radio on Y2**: automatically bypasses Android 4.4.2 Airplane Mode tuner lockouts (`ensureAirplaneModeOff()`), synchronizes MediaTek FM streams, and holds a partial wake lock to prevent playback drops on screen sleep.
 - **Hardware clickwheel layout**: includes `scripts/Y2.kl` mapping input scancodes 103 and 108 to `DPAD_LEFT` and `DPAD_RIGHT`.

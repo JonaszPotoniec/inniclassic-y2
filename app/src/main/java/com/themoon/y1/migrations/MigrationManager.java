@@ -54,6 +54,7 @@ public class MigrationManager {
 
     private void registerDefaultMigrations() {
         registerMigration(new Migration001RestoreDeduplicatedSongs());
+        registerMigration(new Migration002PurgeOemDemoMedia());
     }
 
     /**

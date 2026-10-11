@@ -299,6 +299,16 @@ audit_rom_contents() {
         errors=$((errors + 1))
     fi
 
+    if [ -d "$sys_mount/media/custom_media" ]; then
+        echo "audit fail: /system/media/custom_media still present" >&2
+        errors=$((errors + 1))
+    fi
+
+    if [ -f "$sys_mount/xbin/preloadfiles.sh" ]; then
+        echo "audit fail: /system/xbin/preloadfiles.sh still present" >&2
+        errors=$((errors + 1))
+    fi
+
     # Y1: Generic.kl == Stock.kl (scripts/Stock.kl).
     # Y2: pin scripts/Y2.kl onto the device input names launcher needs.
     if [ "$rom_type" = "y2" ]; then
@@ -439,6 +449,8 @@ sudo rm -f "$MOUNT_SYS/app/org.rockbox.apk"
 sudo rm -f "$MOUNT_SYS/lib/librockbox.so"
 sudo rm -f "$MOUNT_SYS/etc/init.d/99Y1ButtonScript"
 sudo rm -f "$MOUNT_SYS/etc/init.d/99Y1LauncherInit.sh"
+sudo rm -rf "$MOUNT_SYS/media/custom_media"
+sudo rm -f "$MOUNT_SYS/xbin/preloadfiles.sh"
 
 echo "==> Configuring /system/etc/install-recovery.sh for SuperSU and FM radio"
 sudo tee "$MOUNT_SYS/etc/install-recovery.sh" > /dev/null << 'EOF'
@@ -516,6 +528,8 @@ sudo rm -f "$MOUNT_USER/data/com.innioasis.y1.apk"
 sudo rm -f "$MOUNT_USER/jj_launcher.apk"
 sudo rm -f "$MOUNT_USER/data/initialized"
 sudo rm -f "$MOUNT_USER/data/jj_launcher_initialized"
+sudo rm -rf "$MOUNT_USER/media/0/custom_media" \
+            "$MOUNT_USER/media/custom_media"
 if [ "$TYPE" = "y2" ]; then
     strip_solar_artefacts "$MOUNT_SYS" "$MOUNT_USER"
     sudo rm -f "$MOUNT_USER/data/nvram/APCFG/APRDEB/Audio_Vol_custom"

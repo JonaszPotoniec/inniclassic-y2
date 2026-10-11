@@ -3561,8 +3561,8 @@ public class MainActivity extends Activity {
             }
             reader.close();
             org.json.JSONObject root = new org.json.JSONObject(sb.toString());
-            jsonToSongList(root.optJSONArray("music"), customLibrary);
-            jsonToSongList(root.optJSONArray("books"), audiobookLibrary);
+            jsonToSongList(root.optJSONArray("music"), customLibrary, false);
+            jsonToSongList(root.optJSONArray("books"), audiobookLibrary, true);
             rebuildUniqueAlbumList();
             com.themoon.y1.managers.AlbumCoverManager.getInstance().pregenerateThumbnails(uniqueAlbumList, false);
         } catch (Throwable t) {
@@ -3570,7 +3570,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void jsonToSongList(org.json.JSONArray arr, List<SongItem> target) {
+    private void jsonToSongList(org.json.JSONArray arr, List<SongItem> target, boolean isAudiobook) {
         if (arr == null)
             return;
         target.clear();
@@ -3580,6 +3580,13 @@ public class MainActivity extends Activity {
                 File f = new File(o.getString("path"));
                 if (!f.exists())
                     continue; // 🚀 그 사이 삭제된 파일은 캐시에서도 조용히 걸러냅니다
+                if (isAudiobook) {
+                    if (!StoragePaths.isUnderAudiobooks(f))
+                        continue;
+                } else {
+                    if (!StoragePaths.isUnderMusic(f))
+                        continue;
+                }
                 SongItem song = new SongItem(f, o.optString("title", f.getName()),
                         o.optString("artist", "Unknown Artist"), o.optString("album", "Unknown Album"),
                         o.optString("year", "Unknown Year"), o.optString("genre", "Unknown Genre"),
@@ -3616,18 +3623,18 @@ public class MainActivity extends Activity {
                     java.util.Iterator<SongItem> itMusic = customLibrary.iterator();
                     while (itMusic.hasNext()) {
                         SongItem item = itMusic.next();
-                        if (!item.file.exists()) {
+                        if (!item.file.exists() || !StoragePaths.isUnderMusic(item.file)) {
                             trackNumberMap.remove(item.file.getAbsolutePath());
-                            itMusic.remove(); // 파일이 지워졌으면 장부에서 즉시 파쇄!
+                            itMusic.remove(); // 파일이 지워졌거나 유효한 음악 폴더 밖이면 장부에서 즉시 파쇄!
                         }
                     }
 
                     java.util.Iterator<SongItem> itBook = audiobookLibrary.iterator();
                     while (itBook.hasNext()) {
                         SongItem item = itBook.next();
-                        if (!item.file.exists()) {
+                        if (!item.file.exists() || !StoragePaths.isUnderAudiobooks(item.file)) {
                             trackNumberMap.remove(item.file.getAbsolutePath());
-                            itBook.remove(); // 파일이 지워졌으면 장부에서 즉시 파쇄!
+                            itBook.remove(); // 파일이 지워졌거나 유효한 오디오북 폴더 밖이면 장부에서 즉시 파쇄!
                         }
                     }
 

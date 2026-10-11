@@ -115,17 +115,7 @@ public final class StoragePaths {
 
     /** All Music folders to scan (primary + readable secondary). */
     public static List<File> getMusicDirs() {
-        List<File> dirs = mediaDirs("Music");
-        // Y2 stock layout keeps playable audio in custom_media.
-        for (File root : getAllRoots()) {
-            File custom = new File(root, "custom_media");
-            try {
-                if (custom.exists() && custom.isDirectory())
-                    addIfMissing(dirs, custom);
-            } catch (Exception ignored) {
-            }
-        }
-        return dirs;
+        return mediaDirs("Music");
     }
 
     public static List<File> getAudiobooksDirs() {
@@ -238,6 +228,28 @@ public final class StoragePaths {
                 return true;
         }
         return false;
+    }
+
+    public static boolean isUnderAudiobooks(File file) {
+        return file != null && isUnderAudiobooks(file.getAbsolutePath());
+    }
+
+    public static boolean isUnderMusic(String absolutePath) {
+        if (absolutePath == null)
+            return false;
+        if (absolutePath.startsWith(PRIMARY_PATH + "/Music")
+                || absolutePath.startsWith(SECONDARY_PATH + "/Music"))
+            return true;
+        for (File dir : getMusicDirs()) {
+            String root = dir.getAbsolutePath();
+            if (absolutePath.equals(root) || absolutePath.startsWith(root + "/"))
+                return true;
+        }
+        return false;
+    }
+
+    public static boolean isUnderMusic(File file) {
+        return file != null && isUnderMusic(file.getAbsolutePath());
     }
 
     /** Strip known volume prefixes so the browser path stays short. */
