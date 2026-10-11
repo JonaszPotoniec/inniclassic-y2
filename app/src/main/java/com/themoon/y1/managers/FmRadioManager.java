@@ -259,6 +259,16 @@ public class FmRadioManager {
         throw new NoSuchMethodException(name);
     }
 
+    public void routeFmAudio() {
+        try {
+            Method setForceUse = Class.forName("android.media.AudioSystem").getDeclaredMethod("setForceUse", int.class, int.class);
+            setForceUse.setAccessible(true);
+            setForceUse.invoke(null, 5, 1);
+        } catch (Throwable t) {
+            Log.w(TAG, "routeFmAudio failed: " + t.getMessage());
+        }
+    }
+
     // 🚀 [신규 핵심 기술] 칩셋의 소리를 안드로이드 스피커/이어폰으로 연결해 주는 함수!
     private void startFmAudio() {
         try {
@@ -293,8 +303,8 @@ public class FmRadioManager {
             fmPlayer.start();
             applyMasterVolume();
 
-            // 🚀 [버그 수리 2] 시스템이 멋대로 스피커로 소리를 빼버리는 것을 막고, 현재 UI에 설정된 출력(isSpeakerOn) 상태로 물리적 강제 고정!
-            setSpeaker(isSpeakerOn);
+            // 🚀 [오디오 라우팅 고정] Y2 하드웨어 3.5mm 잭으로 오디오를 직결 연결!
+            routeFmAudio();
 
         } catch (Throwable t) {
             lastError = "Audio Routing Failed: " + t.getMessage();
@@ -421,13 +431,30 @@ public class FmRadioManager {
 
     // 3. 주파수 수동 맞추기 (Manual Tuning)
     public boolean tune(float freq) {
+        freq = Math.round(freq * 10.0f) / 10.0f;
+        currentFreq = freq;
         if (fmNativeClass == null || !isPowerUp) return false;
         try {
             Method tuneMethod = getNativeMethod("tune", float.class);
-            boolean success = (Boolean) tuneMethod.invoke(null, freq);
-            if (success) currentFreq = freq;
-            return success;
+            return (Boolean) tuneMethod.invoke(null, freq);
         } catch (Throwable e) { return false; }
+    }
+
+    // 🚀 하드웨어 방송 신호 탐색 (Seek)
+    public float seekStation(boolean isUp) {
+        if (fmNativeClass == null || !isPowerUp) return currentFreq;
+        try {
+            Method seekMethod = getNativeMethod("seek", float.class, boolean.class);
+            float found = (Float) seekMethod.invoke(null, currentFreq, isUp);
+            if (found > 0) {
+                found = Math.round(found * 10.0f) / 10.0f;
+                currentFreq = found;
+                return found;
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Hardware seek failed: " + t.getMessage());
+        }
+        return currentFreq;
     }
 
     // 🚀 4. 자동 스캔 엔진 (Auto Scan)
@@ -443,7 +470,7 @@ public class FmRadioManager {
             if (result != null && result.length > 0) {
                 float[] freqs = new float[result.length];
                 for (int i = 0; i < result.length; i++) {
-                    freqs[i] = result[i] / 10.0f; // 미디어텍은 875를 87.5로 반환하므로 소수점 변환
+                    freqs[i] = Math.round((result[i] / 10.0f) * 10.0f) / 10.0f; // 미디어텍은 875를 87.5로 반환하므로 소수점 변환
                 }
                 return freqs;
             }
@@ -462,13 +489,9 @@ public class FmRadioManager {
         } catch (Throwable e) {}
     }
 
-    // 6. 스피커 출력 강제 변경
+    // 6. 스피커/이어폰 출력 라우팅
     public void setSpeaker(boolean useSpeaker) {
-        try {
-            Method setForceUse = Class.forName("android.media.AudioSystem").getDeclaredMethod("setForceUse", int.class, int.class);
-            setForceUse.setAccessible(true);
-            setForceUse.invoke(null, 5, useSpeaker ? 1 : 0);
-            isSpeakerOn = useSpeaker;
-        } catch (Throwable e) {}
+        routeFmAudio();
+        isSpeakerOn = useSpeaker;
     }
 }
