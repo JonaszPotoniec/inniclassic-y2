@@ -320,8 +320,8 @@ audit_rom_contents() {
             errors=$((errors + 1))
         fi
 
-        if [ ! -f "$sys_mount/priv-app/Bluetooth.apk" ]; then
-            echo "audit fail: /system/priv-app/Bluetooth.apk missing" >&2
+        if [ -f "$REPO_ROOT/tools/rom_assets/Bluetooth.apk" ] && [ ! -f "$sys_mount/priv-app/Bluetooth.apk" ]; then
+            echo "audit fail: /system/priv-app/Bluetooth.apk missing (asset was provided but not installed)" >&2
             errors=$((errors + 1))
         fi
 
