@@ -267,6 +267,8 @@
   "Delete Device": "Eliminar dispositivo",
   "Device Deleted.": "Dispositivo eliminado.",
   "Connect Audio": "Conectar audio",
+  "Disconnect Audio": "Desconectar audio",
+  "Disconnecting Audio...": "Desconectando audio...",
   "No albums found.": "No se encontraron álbumes.",
   "Wait...": "Espere...",
   "Server is Running": "Servidor en ejecución",

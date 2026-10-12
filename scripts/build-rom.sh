@@ -320,6 +320,11 @@ audit_rom_contents() {
             errors=$((errors + 1))
         fi
 
+        if [ ! -f "$sys_mount/priv-app/Bluetooth.apk" ]; then
+            echo "audit fail: /system/priv-app/Bluetooth.apk missing" >&2
+            errors=$((errors + 1))
+        fi
+
         local y2_kl=""
         for y2_kl in Generic.kl Stock.kl mtk-tpd-kpd.kl mtk-kpd.kl Rockbox.kl Y2-Rockbox.kl; do
             if [ ! -f "$sys_mount/usr/keylayout/$y2_kl" ]; then
@@ -483,6 +488,17 @@ if [ ! -f /data/nvram/.audio_vol_lowgain_v1 ]; then
     touch /data/nvram/.audio_vol_lowgain_v1 2>/dev/null
     chmod 644 /data/nvram/.audio_vol_lowgain_v1 2>/dev/null
 fi
+
+# Start the MediaTek Bluetooth daemon (mtkbt) early.
+# It is declared oneshot+disabled in init.rc so it won't auto-start — we must kick it here.
+# Without mtkbt running, bluetooth.blueangel.so cannot open /dev/socket/bt.int.adp and ALL
+# BT operations (power-on, connect, unpair) fail with "No such file or directory".
+setprop ctl.start mtkbt
+
+# Prevent Bluetooth from auto-enabling on every boot / com.android.bluetooth restart.
+# The MTK firmware persists BT state in persist.bluetooth.on; clearing it means the user's
+# explicit OFF choice is respected after reboot rather than being overridden by the stack.
+setprop persist.bluetooth.on 0
 EOF
 sudo chmod 755 "$MOUNT_SYS/etc/install-recovery.sh"
 sudo chown root:root "$MOUNT_SYS/etc/install-recovery.sh"
@@ -514,6 +530,23 @@ if [ "$TYPE" = "y2" ]; then
     sudo python3 "$REPO_ROOT/tools/patch_y2_audio.py" "$MOUNT_SYS/lib/libaudiocustparam.so"
     sudo chmod 644 "$MOUNT_SYS/lib/libaudiocustparam.so"
     sudo chown root:root "$MOUNT_SYS/lib/libaudiocustparam.so"
+
+    if [ -f "$REPO_ROOT/tools/rom_assets/Bluetooth.apk" ]; then
+        echo "==> Installing Bluetooth framework service (tools/rom_assets/Bluetooth.apk)"
+        sudo mkdir -p "$MOUNT_SYS/priv-app"
+        sudo cp -f "$REPO_ROOT/tools/rom_assets/Bluetooth.apk" "$MOUNT_SYS/priv-app/Bluetooth.apk"
+        sudo chmod 644 "$MOUNT_SYS/priv-app/Bluetooth.apk"
+        sudo chown root:root "$MOUNT_SYS/priv-app/Bluetooth.apk"
+    fi
+
+    if [ -f "$REPO_ROOT/tools/rom_assets/MtkBt.apk" ]; then
+        echo "==> Installing signature-aligned MtkBt.apk (tools/rom_assets/MtkBt.apk)"
+        sudo mkdir -p "$MOUNT_SYS/app"
+        sudo cp -f "$REPO_ROOT/tools/rom_assets/MtkBt.apk" "$MOUNT_SYS/app/MtkBt.apk"
+        sudo chmod 644 "$MOUNT_SYS/app/MtkBt.apk"
+        sudo chown root:root "$MOUNT_SYS/app/MtkBt.apk"
+        sudo rm -f "$MOUNT_SYS/app/MtkBt.odex"
+    fi
 fi
 
 sudo mkdir -p "$MOUNT_SYS/app" "$MOUNT_SYS/usr/keylayout"

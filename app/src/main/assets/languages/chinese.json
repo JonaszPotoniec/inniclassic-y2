@@ -267,6 +267,8 @@
   "Delete Device": "删除设备",
   "Device Deleted.": "设备已删除。",
   "Connect Audio": "连接音频",
+  "Disconnect Audio": "断开音频",
+  "Disconnecting Audio...": "正在断开音频...",
   "No albums found.": "未找到专辑。",
   "Wait...": "请稍候...",
   "Server is Running": "服务器正在运行",

@@ -267,6 +267,8 @@
   "Delete Device": "Удалить устройство",
   "Device Deleted.": "Устройство удалено.",
   "Connect Audio": "Подключить аудио",
+  "Disconnect Audio": "Отключить аудио",
+  "Disconnecting Audio...": "Отключение аудио...",
   "No albums found.": "Альбомы не найдены.",
   "Wait...": "Ожидание...",
   "Server is Running": "Сервер запущен",

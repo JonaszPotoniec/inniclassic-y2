@@ -315,6 +315,8 @@
   "Delete Device": "Delete Device",
   "Device Deleted.": "Device Deleted.",
   "Connect Audio": "Connect Audio",
+  "Disconnect Audio": "Disconnect Audio",
+  "Disconnecting Audio...": "Disconnecting Audio...",
   "No albums found.": "No albums found.",
   "Wait...": "Wait...",
   "Server is Running": "Server is Running",

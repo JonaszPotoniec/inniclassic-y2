@@ -251,6 +251,8 @@
   "Delete Device": "デバイス削除",
   "Device Deleted.": "デバイスが削除されました。",
   "Connect Audio": "オーディオ接続",
+  "Disconnect Audio": "オーディオ切断",
+  "Disconnecting Audio...": "オーディオ切断中...",
   "No albums found.": "アルバムが見つかりません。",
   "Wait...": "待機中...",
   "Server is Running": "サーバーが実行中",

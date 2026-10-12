@@ -9,6 +9,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DownloadManager;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothClass;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothProfile;
 import android.content.BroadcastReceiver;
@@ -110,6 +111,8 @@ public class MainActivity extends Activity {
     private BluetoothProfile globalA2dp;
     private BluetoothDevice targetDeviceForAudio = null; // 🚀 [추가] 좀비처럼 물고 늘어질 타겟 기기
     private boolean isBtConnectingState = false;
+    private String lastManualDisconnectAddress = null;
+    private long lastManualDisconnectTime = 0;
     // 💡 [추가] 퀵 스크롤 (알파벳 인덱스) 관련 변수들
     private TextView tvFastScrollLetter;
     private long lastClassicWheelTime;
@@ -1582,12 +1585,10 @@ public class MainActivity extends Activity {
                         && (state == BluetoothAdapter.STATE_ON || state == BluetoothAdapter.STATE_OFF)) {
                     startBluetoothScan();
                 }
-                // (이하 기존 코드 유지)
                 // 🚀 [버그 해결 1] 사용자가 메인 셋팅창(깊이 0)에 있을 때만 새로고침 하도록 방어막 전개!
                 if (currentScreenState == STATE_SETTINGS && currentSettingsDepth == 0)
                     buildSettingsUI();
-                else if (currentScreenState == STATE_BLUETOOTH)
-                    startBluetoothScan();
+                // Note: BT screen refresh is already handled above — no duplicate call here.
             } else if (WifiManager.WIFI_STATE_CHANGED_ACTION.equals(action)) {
                 int state = intent.getIntExtra(WifiManager.EXTRA_WIFI_STATE, WifiManager.WIFI_STATE_UNKNOWN);
                 if (state == WifiManager.WIFI_STATE_ENABLED) {
@@ -1679,15 +1680,24 @@ public class MainActivity extends Activity {
                 int profileState = intent.getIntExtra("android.bluetooth.profile.extra.STATE", -1);
                 BluetoothDevice currentDevice = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
 
-                if (profileState == BluetoothProfile.STATE_DISCONNECTED) {
-                    Toast.makeText(context, t("Audio Disconnected"), Toast.LENGTH_SHORT).show();
-                    // 🚀 [최종 방어막] 블루투스 자체가 꺼져서 끊긴 거라면(isEnabled == false) 절대 재연결 시도를 하지 않습니다!
-                    BluetoothAdapter ba = BluetoothAdapter.getDefaultAdapter();
-                    if (ba != null && ba.isEnabled() && targetDeviceForAudio != null && currentDevice != null
-                            && targetDeviceForAudio.getAddress().equals(currentDevice.getAddress())) {
-                        connectBluetoothAudio(targetDeviceForAudio);
+                if (currentDevice != null && lastManualDisconnectAddress != null
+                        && currentDevice.getAddress().equals(lastManualDisconnectAddress)) {
+                    long elapsed = System.currentTimeMillis() - lastManualDisconnectTime;
+                    if (elapsed < 20000) {
+                        if (profileState == BluetoothProfile.STATE_CONNECTING || profileState == BluetoothProfile.STATE_CONNECTED) {
+                            executeA2dpDisconnect(currentDevice);
+                            return;
+                        }
+                    } else {
+                        lastManualDisconnectAddress = null;
                     }
+                }
+
+                if (profileState == BluetoothProfile.STATE_DISCONNECTED) {
+                    targetDeviceForAudio = null;
+                    Toast.makeText(context, t("Audio Disconnected"), Toast.LENGTH_SHORT).show();
                 } else if (profileState == BluetoothProfile.STATE_CONNECTED) {
+                    targetDeviceForAudio = null;
                     if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return;
                     String name = currentDevice != null ? currentDevice.getName() : "Unknown";
                     Toast.makeText(context, t("Audio Connected to ") + name, Toast.LENGTH_SHORT).show();
@@ -1708,12 +1718,11 @@ public class MainActivity extends Activity {
             } else if (BluetoothDevice.ACTION_BOND_STATE_CHANGED.equals(action)) {
                 int state = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.ERROR);
 
-                // 🚀 [무한 페어링 방어막 1] 페어링이 취소되거나 실패하면(BOND_NONE), 즉시 타겟을 지워서 좀비의 부활을 막습니다!
                 if (state == BluetoothDevice.BOND_NONE) {
                     BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                     if (targetDeviceForAudio != null && device != null
                             && targetDeviceForAudio.getAddress().equals(device.getAddress())) {
-                        targetDeviceForAudio = null; // 타겟 강제 해제!
+                        targetDeviceForAudio = null;
                         Toast.makeText(context, t("Pairing failed or cancelled."), Toast.LENGTH_SHORT).show();
                     }
                 }
@@ -1731,22 +1740,27 @@ public class MainActivity extends Activity {
                     if (bondedDevice != null)
                         connectBluetoothAudio(bondedDevice);
                 }
-            } else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
-                BluetoothDevice disconnectedDevice = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                BluetoothAdapter ba = BluetoothAdapter.getDefaultAdapter();
-
-                if (ba != null && ba.isEnabled() && targetDeviceForAudio != null && disconnectedDevice != null
-                        && targetDeviceForAudio.getAddress().equals(disconnectedDevice.getAddress())) {
-
-                    // 🚀 [무한 페어링 방어막 2] "이미 페어링이 완료된(BONDED)" 기기일 때만 좀비 엔진을 가동합니다!
-                    // 페어링 도중에 튕긴 거라면 재연결을 시도하지 않고 타겟을 깔끔하게 포기합니다.
-                    if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return;
-                    if (disconnectedDevice.getBondState() == BluetoothDevice.BOND_BONDED) {
-                        connectBluetoothAudio(targetDeviceForAudio);
-                    } else {
-                        targetDeviceForAudio = null; // 찌꺼기 타겟 삭제
+            } else if ("android.bluetooth.device.action.PAIRING_REQUEST".equals(action)) {
+                BluetoothDevice pairingDevice = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                if (pairingDevice != null) {
+                    try {
+                        Method confirmMethod = pairingDevice.getClass().getMethod("setPairingConfirmation", boolean.class);
+                        confirmMethod.invoke(pairingDevice, true);
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
                 }
+            } else if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)) {
+                BluetoothDevice aclDevice = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                if (aclDevice != null && lastManualDisconnectAddress != null
+                        && aclDevice.getAddress().equals(lastManualDisconnectAddress)) {
+                    long elapsed = System.currentTimeMillis() - lastManualDisconnectTime;
+                    if (elapsed < 20000) {
+                        executeA2dpDisconnect(aclDevice);
+                    }
+                }
+            } else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
+                targetDeviceForAudio = null;
             } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
                 btnScanBt.setText(t("Scan Complete (Retry)"));
             } else if (WifiManager.SCAN_RESULTS_AVAILABLE_ACTION.equals(action)) {
@@ -1807,6 +1821,8 @@ public class MainActivity extends Activity {
     private void connectBluetoothAudio(final BluetoothDevice targetDevice) {
         if (targetDevice == null)
             return;
+        lastManualDisconnectAddress = null;
+        lastManualDisconnectTime = 0;
         targetDeviceForAudio = targetDevice; // 1. 목표물 영구 고정!
 
         BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
@@ -1838,7 +1854,12 @@ public class MainActivity extends Activity {
                     public void onServiceConnected(int profile, BluetoothProfile proxy) {
                         if (profile == BluetoothProfile.A2DP) {
                             globalA2dp = proxy;
-                            executeA2dpConnect(targetDevice);
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    executeA2dpConnect(targetDevice);
+                                }
+                            });
                         }
                     }
 
@@ -1856,7 +1877,18 @@ public class MainActivity extends Activity {
     private void executeA2dpConnect(BluetoothDevice targetDevice) {
         if (globalA2dp == null || targetDevice == null)
             return;
+        lastManualDisconnectAddress = null;
+        lastManualDisconnectTime = 0;
         try {
+            // Restore priority so Bluetooth stack allows connection
+            try {
+                Method setPriorityMethod = globalA2dp.getClass().getMethod("setPriority", BluetoothDevice.class, int.class);
+                if (setPriorityMethod != null) {
+                    setPriorityMethod.invoke(globalA2dp, targetDevice, 100); // BluetoothProfile.PRIORITY_ON
+                }
+            } catch (Exception ignored) {
+            }
+
             // 💡 [순정 코드의 비밀] 연결 전, 이미 물려있는 다른 오디오 기기가 있다면 가차 없이 끊어버립니다!
             List<BluetoothDevice> connectedDevices = null;
             try {
@@ -1919,6 +1951,87 @@ public class MainActivity extends Activity {
             }
             Toast.makeText(this, t("Audio error: ") + errorStr, Toast.LENGTH_LONG).show();
         }
+    }
+
+    // 🚀 [신규] 블루투스 오디오 연결 해제
+    private void disconnectBluetoothAudio(final BluetoothDevice targetDevice) {
+        if (targetDevice == null)
+            return;
+        targetDeviceForAudio = null; // 의도적인 연결 해제이므로 자동 재연결 타겟 취소
+        lastManualDisconnectAddress = targetDevice.getAddress();
+        lastManualDisconnectTime = System.currentTimeMillis();
+        Toast.makeText(this, t("Disconnecting Audio..."), Toast.LENGTH_SHORT).show();
+
+        if (globalA2dp != null) {
+            executeA2dpDisconnect(targetDevice);
+        } else {
+            BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+            if (adapter != null) {
+                adapter.getProfileProxy(this, new BluetoothProfile.ServiceListener() {
+                    @Override
+                    public void onServiceConnected(int profile, BluetoothProfile proxy) {
+                        if (profile == BluetoothProfile.A2DP) {
+                            globalA2dp = proxy;
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    executeA2dpDisconnect(targetDevice);
+                                }
+                            });
+                        }
+                    }
+
+                    @Override
+                    public void onServiceDisconnected(int profile) {
+                        if (profile == BluetoothProfile.A2DP)
+                            globalA2dp = null;
+                    }
+                }, BluetoothProfile.A2DP);
+            }
+        }
+    }
+
+    private void executeA2dpDisconnect(final BluetoothDevice targetDevice) {
+        if (globalA2dp == null || targetDevice == null)
+            return;
+        try {
+            // Set priority to PRIORITY_OFF (0) so incoming reconnect from earphones is rejected by Android Bluetooth stack
+            try {
+                Method setPriorityMethod = globalA2dp.getClass().getMethod("setPriority", BluetoothDevice.class, int.class);
+                if (setPriorityMethod != null) {
+                    setPriorityMethod.invoke(globalA2dp, targetDevice, 0); // BluetoothProfile.PRIORITY_OFF
+                }
+            } catch (Exception ignored) {
+            }
+
+            Method disconnectMethod = null;
+            try {
+                disconnectMethod = globalA2dp.getClass().getDeclaredMethod("disconnect", BluetoothDevice.class);
+            } catch (NoSuchMethodException e) {
+                for (Method m : globalA2dp.getClass().getMethods()) {
+                    if (m.getName().equals("disconnect") && m.getParameterTypes().length == 1) {
+                        disconnectMethod = m;
+                        break;
+                    }
+                }
+            }
+
+            if (disconnectMethod != null) {
+                disconnectMethod.setAccessible(true);
+                disconnectMethod.invoke(globalA2dp, targetDevice);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        new Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (currentScreenState == STATE_BLUETOOTH) {
+                    startBluetoothScan();
+                }
+            }
+        }, 500);
     }
 
     // 초기화 함수 내부 (앱 실행 시 1회 호출)
@@ -2554,22 +2667,28 @@ public class MainActivity extends Activity {
         layoutWifiMode = findViewById(R.id.layout_wifi_mode);
         containerWifiItems = findViewById(R.id.container_wifi_items);
         btnScanWifi = findViewById(R.id.btn_scan_wifi);
-        // 💡 [추가] 스캔 버튼에 휠 포커스가 닿았을 때 색상 변화 및 중복 소리 차단
+        // 💡 [추가] 스캔 버튼에 휠 포커스가 닿았을 때 테마 기반 색상 변화 및 중복 소리 차단
         View.OnFocusChangeListener scanFocusListener = new View.OnFocusChangeListener() {
             @Override
             public void onFocusChange(View v, boolean hasFocus) {
                 Button btn = (Button) v;
                 if (hasFocus) {
-                    btn.setBackgroundColor(0x88FFFFFF); // 휠이 닿으면 반투명 흰색 배경
-                    btn.setTextColor(0xFF000000); // 글자는 검은색으로 반전!
+                    btn.setBackground(createFocusedButtonBackground());
+                    btn.setTextColor(ThemeManager.getListButtonFocusedTextColor());
                 } else {
-                    btn.setBackgroundColor(0x00000000); // 휠이 벗어나면 다시 투명 배경
-                    btn.setTextColor(0xFFFFFFFF); // 글자는 원래대로 흰색!
+                    btn.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
+                    btn.setTextColor(ThemeManager.getTextColorPrimary());
                 }
             }
         };
         btnScanBt.setOnFocusChangeListener(scanFocusListener);
         btnScanWifi.setOnFocusChangeListener(scanFocusListener);
+        btnScanBt.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
+        btnScanBt.setTextColor(ThemeManager.getTextColorPrimary());
+        btnScanBt.setTypeface(ThemeManager.getCustomFontBold());
+        btnScanWifi.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
+        btnScanWifi.setTextColor(ThemeManager.getTextColorPrimary());
+        btnScanWifi.setTypeface(ThemeManager.getCustomFontBold());
         btnScanBt.setSoundEffectsEnabled(false);
         btnScanWifi.setSoundEffectsEnabled(false);
         layoutWifiKeyboard = findViewById(R.id.layout_wifi_keyboard);
@@ -3223,6 +3342,7 @@ public class MainActivity extends Activity {
         filter.addAction(BluetoothDevice.ACTION_FOUND);
         filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
         filter.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
+        filter.addAction(BluetoothDevice.ACTION_ACL_CONNECTED);
         filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
         filter.addAction("android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED");
         filter.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
@@ -4431,6 +4551,27 @@ public class MainActivity extends Activity {
             if (ivStatusWifi != null && ivStatusWifi.getVisibility() == View.VISIBLE)
                 updateStatusBarWifi(isWifiConnectedStatus);
 
+            if (btnScanBt != null) {
+                if (btnScanBt.hasFocus()) {
+                    btnScanBt.setBackground(createFocusedButtonBackground());
+                    btnScanBt.setTextColor(ThemeManager.getListButtonFocusedTextColor());
+                } else {
+                    btnScanBt.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
+                    btnScanBt.setTextColor(primary);
+                }
+                btnScanBt.setTypeface(ThemeManager.getCustomFontBold());
+            }
+            if (btnScanWifi != null) {
+                if (btnScanWifi.hasFocus()) {
+                    btnScanWifi.setBackground(createFocusedButtonBackground());
+                    btnScanWifi.setTextColor(ThemeManager.getListButtonFocusedTextColor());
+                } else {
+                    btnScanWifi.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
+                    btnScanWifi.setTextColor(primary);
+                }
+                btnScanWifi.setTypeface(ThemeManager.getCustomFontBold());
+            }
+
             int themeFocusColor = ThemeManager.getListButtonFocusedBg() | 0xFF000000;
             if (playerProgress != null) {
                 try {
@@ -4492,13 +4633,9 @@ public class MainActivity extends Activity {
             final int index = i;
             ThemeManager.ThemeData theme = ThemeManager.availableThemes.get(i);
 
-            String prefix = (ThemeManager.getCurrentThemeIndex() == i) ? "✔ " : "   ";
-            Button btn = createListButton(prefix + theme.name);
-
-            if (ThemeManager.getCurrentThemeIndex() == i) {
-                btn.setTypeface(ThemeManager.getCustomFontBold());
-                btn.setTextColor(0xFF00FF00); // 현재 사용 중인 테마는 초록색으로 굵게 강조!
-            }
+            boolean isSelected = (ThemeManager.getCurrentThemeIndex() == i);
+            String[] icon = isSelected ? com.themoon.y1.views.TablerIcons.CHECK : null;
+            View btn = createTablerListButton(icon, theme.name, isSelected ? 0xFF00FF00 : 0, isSelected ? 0xFF00FF00 : 0);
 
             btn.setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -6424,7 +6561,24 @@ public class MainActivity extends Activity {
                         targetDeviceForAudio = null;
                         ba.disable();
                     } else {
-                        ba.enable();
+                        // 🚀 [MTK 수정] mtkbt 데몬을 먼저 살려낸 뒤 블루투스를 켭니다!
+                        ((TextView) btnToggle.getChildAt(1)).setText(t("Wait..."));
+                        new Thread(new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    Runtime.getRuntime().exec(new String[]{"su", "-c", "setprop ctl.start mtkbt"}).waitFor();
+                                    Thread.sleep(1500); // give mtkbt time to create its socket
+                                } catch (Exception ignored) {}
+                                runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        ba.enable();
+                                    }
+                                });
+                            }
+                        }).start();
+                        return; // setText("Wait...") already done above
                     }
                     ((TextView) btnToggle.getChildAt(1)).setText(t("Wait..."));
                 }
@@ -6444,7 +6598,7 @@ public class MainActivity extends Activity {
         // 🚀 2. 순정 런처 완벽 구현: 나의 기기 (PAIRED DEVICES) 목록
         TextView tvPaired = new TextView(this);
         tvPaired.setText("━ " + t("PAIRED DEVICES") + " ━");
-        tvPaired.setTextColor(0xBBFFFFFF);
+        tvPaired.setTextColor(ThemeManager.getTextColorSecondary());
         tvPaired.setTextSize(14);
         tvPaired.setTypeface(ThemeManager.getCustomFontBold());
         tvPaired.setPadding(10, 30, 10, 5);
@@ -6459,7 +6613,7 @@ public class MainActivity extends Activity {
             } else {
                 TextView tvEmpty = new TextView(this);
                 tvEmpty.setText(t("No paired devices."));
-                tvEmpty.setTextColor(0xFF888888);
+                tvEmpty.setTextColor(ThemeManager.getTextColorSecondary());
                 tvEmpty.setPadding(10, 10, 10, 10);
                 containerBtItems.addView(tvEmpty);
             }
@@ -6469,7 +6623,7 @@ public class MainActivity extends Activity {
         // 🚀 3. 새로 찾은 기기 (AVAILABLE DEVICES) 목록
         TextView tvAvailable = new TextView(this);
         tvAvailable.setText("━ " + t("AVAILABLE DEVICES") + " ━");
-        tvAvailable.setTextColor(0xBBFFFFFF);
+        tvAvailable.setTextColor(ThemeManager.getTextColorSecondary());
         tvAvailable.setTextSize(14);
         tvAvailable.setTypeface(ThemeManager.getCustomFontBold());
         tvAvailable.setPadding(10, 30, 10, 5);
@@ -6512,39 +6666,57 @@ public class MainActivity extends Activity {
             }
         }
 
-        String prefix = isConnected ? "((♪)) [CONNECTED] " : "✔ ";
-        final Button btnDevice = createListButton(prefix + name);
+        int accentColor = 0xFF00FFFF;
+        try {
+            accentColor = ThemeManager.getListButtonFocusedBg() | 0xFF000000;
+        } catch (Exception e) {
+        }
 
-        if (isConnected) {
-            int themeColor = 0xFF00FFFF;
-            try {
-                themeColor = ThemeManager.getListButtonFocusedBg() | 0xFF000000;
-            } catch (Exception e) {
+        String[] devIcon = com.themoon.y1.views.TablerIcons.BLUETOOTH;
+        try {
+            BluetoothClass btClass = device.getBluetoothClass();
+            if (btClass != null && (btClass.doesClassMatch(BluetoothClass.PROFILE_A2DP)
+                    || btClass.doesClassMatch(BluetoothClass.PROFILE_HEADSET))) {
+                devIcon = com.themoon.y1.views.TablerIcons.HEADPHONES;
             }
-            btnDevice.setTextColor(themeColor);
-            btnDevice.setTypeface(ThemeManager.getCustomFontBold());
+        } catch (Exception ignored) {
+        }
+
+        final View btnDevice;
+        if (isConnected) {
+            btnDevice = createTablerListButton(devIcon, name, accentColor, accentColor);
         } else {
-            btnDevice.setTextColor(0xFF00FF00);
+            btnDevice = createTablerListButton(devIcon, name, ThemeManager.getTextColorSecondary(), ThemeManager.getTextColorPrimary());
         }
 
         // 🚀 [치명적 버그 수정] 서브 메뉴용 투명 폴더(LinearLayout)를 박살내고 리스트에 직속으로 붙입니다!
 
-        // 🚀 [하이브리드 엔진 연동] 오디오 연결 유니코드("\uE1B1")와 흰색(0xFFFFFFFF)을 주입합니다.
-        // (※ 주의: 리턴 타입이 Button에서 android.view.View로 변경됩니다)
-        final View btnConnect = createListButtonWithIcon("\uE1B1", t("Connect Audio"), 0xFFFFFFFF);
+        final boolean isConnectedDevice = isConnected;
+        final View btnConnect;
+        if (isConnectedDevice) {
+            btnConnect = createTablerListButton(com.themoon.y1.views.TablerIcons.UNLINK, t("Disconnect Audio"));
+            btnConnect.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    clickFeedback();
+                    btnDevice.requestFocus();
+                    disconnectBluetoothAudio(device);
+                }
+            });
+        } else {
+            btnConnect = createTablerListButton(com.themoon.y1.views.TablerIcons.HEADPHONES, t("Connect Audio"));
+            btnConnect.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    clickFeedback();
+                    connectBluetoothAudio(device); // 🚀 중앙 엔진 호출!
+                }
+            });
+        }
 
         btnConnect.setVisibility(View.GONE); // 초기엔 숨겨둡니다.
-        btnConnect.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                clickFeedback();
-                connectBluetoothAudio(device); // 🚀 중앙 엔진 호출!
-            }
-        });
 
-        // 🚀 [하이브리드 엔진 연동] 쓰레기통 유니코드("\uE872")와 빨간색(0xFFFF5555)을 주입합니다.
-        // (※ 주의: 리턴 타입이 Button에서 android.view.View로 변경됩니다)
-        final View btnUnpair = createListButtonWithIcon("\uE872", t("Delete Device"), 0xFFFF5555);
+        final View btnUnpair = createTablerListButton(com.themoon.y1.views.TablerIcons.TRASH, t("Delete Device"), 0xFFFF5555, 0xFFFF5555);
 
         btnUnpair.setVisibility(View.GONE); // 초기엔 숨겨둡니다.
         btnUnpair.setOnClickListener(new View.OnClickListener() {
@@ -6552,10 +6724,19 @@ public class MainActivity extends Activity {
             public void onClick(View v) {
                 clickFeedback();
                 try {
-                    device.getClass().getMethod("removeBond").invoke(device);
-                    Toast.makeText(MainActivity.this, t("Device Deleted."), Toast.LENGTH_SHORT).show();
-                    startBluetoothScan(); // 삭제 후 화면 새로고침
+                    if (isConnectedDevice) {
+                        disconnectBluetoothAudio(device);
+                    }
+                    Object result = device.getClass().getMethod("removeBond").invoke(device);
+                    boolean removed = (result instanceof Boolean) && (Boolean) result;
+                    if (removed) {
+                        Toast.makeText(MainActivity.this, t("Removing device..."), Toast.LENGTH_SHORT).show();
+                        // Don't scan immediately — ACTION_BOND_STATE_CHANGED will trigger scan when BOND_NONE arrives
+                    } else {
+                        Toast.makeText(MainActivity.this, t("Failed to remove device. Try restarting Bluetooth."), Toast.LENGTH_LONG).show();
+                    }
                 } catch (Exception e) {
+                    Toast.makeText(MainActivity.this, t("Error: ") + e.getMessage(), Toast.LENGTH_LONG).show();
                 }
             }
         });
@@ -6584,6 +6765,16 @@ public class MainActivity extends Activity {
 
         // 🚀 인덱스 꼬임 방지: 화면 구조를 만들 때 그냥 차곡차곡 쌓아 올립니다.
         containerBtItems.addView(btnDevice);
+
+        // 💡 [버그 수정] 서브 메뉴 버튼에 좌측 들여쓰기(indent)를 줘서 시각적으로 중첩됨을 표시합니다.
+        float d = getResources().getDisplayMetrics().density;
+        int indentPx = (int) (32 * d);
+        if (btnConnect.getLayoutParams() instanceof ViewGroup.MarginLayoutParams) {
+            ((ViewGroup.MarginLayoutParams) btnConnect.getLayoutParams()).leftMargin = indentPx;
+        }
+        if (btnUnpair.getLayoutParams() instanceof ViewGroup.MarginLayoutParams) {
+            ((ViewGroup.MarginLayoutParams) btnUnpair.getLayoutParams()).leftMargin = indentPx;
+        }
         containerBtItems.addView(btnConnect);
         containerBtItems.addView(btnUnpair);
     }
@@ -6594,7 +6785,17 @@ public class MainActivity extends Activity {
         if (device.getBondState() == BluetoothDevice.BOND_BONDED)
             return; // 페어링된 기기는 위에서 그리므로 무시
 
-        final Button btnDevice = createListButton("🔍 " + name);
+        String[] devIcon = com.themoon.y1.views.TablerIcons.BLUETOOTH;
+        try {
+            BluetoothClass btClass = device.getBluetoothClass();
+            if (btClass != null && (btClass.doesClassMatch(BluetoothClass.PROFILE_A2DP)
+                    || btClass.doesClassMatch(BluetoothClass.PROFILE_HEADSET))) {
+                devIcon = com.themoon.y1.views.TablerIcons.HEADPHONES;
+            }
+        } catch (Exception ignored) {
+        }
+
+        final View btnDevice = createTablerListButton(devIcon, name, ThemeManager.getTextColorSecondary(), ThemeManager.getTextColorPrimary());
 
         btnDevice.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -6615,12 +6816,18 @@ public class MainActivity extends Activity {
                 if (containerBtItems.getChildCount() > 0) {
                     if (targetFocusIndex >= 0 && targetFocusIndex < containerBtItems.getChildCount()) {
                         View target = containerBtItems.getChildAt(targetFocusIndex);
-                        if (target.isFocusable()) {
+                        if (target.isFocusable() && target.getVisibility() == View.VISIBLE) {
                             target.requestFocus();
                             return;
                         }
                     }
-                    containerBtItems.getChildAt(0).requestFocus();
+                    for (int i = 0; i < containerBtItems.getChildCount(); i++) {
+                        View v = containerBtItems.getChildAt(i);
+                        if (v.isFocusable() && v.getVisibility() == View.VISIBLE) {
+                            v.requestFocus();
+                            return;
+                        }
+                    }
                 }
             }
         }, 50);
@@ -6699,11 +6906,11 @@ public class MainActivity extends Activity {
             tvRight.setText(t(statusText));
             if (!btnToggle.hasFocus()) {
                 if (statusText.equals("ON"))
-                    tvRight.setTextColor(0xFFFFFFFF);
+                    tvRight.setTextColor(ThemeManager.getTextColorPrimary());
                 else if (statusText.equals("OFF"))
-                    tvRight.setTextColor(0xFF888888);
+                    tvRight.setTextColor(ThemeManager.getTextColorSecondary());
                 else
-                    tvRight.setTextColor(0xFFFFFFFF);
+                    tvRight.setTextColor(ThemeManager.getTextColorPrimary());
             }
             for (int i = containerWifiItems.getChildCount() - 1; i > 0; i--) {
                 View v = containerWifiItems.getChildAt(i);
@@ -6748,16 +6955,14 @@ public class MainActivity extends Activity {
     // 💡 연결 상태(isConnected)를 파라미터로 직접 전달받도록 개조된 함수
     private void addWifiItemToUI(final String ssid, String capabilities, final boolean isConnected) {
         final boolean isOpen = !capabilities.contains("WPA") && !capabilities.contains("WEP");
-        String lockIcon = isOpen ? "📶 " : "🔒 ";
+        final String[] leftIcon = isConnected ? com.themoon.y1.views.TablerIcons.CHECK : com.themoon.y1.views.TablerIcons.WIFI;
+        final String[] rightIcon = isOpen ? null : com.themoon.y1.views.TablerIcons.LOCK;
 
-        // 연결된 기기 앞에는 투박한 글씨 대신 애플처럼 예쁜 체크마크(✔) 부여!
-        String prefix = isConnected ? "✔ " : "";
-
-        Button btnWifi = createListButton(prefix + lockIcon + ssid);
-
+        final View btnWifi;
         if (isConnected) {
-            btnWifi.setTextColor(0xFF00FF00); // 눈에 확 띄는 초록색!
-            btnWifi.setTypeface(ThemeManager.getCustomFontBold()); // 굵은 글씨로 강조!
+            btnWifi = createTablerListButton(leftIcon, ssid, rightIcon, 0xFF00FF00, 0xFF00FF00);
+        } else {
+            btnWifi = createTablerListButton(leftIcon, ssid, rightIcon, ThemeManager.getTextColorSecondary(), ThemeManager.getTextColorPrimary());
         }
 
         btnWifi.setOnClickListener(new View.OnClickListener() {
@@ -6805,8 +7010,7 @@ public class MainActivity extends Activity {
         TextView tv = new TextView(this);
         tv.setTypeface(ThemeManager.getCustomFontBold());
         tv.setText(t(title)); // 🚀 [수정] 들어온 title을 번역기에 한 번 돌려서 넣습니다!
-        // 💡 하늘색을 빼고, 애플 스타일의 은은한 반투명 흰색 & 굵은 글씨로 변경!
-        tv.setTextColor(0xBBFFFFFF);
+        tv.setTextColor(ThemeManager.getTextColorSecondary());
         tv.setTextSize(14);
         tv.setTypeface(ThemeManager.getCustomFontBold());
         tv.setPadding(10, 30, 10, 5);
@@ -7080,7 +7284,7 @@ public class MainActivity extends Activity {
         return btn;
     }
 
-    public View createTablerListButton(final String[] iconPaths, String text) {
+    public View createTablerListButton(final String[] iconPaths, String text, final String[] rightIconPaths, final int iconColor, final int textColor) {
         final float d = getResources().getDisplayMetrics().density;
         final LinearLayout rowButton = new LinearLayout(this);
         rowButton.setOrientation(LinearLayout.HORIZONTAL);
@@ -7100,19 +7304,26 @@ public class MainActivity extends Activity {
         rowLp.setMargins(0, (int) (3 * d), 0, (int) (3 * d));
         rowButton.setLayoutParams(rowLp);
 
-        final ImageView ivIcon = new ImageView(this);
+        final ImageView ivIcon;
         final int iconSizePx = (int) (20 * d);
+        final int defaultIconColor = (iconColor != 0) ? iconColor : ThemeManager.getTextColorPrimary();
+        final int defaultTextColor = (textColor != 0) ? textColor : ThemeManager.getTextColorPrimary();
+
         if (iconPaths != null) {
-            ivIcon.setImageBitmap(com.themoon.y1.views.TablerIcons.render(iconPaths, iconSizePx, ThemeManager.getTextColorPrimary()));
+            ivIcon = new ImageView(this);
+            ivIcon.setImageBitmap(com.themoon.y1.views.TablerIcons.render(iconPaths, iconSizePx, defaultIconColor));
+            LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(iconSizePx, iconSizePx);
+            iconLp.rightMargin = (int) (10 * d);
+            ivIcon.setLayoutParams(iconLp);
+            rowButton.addView(ivIcon);
+        } else {
+            ivIcon = null;
         }
-        LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(iconSizePx, iconSizePx);
-        iconLp.rightMargin = (int) (10 * d);
-        ivIcon.setLayoutParams(iconLp);
 
         final TextView tvText = new TextView(this);
         tvText.setText(text);
         tvText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, ThemeManager.getListTextSize() * d);
-        tvText.setTextColor(ThemeManager.getTextColorPrimary());
+        tvText.setTextColor(defaultTextColor);
         tvText.setTypeface(ThemeManager.getCustomFontBold());
         tvText.setSingleLine(true);
         tvText.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
@@ -7121,9 +7332,19 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams textLp = new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         tvText.setLayoutParams(textLp);
-
-        rowButton.addView(ivIcon);
         rowButton.addView(tvText);
+
+        final ImageView ivRightIcon;
+        if (rightIconPaths != null) {
+            ivRightIcon = new ImageView(this);
+            ivRightIcon.setImageBitmap(com.themoon.y1.views.TablerIcons.render(rightIconPaths, (int) (16 * d), ThemeManager.getTextColorSecondary()));
+            LinearLayout.LayoutParams rightIconLp = new LinearLayout.LayoutParams((int) (16 * d), (int) (16 * d));
+            rightIconLp.leftMargin = (int) (8 * d);
+            ivRightIcon.setLayoutParams(rightIconLp);
+            rowButton.addView(ivRightIcon);
+        } else {
+            ivRightIcon = null;
+        }
 
         rowButton.setOnFocusChangeListener(new View.OnFocusChangeListener() {
             @Override
@@ -7132,8 +7353,11 @@ public class MainActivity extends Activity {
                     rowButton.setBackground(createFocusedButtonBackground());
                     tvText.setTextColor(ThemeManager.getListButtonFocusedTextColor());
                     tvText.setSelected(true);
-                    if (iconPaths != null) {
+                    if (ivIcon != null && iconPaths != null) {
                         ivIcon.setImageBitmap(com.themoon.y1.views.TablerIcons.render(iconPaths, iconSizePx, ThemeManager.getListButtonFocusedTextColor()));
+                    }
+                    if (ivRightIcon != null && rightIconPaths != null) {
+                        ivRightIcon.setImageBitmap(com.themoon.y1.views.TablerIcons.render(rightIconPaths, (int) (16 * d), ThemeManager.getListButtonFocusedTextColor()));
                     }
                     showFastScrollLetter(tvText.getText().toString());
                     if (currentScreenState == STATE_SETTINGS) {
@@ -7147,16 +7371,35 @@ public class MainActivity extends Activity {
                     }
                 } else {
                     rowButton.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
-                    tvText.setTextColor(ThemeManager.getTextColorPrimary());
+                    tvText.setTextColor(defaultTextColor);
                     tvText.setSelected(false);
-                    if (iconPaths != null) {
-                        ivIcon.setImageBitmap(com.themoon.y1.views.TablerIcons.render(iconPaths, iconSizePx, ThemeManager.getTextColorPrimary()));
+                    if (ivIcon != null && iconPaths != null) {
+                        ivIcon.setImageBitmap(com.themoon.y1.views.TablerIcons.render(iconPaths, iconSizePx, defaultIconColor));
+                    }
+                    if (ivRightIcon != null && rightIconPaths != null) {
+                        ivRightIcon.setImageBitmap(com.themoon.y1.views.TablerIcons.render(rightIconPaths, (int) (16 * d), ThemeManager.getTextColorSecondary()));
                     }
                 }
             }
         });
 
         return rowButton;
+    }
+
+    public View createTablerListButton(final String[] iconPaths, String text) {
+        return createTablerListButton(iconPaths, text, null, 0, 0);
+    }
+
+    public View createTablerListButton(final String[] iconPaths, String text, int color) {
+        return createTablerListButton(iconPaths, text, null, color, color);
+    }
+
+    public View createTablerListButton(final String[] iconPaths, String text, int iconColor, int textColor) {
+        return createTablerListButton(iconPaths, text, null, iconColor, textColor);
+    }
+
+    public View createTablerListButton(final String[] iconPaths, String text, final String[] rightIconPaths) {
+        return createTablerListButton(iconPaths, text, rightIconPaths, 0, 0);
     }
 
     public View createCustomDialogButton(String text) {
@@ -7953,11 +8196,9 @@ public class MainActivity extends Activity {
         langMgr.loadAvailableLanguages(); // 폴더에서 다시 스캔
 
         // 1. 기본 제공 영어 버튼
-        String enPrefix = langMgr.currentLangFileName.equals("English (Default)") ? "✔ " : "   ";
-        Button btnEng = createListButton(enPrefix + "English (Default)");
-        if (langMgr.currentLangFileName.equals("English (Default)")) {
-            btnEng.setTextColor(0xFF00FF00);
-        }
+        boolean isEngSelected = langMgr.currentLangFileName.equals("English (Default)");
+        View btnEng = createTablerListButton(isEngSelected ? com.themoon.y1.views.TablerIcons.CHECK : null,
+                "English (Default)", isEngSelected ? 0xFF00FF00 : 0, isEngSelected ? 0xFF00FF00 : 0);
         btnEng.setOnClickListener(v -> {
             clickFeedback();
             prefs.edit().putString("app_language", "English (Default)").commit();
@@ -7968,11 +8209,9 @@ public class MainActivity extends Activity {
 
         // 2. 외부에서 읽어온 JSON 언어팩들 목록 나열
         for (final File f : langMgr.availableLangFiles) {
-            String prefix = langMgr.currentLangFileName.equals(f.getName()) ? "✔ " : "   ";
-            Button btnLang = createListButton(prefix + f.getName().replace(".json", ""));
-            if (langMgr.currentLangFileName.equals(f.getName())) {
-                btnLang.setTextColor(0xFF00FF00);
-            }
+            boolean isSelected = langMgr.currentLangFileName.equals(f.getName());
+            View btnLang = createTablerListButton(isSelected ? com.themoon.y1.views.TablerIcons.CHECK : null,
+                    f.getName().replace(".json", ""), isSelected ? 0xFF00FF00 : 0, isSelected ? 0xFF00FF00 : 0);
 
             btnLang.setOnClickListener(v -> {
                 clickFeedback();
@@ -9397,7 +9636,7 @@ public class MainActivity extends Activity {
 
                             final TextView tvHeader = new TextView(MainActivity.this);
                             tvHeader.setTypeface(ThemeManager.getCustomFontBold());
-                            tvHeader.setTextColor(0xBBFFFFFF);
+                            tvHeader.setTextColor(ThemeManager.getTextColorSecondary());
                             tvHeader.setTextSize(14);
                             tvHeader.setPadding(10, 30, 10, 5);
                             String infoHeader = t("Selected") + ": " + currentSelections.size() + " (" + formatStorageSize(totalSize) + ") | "
@@ -17693,13 +17932,12 @@ public class MainActivity extends Activity {
             for (int i = 0; i < eqPresetNames.size(); i++) {
                 final int pIdx = i;
                 final String pId = "preset_" + pIdx;
-                String prefix = currentEqProfile.equals(pId) ? "✔ " : "   ";
+                final boolean isSelected = currentEqProfile.equals(pId);
 
-                Button btn = createListButton(prefix + t(eqPresetNames.get(i)));
+                final View btn = createTablerListButton(isSelected ? com.themoon.y1.views.TablerIcons.CHECK : null,
+                        t(eqPresetNames.get(i)), isSelected ? 0xFF00FF00 : 0, isSelected ? 0xFF00FF00 : 0);
 
-                if (currentEqProfile.equals(pId)) {
-                    btn.setTextColor(0xFF00FF00);
-                    btn.setTypeface(ThemeManager.getCustomFontBold());
+                if (isSelected) {
                     targetFocusView[0] = btn; // 🎯 [핵심] 현재 활성화된 버튼 객체를 금고에 저장!
                 }
 
@@ -17732,13 +17970,12 @@ public class MainActivity extends Activity {
                 if (prof.trim().isEmpty())
                     continue;
                 final String cId = "custom_" + prof;
-                String prefix = currentEqProfile.equals(cId) ? "✔ " : "   ";
+                final boolean isCustomSelected = currentEqProfile.equals(cId);
 
-                Button btn = createListButton(prefix + prof);
+                final View btn = createTablerListButton(isCustomSelected ? com.themoon.y1.views.TablerIcons.CHECK : null,
+                        prof, isCustomSelected ? 0xFF00FF00 : 0, isCustomSelected ? 0xFF00FF00 : 0);
 
-                if (currentEqProfile.equals(cId)) {
-                    btn.setTextColor(0xFF00FF00);
-                    btn.setTypeface(ThemeManager.getCustomFontBold());
+                if (isCustomSelected) {
                     targetFocusView[0] = btn; // 🎯 [핵심] 현재 커스텀 EQ 버튼 객체도 금고에 저장!
                 }
 
@@ -19075,7 +19312,7 @@ public class MainActivity extends Activity {
         };
 
         // 삭제 버튼 (빨간색)
-        View btnRemove = createListButtonWithIcon("\uE872", t("Remove"), 0xFFFF5555);
+        View btnRemove = createTablerListButton(com.themoon.y1.views.TablerIcons.TRASH, t("Remove"), 0xFFFF5555, 0xFFFF5555);
         btnRemove.setOnKeyListener(dialogWheelListener);
         btnRemove.setOnClickListener(v -> {
             clickFeedback();
@@ -20595,7 +20832,7 @@ public class MainActivity extends Activity {
         };
 
         // 4. [삭제] 버튼
-        View btnDelete = createListButtonWithIcon("\uE872", t("Delete"), 0xFFFF5555);
+        View btnDelete = createTablerListButton(com.themoon.y1.views.TablerIcons.TRASH, t("Delete"), 0xFFFF5555, 0xFFFF5555);
         btnDelete.setOnKeyListener(dialogWheelListener);
         btnDelete.setOnClickListener(v -> {
             clickFeedback();
@@ -20678,8 +20915,7 @@ public class MainActivity extends Activity {
             containerBrowserItems.addView(tvEmpty);
         } else {
             for (final String[] channel : channels) {
-                // 💡 빨간색(0xFFFF5555) 휴지통 아이콘으로 '삭제용 버튼'임을 명확히 보여줍니다!
-                View btnDel = createListButtonWithIcon("\uE872", channel[0], 0xFFFF5555);
+                View btnDel = createTablerListButton(com.themoon.y1.views.TablerIcons.TRASH, channel[0], 0xFFFF5555, 0xFFFF5555);
 
                 // 기존의 new AlertDialog.Builder(...) 부분을 통째로 지우고 이 한 줄로 교체하세요!
                 btnDel.setOnClickListener(v -> {

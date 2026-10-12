@@ -297,6 +297,8 @@
   "AVAILABLE DEVICES": "DOSTĘPNE URZĄDZENIA",
   "PAIRED DEVICES": "SPAROWANE URZĄDZENIA",
   "Connect Audio": "Połącz audio",
+  "Disconnect Audio": "Rozłącz audio",
+  "Disconnecting Audio...": "Rozłączanie audio...",
   "Delete Device": "Usuń urządzenie",
   "Device Deleted.": "Urządzenie usunięte.",
   "Pairing with ": "Parowanie z ",
