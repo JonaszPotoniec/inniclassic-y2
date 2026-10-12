@@ -185,18 +185,42 @@ public class MainActivity extends Activity {
             combinedLibrary.addAll(audiobookLibrary);
         }
 
-        HashSet<String> checkedAlbums = new HashSet<>();
-        List<SongItem> result = new ArrayList<>();
+        java.util.LinkedHashMap<String, List<SongItem>> albumMap = new java.util.LinkedHashMap<>();
 
         for (SongItem song : combinedLibrary) {
             if (song == null || song.file == null) continue;
-            String album = (song.album != null && !song.album.trim().isEmpty()) ? song.album : "Unknown Album";
-            String parentPath = (song.file.getParentFile() != null) ? song.file.getParentFile().getAbsolutePath() : "";
-            String key = parentPath + " - " + album;
-            if (!checkedAlbums.contains(key)) {
-                checkedAlbums.add(key);
-                result.add(song);
+            String album = (song.album != null && !song.album.trim().isEmpty()) ? song.album.trim() : "Unknown Album";
+            String key = album.toLowerCase(Locale.US);
+            List<SongItem> list = albumMap.get(key);
+            if (list == null) {
+                list = new ArrayList<>();
+                albumMap.put(key, list);
             }
+            list.add(song);
+        }
+
+        List<SongItem> result = new ArrayList<>();
+        for (List<SongItem> tracks : albumMap.values()) {
+            if (tracks.isEmpty()) continue;
+            // Determine consensus albumArtist (most frequent albumArtist across tracks of this album)
+            java.util.Map<String, Integer> artistCounts = new java.util.HashMap<>();
+            String bestArtist = null;
+            int maxCount = -1;
+            for (SongItem t : tracks) {
+                String a = (t.albumArtist != null && !t.albumArtist.trim().isEmpty()) ? t.albumArtist.trim()
+                        : ((t.artist != null && !t.artist.trim().isEmpty()) ? t.artist.trim() : "Unknown Artist");
+                int cnt = (artistCounts.containsKey(a) ? artistCounts.get(a) : 0) + 1;
+                artistCounts.put(a, cnt);
+                if (cnt > maxCount) {
+                    maxCount = cnt;
+                    bestArtist = a;
+                }
+            }
+            if (bestArtist == null) bestArtist = "Unknown Artist";
+
+            SongItem first = tracks.get(0);
+            SongItem rep = new SongItem(first.file, first.title, bestArtist, first.album, first.year, first.genre, bestArtist, first.composer);
+            result.add(rep);
         }
 
         java.util.Collections.sort(result, new java.util.Comparator<SongItem>() {
@@ -856,8 +880,15 @@ public class MainActivity extends Activity {
     private String typedPassword = "";
     private boolean isTargetWifiOpen = false;
     private boolean isPendingUpdateCheckAfterWifi = false;
+    private boolean isPendingJellyfinSyncAfterWifi = false;
+    private boolean isPendingJellyfinTestAfterWifi = false;
+    private boolean isPendingJellyfinQuickConnectAfterWifi = false;
+    private com.themoon.y1.sync.MediaSyncProvider.LibraryInfo jellyfinActiveLibrary = null;
+    private int lastJellyfinFocusIndex = -1;
+    private int lastJellyfinLibConfigFocusIndex = -1;
+    private String jellyfinPendingUsername = "";
     private boolean isWifiConnectedStatus = false;
-    // currentKeyboardMode: 0=Wi-Fi password, 1=podcast search, 2=Last.fm username, 3=Last.fm password
+    // currentKeyboardMode: 0=Wi-Fi password, 1=podcast search, 2=Last.fm username, 3=Last.fm password, 5=Jellyfin URL, 6=Jellyfin User, 7=Jellyfin Pass, 8=Jellyfin Token
     private String pendingLastFmUsername = "";
     // 💡 미디어 스캐너가 현재 작업 중인지 추적하는 변수
     private boolean isMediaScanning = false;
@@ -1587,6 +1618,42 @@ public class MainActivity extends Activity {
                                 startUpdateCheckWithWifi();
                             }
                         });
+                    } else if (isPendingJellyfinSyncAfterWifi) {
+                        isPendingJellyfinSyncAfterWifi = false;
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                isNavigatingToSubMenu = true;
+                                changeScreen(STATE_SETTINGS);
+                                buildJellyfinSettingsUI();
+                                isNavigatingToSubMenu = false;
+                                startJellyfinSyncWithWifi();
+                            }
+                        });
+                    } else if (isPendingJellyfinTestAfterWifi) {
+                        isPendingJellyfinTestAfterWifi = false;
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                isNavigatingToSubMenu = true;
+                                changeScreen(STATE_SETTINGS);
+                                buildJellyfinSettingsUI();
+                                isNavigatingToSubMenu = false;
+                                testJellyfinConnection();
+                            }
+                        });
+                    } else if (isPendingJellyfinQuickConnectAfterWifi) {
+                        isPendingJellyfinQuickConnectAfterWifi = false;
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                isNavigatingToSubMenu = true;
+                                changeScreen(STATE_SETTINGS);
+                                buildJellyfinSettingsUI();
+                                isNavigatingToSubMenu = false;
+                                startJellyfinQuickConnect();
+                            }
+                        });
                     } else if (currentScreenState == STATE_WIFI) {
                         startWifiScan();
                     }
@@ -2309,7 +2376,13 @@ public class MainActivity extends Activity {
         }
 
         if (customLibrary.isEmpty()) {
-            loadLibraryCache();
+            // If secondary microSD exists, give mount monitor a brief moment if not ready yet
+            if (com.themoon.y1.managers.ExternalSdMountMonitor.hasSecondarySlot()
+                    && !com.themoon.y1.managers.ExternalSdMountMonitor.isSecondaryReady()) {
+                Log.i(TAG, "Secondary storage not ready yet at onCreate, will load library once mounted");
+            } else {
+                loadLibraryCache();
+            }
         }
 
         // 🚀 [추가된 부분] 앱이 켜질 때(혹은 튕기고 재시작될 때) 조용히 자동 스캔을 돌려 리스트를 복구합니다!
@@ -2325,8 +2398,12 @@ public class MainActivity extends Activity {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        if (!isCustomScanning)
+                        if (customLibrary.isEmpty()) {
+                            loadLibraryCache();
+                        }
+                        if (customLibrary.isEmpty() && !isCustomScanning) {
                             startMediaLibraryScan();
+                        }
                     }
                 });
             }
@@ -5928,6 +6005,15 @@ public class MainActivity extends Activity {
             View c = getCurrentFocus();
             if (c != null) {
                 c.performClick();
+            } else if (currentScreenState == STATE_SETTINGS && containerSettingsItems != null && containerSettingsItems.getChildCount() > 0) {
+                for (int i = 0; i < containerSettingsItems.getChildCount(); i++) {
+                    View child = containerSettingsItems.getChildAt(i);
+                    if (child != null && child.isFocusable() && child.getVisibility() == View.VISIBLE) {
+                        child.requestFocus();
+                        child.performClick();
+                        break;
+                    }
+                }
             } else if (currentScreenState == STATE_BROWSER && listVirtualSongs != null
                     && listVirtualSongs.getVisibility() == View.VISIBLE) {
                 int curFirst = listVirtualSongs.getFirstVisiblePosition();
@@ -6040,6 +6126,13 @@ public class MainActivity extends Activity {
             clickFeedback();
             return;
         }
+        if (currentKeyboardMode >= 5 && currentKeyboardMode <= 8) {
+            currentKeyboardMode = 0;
+            changeScreen(STATE_SETTINGS);
+            buildJellyfinSettingsUI();
+            clickFeedback();
+            return;
+        }
         changeScreen(STATE_WIFI);
         clickFeedback();
     }
@@ -6097,13 +6190,61 @@ public class MainActivity extends Activity {
                             });
                         }
                     });
+        } else if (currentKeyboardMode == 5) {
+            if (typedPassword.trim().isEmpty()) {
+                Toast.makeText(this, t("Please enter a keyword."), Toast.LENGTH_SHORT).show();
+                return;
+            }
+            com.themoon.y1.sync.jellyfin.JellyfinSyncProvider.getInstance(this).setServerUrl(typedPassword.trim());
+            currentKeyboardMode = 0;
+            changeScreen(STATE_SETTINGS);
+            buildJellyfinSettingsUI();
+            clickFeedback();
+        } else if (currentKeyboardMode == 6) {
+            if (typedPassword.trim().isEmpty()) {
+                Toast.makeText(this, t("Please enter a username."), Toast.LENGTH_SHORT).show();
+                return;
+            }
+            jellyfinPendingUsername = typedPassword.trim();
+            com.themoon.y1.sync.jellyfin.JellyfinSyncProvider provider = com.themoon.y1.sync.jellyfin.JellyfinSyncProvider.getInstance(this);
+            provider.setUsername(jellyfinPendingUsername);
+            currentKeyboardMode = 7; // Next to password
+            typedPassword = provider.getPassword();
+            openKeyboard();
+        } else if (currentKeyboardMode == 7) {
+            final String password = typedPassword;
+            if (password.isEmpty()) {
+                Toast.makeText(this, t("Please enter a password."), Toast.LENGTH_SHORT).show();
+                return;
+            }
+            com.themoon.y1.sync.jellyfin.JellyfinSyncProvider provider = com.themoon.y1.sync.jellyfin.JellyfinSyncProvider.getInstance(this);
+            provider.setPassword(password);
+            provider.setAccessToken(""); // Invalidate cached token so fresh auth is performed with new password
+            currentKeyboardMode = 0;
+            changeScreen(STATE_SETTINGS);
+            buildJellyfinSettingsUI();
+            testJellyfinConnection();
+            clickFeedback();
+        } else if (currentKeyboardMode == 8) {
+            if (typedPassword.trim().isEmpty()) {
+                Toast.makeText(this, t("Please enter a keyword."), Toast.LENGTH_SHORT).show();
+                return;
+            }
+            com.themoon.y1.sync.jellyfin.JellyfinSyncProvider.getInstance(this).setAccessToken(typedPassword.trim());
+            currentKeyboardMode = 0;
+            changeScreen(STATE_SETTINGS);
+            buildJellyfinSettingsUI();
+            testJellyfinConnection();
+            clickFeedback();
         } else {
             connectToWifi(); // 기존 와이파이 접속 엔진 발사!
         }
     }
 
     private void openKeyboard() {
-        typedPassword = "";
+        if (currentKeyboardMode != 5 && currentKeyboardMode != 6 && currentKeyboardMode != 7 && currentKeyboardMode != 8) {
+            typedPassword = "";
+        }
         keyboardIndex = 0;
         try {
             Settings.System.putInt(getContentResolver(), Settings.System.HAPTIC_FEEDBACK_ENABLED, 0);
@@ -6117,6 +6258,14 @@ public class MainActivity extends Activity {
             tvKeyboardSsid.setText(t("Last.fm Password") + ": " + pendingLastFmUsername);
         } else if (currentKeyboardMode == 4) {
             tvKeyboardSsid.setText("🔍 " + t("Search"));
+        } else if (currentKeyboardMode == 5) {
+            tvKeyboardSsid.setText(t("Server URL"));
+        } else if (currentKeyboardMode == 6) {
+            tvKeyboardSsid.setText(t("Username"));
+        } else if (currentKeyboardMode == 7) {
+            tvKeyboardSsid.setText(t("Password") + ": " + jellyfinPendingUsername);
+        } else if (currentKeyboardMode == 8) {
+            tvKeyboardSsid.setText(t("API Token"));
         } else {
             tvKeyboardSsid.setText(t("Target") + ": " + targetWifiSsid);
         }
@@ -6127,8 +6276,9 @@ public class MainActivity extends Activity {
                 keyboardQwertyView.setVisibility(View.VISIBLE);
                 String actionLabel = t("Connect");
                 if (currentKeyboardMode == 1 || currentKeyboardMode == 4) actionLabel = t("Search");
-                else if (currentKeyboardMode == 2) actionLabel = t("Next");
-                else if (currentKeyboardMode == 3) actionLabel = t("Login");
+                else if (currentKeyboardMode == 2 || currentKeyboardMode == 6) actionLabel = t("Next");
+                else if (currentKeyboardMode == 3 || currentKeyboardMode == 7 || currentKeyboardMode == 8) actionLabel = t("Login");
+                else if (currentKeyboardMode == 5) actionLabel = t("Save");
                 keyboardQwertyView.setSubmitActionLabel(actionLabel);
                 keyboardQwertyView.resetState();
             }
@@ -6155,20 +6305,34 @@ public class MainActivity extends Activity {
         // 🚀 와이파이 모드일 때만 '개방형 네트워크' 텍스트 표시
         if (isTargetWifiOpen && currentKeyboardMode == 0) {
             tvKeyboardInput.setText(t("Open Network (Direct Connect)"));
+            tvKeyboardInput.setTextColor(0x77FFFFFF);
             keyboardIndex = len - 1;
             tvKeyCurrent.setText(KEYBOARD_CHARS[keyboardIndex]);
         } else {
-            // 🚀 모드에 따라 힌트 텍스트 다르게 표시!
-            if (currentKeyboardMode == 1) {
-                tvKeyboardInput.setText(typedPassword.length() == 0 ? t("Enter keyword...") : typedPassword);
-            } else if (currentKeyboardMode == 2) {
-                tvKeyboardInput.setText(typedPassword.length() == 0 ? t("Enter Last.fm username...") : typedPassword);
-            } else if (currentKeyboardMode == 3) {
-                tvKeyboardInput.setText(typedPassword.length() == 0 ? t("Enter Last.fm password...") : typedPassword);
-            } else if (currentKeyboardMode == 4) {
-                tvKeyboardInput.setText(typedPassword.length() == 0 ? t("Enter search term...") : typedPassword);
+            if (typedPassword.length() == 0) {
+                tvKeyboardInput.setTextColor(0x77FFFFFF); // 💡 Dimmed gray placeholder
+                if (currentKeyboardMode == 1) {
+                    tvKeyboardInput.setText(t("Enter keyword..."));
+                } else if (currentKeyboardMode == 2) {
+                    tvKeyboardInput.setText(t("Enter Last.fm username..."));
+                } else if (currentKeyboardMode == 3) {
+                    tvKeyboardInput.setText(t("Enter Last.fm password..."));
+                } else if (currentKeyboardMode == 4) {
+                    tvKeyboardInput.setText(t("Enter search term..."));
+                } else if (currentKeyboardMode == 5) {
+                    tvKeyboardInput.setText("http://...");
+                } else if (currentKeyboardMode == 6) {
+                    tvKeyboardInput.setText(t("Username"));
+                } else if (currentKeyboardMode == 7) {
+                    tvKeyboardInput.setText(t("Password"));
+                } else if (currentKeyboardMode == 8) {
+                    tvKeyboardInput.setText(t("API Token"));
+                } else {
+                    tvKeyboardInput.setText(t("Enter Password..."));
+                }
             } else {
-                tvKeyboardInput.setText(typedPassword.length() == 0 ? t("Enter Password...") : typedPassword);
+                tvKeyboardInput.setTextColor(0xFFFFFFFF); // 💡 Solid white for actual user typed text
+                tvKeyboardInput.setText(typedPassword);
             }
         }
     }
@@ -6701,15 +6865,23 @@ public class MainActivity extends Activity {
                             if (currentSettingsDepth == 0)
                                 lastSettingsFocusIndex = idx;
                             else if (currentSettingsDepth == 1) {
-                                lastRadioFocusIndex = idx; // 💡 라디오 포커스 완벽 추적!
+                                if (isRadioUIShowing) {
+                                    lastRadioFocusIndex = idx; // 💡 라디오 포커스 완벽 추적!
 
-                                // 🚀 [주파수 전광판 시야 확보]
-                                // 포커스가 상단 항목(Power=2, Tune=3)에 위치하면 안드로이드 스크롤뷰가
-                                // 위의 전광판을 잘라버리는 문제를 막기 위해 최상단(0,0)으로 스크롤을 강제 고정합니다.
-                                if (idx <= 2) {
-                                    if (containerSettingsItems.getParent() instanceof ScrollView) {
-                                        ((ScrollView) containerSettingsItems.getParent()).scrollTo(0, 0);
+                                    // 🚀 [주파수 전광판 시야 확보]
+                                    // 포커스가 상단 항목(Power=2, Tune=3)에 위치하면 안드로이드 스크롤뷰가
+                                    // 위의 전광판을 잘라버리는 문제를 막기 위해 최상단(0,0)으로 스크롤을 강제 고정합니다.
+                                    if (idx <= 2) {
+                                        if (containerSettingsItems.getParent() instanceof ScrollView) {
+                                            ((ScrollView) containerSettingsItems.getParent()).scrollTo(0, 0);
+                                        }
                                     }
+                                } else if (settingsSubMode == 5) {
+                                    lastJellyfinFocusIndex = idx;
+                                }
+                            } else if (currentSettingsDepth == 2) {
+                                if (settingsSubMode == 5) {
+                                    lastJellyfinLibConfigFocusIndex = idx;
                                 }
                             }
                         }
@@ -6964,6 +7136,15 @@ public class MainActivity extends Activity {
                         ivIcon.setImageBitmap(com.themoon.y1.views.TablerIcons.render(iconPaths, iconSizePx, ThemeManager.getListButtonFocusedTextColor()));
                     }
                     showFastScrollLetter(tvText.getText().toString());
+                    if (currentScreenState == STATE_SETTINGS) {
+                        int idx = containerSettingsItems.indexOfChild(rowButton);
+                        if (idx != -1) {
+                            if (currentSettingsDepth == 0)
+                                lastSettingsFocusIndex = idx;
+                            else if (currentSettingsDepth == 1 && settingsSubMode == 5)
+                                lastJellyfinFocusIndex = idx;
+                        }
+                    }
                 } else {
                     rowButton.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
                     tvText.setTextColor(ThemeManager.getTextColorPrimary());
@@ -7034,6 +7215,7 @@ public class MainActivity extends Activity {
 
     private void buildSettingsUI() {
         currentSettingsDepth = 0; // 🚀 메인 설정은 깊이 0
+        settingsSubMode = 0;
         isPendingUpdateCheckAfterWifi = false;
 
         // 🚀 [안전장치] 일반 세팅 화면으로 들어오면 라디오 UI 플래그를 완벽하게 해제합니다.
@@ -7442,6 +7624,19 @@ public class MainActivity extends Activity {
             }
         });
         containerSettingsItems.addView(btnWifiMenu);
+
+        // 🚀 Jellyfin Sync
+        final LinearLayout btnJellyfin = createSettingRow(t("Jellyfin Sync"),
+                com.themoon.y1.sync.jellyfin.JellyfinSyncProvider.getInstance(this).getStatusSummary());
+        btnJellyfin.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                lastJellyfinFocusIndex = -1;
+                buildJellyfinSettingsUI();
+            }
+        });
+        containerSettingsItems.addView(btnJellyfin);
         // 🚀 [추가 1] 인터넷에서 앨범 아트 및 곡 정보 자동 검색 켜기/끄기
         final LinearLayout btnAutoFetch = createSettingRow("Auto Fetch Album Art",
                 isAutoFetchEnabled ? t("ON") : t("OFF"));
@@ -8747,6 +8942,1237 @@ public class MainActivity extends Activity {
                 btnOk.requestFocus();
             }
         }, 50);
+        dialog.show();
+    }
+
+    // =========================================================================
+    // 🚀 [JELLYFIN SYNC] Settings UI, Browse & Select, and Sync Coordinator
+    // =========================================================================
+
+    private void buildJellyfinSettingsUI() {
+        buildJellyfinSettingsUI(lastJellyfinFocusIndex);
+    }
+
+    private void buildJellyfinSettingsUI(final int preferredFocusIndex) {
+        currentSettingsDepth = 1;
+        settingsSubMode = 5;
+        containerSettingsItems.removeAllViews();
+
+        final com.themoon.y1.sync.jellyfin.JellyfinSyncProvider provider =
+                com.themoon.y1.sync.jellyfin.JellyfinSyncProvider.getInstance(this);
+
+        createCategoryHeader("━ " + t("Server") + " ━");
+
+        // 1. Server URL row
+        String rawUrl = provider.getServerUrl();
+        LinearLayout rowUrl = createSettingRow(t("Server URL"), rawUrl.isEmpty() ? t("Not Configured") : rawUrl);
+        rowUrl.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                currentKeyboardMode = 5;
+                typedPassword = provider.getServerUrl();
+                changeScreen(STATE_WIFI_KEYBOARD);
+                openKeyboard();
+            }
+        });
+        containerSettingsItems.addView(rowUrl);
+
+        // 2. Auth Mode row
+        final String authMode = provider.getAuthMode();
+        String authModeLabel = t("QuickConnect");
+        if ("credentials".equalsIgnoreCase(authMode)) {
+            authModeLabel = t("Credentials");
+        } else if ("token".equalsIgnoreCase(authMode)) {
+            authModeLabel = t("Token");
+        }
+
+        final LinearLayout rowAuthMode = createSettingRow(t("Auth Mode"), authModeLabel);
+        rowAuthMode.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                String cur = provider.getAuthMode();
+                String next;
+                if ("quickconnect".equalsIgnoreCase(cur)) {
+                    next = "credentials";
+                } else if ("credentials".equalsIgnoreCase(cur)) {
+                    next = "token";
+                } else {
+                    next = "quickconnect";
+                }
+                provider.setAuthMode(next);
+                buildJellyfinSettingsUI(containerSettingsItems.indexOfChild(rowAuthMode));
+            }
+        });
+        containerSettingsItems.addView(rowAuthMode);
+
+        if ("quickconnect".equalsIgnoreCase(authMode)) {
+            // QuickConnect row/button
+            boolean paired = !provider.getAccessToken().isEmpty();
+            String userSummary = provider.getUsername().isEmpty() ? t("Not Configured") : ("@" + provider.getUsername());
+            if (paired) {
+                LinearLayout rowUser = createSettingRow(t("Username"), userSummary);
+                containerSettingsItems.addView(rowUser);
+            }
+
+            View btnQuickConnect = createTablerListButton(com.themoon.y1.views.TablerIcons.LOGIN,
+                    paired ? t("Connect via QuickConnect") : t("Connect via QuickConnect"));
+            btnQuickConnect.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    clickFeedback();
+                    startJellyfinQuickConnect();
+                }
+            });
+            containerSettingsItems.addView(btnQuickConnect);
+        } else if ("token".equalsIgnoreCase(authMode)) {
+            // Token row
+            String token = provider.getAccessToken();
+            LinearLayout rowToken = createSettingRow(t("API Token"), token.isEmpty() ? t("Not Configured") : "••••••••");
+            rowToken.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    clickFeedback();
+                    currentKeyboardMode = 8;
+                    typedPassword = provider.getAccessToken();
+                    changeScreen(STATE_WIFI_KEYBOARD);
+                    openKeyboard();
+                }
+            });
+            containerSettingsItems.addView(rowToken);
+        } else {
+            // Username row
+            String user = provider.getUsername();
+            LinearLayout rowUser = createSettingRow(t("Username"), user.isEmpty() ? t("Not Configured") : user);
+            rowUser.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    clickFeedback();
+                    currentKeyboardMode = 6;
+                    typedPassword = provider.getUsername();
+                    changeScreen(STATE_WIFI_KEYBOARD);
+                    openKeyboard();
+                }
+            });
+            containerSettingsItems.addView(rowUser);
+
+            // Password row
+            String pass = provider.getPassword();
+            LinearLayout rowPass = createSettingRow(t("Password"), pass.isEmpty() ? t("Not Configured") : "••••••••");
+            rowPass.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    clickFeedback();
+                    jellyfinPendingUsername = provider.getUsername();
+                    currentKeyboardMode = 7;
+                    typedPassword = provider.getPassword();
+                    changeScreen(STATE_WIFI_KEYBOARD);
+                    openKeyboard();
+                }
+            });
+            containerSettingsItems.addView(rowPass);
+        }
+
+        // Test Connection button
+        View btnTest = createTablerListButton(com.themoon.y1.views.TablerIcons.REFRESH, t("Test Connection"));
+        btnTest.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                testJellyfinConnection();
+            }
+        });
+        containerSettingsItems.addView(btnTest);
+
+        createCategoryHeader("━ " + t("Libraries") + " ━");
+
+        final int libraryInsertionIndex = containerSettingsItems.getChildCount();
+
+        if (!provider.isConfigured() || provider.getUserId().isEmpty()) {
+            TextView tvHint = new TextView(this);
+            tvHint.setText(t("Connect to discover libraries."));
+            tvHint.setTextColor(ThemeManager.getTextColorSecondary());
+            tvHint.setTextSize(14f);
+            tvHint.setPadding(20, 15, 20, 15);
+            containerSettingsItems.addView(tvHint);
+        } else {
+            // Asynchronously or cached load libraries
+            final com.themoon.y1.sync.SyncLedger ledger = com.themoon.y1.sync.SyncManager.getInstance(this).getLedger();
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        final java.util.List<com.themoon.y1.sync.MediaSyncProvider.LibraryInfo> libs =
+                                provider.fetchLibraries(new com.themoon.y1.sync.MediaSyncProvider.CancellationToken());
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (currentSettingsDepth != 1 || settingsSubMode != 5) return;
+                                int insertPos = libraryInsertionIndex;
+                                for (final com.themoon.y1.sync.MediaSyncProvider.LibraryInfo lib : libs) {
+                                    String defaultMode = "music".equalsIgnoreCase(lib.collectionType) ? "all" :
+                                            ("movies".equalsIgnoreCase(lib.collectionType) || "tvshows".equalsIgnoreCase(lib.collectionType) ? "manual" : "off");
+                                    String curMode = ledger.getLibrarySyncMode(lib.id, defaultMode);
+                                    String modeLabel = "all".equalsIgnoreCase(curMode) ? t("Sync All") :
+                                            ("manual".equalsIgnoreCase(curMode) ? t("Manual") : t("Off"));
+
+                                    String icon = "music".equalsIgnoreCase(lib.collectionType) ? "♫ " :
+                                            ("movies".equalsIgnoreCase(lib.collectionType) ? "🎬 " : "📺 ");
+                                    LinearLayout rowLib = createSettingRow(icon + lib.name, modeLabel + " 〉");
+                                    rowLib.setOnClickListener(new View.OnClickListener() {
+                                        @Override
+                                        public void onClick(View v) {
+                                            clickFeedback();
+                                            lastJellyfinLibConfigFocusIndex = -1;
+                                            buildJellyfinLibraryConfigUI(lib);
+                                        }
+                                    });
+                                    containerSettingsItems.addView(rowLib, Math.min(insertPos++, containerSettingsItems.getChildCount()));
+                                }
+                                if (getCurrentFocus() == null) {
+                                    for (int i = 0; i < containerSettingsItems.getChildCount(); i++) {
+                                        View child = containerSettingsItems.getChildAt(i);
+                                        if (child != null && child.isFocusable() && child.getVisibility() == View.VISIBLE) {
+                                            child.requestFocus();
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    } catch (Exception ignored) {}
+                }
+            }).start();
+        }
+
+        createCategoryHeader("━ " + t("Sync") + " ━");
+
+        // Remove Deleted toggle
+        final LinearLayout btnRemoveDel = createSettingRow(t("Remove Deleted"),
+                provider.isRemoveDeletedEnabled() ? t("ON") : t("OFF"));
+        btnRemoveDel.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                boolean newVal = !provider.isRemoveDeletedEnabled();
+                provider.setRemoveDeletedEnabled(newVal);
+                ((TextView) btnRemoveDel.getChildAt(1)).setText(newVal ? t("ON") : t("OFF"));
+            }
+        });
+        containerSettingsItems.addView(btnRemoveDel);
+
+        // Transcode Video toggle
+        final LinearLayout btnTranscode = createSettingRow(t("Transcode Video"),
+                provider.isTranscodeVideoEnabled() ? t("ON") : t("OFF"));
+        btnTranscode.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                boolean newVal = !provider.isTranscodeVideoEnabled();
+                provider.setTranscodeVideoEnabled(newVal);
+                ((TextView) btnTranscode.getChildAt(1)).setText(newVal ? t("ON") : t("OFF"));
+            }
+        });
+        containerSettingsItems.addView(btnTranscode);
+
+        // Download Covers toggle
+        final LinearLayout btnCovers = createSettingRow(t("Download Covers"),
+                provider.isDownloadCoversEnabled() ? t("ON") : t("OFF"));
+        btnCovers.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                boolean newVal = !provider.isDownloadCoversEnabled();
+                provider.setDownloadCoversEnabled(newVal);
+                ((TextView) btnCovers.getChildAt(1)).setText(newVal ? t("ON") : t("OFF"));
+            }
+        });
+        containerSettingsItems.addView(btnCovers);
+
+        // Last Synced
+        long lastSync = com.themoon.y1.sync.SyncManager.getInstance(this).getLedger().getLastSyncTime();
+        String lastSyncStr = t("Never");
+        if (lastSync > 0) {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault());
+            lastSyncStr = sdf.format(new java.util.Date(lastSync));
+        }
+        LinearLayout rowLastSync = createSettingRow(t("Last Synced"), lastSyncStr);
+        rowLastSync.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+            }
+        });
+        containerSettingsItems.addView(rowLastSync);
+
+        // Sync Now button
+        View btnSyncNow = createTablerListButton(com.themoon.y1.views.TablerIcons.DOWNLOAD, t("Sync Now"));
+        btnSyncNow.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                startJellyfinSyncWithWifi();
+            }
+        });
+        containerSettingsItems.addView(btnSyncNow);
+
+        // Log Out / Reset button
+        LinearLayout btnLogout = createSettingRow(t("Log Out / Reset"), "〉 ");
+        btnLogout.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                provider.clearConfiguration();
+                lastJellyfinFocusIndex = -1;
+                buildJellyfinSettingsUI();
+            }
+        });
+        containerSettingsItems.addView(btnLogout);
+
+        containerSettingsItems.post(new Runnable() {
+            @Override
+            public void run() {
+                if (currentSettingsDepth != 1 || settingsSubMode != 5) return;
+                int targetIdx = preferredFocusIndex;
+                if (targetIdx >= 0 && targetIdx < containerSettingsItems.getChildCount()) {
+                    View target = containerSettingsItems.getChildAt(targetIdx);
+                    if (target != null && target.isFocusable() && target.getVisibility() == View.VISIBLE) {
+                        target.requestFocus();
+                        return;
+                    }
+                }
+                for (int i = 0; i < containerSettingsItems.getChildCount(); i++) {
+                    View child = containerSettingsItems.getChildAt(i);
+                    if (child != null && child.isFocusable() && child.getVisibility() == View.VISIBLE) {
+                        child.requestFocus();
+                        break;
+                    }
+                }
+            }
+        });
+    }
+
+    private void buildJellyfinLibraryConfigUI(final com.themoon.y1.sync.MediaSyncProvider.LibraryInfo library) {
+        currentSettingsDepth = 2;
+        settingsSubMode = 5;
+        jellyfinActiveLibrary = library;
+        containerSettingsItems.removeAllViews();
+
+        final com.themoon.y1.sync.SyncLedger ledger = com.themoon.y1.sync.SyncManager.getInstance(this).getLedger();
+        String defaultMode = "music".equalsIgnoreCase(library.collectionType) ? "all" :
+                ("movies".equalsIgnoreCase(library.collectionType) || "tvshows".equalsIgnoreCase(library.collectionType) ? "manual" : "off");
+        final String curMode = ledger.getLibrarySyncMode(library.id, defaultMode);
+
+        createCategoryHeader("━ " + library.name + " ━");
+
+        // Sync All option
+        final LinearLayout rowAll = createSettingRow(t("Sync All"), "all".equalsIgnoreCase(curMode) ? "●" : "○");
+        rowAll.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                ledger.setLibrarySyncMode(library.id, "all");
+                ledger.save();
+                lastJellyfinLibConfigFocusIndex = containerSettingsItems.indexOfChild(rowAll);
+                buildJellyfinLibraryConfigUI(library);
+            }
+        });
+        containerSettingsItems.addView(rowAll);
+
+        // Manual option
+        final LinearLayout rowManual = createSettingRow(t("Manual"), "manual".equalsIgnoreCase(curMode) ? "●" : "○");
+        rowManual.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                ledger.setLibrarySyncMode(library.id, "manual");
+                ledger.save();
+                lastJellyfinLibConfigFocusIndex = containerSettingsItems.indexOfChild(rowManual);
+                buildJellyfinLibraryConfigUI(library);
+            }
+        });
+        containerSettingsItems.addView(rowManual);
+
+        // Off option
+        final LinearLayout rowOff = createSettingRow(t("Off"), "off".equalsIgnoreCase(curMode) ? "●" : "○");
+        rowOff.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                ledger.setLibrarySyncMode(library.id, "off");
+                ledger.save();
+                lastJellyfinLibConfigFocusIndex = containerSettingsItems.indexOfChild(rowOff);
+                buildJellyfinLibraryConfigUI(library);
+            }
+        });
+        containerSettingsItems.addView(rowOff);
+
+        if ("manual".equalsIgnoreCase(curMode)) {
+            createCategoryHeader("━━━━━━━━━━━━━━");
+            LinearLayout btnBrowse = createSettingRow(t("Browse & Select"), "〉 ");
+            btnBrowse.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    clickFeedback();
+                    buildJellyfinBrowseSelectUI(library);
+                }
+            });
+            containerSettingsItems.addView(btnBrowse);
+
+            java.util.Set<String> sel = ledger.getLibrarySelections(library.id);
+            LinearLayout rowSelCount = createSettingRow(t("Selected"), String.valueOf(sel.size()));
+            containerSettingsItems.addView(rowSelCount);
+        }
+
+        containerSettingsItems.post(new Runnable() {
+            @Override
+            public void run() {
+                if (currentSettingsDepth != 2 || settingsSubMode != 5) return;
+                int targetIdx = lastJellyfinLibConfigFocusIndex;
+                if (targetIdx >= 0 && targetIdx < containerSettingsItems.getChildCount()) {
+                    View target = containerSettingsItems.getChildAt(targetIdx);
+                    if (target != null && target.isFocusable() && target.getVisibility() == View.VISIBLE) {
+                        target.requestFocus();
+                        return;
+                    }
+                }
+                for (int i = 0; i < containerSettingsItems.getChildCount(); i++) {
+                    View child = containerSettingsItems.getChildAt(i);
+                    if (child != null && child.isFocusable() && child.getVisibility() == View.VISIBLE) {
+                        child.requestFocus();
+                        break;
+                    }
+                }
+            }
+        });
+    }
+
+    private void buildJellyfinBrowseSelectUI(final com.themoon.y1.sync.MediaSyncProvider.LibraryInfo library) {
+        currentSettingsDepth = 3;
+        settingsSubMode = 5;
+        containerSettingsItems.removeAllViews();
+
+        final float d = getResources().getDisplayMetrics().density;
+        createCategoryHeader("━ " + t("Browse & Select") + " ━");
+
+        final com.themoon.y1.sync.SyncLedger ledger = com.themoon.y1.sync.SyncManager.getInstance(this).getLedger();
+        final com.themoon.y1.sync.jellyfin.JellyfinSyncProvider provider =
+                com.themoon.y1.sync.jellyfin.JellyfinSyncProvider.getInstance(this);
+
+        final TextView tvLoading = new TextView(this);
+        tvLoading.setText(t("Counting files...\nPlease wait."));
+        tvLoading.setTextColor(ThemeManager.getTextColorSecondary());
+        tvLoading.setPadding(20, 20, 20, 20);
+        containerSettingsItems.addView(tvLoading);
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    String validToken = provider.ensureValidAccessToken();
+                    com.themoon.y1.sync.jellyfin.JellyfinClient client = provider.createClient();
+                    final com.themoon.y1.sync.jellyfin.JellyfinClient.ItemsQueryResult res =
+                            client.fetchItemsPage(validToken, provider.getUserId(),
+                                    library.id, library.collectionType, 0, 500, null, null);
+
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (currentSettingsDepth != 3 || settingsSubMode != 5) return;
+                            containerSettingsItems.removeView(tvLoading);
+
+                            final java.util.Set<String> currentSelections = ledger.getLibrarySelections(library.id);
+                            long totalSize = 0;
+                            for (com.themoon.y1.sync.jellyfin.JellyfinMediaItem item : res.items) {
+                                if (currentSelections.contains(item.id)) {
+                                    totalSize += item.fileSize;
+                                }
+                            }
+
+                            // Free space display
+                            File root = com.themoon.y1.sync.SyncManager.getSyncRoot();
+                            android.os.StatFs stat = new android.os.StatFs(root.getAbsolutePath());
+                            final long freeBytes = (long) stat.getAvailableBlocks() * (long) stat.getBlockSize();
+
+                            final TextView tvHeader = new TextView(MainActivity.this);
+                            tvHeader.setTypeface(ThemeManager.getCustomFontBold());
+                            tvHeader.setTextColor(0xBBFFFFFF);
+                            tvHeader.setTextSize(14);
+                            tvHeader.setPadding(10, 30, 10, 5);
+                            String infoHeader = t("Selected") + ": " + currentSelections.size() + " (" + formatStorageSize(totalSize) + ") | "
+                                    + t("Free") + ": " + formatStorageSize(freeBytes);
+                            tvHeader.setText(infoHeader);
+                            containerSettingsItems.addView(tvHeader);
+
+                            for (final com.themoon.y1.sync.jellyfin.JellyfinMediaItem item : res.items) {
+                                final boolean isSelected = currentSelections.contains(item.id);
+                                String check = isSelected ? "☑" : "☐";
+                                String rightText = (item.fileSize > 0 ? formatStorageSize(item.fileSize) + " " : "") + check;
+
+                                final LinearLayout row = createSettingRow(item.name, rightText);
+                                final TextView tvRight = (TextView) row.getChildAt(1);
+                                row.setOnClickListener(new View.OnClickListener() {
+                                    @Override
+                                    public void onClick(View v) {
+                                        clickFeedback();
+                                        ledger.toggleLibrarySelection(library.id, item.id);
+                                        ledger.save();
+                                        java.util.Set<String> updatedSel = ledger.getLibrarySelections(library.id);
+                                        boolean isNowSel = updatedSel.contains(item.id);
+                                        String checkSymbol = isNowSel ? "☑" : "☐";
+                                        String newRight = (item.fileSize > 0 ? formatStorageSize(item.fileSize) + " " : "") + checkSymbol;
+                                        tvRight.setText(newRight);
+                                        long tot = 0;
+                                        for (com.themoon.y1.sync.jellyfin.JellyfinMediaItem mi : res.items) {
+                                            if (updatedSel.contains(mi.id)) tot += mi.fileSize;
+                                        }
+                                        tvHeader.setText(t("Selected") + ": " + updatedSel.size() + " (" + formatStorageSize(tot) + ") | "
+                                                + t("Free") + ": " + formatStorageSize(freeBytes));
+                                    }
+                                });
+                                containerSettingsItems.addView(row);
+                            }
+
+                            containerSettingsItems.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    if (currentSettingsDepth != 3 || settingsSubMode != 5) return;
+                                    for (int i = 0; i < containerSettingsItems.getChildCount(); i++) {
+                                        View child = containerSettingsItems.getChildAt(i);
+                                        if (child != null && child.isFocusable() && child.getVisibility() == View.VISIBLE) {
+                                            child.requestFocus();
+                                            break;
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    });
+                } catch (final Exception e) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            tvLoading.setText(t("Cannot reach server. Check URL and network."));
+                        }
+                    });
+                }
+            }
+        }).start();
+    }
+
+    private void startJellyfinQuickConnect() {
+        final com.themoon.y1.sync.jellyfin.JellyfinSyncProvider provider =
+                com.themoon.y1.sync.jellyfin.JellyfinSyncProvider.getInstance(this);
+        String serverUrl = provider.getServerUrl();
+        if (serverUrl == null || serverUrl.trim().isEmpty()) {
+            Toast.makeText(this, t("Server URL is empty"), Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        final float d = getResources().getDisplayMetrics().density;
+        final android.app.Dialog qcDialog = new android.app.Dialog(this);
+        qcDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        if (qcDialog.getWindow() != null) {
+            qcDialog.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
+        }
+
+        LinearLayout rootLayout = new LinearLayout(this);
+        rootLayout.setOrientation(LinearLayout.VERTICAL);
+        rootLayout.setGravity(Gravity.CENTER);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(ThemeManager.getOverlayBackgroundColor() | 0xEE000000);
+        bg.setCornerRadius(15 * d);
+        bg.setStroke((int) (1 * d), 0x33FFFFFF);
+        rootLayout.setBackground(bg);
+        rootLayout.setPadding((int) (22 * d), (int) (20 * d), (int) (22 * d), (int) (20 * d));
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText(t("QuickConnect"));
+        tvTitle.setTextColor(ThemeManager.getTextColorPrimary());
+        tvTitle.setTextSize(17f);
+        tvTitle.setTypeface(ThemeManager.getCustomFontBold());
+        tvTitle.setGravity(Gravity.CENTER);
+        rootLayout.addView(tvTitle);
+
+        final TextView tvInstruction = new TextView(this);
+        tvInstruction.setText(t("Enter this code on your device:"));
+        tvInstruction.setTextColor(ThemeManager.getTextColorSecondary());
+        tvInstruction.setTextSize(13f);
+        tvInstruction.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams instrLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        instrLp.topMargin = (int) (8 * d);
+        rootLayout.addView(tvInstruction, instrLp);
+
+        final ProgressBar progressBar = new ProgressBar(this);
+        LinearLayout.LayoutParams pbLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        pbLp.gravity = Gravity.CENTER_HORIZONTAL;
+        pbLp.topMargin = (int) (14 * d);
+        pbLp.bottomMargin = (int) (14 * d);
+        rootLayout.addView(progressBar, pbLp);
+
+        final TextView tvCode = new TextView(this);
+        tvCode.setText("------");
+        tvCode.setTextColor(0xFF00AAFF);
+        tvCode.setTextSize(32f);
+        tvCode.setTypeface(ThemeManager.getCustomFontBold());
+        tvCode.setGravity(Gravity.CENTER);
+        tvCode.setVisibility(View.GONE);
+        LinearLayout.LayoutParams codeLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        codeLp.topMargin = (int) (10 * d);
+        codeLp.bottomMargin = (int) (10 * d);
+        rootLayout.addView(tvCode, codeLp);
+
+        final TextView tvSubInstruction = new TextView(this);
+        tvSubInstruction.setText(t("Go to Jellyfin Settings > Quick Connect"));
+        tvSubInstruction.setTextColor(ThemeManager.getTextColorSecondary());
+        tvSubInstruction.setTextSize(11f);
+        tvSubInstruction.setGravity(Gravity.CENTER);
+        rootLayout.addView(tvSubInstruction);
+
+        final TextView tvStatus = new TextView(this);
+        tvStatus.setText(t("Connecting..."));
+        tvStatus.setTextColor(0xAAFFFFFF);
+        tvStatus.setTextSize(12f);
+        tvStatus.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams statusLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        statusLp.topMargin = (int) (8 * d);
+        statusLp.bottomMargin = (int) (14 * d);
+        rootLayout.addView(tvStatus, statusLp);
+
+        Button btnCancel = new Button(this);
+        btnCancel.setText(t("Cancel"));
+        btnCancel.setTextColor(0xFFFFFFFF);
+        btnCancel.setTextSize(14f);
+        btnCancel.setFocusable(true);
+        GradientDrawable cancelBg = new GradientDrawable();
+        cancelBg.setColor(0x33FFFFFF);
+        cancelBg.setCornerRadius(6 * d);
+        btnCancel.setBackground(cancelBg);
+        LinearLayout.LayoutParams btnLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, (int) (36 * d));
+        rootLayout.addView(btnCancel, btnLp);
+
+        qcDialog.setContentView(rootLayout);
+        qcDialog.setCancelable(true);
+        qcDialog.setCanceledOnTouchOutside(false);
+
+        Window window = qcDialog.getWindow();
+        if (window != null) {
+            window.setLayout((int) (280 * d), ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+
+        final boolean[] isCancelled = new boolean[]{false};
+        btnCancel.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                isCancelled[0] = true;
+                qcDialog.dismiss();
+            }
+        });
+        qcDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
+            @Override
+            public void onCancel(DialogInterface dialog) {
+                isCancelled[0] = true;
+            }
+        });
+
+        qcDialog.show();
+        btnCancel.requestFocus();
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                    boolean connected = isNetworkConnected();
+
+                    if (!connected) {
+                        if (wm != null && !wm.isWifiEnabled()) {
+                            wm.setWifiEnabled(true);
+                        }
+
+                        int waitCount = 0;
+                        while (!connected && waitCount < 20) {
+                            if (isCancelled[0]) return;
+                            try {
+                                Thread.sleep(500);
+                            } catch (InterruptedException e) {
+                                return;
+                            }
+                            waitCount++;
+                            connected = isNetworkConnected();
+                        }
+                    }
+
+                    if (isCancelled[0]) return;
+
+                    if (!connected) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (qcDialog.isShowing()) {
+                                    qcDialog.dismiss();
+                                }
+                                Toast.makeText(MainActivity.this,
+                                        t("Wi-Fi connection required. Please connect."),
+                                        Toast.LENGTH_LONG).show();
+                                isPendingJellyfinQuickConnectAfterWifi = true;
+                                changeScreen(STATE_WIFI);
+                            }
+                        });
+                        return;
+                    }
+
+                    final com.themoon.y1.sync.jellyfin.JellyfinClient client = provider.createClient();
+                    if (!client.isQuickConnectEnabled()) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                progressBar.setVisibility(View.GONE);
+                                tvStatus.setText(t("Server does not support QuickConnect"));
+                                Toast.makeText(MainActivity.this, t("Server does not support QuickConnect"), Toast.LENGTH_LONG).show();
+                            }
+                        });
+                        return;
+                    }
+
+                    final com.themoon.y1.sync.jellyfin.JellyfinClient.QuickConnectSession initSession =
+                            client.initiateQuickConnect();
+
+                    if (isCancelled[0]) return;
+
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            progressBar.setVisibility(View.GONE);
+                            tvCode.setVisibility(View.VISIBLE);
+                            tvCode.setText(initSession.code);
+                            tvStatus.setText(t("Waiting for authorization..."));
+                        }
+                    });
+
+                    // Poll every 2 seconds for up to 10 minutes (300 iterations)
+                    String secret = initSession.secret;
+                    boolean authenticated = false;
+                    for (int i = 0; i < 300; i++) {
+                        if (isCancelled[0]) return;
+                        Thread.sleep(2000);
+                        if (isCancelled[0]) return;
+
+                        try {
+                            com.themoon.y1.sync.jellyfin.JellyfinClient.QuickConnectSession pollSession =
+                                    client.checkQuickConnect(secret);
+                            if (pollSession.authenticated) {
+                                authenticated = true;
+                                break;
+                            }
+                        } catch (Exception pollEx) {
+                            // If 404/expired, break out
+                            break;
+                        }
+                    }
+
+                    if (isCancelled[0]) return;
+
+                    if (!authenticated) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                tvStatus.setText(t("QuickConnect Expired / Failed"));
+                            }
+                        });
+                        return;
+                    }
+
+                    // Exchange secret for Token
+                    final com.themoon.y1.sync.jellyfin.JellyfinClient.AuthResult auth =
+                            client.authenticateWithQuickConnect(secret);
+
+                    provider.setAccessToken(auth.accessToken);
+                    provider.setUserId(auth.userId);
+                    provider.setServerName(auth.serverName);
+                    if (auth.serverName != null && !auth.serverName.isEmpty()) {
+                        provider.setUsername(auth.serverName);
+                    }
+
+                    if (isCancelled[0]) return;
+
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                qcDialog.dismiss();
+                            } catch (Exception ignored) {}
+                            Toast.makeText(MainActivity.this, t("QuickConnect Paired!") + " " + t("Paired as ") + auth.serverName,
+                                    Toast.LENGTH_LONG).show();
+                            if (currentScreenState == STATE_SETTINGS) {
+                                buildJellyfinSettingsUI();
+                            }
+                        }
+                    });
+
+                } catch (final Exception e) {
+                    if (isCancelled[0]) return;
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            progressBar.setVisibility(View.GONE);
+                            tvStatus.setText(e.getMessage() != null ? e.getMessage() : t("Connection Error"));
+                            Toast.makeText(MainActivity.this, e.getMessage() != null ? e.getMessage() : t("Connection Error"),
+                                    Toast.LENGTH_LONG).show();
+                        }
+                    });
+                }
+            }
+        }).start();
+    }
+
+    private void testJellyfinConnection() {
+        final float d = getResources().getDisplayMetrics().density;
+        final android.app.Dialog loaderDialog = new android.app.Dialog(this);
+        loaderDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        if (loaderDialog.getWindow() != null) {
+            loaderDialog.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
+        }
+
+        LinearLayout loaderLayout = new LinearLayout(this);
+        loaderLayout.setOrientation(LinearLayout.VERTICAL);
+        loaderLayout.setGravity(Gravity.CENTER);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(ThemeManager.getOverlayBackgroundColor() | 0xEE000000);
+        bg.setCornerRadius(15 * d);
+        bg.setStroke((int) (1 * d), 0x33FFFFFF);
+        loaderLayout.setBackground(bg);
+        loaderLayout.setPadding((int) (24 * d), (int) (24 * d), (int) (24 * d), (int) (24 * d));
+
+        ProgressBar progressBar = new ProgressBar(this);
+        LinearLayout.LayoutParams pbLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        pbLp.gravity = Gravity.CENTER_HORIZONTAL;
+        pbLp.bottomMargin = (int) (14 * d);
+        loaderLayout.addView(progressBar, pbLp);
+
+        final TextView tvLoaderMsg = new TextView(this);
+        tvLoaderMsg.setText(t("Connecting to Wi-Fi..."));
+        tvLoaderMsg.setTextColor(ThemeManager.getTextColorPrimary());
+        tvLoaderMsg.setTextSize(15f);
+        tvLoaderMsg.setTypeface(ThemeManager.getCustomFontBold());
+        tvLoaderMsg.setGravity(Gravity.CENTER);
+        loaderLayout.addView(tvLoaderMsg);
+
+        loaderDialog.setContentView(loaderLayout);
+        loaderDialog.setCancelable(true);
+        loaderDialog.setCanceledOnTouchOutside(false);
+
+        Window window = loaderDialog.getWindow();
+        if (window != null) {
+            window.setLayout((int) (270 * d), ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        loaderDialog.show();
+
+        final boolean[] isCancelled = new boolean[]{false};
+        loaderDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
+            @Override
+            public void onCancel(DialogInterface dialog) {
+                isCancelled[0] = true;
+            }
+        });
+        loaderDialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
+            @Override
+            public void onDismiss(DialogInterface dialog) {
+                isCancelled[0] = true;
+            }
+        });
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                    boolean connected = isNetworkConnected();
+
+                    if (!connected) {
+                        if (wm != null && !wm.isWifiEnabled()) {
+                            wm.setWifiEnabled(true);
+                        }
+
+                        int waitCount = 0;
+                        while (!connected && waitCount < 20) {
+                            if (isCancelled[0]) return;
+                            try {
+                                Thread.sleep(500);
+                            } catch (InterruptedException e) {
+                                return;
+                            }
+                            waitCount++;
+                            connected = isNetworkConnected();
+                        }
+                    }
+
+                    if (isCancelled[0]) return;
+
+                    if (!connected) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (loaderDialog.isShowing()) {
+                                    loaderDialog.dismiss();
+                                }
+                                Toast.makeText(MainActivity.this,
+                                        t("Wi-Fi connection required. Please connect."),
+                                        Toast.LENGTH_LONG).show();
+                                isPendingJellyfinTestAfterWifi = true;
+                                changeScreen(STATE_WIFI);
+                            }
+                        });
+                        return;
+                    }
+
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (loaderDialog.isShowing()) {
+                                tvLoaderMsg.setText(t("Connecting..."));
+                            }
+                        }
+                    });
+
+                    final com.themoon.y1.sync.jellyfin.JellyfinSyncProvider provider =
+                            com.themoon.y1.sync.jellyfin.JellyfinSyncProvider.getInstance(MainActivity.this);
+
+                    provider.testConnection(new com.themoon.y1.sync.MediaSyncProvider.ConnectionCallback() {
+                        @Override
+                        public void onSuccess(final String serverName, final String version) {
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    if (loaderDialog.isShowing()) loaderDialog.dismiss();
+                                    Toast.makeText(MainActivity.this, t("Connected") + ": " + serverName, Toast.LENGTH_SHORT).show();
+                                    if (currentScreenState == STATE_SETTINGS) {
+                                        buildJellyfinSettingsUI();
+                                    }
+                                }
+                            });
+                        }
+
+                        @Override
+                        public void onError(final String errorMessage) {
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    if (loaderDialog.isShowing()) loaderDialog.dismiss();
+                                    Toast.makeText(MainActivity.this, t("Cannot reach server. Check URL and network.") + "\n" + errorMessage,
+                                            Toast.LENGTH_LONG).show();
+                                }
+                            });
+                        }
+                    });
+
+                } catch (Exception e) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (loaderDialog.isShowing()) loaderDialog.dismiss();
+                        }
+                    });
+                }
+            }
+        }).start();
+    }
+
+    private void startJellyfinSyncWithWifi() {
+        final float d = getResources().getDisplayMetrics().density;
+        final android.app.Dialog loaderDialog = new android.app.Dialog(this);
+        loaderDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        if (loaderDialog.getWindow() != null) {
+            loaderDialog.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
+        }
+
+        LinearLayout loaderLayout = new LinearLayout(this);
+        loaderLayout.setOrientation(LinearLayout.VERTICAL);
+        loaderLayout.setGravity(Gravity.CENTER);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(ThemeManager.getOverlayBackgroundColor() | 0xEE000000);
+        bg.setCornerRadius(15 * d);
+        bg.setStroke((int) (1 * d), 0x33FFFFFF);
+        loaderLayout.setBackground(bg);
+        loaderLayout.setPadding((int) (24 * d), (int) (24 * d), (int) (24 * d), (int) (24 * d));
+
+        ProgressBar progressBar = new ProgressBar(this);
+        LinearLayout.LayoutParams pbLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        pbLp.gravity = Gravity.CENTER_HORIZONTAL;
+        pbLp.bottomMargin = (int) (14 * d);
+        loaderLayout.addView(progressBar, pbLp);
+
+        final TextView tvLoaderMsg = new TextView(this);
+        tvLoaderMsg.setText(t("Connecting to Wi-Fi..."));
+        tvLoaderMsg.setTextColor(ThemeManager.getTextColorPrimary());
+        tvLoaderMsg.setTextSize(15f);
+        tvLoaderMsg.setTypeface(ThemeManager.getCustomFontBold());
+        tvLoaderMsg.setGravity(Gravity.CENTER);
+        loaderLayout.addView(tvLoaderMsg);
+
+        loaderDialog.setContentView(loaderLayout);
+        loaderDialog.setCancelable(true);
+        loaderDialog.setCanceledOnTouchOutside(false);
+
+        Window window = loaderDialog.getWindow();
+        if (window != null) {
+            window.setLayout((int) (270 * d), ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        loaderDialog.show();
+
+        final boolean[] isCancelled = new boolean[]{false};
+        loaderDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
+            @Override
+            public void onCancel(DialogInterface dialog) {
+                isCancelled[0] = true;
+            }
+        });
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                    boolean connected = isNetworkConnected();
+
+                    if (!connected) {
+                        if (wm != null && !wm.isWifiEnabled()) {
+                            wm.setWifiEnabled(true);
+                        }
+
+                        int waitCount = 0;
+                        while (!connected && waitCount < 20) {
+                            if (isCancelled[0]) return;
+                            try {
+                                Thread.sleep(500);
+                            } catch (InterruptedException e) {
+                                return;
+                            }
+                            waitCount++;
+                            connected = isNetworkConnected();
+                        }
+                    }
+
+                    if (isCancelled[0]) return;
+
+                    if (!connected) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (loaderDialog.isShowing()) {
+                                    loaderDialog.dismiss();
+                                }
+                                Toast.makeText(MainActivity.this,
+                                        t("Wi-Fi connection required. Please connect."),
+                                        Toast.LENGTH_LONG).show();
+                                isPendingJellyfinSyncAfterWifi = true;
+                                changeScreen(STATE_WIFI);
+                            }
+                        });
+                        return;
+                    }
+
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (loaderDialog.isShowing()) {
+                                loaderDialog.dismiss();
+                            }
+                            launchJellyfinSync();
+                        }
+                    });
+
+                } catch (Exception e) {
+                    if (isCancelled[0]) return;
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (loaderDialog.isShowing()) {
+                                loaderDialog.dismiss();
+                            }
+                        }
+                    });
+                }
+            }
+        }).start();
+    }
+
+    private void launchJellyfinSync() {
+        if (isCustomScanning) {
+            Toast.makeText(this, t("Scanning Media..."), Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        final com.themoon.y1.sync.SyncManager syncManager = com.themoon.y1.sync.SyncManager.getInstance(this);
+        if (syncManager.isSyncing()) {
+            Toast.makeText(this, t("Syncing..."), Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        showJellyfinSyncModal();
+
+        syncManager.setBatchUpdateCallback(new com.themoon.y1.sync.SyncManager.LibraryBatchUpdateCallback() {
+            @Override
+            public void onMusicBatchReady(final List<SongItem> newSongs, final List<SongItem> updatedSongs,
+                                          final java.util.Map<String, Integer> trackNumbers, final boolean isDirty) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        synchronized (customLibrary) {
+                            for (java.util.Map.Entry<String, Integer> e : trackNumbers.entrySet()) {
+                                trackNumberMap.put(e.getKey(), e.getValue());
+                            }
+                        }
+                    }
+                });
+            }
+
+            @Override
+            public void onVideosBatchReady() {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        scanVideoLibrary();
+                    }
+                });
+            }
+        });
+
+        syncManager.setPlaybackCheckCallback(new com.themoon.y1.sync.SyncManager.PlaybackCheckCallback() {
+            @Override
+            public boolean isFileCurrentlyPlaying(File file) {
+                if (file == null) return false;
+                if (!currentPlaylist.isEmpty() && currentIndex >= 0 && currentIndex < currentPlaylist.size()) {
+                    File cur = currentPlaylist.get(currentIndex);
+                    if (cur != null && cur.getAbsolutePath().equals(file.getAbsolutePath())) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        });
+
+        syncManager.startSync(customLibrary, trackNumberMap);
+    }
+
+    private void showJellyfinSyncModal() {
+        final float d = getResources().getDisplayMetrics().density;
+        final android.app.Dialog dialog = new android.app.Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
+        }
+
+        final LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setGravity(Gravity.CENTER_HORIZONTAL);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(ThemeManager.getOverlayBackgroundColor() | 0xEE000000);
+        bg.setCornerRadius(15 * d);
+        bg.setStroke((int) (1 * d), 0x33FFFFFF);
+        root.setBackground(bg);
+        root.setPadding((int) (20 * d), (int) (18 * d), (int) (20 * d), (int) (18 * d));
+
+        final TextView tvTitle = new TextView(this);
+        tvTitle.setText(t("Jellyfin Sync"));
+        tvTitle.setTextColor(ThemeManager.getTextColorPrimary());
+        tvTitle.setTextSize(16f);
+        tvTitle.setTypeface(ThemeManager.getCustomFontBold());
+        tvTitle.setGravity(Gravity.CENTER);
+        root.addView(tvTitle);
+
+        final TextView tvStatus = new TextView(this);
+        tvStatus.setText(t("Syncing..."));
+        tvStatus.setTextColor(ThemeManager.getTextColorSecondary());
+        tvStatus.setTextSize(13f);
+        tvStatus.setGravity(Gravity.CENTER);
+        tvStatus.setPadding(0, (int) (6 * d), 0, (int) (8 * d));
+        root.addView(tvStatus);
+
+        final ProgressBar pBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        pBar.setMax(100);
+        pBar.setProgress(0);
+        LinearLayout.LayoutParams pLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, (int) (8 * d));
+        pLp.bottomMargin = (int) (8 * d);
+        root.addView(pBar, pLp);
+
+        final TextView tvDetail = new TextView(this);
+        tvDetail.setText("");
+        tvDetail.setTextColor(ThemeManager.getTextColorSecondary());
+        tvDetail.setTextSize(12f);
+        tvDetail.setGravity(Gravity.CENTER);
+        tvDetail.setPadding(0, 0, 0, (int) (12 * d));
+        root.addView(tvDetail);
+
+        final View btnCancel = createCustomDialogButton(t("Cancel"));
+        btnCancel.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                com.themoon.y1.sync.SyncManager.getInstance(MainActivity.this).cancelSync();
+                dialog.dismiss();
+            }
+        });
+        markDialogButtonFocused(btnCancel);
+        root.addView(btnCancel);
+
+        dialog.setContentView(root);
+        Window w = dialog.getWindow();
+        if (w != null) {
+            w.setLayout((int) (290 * d), ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+
+        final com.themoon.y1.sync.SyncManager syncManager = com.themoon.y1.sync.SyncManager.getInstance(this);
+        syncManager.setSyncListener(new com.themoon.y1.sync.SyncManager.SyncListener() {
+            @Override
+            public void onStateChanged(final com.themoon.y1.sync.SyncManager.SyncState state, final String message) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        tvStatus.setText(message);
+                        if (state == com.themoon.y1.sync.SyncManager.SyncState.COMPLETE) {
+                            Toast.makeText(MainActivity.this, t("Sync Complete"), Toast.LENGTH_SHORT).show();
+                            if (dialog.isShowing()) dialog.dismiss();
+                            if (currentScreenState == STATE_SETTINGS) buildJellyfinSettingsUI();
+                            startMediaLibraryScan();
+                        } else if (state == com.themoon.y1.sync.SyncManager.SyncState.ERROR) {
+                            Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show();
+                            if (dialog.isShowing()) dialog.dismiss();
+                        } else if (state == com.themoon.y1.sync.SyncManager.SyncState.CANCELLED) {
+                            if (dialog.isShowing()) dialog.dismiss();
+                        }
+                    }
+                });
+            }
+
+            @Override
+            public void onProgress(final String libraryName, final int currentItem, final int totalItems,
+                                   final String currentTitle, final long bytesRead, final long bytesTotal) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        int pct = totalItems > 0 ? (currentItem * 100 / totalItems) : 0;
+                        pBar.setProgress(pct);
+                        tvStatus.setText(libraryName + " (" + currentItem + "/" + totalItems + ")");
+                        String sizeStr = "";
+                        if (bytesTotal > 0) {
+                            sizeStr = " - " + formatStorageSize(bytesRead) + " / " + formatStorageSize(bytesTotal);
+                        }
+                        tvDetail.setText(currentTitle + sizeStr);
+                    }
+                });
+            }
+        });
+
         dialog.show();
     }
 
@@ -14109,6 +15535,39 @@ public class MainActivity extends Activity {
                         }
                         return true;
                     }
+                    if (currentScreenState == STATE_WIFI && isPendingJellyfinSyncAfterWifi) {
+                        isPendingJellyfinSyncAfterWifi = false;
+                        isNavigatingToSubMenu = true;
+                        changeScreen(STATE_SETTINGS);
+                        buildJellyfinSettingsUI();
+                        isNavigatingToSubMenu = false;
+                        if (isNetworkConnected()) {
+                            startJellyfinSyncWithWifi();
+                        }
+                        return true;
+                    }
+                    if (currentScreenState == STATE_WIFI && isPendingJellyfinTestAfterWifi) {
+                        isPendingJellyfinTestAfterWifi = false;
+                        isNavigatingToSubMenu = true;
+                        changeScreen(STATE_SETTINGS);
+                        buildJellyfinSettingsUI();
+                        isNavigatingToSubMenu = false;
+                        if (isNetworkConnected()) {
+                            testJellyfinConnection();
+                        }
+                        return true;
+                    }
+                    if (currentScreenState == STATE_WIFI && isPendingJellyfinQuickConnectAfterWifi) {
+                        isPendingJellyfinQuickConnectAfterWifi = false;
+                        isNavigatingToSubMenu = true;
+                        changeScreen(STATE_SETTINGS);
+                        buildJellyfinSettingsUI();
+                        isNavigatingToSubMenu = false;
+                        if (isNetworkConnected()) {
+                            startJellyfinQuickConnect();
+                        }
+                        return true;
+                    }
                     changeScreen(backTargetForUtility);
                 } else if (currentScreenState == STATE_MUSIC_QUIZ) {
                     exitMusicQuiz();
@@ -14147,11 +15606,19 @@ public class MainActivity extends Activity {
                         buildSettingsUI(); // 서브 메뉴창(깊이 1)이면 메인 설정창으로 1단계 복귀!
                     } else if (currentSettingsDepth == 2) {
                         // EQ 등의 더 깊은 창(깊이 2)에서 빠져나올 때의 처리
-                        if (settingsSubMode == 2 || settingsSubMode == 3) {
+                        if (settingsSubMode == 5) {
+                            buildJellyfinSettingsUI(); // Jellyfin Library config -> Jellyfin Settings
+                        } else if (settingsSubMode == 2 || settingsSubMode == 3) {
                             buildEqualizerSettingsUI();
                         } else if (isRadioUIShowing) {
                             // 🚀 [라디오 채널 관리창에서 탈출] 안전하게 라디오 설정 메뉴로 1단계만 복귀!
                             buildRadioUI();
+                        } else {
+                            buildSettingsUI();
+                        }
+                    } else if (currentSettingsDepth == 3) {
+                        if (settingsSubMode == 5 && jellyfinActiveLibrary != null) {
+                            buildJellyfinLibraryConfigUI(jellyfinActiveLibrary);
                         } else {
                             buildSettingsUI();
                         }
@@ -14430,6 +15897,16 @@ public class MainActivity extends Activity {
                 // 🚀 [포커스 점프 버그 완벽 해결] 처음 화면 진입 직후 포커스가 일시적으로 없는 상태(null)에서
                 // 사용자가 휠을 처음 딸깍 돌렸을 때, 시스템이 애매하게 걸린 하단 버튼으로 워프하는 현상을 원천 차단합니다!
                 if (keyCode == 21 || keyCode == 22) {
+                    if (currentScreenState == STATE_SETTINGS && containerSettingsItems != null && containerSettingsItems.getChildCount() > 0) {
+                        for (int i = 0; i < containerSettingsItems.getChildCount(); i++) {
+                            View child = containerSettingsItems.getChildAt(i);
+                            if (child != null && child.isFocusable() && child.getVisibility() == View.VISIBLE) {
+                                child.requestFocus();
+                                clickFeedback();
+                                return true;
+                            }
+                        }
+                    }
                     if (currentScreenState == STATE_STORAGE && containerStorageItems != null && containerStorageItems.getChildCount() > 0) {
                         containerStorageItems.getChildAt(0).requestFocus();
                         clickFeedback();

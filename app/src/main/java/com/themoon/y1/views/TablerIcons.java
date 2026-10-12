@@ -54,6 +54,13 @@ public final class TablerIcons {
         "M21 7h-5a4.978 4.978 0 0 0 -3 1m-4 8a4.984 4.984 0 0 1 -3 1h-3"
     };
 
+    /** Tabler Icons outline/login.svg (MIT) */
+    public static final String[] LOGIN = {
+        "M15 8v-2a2 2 0 0 0 -2 -2h-7a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2 -2v-2",
+        "M21 12h-13l3 -3",
+        "M11 15l-3 -3"
+    };
+
     /**
      * Renders a Tabler icon centered on a rounded card tile.
      */
