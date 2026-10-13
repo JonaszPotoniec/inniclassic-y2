@@ -30,7 +30,29 @@ class PowerBacklightManager private constructor(private val context: Context) {
 
     var backlightTimerIndex: Int = 3
     var isFakeScreenOff: Boolean = false
-        private set
+        set(value) {
+            field = value
+        }
+    var wasWifiOnBeforeSleep: Boolean = false
+
+    fun autoManageWifiPower(isGoingToSleep: Boolean, isServerRunning: Boolean, isRadioActive: Boolean) {
+        val wm = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? android.net.wifi.WifiManager ?: return
+        if (isGoingToSleep) {
+            val isWifiActive = wm.isWifiEnabled || wm.wifiState == android.net.wifi.WifiManager.WIFI_STATE_ENABLING
+            if (isWifiActive) {
+                wasWifiOnBeforeSleep = true
+                if (!isServerRunning && !isRadioActive) {
+                    wm.isWifiEnabled = false
+                }
+            } else {
+                wasWifiOnBeforeSleep = false
+            }
+        } else {
+            if (wasWifiOnBeforeSleep && !wm.isWifiEnabled) {
+                wm.isWifiEnabled = true
+            }
+        }
+    }
 
     private val handler = Handler(Looper.getMainLooper())
     private var onTimeoutAction: (() -> Unit)? = null

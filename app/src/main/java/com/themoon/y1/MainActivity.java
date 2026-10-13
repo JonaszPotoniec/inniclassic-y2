@@ -799,32 +799,10 @@ public class MainActivity extends Activity {
 
     // 🚀 [지능형 와이파이 절전 엔진]
     private void autoManageWifiPower(boolean isGoingToSleep) {
-        WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-        if (wm == null)
-            return;
-
-        if (isGoingToSleep) {
-            // 💡 [버그 해결] 완전히 켜져 있거나 '켜지는 중(Enabling)'일 때를 모두 '켜진 상태'로 기억하게 만듭니다!
-            boolean isWifiActive = wm.isWifiEnabled() || wm.getWifiState() == WifiManager.WIFI_STATE_ENABLING;
-            if (isWifiActive) {
-                wasWifiOnBeforeSleep = true;
-                // 🚀 [라디오 재생 중 하드웨어 방어막] FM 튜너가 켜져 있는 동안 Wi-Fi 전원을 껐다 켜면
-                // (많은 저가형 MTK 콤보 칩에서 FM/Wi-Fi/BT가 같은 RF 프론트엔드를 공유합니다) 튜너가
-                // 응답 없는 상태로 굳어버려 하드웨어 리셋 없이는 복구가 안 되는 사례가 보고되었습니다.
-                // 서버 실행 중일 때 이미 건드리지 않는 것과 같은 이유로, 라디오가 켜져 있을 때도 그대로 둡니다.
-                boolean isRadioActive = com.themoon.y1.managers.FmRadioManager.getInstance(this).isPowerUp;
-                if (!isServerRunning && !isRadioActive) {
-                    wm.setWifiEnabled(false);
-                }
-            } else {
-                wasWifiOnBeforeSleep = false;
-            }
-        } else {
-            // 💡 깰 때: 잠들기 전에 켜져 있었던 경우에만 다시 와이파이 전원 ON!
-            if (wasWifiOnBeforeSleep && !wm.isWifiEnabled()) {
-                wm.setWifiEnabled(true);
-            }
-        }
+        boolean isRadioActive = com.themoon.y1.managers.FmRadioManager.getInstance(this).isPowerUp;
+        com.themoon.y1.managers.PowerBacklightManager pbm = com.themoon.y1.managers.PowerBacklightManager.getInstance(this);
+        pbm.autoManageWifiPower(isGoingToSleep, isServerRunning, isRadioActive);
+        wasWifiOnBeforeSleep = pbm.getWasWifiOnBeforeSleep();
     }
 
     public void turnOffScreen() {
@@ -836,44 +814,16 @@ public class MainActivity extends Activity {
                 @Override
                 public void run() {
                     isFakeScreenOff = true;
-                    autoManageWifiPower(true); // 🚀 [절전 모드 진입]
-                    if (layoutLoadingOverlay != null) {
-                        layoutLoadingOverlay.setBackgroundColor(0xFF000000); // 100% 완전 블랙 암전 덮개
-                        if (pbLoadingProgress != null)
-                            pbLoadingProgress.setVisibility(View.GONE);
-                        if (tvLoadingProgress != null)
-                            tvLoadingProgress.setText("");
-                        layoutLoadingOverlay.setAlpha(0.0f); // 🚀 0% 투명도부터 시작
-                        layoutLoadingOverlay.setVisibility(View.VISIBLE);
-                    }
-
-                    // 🚀 [신규 엔진] 25ms 주기로 화면을 스르륵 어두워지게 만드는 가상 페이드아웃 뷰 렌더러
-                    final Handler fadeHandler = new Handler();
-                    fadeHandler.post(new Runnable() {
-                        float alpha = 0.0f;
-
-                        @Override
-                        public void run() {
-                            // 🚀 [충돌 완벽 방어막] 꺼지는 도중에 화면을 깨우면, 즉시 암전 스크립트를 파쇄합니다!
-                            if (!isFakeScreenOff)
-                                return;
-
-                            alpha += 0.08f; // 💡 이 숫자를 낮추면 더 천천히 어두워집니다.
-                            if (alpha >= 1.0f) {
-                                layoutLoadingOverlay.setAlpha(1.0f);
-                                // 암전이 완벽히 끝나면 백라이트 밝기를 최저로 낮춥니다.
-                                try {
-                                    WindowManager.LayoutParams lp = getWindow().getAttributes();
-                                    lp.screenBrightness = 0.01f;
-                                    getWindow().setAttributes(lp);
-                                } catch (Exception e) {
-                                }
-                            } else {
-                                layoutLoadingOverlay.setAlpha(alpha);
-                                fadeHandler.postDelayed(this, 25);
+                    if (pbLoadingProgress != null) pbLoadingProgress.setVisibility(View.GONE);
+                    if (tvLoadingProgress != null) tvLoadingProgress.setText("");
+                    com.themoon.y1.managers.PowerBacklightManager.getInstance(MainActivity.this).enterFakeScreenOff(
+                            getWindow(),
+                            layoutLoadingOverlay,
+                            (sleep) -> {
+                                autoManageWifiPower(sleep);
+                                return kotlin.Unit.INSTANCE;
                             }
-                        }
-                    });
+                    );
                 }
             });
         } else {
@@ -884,24 +834,17 @@ public class MainActivity extends Activity {
         }
     }
 
-    // 🚀 [버그 수리] isFakeScreenOff는 그동안 true로만 켜지고 다시 false로 되돌리는 코드가 어디에도
-    // 없었습니다 - 라디오/웹서버 재생 중 백라이트 타이머가 한 번이라도 발동하면, 그 뒤로는 아무 버튼을
-    // 눌러도(진동/클릭음은 정상 작동하니 dispatchKeyEvent 자체는 계속 실행되고 있었음) 화면이 영원히
-    // 새까맣게 남아있었던 것이 이 함수 하나가 빠져서였습니다. 실제 화면을 껐다 켜는 turnOffScreen()의
-    // else 분기와 대칭을 이루도록, 오버레이/밝기/와이파이를 전부 원상복구합니다.
     private void wakeFromFakeScreenOff() {
         isFakeScreenOff = false;
-        autoManageWifiPower(false);
-        if (layoutLoadingOverlay != null) {
-            layoutLoadingOverlay.setVisibility(View.GONE);
-            layoutLoadingOverlay.setBackgroundColor(0xDD000000);
-        }
-        try {
-            WindowManager.LayoutParams lp = getWindow().getAttributes();
-            lp.screenBrightness = currentSystemBrightness / 255.0f;
-            getWindow().setAttributes(lp);
-        } catch (Exception e) {
-        }
+        com.themoon.y1.managers.PowerBacklightManager.getInstance(this).wakeFromFakeScreenOff(
+                getWindow(),
+                layoutLoadingOverlay,
+                currentSystemBrightness,
+                (sleep) -> {
+                    autoManageWifiPower(sleep);
+                    return kotlin.Unit.INSTANCE;
+                }
+        );
         updateScreenOffFeedback(true);
     }
 
