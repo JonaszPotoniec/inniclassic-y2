@@ -62,5 +62,19 @@ public class SyncLedgerTest {
 
         ledger.toggleLibrarySelection("lib-movies", "id1");
         assertTrue(ledger.getLibrarySelections("lib-movies").contains("id1"));
+
+        // Batch additions and removals
+        ledger.addLibrarySelections("lib-movies", Arrays.asList("id3", "id4"));
+        Set<String> afterAdd = ledger.getLibrarySelections("lib-movies");
+        assertEquals(4, afterAdd.size());
+        assertTrue(afterAdd.containsAll(Arrays.asList("id1", "id2", "id3", "id4")));
+
+        ledger.removeLibrarySelections("lib-movies", Arrays.asList("id1", "id3"));
+        Set<String> afterRemove = ledger.getLibrarySelections("lib-movies");
+        assertEquals(2, afterRemove.size());
+        assertTrue(afterRemove.contains("id2"));
+        assertTrue(afterRemove.contains("id4"));
+        assertFalse(afterRemove.contains("id1"));
+        assertFalse(afterRemove.contains("id3"));
     }
 }

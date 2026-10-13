@@ -104,6 +104,68 @@ public final class TablerIcons {
         "M8 11v-4a4 4 0 1 1 8 0v4"
     };
 
+    /** Tabler Icons outline/square-check.svg (MIT) */
+    public static final String[] CHECKBOX = {
+        "M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z",
+        "M9 12l2 2l4 -4"
+    };
+
+    /** Tabler Icons outline/square-minus.svg (MIT) */
+    public static final String[] SQUARE_MINUS = {
+        "M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z",
+        "M9 12h6"
+    };
+
+    /** Tabler Icons outline/square.svg (MIT) */
+    public static final String[] SQUARE = {
+        "M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"
+    };
+
+    /** Tabler Icons outline/chevron-right.svg (MIT) */
+    public static final String[] CHEVRON_RIGHT = {
+        "M9 6l6 6l-6 6"
+    };
+
+    /** Tabler Icons outline/device-tv.svg (MIT) */
+    public static final String[] DEVICE_TV = {
+        "M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z",
+        "M16 3l-4 4l-4 -4"
+    };
+
+    /** Tabler Icons outline/movie.svg (MIT) */
+    public static final String[] MOVIE = {
+        "M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z",
+        "M8 4l0 16",
+        "M16 4l0 16",
+        "M4 8l4 0",
+        "M4 16l4 0",
+        "M4 12l16 0",
+        "M16 8l4 0",
+        "M16 16l4 0"
+    };
+
+    /** Tabler Icons outline/disc.svg (MIT) */
+    public static final String[] DISC = {
+        "M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0",
+        "M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0",
+        "M7 12a5 5 0 0 1 5 -5",
+        "M12 17a5 5 0 0 0 5 -5"
+    };
+
+    /** Tabler Icons outline/user.svg (MIT) */
+    public static final String[] USER = {
+        "M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0",
+        "M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"
+    };
+
+    /** Tabler Icons outline/music.svg (MIT) */
+    public static final String[] MUSIC = {
+        "M3 17a3 3 0 1 0 6 0a3 3 0 0 0 -6 0",
+        "M13 17a3 3 0 1 0 6 0a3 3 0 0 0 -6 0",
+        "M9 17v-13h10v13",
+        "M9 8h10"
+    };
+
     /**
      * Renders a Tabler icon centered on a rounded card tile.
      */

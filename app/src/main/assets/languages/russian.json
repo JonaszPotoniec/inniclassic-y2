@@ -381,7 +381,6 @@
   "QuickConnect Paired!": "QuickConnect подключен!",
   "QuickConnect Expired / Failed": "QuickConnect истек или ошибка",
   "Server does not support QuickConnect": "Сервер не поддерживает QuickConnect",
-  "Cancel": "Отмена",
   "Paired as ": "Вход выполнен как ",
   "Sync Now": "Синхронизировать сейчас",
   "Test Connection": "Проверить соединение",
@@ -409,5 +408,15 @@
   "Libraries": "Библиотеки",
   "Sync": "Синхронизация",
   "Last Synced": "Последняя синхронизация",
-  "Never": "Никогда"
+  "Never": "Никогда",
+  "Select All": "Выбрать все",
+  "Deselect All": "Снять все",
+  "Seasons": "Сезоны",
+  "Episodes": "Эпизоды",
+  "Series": "Сериалы",
+  "Counting files...": "Подсчет файлов...",
+  "Fetch Libraries": "Получить библиотеки",
+  "Fetching libraries...": "Получение библиотек...",
+  "Failed to fetch libraries": "Не удалось получить библиотеки",
+  "Libraries updated": "Библиотеки обновлены"
 }

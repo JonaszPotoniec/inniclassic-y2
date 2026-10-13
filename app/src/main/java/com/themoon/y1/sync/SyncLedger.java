@@ -121,6 +121,24 @@ public class SyncLedger {
         }
     }
 
+    public synchronized void addLibrarySelections(String libraryId, java.util.Collection<String> itemIds) {
+        if (itemIds == null || itemIds.isEmpty()) return;
+        Set<String> set = librarySelections.get(libraryId);
+        if (set == null) {
+            set = new HashSet<>();
+            librarySelections.put(libraryId, set);
+        }
+        set.addAll(itemIds);
+    }
+
+    public synchronized void removeLibrarySelections(String libraryId, java.util.Collection<String> itemIds) {
+        if (itemIds == null || itemIds.isEmpty()) return;
+        Set<String> set = librarySelections.get(libraryId);
+        if (set != null) {
+            set.removeAll(itemIds);
+        }
+    }
+
     public synchronized LedgerItem getItem(String jellyfinId) {
         return items.get(jellyfinId);
     }

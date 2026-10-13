@@ -6,8 +6,11 @@ import android.content.SharedPreferences;
 import com.themoon.y1.sync.MediaSyncProvider;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 /**
  * Jellyfin implementation of MediaSyncProvider.
@@ -185,6 +188,12 @@ public class JellyfinSyncProvider implements MediaSyncProvider {
 
                     setUserId(auth.userId);
                     setServerName(auth.serverName);
+                    try {
+                        List<LibraryInfo> libs = client.fetchLibraries(getAccessToken(), auth.userId, null);
+                        if (libs != null && !libs.isEmpty()) {
+                            setCachedLibraries(libs);
+                        }
+                    } catch (Exception ignored) {}
                     callback.onSuccess(auth.serverName, "OK");
                 } catch (Exception e) {
                     callback.onError(e.getMessage() != null ? e.getMessage() : "Connection failed");
@@ -212,15 +221,65 @@ public class JellyfinSyncProvider implements MediaSyncProvider {
                 setServerName(auth.serverName);
                 return auth.accessToken;
             }
+        } else {
+            if (getUserId().isEmpty() && !token.isEmpty()) {
+                JellyfinClient client = createClient();
+                try {
+                    JellyfinClient.AuthResult auth = client.verifyToken(token);
+                    if (auth.userId != null && !auth.userId.isEmpty()) {
+                        setUserId(auth.userId);
+                    }
+                    if (auth.serverName != null && !auth.serverName.isEmpty()) {
+                        setServerName(auth.serverName);
+                    }
+                } catch (Exception ignored) {}
+            }
         }
         return token;
+    }
+
+    public synchronized List<LibraryInfo> getCachedLibraries() {
+        String jsonStr = prefs.getString("cached_libraries", "");
+        List<LibraryInfo> list = new ArrayList<>();
+        if (jsonStr == null || jsonStr.isEmpty()) return list;
+        try {
+            JSONArray arr = new JSONArray(jsonStr);
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject obj = arr.getJSONObject(i);
+                list.add(new LibraryInfo(
+                        obj.optString("id", ""),
+                        obj.optString("name", ""),
+                        obj.optString("collectionType", "")
+                ));
+            }
+        } catch (Exception ignored) {}
+        return list;
+    }
+
+    public synchronized void setCachedLibraries(List<LibraryInfo> libraries) {
+        if (libraries == null) return;
+        try {
+            JSONArray arr = new JSONArray();
+            for (LibraryInfo lib : libraries) {
+                JSONObject obj = new JSONObject();
+                obj.put("id", lib.id);
+                obj.put("name", lib.name);
+                obj.put("collectionType", lib.collectionType);
+                arr.put(obj);
+            }
+            prefs.edit().putString("cached_libraries", arr.toString()).apply();
+        } catch (Exception ignored) {}
     }
 
     @Override
     public List<LibraryInfo> fetchLibraries(CancellationToken token) throws Exception {
         String validToken = ensureValidAccessToken();
         JellyfinClient client = createClient();
-        return client.fetchLibraries(validToken, getUserId(), token);
+        List<LibraryInfo> libs = client.fetchLibraries(validToken, getUserId(), token);
+        if (libs != null && !libs.isEmpty()) {
+            setCachedLibraries(libs);
+        }
+        return libs;
     }
 
     @Override
@@ -233,6 +292,7 @@ public class JellyfinSyncProvider implements MediaSyncProvider {
                 .remove("access_token")
                 .remove("user_id")
                 .remove("server_name")
+                .remove("cached_libraries")
                 .apply();
     }
 }

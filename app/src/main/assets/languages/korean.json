@@ -381,7 +381,6 @@
   "QuickConnect Paired!": "QuickConnect 연결 완료!",
   "QuickConnect Expired / Failed": "QuickConnect 만료됨 또는 실패",
   "Server does not support QuickConnect": "서버가 QuickConnect를 지원하지 않습니다",
-  "Cancel": "취소",
   "Paired as ": "연결된 사용자: ",
   "Sync Now": "지금 동기화",
   "Test Connection": "연결 테스트",
@@ -409,5 +408,15 @@
   "Libraries": "라이브러리",
   "Sync": "동기화",
   "Last Synced": "최근 동기화",
-  "Never": "없음"
+  "Never": "없음",
+  "Select All": "전체 선택",
+  "Deselect All": "전체 해제",
+  "Seasons": "시즌",
+  "Episodes": "에피소드",
+  "Series": "시리즈",
+  "Counting files...": "파일 확인 중...",
+  "Fetch Libraries": "라이브러리 가져오기",
+  "Fetching libraries...": "라이브러리 가져오는 중...",
+  "Failed to fetch libraries": "라이브러리를 가져오지 못했습니다",
+  "Libraries updated": "라이브러리가 업데이트되었습니다"
 }

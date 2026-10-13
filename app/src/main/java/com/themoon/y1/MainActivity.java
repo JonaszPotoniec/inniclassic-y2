@@ -539,6 +539,7 @@ public class MainActivity extends Activity {
     // 🚀 [신규 추가] 머티리얼 아이콘 폰트를 담아둘 메모리 공간
     private Typeface materialIconFont = null;
     public boolean isLongPressConsumed = false; // 🚀 롱클릭 방어막 변수 추가
+    public long lastJellyfinLongClickTime = 0; // 🚀 Jellyfin 롱클릭 후 즉시 하위 페이지 진입 방지 디바운스
     public boolean isMediaLongPressConsumed = false; // 🚀 [신규 추가] 미디어 버튼 롱클릭 방어막
     private boolean isSeekPerformed = false;
     private long lastSeekTime = 0;
@@ -885,10 +886,19 @@ public class MainActivity extends Activity {
     private boolean isPendingUpdateCheckAfterWifi = false;
     private boolean isPendingJellyfinSyncAfterWifi = false;
     private boolean isPendingJellyfinTestAfterWifi = false;
+    private boolean isPendingJellyfinFetchLibrariesAfterWifi = false;
     private boolean isPendingJellyfinQuickConnectAfterWifi = false;
     private com.themoon.y1.sync.MediaSyncProvider.LibraryInfo jellyfinActiveLibrary = null;
     private int lastJellyfinFocusIndex = -1;
     private int lastJellyfinLibConfigFocusIndex = -1;
+    private int lastJellyfinBrowseDepth3FocusIndex = -1;
+    private int lastJellyfinBrowseDepth4FocusIndex = -1;
+    private int lastJellyfinBrowseDepth5FocusIndex = -1;
+    private com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.SeriesNode currentSelectedJellyfinSeries = null;
+    private com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.SeasonNode currentSelectedJellyfinSeason = null;
+    private com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.ArtistNode currentSelectedJellyfinArtist = null;
+    private com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.AlbumNode currentSelectedJellyfinAlbum = null;
+    private com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy currentJellyfinHierarchy = null;
     private String jellyfinPendingUsername = "";
     private boolean isWifiConnectedStatus = false;
     // currentKeyboardMode: 0=Wi-Fi password, 1=podcast search, 2=Last.fm username, 3=Last.fm password, 5=Jellyfin URL, 6=Jellyfin User, 7=Jellyfin Pass, 8=Jellyfin Token
@@ -1641,6 +1651,18 @@ public class MainActivity extends Activity {
                                 buildJellyfinSettingsUI();
                                 isNavigatingToSubMenu = false;
                                 testJellyfinConnection();
+                            }
+                        });
+                    } else if (isPendingJellyfinFetchLibrariesAfterWifi) {
+                        isPendingJellyfinFetchLibrariesAfterWifi = false;
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                isNavigatingToSubMenu = true;
+                                changeScreen(STATE_SETTINGS);
+                                buildJellyfinSettingsUI();
+                                isNavigatingToSubMenu = false;
+                                fetchJellyfinLibrariesWithWifi();
                             }
                         });
                     } else if (isPendingJellyfinQuickConnectAfterWifi) {
@@ -6139,6 +6161,11 @@ public class MainActivity extends Activity {
                 }
                 return;
             }
+            if (currentScreenState == STATE_SETTINGS && settingsSubMode == 5 && currentSettingsDepth >= 3) {
+                if (System.currentTimeMillis() - lastJellyfinLongClickTime < 600) {
+                    return;
+                }
+            }
             View c = getCurrentFocus();
             if (c != null) {
                 c.performClick();
@@ -9314,7 +9341,7 @@ public class MainActivity extends Activity {
         }
 
         // Test Connection button
-        View btnTest = createTablerListButton(com.themoon.y1.views.TablerIcons.REFRESH, t("Test Connection"));
+        View btnTest = createTablerListButton(com.themoon.y1.views.TablerIcons.WIFI, t("Test Connection"));
         btnTest.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -9326,64 +9353,71 @@ public class MainActivity extends Activity {
 
         createCategoryHeader("━ " + t("Libraries") + " ━");
 
-        final int libraryInsertionIndex = containerSettingsItems.getChildCount();
+        final com.themoon.y1.sync.SyncLedger ledger = com.themoon.y1.sync.SyncManager.getInstance(this).getLedger();
+        final java.util.List<com.themoon.y1.sync.MediaSyncProvider.LibraryInfo> cachedLibs = provider.getCachedLibraries();
 
-        if (!provider.isConfigured() || provider.getUserId().isEmpty()) {
+        if (cachedLibs.isEmpty()) {
             TextView tvHint = new TextView(this);
             tvHint.setText(t("Connect to discover libraries."));
             tvHint.setTextColor(ThemeManager.getTextColorSecondary());
             tvHint.setTextSize(14f);
             tvHint.setPadding(20, 15, 20, 15);
             containerSettingsItems.addView(tvHint);
-        } else {
-            // Asynchronously or cached load libraries
-            final com.themoon.y1.sync.SyncLedger ledger = com.themoon.y1.sync.SyncManager.getInstance(this).getLedger();
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        final java.util.List<com.themoon.y1.sync.MediaSyncProvider.LibraryInfo> libs =
-                                provider.fetchLibraries(new com.themoon.y1.sync.MediaSyncProvider.CancellationToken());
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (currentSettingsDepth != 1 || settingsSubMode != 5) return;
-                                int insertPos = libraryInsertionIndex;
-                                for (final com.themoon.y1.sync.MediaSyncProvider.LibraryInfo lib : libs) {
-                                    String defaultMode = "music".equalsIgnoreCase(lib.collectionType) ? "all" :
-                                            ("movies".equalsIgnoreCase(lib.collectionType) || "tvshows".equalsIgnoreCase(lib.collectionType) ? "manual" : "off");
-                                    String curMode = ledger.getLibrarySyncMode(lib.id, defaultMode);
-                                    String modeLabel = "all".equalsIgnoreCase(curMode) ? t("Sync All") :
-                                            ("manual".equalsIgnoreCase(curMode) ? t("Manual") : t("Off"));
 
-                                    String icon = "music".equalsIgnoreCase(lib.collectionType) ? "♫ " :
-                                            ("movies".equalsIgnoreCase(lib.collectionType) ? "🎬 " : "📺 ");
-                                    LinearLayout rowLib = createSettingRow(icon + lib.name, modeLabel + " 〉");
-                                    rowLib.setOnClickListener(new View.OnClickListener() {
-                                        @Override
-                                        public void onClick(View v) {
-                                            clickFeedback();
-                                            lastJellyfinLibConfigFocusIndex = -1;
-                                            buildJellyfinLibraryConfigUI(lib);
-                                        }
-                                    });
-                                    containerSettingsItems.addView(rowLib, Math.min(insertPos++, containerSettingsItems.getChildCount()));
-                                }
-                                if (getCurrentFocus() == null) {
-                                    for (int i = 0; i < containerSettingsItems.getChildCount(); i++) {
-                                        View child = containerSettingsItems.getChildAt(i);
-                                        if (child != null && child.isFocusable() && child.getVisibility() == View.VISIBLE) {
-                                            child.requestFocus();
-                                            break;
+            if (provider.isConfigured() && isNetworkConnected()) {
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            final java.util.List<com.themoon.y1.sync.MediaSyncProvider.LibraryInfo> fetched =
+                                    provider.fetchLibraries(new com.themoon.y1.sync.MediaSyncProvider.CancellationToken());
+                            if (fetched != null && !fetched.isEmpty()) {
+                                runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        if (currentSettingsDepth == 1 && settingsSubMode == 5) {
+                                            buildJellyfinSettingsUI();
                                         }
                                     }
-                                }
+                                });
                             }
-                        });
-                    } catch (Exception ignored) {}
-                }
-            }).start();
+                        } catch (Exception ignored) {}
+                    }
+                }).start();
+            }
+        } else {
+            for (final com.themoon.y1.sync.MediaSyncProvider.LibraryInfo lib : cachedLibs) {
+                String defaultMode = "music".equalsIgnoreCase(lib.collectionType) ? "all" :
+                        ("movies".equalsIgnoreCase(lib.collectionType) || "tvshows".equalsIgnoreCase(lib.collectionType) ? "manual" : "off");
+                String curMode = ledger.getLibrarySyncMode(lib.id, defaultMode);
+                String modeLabel = "all".equalsIgnoreCase(curMode) ? t("Sync All") :
+                        ("manual".equalsIgnoreCase(curMode) ? t("Manual") : t("Off"));
+
+                String[] libIcon = "music".equalsIgnoreCase(lib.collectionType) ? com.themoon.y1.views.TablerIcons.MUSIC :
+                        ("movies".equalsIgnoreCase(lib.collectionType) ? com.themoon.y1.views.TablerIcons.MOVIE : com.themoon.y1.views.TablerIcons.DEVICE_TV);
+
+                View rowLib = createJellyfinLibraryRow(libIcon, lib.name, modeLabel, new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        clickFeedback();
+                        lastJellyfinLibConfigFocusIndex = -1;
+                        buildJellyfinLibraryConfigUI(lib);
+                    }
+                });
+                containerSettingsItems.addView(rowLib);
+            }
         }
+
+        // Fetch Libraries button
+        View btnFetchLibs = createTablerListButton(com.themoon.y1.views.TablerIcons.REFRESH, t("Fetch Libraries"));
+        btnFetchLibs.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                clickFeedback();
+                fetchJellyfinLibrariesWithWifi();
+            }
+        });
+        containerSettingsItems.addView(btnFetchLibs);
 
         createCategoryHeader("━ " + t("Sync") + " ━");
 
@@ -9495,6 +9529,9 @@ public class MainActivity extends Activity {
     private void buildJellyfinLibraryConfigUI(final com.themoon.y1.sync.MediaSyncProvider.LibraryInfo library) {
         currentSettingsDepth = 2;
         settingsSubMode = 5;
+        if (jellyfinActiveLibrary == null || !library.id.equals(jellyfinActiveLibrary.id)) {
+            currentJellyfinHierarchy = null;
+        }
         jellyfinActiveLibrary = library;
         containerSettingsItems.removeAllViews();
 
@@ -9554,6 +9591,7 @@ public class MainActivity extends Activity {
                 @Override
                 public void onClick(View v) {
                     clickFeedback();
+                    lastJellyfinBrowseDepth3FocusIndex = -1;
                     buildJellyfinBrowseSelectUI(library);
                 }
             });
@@ -9587,23 +9625,505 @@ public class MainActivity extends Activity {
         });
     }
 
+    private void addJellyfinStorageHeader(long selectedBytes, int selectedCount, int totalCount) {
+        File root = com.themoon.y1.sync.SyncManager.getSyncRoot();
+        long freeBytes = 0;
+        try {
+            android.os.StatFs stat = new android.os.StatFs(root.getAbsolutePath());
+            freeBytes = (long) stat.getAvailableBlocks() * (long) stat.getBlockSize();
+        } catch (Exception ignored) {}
+
+        final TextView tvHeader = new TextView(this);
+        tvHeader.setTypeface(ThemeManager.getCustomFontBold());
+        tvHeader.setTextColor(ThemeManager.getTextColorSecondary());
+        tvHeader.setTextSize(13f);
+        tvHeader.setPadding(10, 15, 10, 5);
+        String infoHeader = t("Selected") + ": " + selectedCount + "/" + totalCount
+                + (selectedBytes > 0 ? " (" + formatStorageSize(selectedBytes) + ")" : "")
+                + " | " + t("Free") + ": " + formatStorageSize(freeBytes);
+        tvHeader.setText(infoHeader);
+        containerSettingsItems.addView(tvHeader);
+    }
+
+    private void restoreJellyfinFocus(final int targetDepth, final int preferredIndex) {
+        containerSettingsItems.post(new Runnable() {
+            @Override
+            public void run() {
+                if (currentSettingsDepth != targetDepth || settingsSubMode != 5) return;
+                if (preferredIndex >= 0 && preferredIndex < containerSettingsItems.getChildCount()) {
+                    View target = containerSettingsItems.getChildAt(preferredIndex);
+                    if (target != null && target.isFocusable() && target.getVisibility() == View.VISIBLE) {
+                        target.requestFocus();
+                        return;
+                    }
+                }
+                for (int i = 0; i < containerSettingsItems.getChildCount(); i++) {
+                    View child = containerSettingsItems.getChildAt(i);
+                    if (child != null && child.isFocusable() && child.getVisibility() == View.VISIBLE) {
+                        child.requestFocus();
+                        break;
+                    }
+                }
+            }
+        });
+    }
+
+    private LinearLayout createJellyfinLibraryRow(
+            final String[] iconPaths,
+            String name,
+            String modeLabel,
+            final View.OnClickListener clickListener) {
+
+        final float d = getResources().getDisplayMetrics().density;
+        final LinearLayout rowButton = new LinearLayout(this);
+        rowButton.setOrientation(LinearLayout.HORIZONTAL);
+        rowButton.setGravity(Gravity.CENTER_VERTICAL);
+        rowButton.setFocusable(true);
+        rowButton.setClickable(true);
+        rowButton.setSoundEffectsEnabled(false);
+        rowButton.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
+
+        int padLeft = (int) (12 * d);
+        int padTopBottom = (int) ((ThemeManager.isClassicTheme() ? 6 : 8) * d);
+        int padRight = (int) (12 * d);
+        rowButton.setPadding(padLeft, padTopBottom, padRight, padTopBottom);
+
+        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        rowLp.setMargins(0, (int) (3 * d), 0, (int) (3 * d));
+        rowButton.setLayoutParams(rowLp);
+
+        final int iconSizePx = (int) (20 * d);
+        final int chevronSizePx = (int) (14 * d);
+
+        final int defaultIconColor = ThemeManager.getTextColorSecondary();
+        final int defaultTextColor = ThemeManager.getTextColorPrimary();
+        final int defaultSubtitleColor = ThemeManager.getTextColorSecondary();
+
+        final ImageView ivIcon;
+        if (iconPaths != null) {
+            ivIcon = new ImageView(this);
+            ivIcon.setImageBitmap(com.themoon.y1.views.TablerIcons.render(iconPaths, iconSizePx, defaultIconColor));
+            LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(iconSizePx, iconSizePx);
+            iconLp.rightMargin = (int) (10 * d);
+            ivIcon.setLayoutParams(iconLp);
+            rowButton.addView(ivIcon);
+        } else {
+            ivIcon = null;
+        }
+
+        final TextView tvTitle = new TextView(this);
+        tvTitle.setText(name);
+        tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, ThemeManager.getListTextSize() * d);
+        tvTitle.setTextColor(defaultTextColor);
+        tvTitle.setTypeface(ThemeManager.getCustomFontBold());
+        tvTitle.setSingleLine(true);
+        tvTitle.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
+        tvTitle.setMarqueeRepeatLimit(-1);
+        tvTitle.setHorizontalFadingEdgeEnabled(true);
+        LinearLayout.LayoutParams textLp = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        tvTitle.setLayoutParams(textLp);
+        rowButton.addView(tvTitle);
+
+        final TextView tvMode = new TextView(this);
+        tvMode.setText(modeLabel);
+        tvMode.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, (ThemeManager.getListTextSize() - 2f) * d);
+        tvMode.setTextColor(defaultSubtitleColor);
+        tvMode.setTypeface(ThemeManager.getCustomFont());
+        LinearLayout.LayoutParams modeLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        modeLp.leftMargin = (int) (8 * d);
+        tvMode.setLayoutParams(modeLp);
+        rowButton.addView(tvMode);
+
+        final ImageView ivChevron = new ImageView(this);
+        ivChevron.setImageBitmap(com.themoon.y1.views.TablerIcons.render(com.themoon.y1.views.TablerIcons.CHEVRON_RIGHT, chevronSizePx, defaultSubtitleColor));
+        LinearLayout.LayoutParams chevLp = new LinearLayout.LayoutParams(chevronSizePx, chevronSizePx);
+        chevLp.leftMargin = (int) (6 * d);
+        ivChevron.setLayoutParams(chevLp);
+        rowButton.addView(ivChevron);
+
+        rowButton.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            @Override
+            public void onFocusChange(View v, boolean hasFocus) {
+                if (hasFocus) {
+                    rowButton.setBackground(createFocusedButtonBackground());
+                    int focusedColor = ThemeManager.getListButtonFocusedTextColor();
+                    tvTitle.setTextColor(focusedColor);
+                    tvTitle.setSelected(true);
+                    tvMode.setTextColor(focusedColor);
+                    if (ivIcon != null && iconPaths != null) {
+                        ivIcon.setImageBitmap(com.themoon.y1.views.TablerIcons.render(iconPaths, iconSizePx, focusedColor));
+                    }
+                    ivChevron.setImageBitmap(com.themoon.y1.views.TablerIcons.render(com.themoon.y1.views.TablerIcons.CHEVRON_RIGHT, chevronSizePx, focusedColor));
+                    showFastScrollLetter(tvTitle.getText().toString());
+                    int idx = containerSettingsItems.indexOfChild(rowButton);
+                    if (idx != -1 && currentScreenState == STATE_SETTINGS && settingsSubMode == 5 && currentSettingsDepth == 1) {
+                        lastJellyfinFocusIndex = idx;
+                    }
+                } else {
+                    rowButton.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
+                    tvTitle.setTextColor(defaultTextColor);
+                    tvTitle.setSelected(false);
+                    tvMode.setTextColor(defaultSubtitleColor);
+                    if (ivIcon != null && iconPaths != null) {
+                        ivIcon.setImageBitmap(com.themoon.y1.views.TablerIcons.render(iconPaths, iconSizePx, defaultIconColor));
+                    }
+                    ivChevron.setImageBitmap(com.themoon.y1.views.TablerIcons.render(com.themoon.y1.views.TablerIcons.CHEVRON_RIGHT, chevronSizePx, defaultSubtitleColor));
+                }
+            }
+        });
+
+        if (clickListener != null) {
+            rowButton.setOnClickListener(clickListener);
+        }
+
+        return rowButton;
+    }
+
+    private LinearLayout createJellyfinSelectRow(
+            final String[] leftIconPaths,
+            String title,
+            String subtitleText,
+            final com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState checkState,
+            final boolean showChevron,
+            final View.OnClickListener clickListener,
+            final View.OnLongClickListener longClickListener) {
+
+        float d = getResources().getDisplayMetrics().density;
+        final LinearLayout rowButton = new LinearLayout(this);
+        rowButton.setOrientation(LinearLayout.HORIZONTAL);
+        rowButton.setGravity(Gravity.CENTER_VERTICAL);
+        rowButton.setFocusable(true);
+        rowButton.setClickable(true);
+        rowButton.setSoundEffectsEnabled(false);
+        rowButton.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
+
+        int padLeft = (int) (12 * d);
+        int padTopBottom = (int) ((ThemeManager.isClassicTheme() ? 6 : 8) * d);
+        int padRight = (int) (12 * d);
+        rowButton.setPadding(padLeft, padTopBottom, padRight, padTopBottom);
+
+        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        rowLp.setMargins(0, (int) (3 * d), 0, (int) (3 * d));
+        rowButton.setLayoutParams(rowLp);
+
+        final int iconSizePx = (int) (20 * d);
+        final int checkSizePx = (int) (18 * d);
+        final int chevronSizePx = (int) (14 * d);
+
+        final int defaultLeftIconColor = ThemeManager.getTextColorSecondary();
+        final int defaultTextColor = ThemeManager.getTextColorPrimary();
+        final int defaultSubtitleColor = ThemeManager.getTextColorSecondary();
+
+        final ImageView ivLeftIcon;
+        if (leftIconPaths != null) {
+            ivLeftIcon = new ImageView(this);
+            ivLeftIcon.setImageBitmap(com.themoon.y1.views.TablerIcons.render(leftIconPaths, iconSizePx, defaultLeftIconColor));
+            LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(iconSizePx, iconSizePx);
+            iconLp.rightMargin = (int) (8 * d);
+            ivLeftIcon.setLayoutParams(iconLp);
+            rowButton.addView(ivLeftIcon);
+        } else {
+            ivLeftIcon = null;
+        }
+
+        final TextView tvTitle = new TextView(this);
+        tvTitle.setText(title);
+        tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, ThemeManager.getListTextSize() * d);
+        tvTitle.setTextColor(defaultTextColor);
+        tvTitle.setTypeface(ThemeManager.getCustomFontBold());
+        tvTitle.setSingleLine(true);
+        tvTitle.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
+        tvTitle.setMarqueeRepeatLimit(-1);
+        tvTitle.setHorizontalFadingEdgeEnabled(true);
+        LinearLayout.LayoutParams textLp = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        tvTitle.setLayoutParams(textLp);
+        rowButton.addView(tvTitle);
+
+        final TextView tvSubtitle;
+        if (subtitleText != null && !subtitleText.isEmpty()) {
+            tvSubtitle = new TextView(this);
+            tvSubtitle.setText(subtitleText);
+            tvSubtitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, (ThemeManager.getListTextSize() - 2f) * d);
+            tvSubtitle.setTextColor(defaultSubtitleColor);
+            tvSubtitle.setTypeface(ThemeManager.getCustomFont());
+            LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            subLp.leftMargin = (int) (8 * d);
+            subLp.rightMargin = (int) (6 * d);
+            tvSubtitle.setLayoutParams(subLp);
+            rowButton.addView(tvSubtitle);
+        } else {
+            tvSubtitle = null;
+        }
+
+        final String[] checkPaths = (checkState == com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.CHECKED)
+                ? com.themoon.y1.views.TablerIcons.CHECKBOX
+                : ((checkState == com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.INDETERMINATE)
+                        ? com.themoon.y1.views.TablerIcons.SQUARE_MINUS
+                        : com.themoon.y1.views.TablerIcons.SQUARE);
+
+        final int checkColor = (checkState == com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.UNCHECKED)
+                ? defaultSubtitleColor
+                : defaultTextColor;
+
+        final ImageView ivCheck = new ImageView(this);
+        ivCheck.setImageBitmap(com.themoon.y1.views.TablerIcons.render(checkPaths, checkSizePx, checkColor));
+        LinearLayout.LayoutParams checkLp = new LinearLayout.LayoutParams(checkSizePx, checkSizePx);
+        checkLp.leftMargin = (int) (4 * d);
+        ivCheck.setLayoutParams(checkLp);
+        rowButton.addView(ivCheck);
+
+        final ImageView ivChevron;
+        if (showChevron) {
+            ivChevron = new ImageView(this);
+            ivChevron.setImageBitmap(com.themoon.y1.views.TablerIcons.render(com.themoon.y1.views.TablerIcons.CHEVRON_RIGHT, chevronSizePx, defaultSubtitleColor));
+            LinearLayout.LayoutParams chevLp = new LinearLayout.LayoutParams(chevronSizePx, chevronSizePx);
+            chevLp.leftMargin = (int) (6 * d);
+            ivChevron.setLayoutParams(chevLp);
+            rowButton.addView(ivChevron);
+        } else {
+            ivChevron = null;
+        }
+
+        rowButton.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            @Override
+            public void onFocusChange(View v, boolean hasFocus) {
+                if (hasFocus) {
+                    rowButton.setBackground(createFocusedButtonBackground());
+                    int focusedColor = ThemeManager.getListButtonFocusedTextColor();
+                    tvTitle.setTextColor(focusedColor);
+                    tvTitle.setSelected(true);
+                    if (tvSubtitle != null) tvSubtitle.setTextColor(focusedColor);
+                    if (ivLeftIcon != null && leftIconPaths != null) {
+                        ivLeftIcon.setImageBitmap(com.themoon.y1.views.TablerIcons.render(leftIconPaths, iconSizePx, focusedColor));
+                    }
+                    ivCheck.setImageBitmap(com.themoon.y1.views.TablerIcons.render(checkPaths, checkSizePx, focusedColor));
+                    if (ivChevron != null) {
+                        ivChevron.setImageBitmap(com.themoon.y1.views.TablerIcons.render(com.themoon.y1.views.TablerIcons.CHEVRON_RIGHT, chevronSizePx, focusedColor));
+                    }
+                    showFastScrollLetter(tvTitle.getText().toString());
+                    int idx = containerSettingsItems.indexOfChild(rowButton);
+                    if (idx != -1 && currentScreenState == STATE_SETTINGS && settingsSubMode == 5) {
+                        if (currentSettingsDepth == 3) {
+                            lastJellyfinBrowseDepth3FocusIndex = idx;
+                        } else if (currentSettingsDepth == 4) {
+                            lastJellyfinBrowseDepth4FocusIndex = idx;
+                        } else if (currentSettingsDepth == 5) {
+                            lastJellyfinBrowseDepth5FocusIndex = idx;
+                        }
+                    }
+                } else {
+                    rowButton.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
+                    tvTitle.setTextColor(defaultTextColor);
+                    tvTitle.setSelected(false);
+                    if (tvSubtitle != null) tvSubtitle.setTextColor(defaultSubtitleColor);
+                    if (ivLeftIcon != null && leftIconPaths != null) {
+                        ivLeftIcon.setImageBitmap(com.themoon.y1.views.TablerIcons.render(leftIconPaths, iconSizePx, defaultLeftIconColor));
+                    }
+                    ivCheck.setImageBitmap(com.themoon.y1.views.TablerIcons.render(checkPaths, checkSizePx, checkColor));
+                    if (ivChevron != null) {
+                        ivChevron.setImageBitmap(com.themoon.y1.views.TablerIcons.render(com.themoon.y1.views.TablerIcons.CHEVRON_RIGHT, chevronSizePx, defaultSubtitleColor));
+                    }
+                }
+            }
+        });
+
+        if (clickListener != null) {
+            rowButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (System.currentTimeMillis() - lastJellyfinLongClickTime < 600) {
+                        return;
+                    }
+                    clickListener.onClick(v);
+                }
+            });
+        }
+
+        if (longClickListener != null) {
+            rowButton.setOnLongClickListener(new View.OnLongClickListener() {
+                @Override
+                public boolean onLongClick(View v) {
+                    lastJellyfinLongClickTime = System.currentTimeMillis();
+                    isLongPressConsumed = true;
+                    return longClickListener.onLongClick(v);
+                }
+            });
+        }
+
+        return rowButton;
+    }
+
+    private View createJellyfinToggleAllRow(
+            final com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState overallState,
+            int selectedCount,
+            int totalCount,
+            final View.OnClickListener clickListener) {
+
+        String label = (overallState == com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.CHECKED)
+                ? t("Deselect All") : t("Select All");
+        String countStr = selectedCount + "/" + totalCount;
+
+        final String[] checkPaths = (overallState == com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.CHECKED)
+                ? com.themoon.y1.views.TablerIcons.CHECKBOX
+                : ((overallState == com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.INDETERMINATE)
+                        ? com.themoon.y1.views.TablerIcons.SQUARE_MINUS
+                        : com.themoon.y1.views.TablerIcons.SQUARE);
+
+        float d = getResources().getDisplayMetrics().density;
+        final LinearLayout rowButton = new LinearLayout(this);
+        rowButton.setOrientation(LinearLayout.HORIZONTAL);
+        rowButton.setGravity(Gravity.CENTER_VERTICAL);
+        rowButton.setFocusable(true);
+        rowButton.setClickable(true);
+        rowButton.setSoundEffectsEnabled(false);
+        rowButton.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
+
+        int padLeft = (int) (12 * d);
+        int padTopBottom = (int) ((ThemeManager.isClassicTheme() ? 6 : 8) * d);
+        int padRight = (int) (12 * d);
+        rowButton.setPadding(padLeft, padTopBottom, padRight, padTopBottom);
+
+        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        rowLp.setMargins(0, (int) (3 * d), 0, (int) (3 * d));
+        rowButton.setLayoutParams(rowLp);
+
+        final int iconSizePx = (int) (20 * d);
+        final int defaultTextColor = ThemeManager.getTextColorPrimary();
+        final int defaultSubtitleColor = ThemeManager.getTextColorSecondary();
+
+        final ImageView ivCheck = new ImageView(this);
+        ivCheck.setImageBitmap(com.themoon.y1.views.TablerIcons.render(checkPaths, iconSizePx, defaultTextColor));
+        LinearLayout.LayoutParams checkLp = new LinearLayout.LayoutParams(iconSizePx, iconSizePx);
+        checkLp.rightMargin = (int) (10 * d);
+        ivCheck.setLayoutParams(checkLp);
+        rowButton.addView(ivCheck);
+
+        final TextView tvLabel = new TextView(this);
+        tvLabel.setText(label);
+        tvLabel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, ThemeManager.getListTextSize() * d);
+        tvLabel.setTextColor(defaultTextColor);
+        tvLabel.setTypeface(ThemeManager.getCustomFontBold());
+        tvLabel.setSingleLine(true);
+        LinearLayout.LayoutParams textLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        tvLabel.setLayoutParams(textLp);
+        rowButton.addView(tvLabel);
+
+        final TextView tvCount = new TextView(this);
+        tvCount.setText(countStr);
+        tvCount.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, (ThemeManager.getListTextSize() - 2f) * d);
+        tvCount.setTextColor(defaultSubtitleColor);
+        tvCount.setTypeface(ThemeManager.getCustomFont());
+        LinearLayout.LayoutParams countLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        tvCount.setLayoutParams(countLp);
+        rowButton.addView(tvCount);
+
+        rowButton.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            @Override
+            public void onFocusChange(View v, boolean hasFocus) {
+                if (hasFocus) {
+                    rowButton.setBackground(createFocusedButtonBackground());
+                    int focusedColor = ThemeManager.getListButtonFocusedTextColor();
+                    tvLabel.setTextColor(focusedColor);
+                    tvCount.setTextColor(focusedColor);
+                    ivCheck.setImageBitmap(com.themoon.y1.views.TablerIcons.render(checkPaths, iconSizePx, focusedColor));
+                    showFastScrollLetter(tvLabel.getText().toString());
+                    int idx = containerSettingsItems.indexOfChild(rowButton);
+                    if (idx != -1 && currentScreenState == STATE_SETTINGS && settingsSubMode == 5) {
+                        if (currentSettingsDepth == 3) {
+                            lastJellyfinBrowseDepth3FocusIndex = idx;
+                        } else if (currentSettingsDepth == 4) {
+                            lastJellyfinBrowseDepth4FocusIndex = idx;
+                        } else if (currentSettingsDepth == 5) {
+                            lastJellyfinBrowseDepth5FocusIndex = idx;
+                        }
+                    }
+                } else {
+                    rowButton.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
+                    tvLabel.setTextColor(defaultTextColor);
+                    tvCount.setTextColor(defaultSubtitleColor);
+                    ivCheck.setImageBitmap(com.themoon.y1.views.TablerIcons.render(checkPaths, iconSizePx, defaultTextColor));
+                }
+            }
+        });
+
+        if (clickListener != null) {
+            rowButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (System.currentTimeMillis() - lastJellyfinLongClickTime < 600) {
+                        return;
+                    }
+                    clickListener.onClick(v);
+                }
+            });
+
+            rowButton.setOnLongClickListener(new View.OnLongClickListener() {
+                @Override
+                public boolean onLongClick(View v) {
+                    lastJellyfinLongClickTime = System.currentTimeMillis();
+                    isLongPressConsumed = true;
+                    clickListener.onClick(v);
+                    return true;
+                }
+            });
+        }
+
+        return rowButton;
+    }
+
     private void buildJellyfinBrowseSelectUI(final com.themoon.y1.sync.MediaSyncProvider.LibraryInfo library) {
         currentSettingsDepth = 3;
         settingsSubMode = 5;
+        jellyfinActiveLibrary = library;
+
+        // If hierarchy is already cached for this library, immediately route to level 1
+        if (currentJellyfinHierarchy != null) {
+            if ("tvshows".equalsIgnoreCase(library.collectionType)) {
+                buildJellyfinTvSeriesListUI();
+            } else if ("music".equalsIgnoreCase(library.collectionType)) {
+                buildJellyfinMusicArtistsListUI();
+            } else {
+                buildJellyfinMoviesListUI();
+            }
+            return;
+        }
+
         containerSettingsItems.removeAllViews();
+        createCategoryHeader("━ " + library.name + " ━");
 
-        final float d = getResources().getDisplayMetrics().density;
-        createCategoryHeader("━ " + t("Browse & Select") + " ━");
-
-        final com.themoon.y1.sync.SyncLedger ledger = com.themoon.y1.sync.SyncManager.getInstance(this).getLedger();
         final com.themoon.y1.sync.jellyfin.JellyfinSyncProvider provider =
                 com.themoon.y1.sync.jellyfin.JellyfinSyncProvider.getInstance(this);
+
+        float d = getResources().getDisplayMetrics().density;
+        LinearLayout layoutLoading = new LinearLayout(this);
+        layoutLoading.setOrientation(LinearLayout.VERTICAL);
+        layoutLoading.setGravity(Gravity.CENTER_HORIZONTAL);
+        layoutLoading.setPadding((int) (20 * d), (int) (24 * d), (int) (20 * d), (int) (20 * d));
 
         final TextView tvLoading = new TextView(this);
         tvLoading.setText(t("Counting files...\nPlease wait."));
         tvLoading.setTextColor(ThemeManager.getTextColorSecondary());
-        tvLoading.setPadding(20, 20, 20, 20);
-        containerSettingsItems.addView(tvLoading);
+        tvLoading.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, (ThemeManager.getListTextSize() - 1f) * d);
+        tvLoading.setTypeface(ThemeManager.getCustomFont());
+        tvLoading.setGravity(Gravity.CENTER);
+        tvLoading.setPadding(0, 0, 0, (int) (14 * d));
+        layoutLoading.addView(tvLoading);
+
+        final ProgressBar pbLoading = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        pbLoading.setIndeterminate(true);
+        LinearLayout.LayoutParams pbLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, (int) (8 * d));
+        pbLoading.setLayoutParams(pbLp);
+        layoutLoading.addView(pbLoading);
+
+        containerSettingsItems.addView(layoutLoading);
 
         new Thread(new Runnable() {
             @Override
@@ -9611,81 +10131,45 @@ public class MainActivity extends Activity {
                 try {
                     String validToken = provider.ensureValidAccessToken();
                     com.themoon.y1.sync.jellyfin.JellyfinClient client = provider.createClient();
-                    final com.themoon.y1.sync.jellyfin.JellyfinClient.ItemsQueryResult res =
-                            client.fetchItemsPage(validToken, provider.getUserId(),
-                                    library.id, library.collectionType, 0, 500, null, null);
+
+                    com.themoon.y1.sync.jellyfin.JellyfinClient.ItemsFetchProgressListener progressListener =
+                            new com.themoon.y1.sync.jellyfin.JellyfinClient.ItemsFetchProgressListener() {
+                        @Override
+                        public void onProgress(final int loaded, final int total) {
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    if (currentSettingsDepth != 3 || settingsSubMode != 5) return;
+                                    if (total > 0) {
+                                        pbLoading.setIndeterminate(false);
+                                        pbLoading.setMax(total);
+                                        pbLoading.setProgress(loaded);
+                                        tvLoading.setText(t("Counting files...") + "\n" + loaded + " / " + total);
+                                    } else {
+                                        tvLoading.setText(t("Counting files...") + "\n" + loaded);
+                                    }
+                                }
+                            });
+                        }
+                    };
+
+                    final List<com.themoon.y1.sync.jellyfin.JellyfinMediaItem> items =
+                            client.fetchLibraryItemsAll(validToken, provider.getUserId(), library.id, library.collectionType, progressListener, null);
 
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
                             if (currentSettingsDepth != 3 || settingsSubMode != 5) return;
-                            containerSettingsItems.removeView(tvLoading);
-
-                            final java.util.Set<String> currentSelections = ledger.getLibrarySelections(library.id);
-                            long totalSize = 0;
-                            for (com.themoon.y1.sync.jellyfin.JellyfinMediaItem item : res.items) {
-                                if (currentSelections.contains(item.id)) {
-                                    totalSize += item.fileSize;
-                                }
+                            if ("tvshows".equalsIgnoreCase(library.collectionType)) {
+                                currentJellyfinHierarchy = com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.buildTvHierarchy(items);
+                                buildJellyfinTvSeriesListUI();
+                            } else if ("music".equalsIgnoreCase(library.collectionType)) {
+                                currentJellyfinHierarchy = com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.buildMusicHierarchy(items);
+                                buildJellyfinMusicArtistsListUI();
+                            } else {
+                                currentJellyfinHierarchy = com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.buildMoviesHierarchy(items);
+                                buildJellyfinMoviesListUI();
                             }
-
-                            // Free space display
-                            File root = com.themoon.y1.sync.SyncManager.getSyncRoot();
-                            android.os.StatFs stat = new android.os.StatFs(root.getAbsolutePath());
-                            final long freeBytes = (long) stat.getAvailableBlocks() * (long) stat.getBlockSize();
-
-                            final TextView tvHeader = new TextView(MainActivity.this);
-                            tvHeader.setTypeface(ThemeManager.getCustomFontBold());
-                            tvHeader.setTextColor(ThemeManager.getTextColorSecondary());
-                            tvHeader.setTextSize(14);
-                            tvHeader.setPadding(10, 30, 10, 5);
-                            String infoHeader = t("Selected") + ": " + currentSelections.size() + " (" + formatStorageSize(totalSize) + ") | "
-                                    + t("Free") + ": " + formatStorageSize(freeBytes);
-                            tvHeader.setText(infoHeader);
-                            containerSettingsItems.addView(tvHeader);
-
-                            for (final com.themoon.y1.sync.jellyfin.JellyfinMediaItem item : res.items) {
-                                final boolean isSelected = currentSelections.contains(item.id);
-                                String check = isSelected ? "☑" : "☐";
-                                String rightText = (item.fileSize > 0 ? formatStorageSize(item.fileSize) + " " : "") + check;
-
-                                final LinearLayout row = createSettingRow(item.name, rightText);
-                                final TextView tvRight = (TextView) row.getChildAt(1);
-                                row.setOnClickListener(new View.OnClickListener() {
-                                    @Override
-                                    public void onClick(View v) {
-                                        clickFeedback();
-                                        ledger.toggleLibrarySelection(library.id, item.id);
-                                        ledger.save();
-                                        java.util.Set<String> updatedSel = ledger.getLibrarySelections(library.id);
-                                        boolean isNowSel = updatedSel.contains(item.id);
-                                        String checkSymbol = isNowSel ? "☑" : "☐";
-                                        String newRight = (item.fileSize > 0 ? formatStorageSize(item.fileSize) + " " : "") + checkSymbol;
-                                        tvRight.setText(newRight);
-                                        long tot = 0;
-                                        for (com.themoon.y1.sync.jellyfin.JellyfinMediaItem mi : res.items) {
-                                            if (updatedSel.contains(mi.id)) tot += mi.fileSize;
-                                        }
-                                        tvHeader.setText(t("Selected") + ": " + updatedSel.size() + " (" + formatStorageSize(tot) + ") | "
-                                                + t("Free") + ": " + formatStorageSize(freeBytes));
-                                    }
-                                });
-                                containerSettingsItems.addView(row);
-                            }
-
-                            containerSettingsItems.post(new Runnable() {
-                                @Override
-                                public void run() {
-                                    if (currentSettingsDepth != 3 || settingsSubMode != 5) return;
-                                    for (int i = 0; i < containerSettingsItems.getChildCount(); i++) {
-                                        View child = containerSettingsItems.getChildAt(i);
-                                        if (child != null && child.isFocusable() && child.getVisibility() == View.VISIBLE) {
-                                            child.requestFocus();
-                                            break;
-                                        }
-                                    }
-                                }
-                            });
                         }
                     });
                 } catch (final Exception e) {
@@ -9693,11 +10177,628 @@ public class MainActivity extends Activity {
                         @Override
                         public void run() {
                             tvLoading.setText(t("Cannot reach server. Check URL and network."));
+                            pbLoading.setVisibility(View.GONE);
                         }
                     });
                 }
             }
         }).start();
+    }
+
+    private void buildJellyfinTvSeriesListUI() {
+        if (currentJellyfinHierarchy == null || jellyfinActiveLibrary == null) return;
+        currentSettingsDepth = 3;
+        settingsSubMode = 5;
+        containerSettingsItems.removeAllViews();
+
+        createCategoryHeader("━ " + jellyfinActiveLibrary.name + " ━");
+
+        final com.themoon.y1.sync.SyncLedger ledger = com.themoon.y1.sync.SyncManager.getInstance(this).getLedger();
+        final Set<String> currentSelections = ledger.getLibrarySelections(jellyfinActiveLibrary.id);
+
+        long totalSize = 0;
+        for (com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.SeriesNode s : currentJellyfinHierarchy.seriesList) {
+            for (com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.SeasonNode sn : s.seasons) {
+                for (com.themoon.y1.sync.jellyfin.JellyfinMediaItem ep : sn.episodes) {
+                    if (currentSelections.contains(ep.id)) {
+                        totalSize += ep.fileSize;
+                    }
+                }
+            }
+        }
+
+        int totalSelected = com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.countSelected(
+                currentJellyfinHierarchy.allItemIds, currentSelections);
+        addJellyfinStorageHeader(totalSize, totalSelected, currentJellyfinHierarchy.allItemIds.size());
+
+        final com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState overallState =
+                com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.computeTriState(
+                        currentJellyfinHierarchy.allItemIds, currentSelections);
+
+        View rowToggleAll = createJellyfinToggleAllRow(overallState, totalSelected, currentJellyfinHierarchy.allItemIds.size(),
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        clickFeedback();
+                        if (overallState == com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.CHECKED) {
+                            ledger.removeLibrarySelections(jellyfinActiveLibrary.id, currentJellyfinHierarchy.allItemIds);
+                        } else {
+                            ledger.addLibrarySelections(jellyfinActiveLibrary.id, currentJellyfinHierarchy.allItemIds);
+                        }
+                        ledger.save();
+                        buildJellyfinTvSeriesListUI();
+                    }
+                });
+        containerSettingsItems.addView(rowToggleAll);
+
+        for (final com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.SeriesNode series : currentJellyfinHierarchy.seriesList) {
+            int sel = series.getSelectedCount(currentSelections);
+            int tot = series.allEpisodeIds.size();
+            com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState st = series.getTriState(currentSelections);
+
+            LinearLayout row = createJellyfinSelectRow(
+                    com.themoon.y1.views.TablerIcons.DEVICE_TV,
+                    series.name,
+                    sel + "/" + tot,
+                    st,
+                    true,
+                    new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            clickFeedback();
+                            currentSelectedJellyfinSeries = series;
+                            lastJellyfinBrowseDepth4FocusIndex = -1;
+                            buildJellyfinTvSeasonsListUI(series);
+                        }
+                    },
+                    new View.OnLongClickListener() {
+                        @Override
+                        public boolean onLongClick(View v) {
+                            clickFeedback();
+                            com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState cur =
+                                    series.getTriState(ledger.getLibrarySelections(jellyfinActiveLibrary.id));
+                            if (cur == com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.CHECKED) {
+                                ledger.removeLibrarySelections(jellyfinActiveLibrary.id, series.allEpisodeIds);
+                            } else {
+                                ledger.addLibrarySelections(jellyfinActiveLibrary.id, series.allEpisodeIds);
+                            }
+                            ledger.save();
+                            buildJellyfinTvSeriesListUI();
+                            return true;
+                        }
+                    });
+            containerSettingsItems.addView(row);
+        }
+
+        restoreJellyfinFocus(3, lastJellyfinBrowseDepth3FocusIndex);
+    }
+
+    private void buildJellyfinTvSeasonsListUI(final com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.SeriesNode series) {
+        if (series == null || jellyfinActiveLibrary == null) return;
+        currentSettingsDepth = 4;
+        settingsSubMode = 5;
+        currentSelectedJellyfinSeries = series;
+        containerSettingsItems.removeAllViews();
+
+        createCategoryHeader("━ " + series.name + " ━");
+
+        final com.themoon.y1.sync.SyncLedger ledger = com.themoon.y1.sync.SyncManager.getInstance(this).getLedger();
+        final Set<String> currentSelections = ledger.getLibrarySelections(jellyfinActiveLibrary.id);
+
+        long totalSize = 0;
+        for (com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.SeasonNode sn : series.seasons) {
+            for (com.themoon.y1.sync.jellyfin.JellyfinMediaItem ep : sn.episodes) {
+                if (currentSelections.contains(ep.id)) {
+                    totalSize += ep.fileSize;
+                }
+            }
+        }
+
+        int totalSelected = series.getSelectedCount(currentSelections);
+        addJellyfinStorageHeader(totalSize, totalSelected, series.allEpisodeIds.size());
+
+        final com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState overallState =
+                series.getTriState(currentSelections);
+
+        View rowToggleAll = createJellyfinToggleAllRow(overallState, totalSelected, series.allEpisodeIds.size(),
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        clickFeedback();
+                        if (overallState == com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.CHECKED) {
+                            ledger.removeLibrarySelections(jellyfinActiveLibrary.id, series.allEpisodeIds);
+                        } else {
+                            ledger.addLibrarySelections(jellyfinActiveLibrary.id, series.allEpisodeIds);
+                        }
+                        ledger.save();
+                        buildJellyfinTvSeasonsListUI(series);
+                    }
+                });
+        containerSettingsItems.addView(rowToggleAll);
+
+        for (final com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.SeasonNode season : series.seasons) {
+            int sel = season.getSelectedCount(currentSelections);
+            int tot = season.allEpisodeIds.size();
+            com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState st = season.getTriState(currentSelections);
+
+            LinearLayout row = createJellyfinSelectRow(
+                    null,
+                    season.name,
+                    sel + "/" + tot,
+                    st,
+                    true,
+                    new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            clickFeedback();
+                            currentSelectedJellyfinSeason = season;
+                            lastJellyfinBrowseDepth5FocusIndex = -1;
+                            buildJellyfinTvEpisodesListUI(series, season);
+                        }
+                    },
+                    new View.OnLongClickListener() {
+                        @Override
+                        public boolean onLongClick(View v) {
+                            clickFeedback();
+                            com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState cur =
+                                    season.getTriState(ledger.getLibrarySelections(jellyfinActiveLibrary.id));
+                            if (cur == com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.CHECKED) {
+                                ledger.removeLibrarySelections(jellyfinActiveLibrary.id, season.allEpisodeIds);
+                            } else {
+                                ledger.addLibrarySelections(jellyfinActiveLibrary.id, season.allEpisodeIds);
+                            }
+                            ledger.save();
+                            buildJellyfinTvSeasonsListUI(series);
+                            return true;
+                        }
+                    });
+            containerSettingsItems.addView(row);
+        }
+
+        restoreJellyfinFocus(4, lastJellyfinBrowseDepth4FocusIndex);
+    }
+
+    private void buildJellyfinTvEpisodesListUI(
+            final com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.SeriesNode series,
+            final com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.SeasonNode season) {
+        if (series == null || season == null || jellyfinActiveLibrary == null) return;
+        currentSettingsDepth = 5;
+        settingsSubMode = 5;
+        currentSelectedJellyfinSeries = series;
+        currentSelectedJellyfinSeason = season;
+        containerSettingsItems.removeAllViews();
+
+        createCategoryHeader("━ " + series.name + " - " + season.name + " ━");
+
+        final com.themoon.y1.sync.SyncLedger ledger = com.themoon.y1.sync.SyncManager.getInstance(this).getLedger();
+        final Set<String> currentSelections = ledger.getLibrarySelections(jellyfinActiveLibrary.id);
+
+        long totalSize = 0;
+        for (com.themoon.y1.sync.jellyfin.JellyfinMediaItem ep : season.episodes) {
+            if (currentSelections.contains(ep.id)) {
+                totalSize += ep.fileSize;
+            }
+        }
+
+        int totalSelected = season.getSelectedCount(currentSelections);
+        addJellyfinStorageHeader(totalSize, totalSelected, season.allEpisodeIds.size());
+
+        final com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState overallState =
+                season.getTriState(currentSelections);
+
+        View rowToggleAll = createJellyfinToggleAllRow(overallState, totalSelected, season.allEpisodeIds.size(),
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        clickFeedback();
+                        if (overallState == com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.CHECKED) {
+                            ledger.removeLibrarySelections(jellyfinActiveLibrary.id, season.allEpisodeIds);
+                        } else {
+                            ledger.addLibrarySelections(jellyfinActiveLibrary.id, season.allEpisodeIds);
+                        }
+                        ledger.save();
+                        buildJellyfinTvEpisodesListUI(series, season);
+                    }
+                });
+        containerSettingsItems.addView(rowToggleAll);
+
+        for (final com.themoon.y1.sync.jellyfin.JellyfinMediaItem ep : season.episodes) {
+            boolean isSel = currentSelections.contains(ep.id);
+            com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState st = isSel
+                    ? com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.CHECKED
+                    : com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.UNCHECKED;
+
+            String epTitle = (ep.indexNumber > 0 ? "E" + (ep.indexNumber < 10 ? "0" : "") + ep.indexNumber + " - " : "") + ep.name;
+            String sizeStr = ep.fileSize > 0 ? formatStorageSize(ep.fileSize) : "";
+
+            LinearLayout row = createJellyfinSelectRow(
+                    null,
+                    epTitle,
+                    sizeStr,
+                    st,
+                    false,
+                    new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            clickFeedback();
+                            ledger.toggleLibrarySelection(jellyfinActiveLibrary.id, ep.id);
+                            ledger.save();
+                            buildJellyfinTvEpisodesListUI(series, season);
+                        }
+                    },
+                    new View.OnLongClickListener() {
+                        @Override
+                        public boolean onLongClick(View v) {
+                            clickFeedback();
+                            com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState cur =
+                                    season.getTriState(ledger.getLibrarySelections(jellyfinActiveLibrary.id));
+                            if (cur == com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.CHECKED) {
+                                ledger.removeLibrarySelections(jellyfinActiveLibrary.id, season.allEpisodeIds);
+                            } else {
+                                ledger.addLibrarySelections(jellyfinActiveLibrary.id, season.allEpisodeIds);
+                            }
+                            ledger.save();
+                            buildJellyfinTvEpisodesListUI(series, season);
+                            return true;
+                        }
+                    });
+            containerSettingsItems.addView(row);
+        }
+
+        restoreJellyfinFocus(5, lastJellyfinBrowseDepth5FocusIndex);
+    }
+
+    private void buildJellyfinMusicArtistsListUI() {
+        if (currentJellyfinHierarchy == null || jellyfinActiveLibrary == null) return;
+        currentSettingsDepth = 3;
+        settingsSubMode = 5;
+        containerSettingsItems.removeAllViews();
+
+        createCategoryHeader("━ " + jellyfinActiveLibrary.name + " ━");
+
+        final com.themoon.y1.sync.SyncLedger ledger = com.themoon.y1.sync.SyncManager.getInstance(this).getLedger();
+        final Set<String> currentSelections = ledger.getLibrarySelections(jellyfinActiveLibrary.id);
+
+        long totalSize = 0;
+        for (com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.ArtistNode art : currentJellyfinHierarchy.artistsList) {
+            for (com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.AlbumNode alb : art.albums) {
+                for (com.themoon.y1.sync.jellyfin.JellyfinMediaItem s : alb.songs) {
+                    if (currentSelections.contains(s.id)) {
+                        totalSize += s.fileSize;
+                    }
+                }
+            }
+        }
+
+        int totalSelected = com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.countSelected(
+                currentJellyfinHierarchy.allItemIds, currentSelections);
+        addJellyfinStorageHeader(totalSize, totalSelected, currentJellyfinHierarchy.allItemIds.size());
+
+        final com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState overallState =
+                com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.computeTriState(
+                        currentJellyfinHierarchy.allItemIds, currentSelections);
+
+        View rowToggleAll = createJellyfinToggleAllRow(overallState, totalSelected, currentJellyfinHierarchy.allItemIds.size(),
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        clickFeedback();
+                        if (overallState == com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.CHECKED) {
+                            ledger.removeLibrarySelections(jellyfinActiveLibrary.id, currentJellyfinHierarchy.allItemIds);
+                        } else {
+                            ledger.addLibrarySelections(jellyfinActiveLibrary.id, currentJellyfinHierarchy.allItemIds);
+                        }
+                        ledger.save();
+                        buildJellyfinMusicArtistsListUI();
+                    }
+                });
+        containerSettingsItems.addView(rowToggleAll);
+
+        for (final com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.ArtistNode artist : currentJellyfinHierarchy.artistsList) {
+            int sel = artist.getSelectedCount(currentSelections);
+            int tot = artist.allSongIds.size();
+            com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState st = artist.getTriState(currentSelections);
+
+            LinearLayout row = createJellyfinSelectRow(
+                    com.themoon.y1.views.TablerIcons.USER,
+                    artist.name,
+                    sel + "/" + tot,
+                    st,
+                    true,
+                    new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            clickFeedback();
+                            currentSelectedJellyfinArtist = artist;
+                            lastJellyfinBrowseDepth4FocusIndex = -1;
+                            buildJellyfinMusicAlbumsListUI(artist);
+                        }
+                    },
+                    new View.OnLongClickListener() {
+                        @Override
+                        public boolean onLongClick(View v) {
+                            clickFeedback();
+                            com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState cur =
+                                    artist.getTriState(ledger.getLibrarySelections(jellyfinActiveLibrary.id));
+                            if (cur == com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.CHECKED) {
+                                ledger.removeLibrarySelections(jellyfinActiveLibrary.id, artist.allSongIds);
+                            } else {
+                                ledger.addLibrarySelections(jellyfinActiveLibrary.id, artist.allSongIds);
+                            }
+                            ledger.save();
+                            buildJellyfinMusicArtistsListUI();
+                            return true;
+                        }
+                    });
+            containerSettingsItems.addView(row);
+        }
+
+        restoreJellyfinFocus(3, lastJellyfinBrowseDepth3FocusIndex);
+    }
+
+    private void buildJellyfinMusicAlbumsListUI(final com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.ArtistNode artist) {
+        if (artist == null || jellyfinActiveLibrary == null) return;
+        currentSettingsDepth = 4;
+        settingsSubMode = 5;
+        currentSelectedJellyfinArtist = artist;
+        containerSettingsItems.removeAllViews();
+
+        createCategoryHeader("━ " + artist.name + " ━");
+
+        final com.themoon.y1.sync.SyncLedger ledger = com.themoon.y1.sync.SyncManager.getInstance(this).getLedger();
+        final Set<String> currentSelections = ledger.getLibrarySelections(jellyfinActiveLibrary.id);
+
+        long totalSize = 0;
+        for (com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.AlbumNode alb : artist.albums) {
+            for (com.themoon.y1.sync.jellyfin.JellyfinMediaItem s : alb.songs) {
+                if (currentSelections.contains(s.id)) {
+                    totalSize += s.fileSize;
+                }
+            }
+        }
+
+        int totalSelected = artist.getSelectedCount(currentSelections);
+        addJellyfinStorageHeader(totalSize, totalSelected, artist.allSongIds.size());
+
+        final com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState overallState =
+                artist.getTriState(currentSelections);
+
+        View rowToggleAll = createJellyfinToggleAllRow(overallState, totalSelected, artist.allSongIds.size(),
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        clickFeedback();
+                        if (overallState == com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.CHECKED) {
+                            ledger.removeLibrarySelections(jellyfinActiveLibrary.id, artist.allSongIds);
+                        } else {
+                            ledger.addLibrarySelections(jellyfinActiveLibrary.id, artist.allSongIds);
+                        }
+                        ledger.save();
+                        buildJellyfinMusicAlbumsListUI(artist);
+                    }
+                });
+        containerSettingsItems.addView(rowToggleAll);
+
+        for (final com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.AlbumNode album : artist.albums) {
+            int sel = album.getSelectedCount(currentSelections);
+            int tot = album.allSongIds.size();
+            com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState st = album.getTriState(currentSelections);
+
+            LinearLayout row = createJellyfinSelectRow(
+                    com.themoon.y1.views.TablerIcons.DISC,
+                    album.name,
+                    sel + "/" + tot,
+                    st,
+                    true,
+                    new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            clickFeedback();
+                            currentSelectedJellyfinAlbum = album;
+                            lastJellyfinBrowseDepth5FocusIndex = -1;
+                            buildJellyfinMusicSongsListUI(artist, album);
+                        }
+                    },
+                    new View.OnLongClickListener() {
+                        @Override
+                        public boolean onLongClick(View v) {
+                            clickFeedback();
+                            com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState cur =
+                                    album.getTriState(ledger.getLibrarySelections(jellyfinActiveLibrary.id));
+                            if (cur == com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.CHECKED) {
+                                ledger.removeLibrarySelections(jellyfinActiveLibrary.id, album.allSongIds);
+                            } else {
+                                ledger.addLibrarySelections(jellyfinActiveLibrary.id, album.allSongIds);
+                            }
+                            ledger.save();
+                            buildJellyfinMusicAlbumsListUI(artist);
+                            return true;
+                        }
+                    });
+            containerSettingsItems.addView(row);
+        }
+
+        restoreJellyfinFocus(4, lastJellyfinBrowseDepth4FocusIndex);
+    }
+
+    private void buildJellyfinMusicSongsListUI(
+            final com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.ArtistNode artist,
+            final com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.AlbumNode album) {
+        if (artist == null || album == null || jellyfinActiveLibrary == null) return;
+        currentSettingsDepth = 5;
+        settingsSubMode = 5;
+        currentSelectedJellyfinArtist = artist;
+        currentSelectedJellyfinAlbum = album;
+        containerSettingsItems.removeAllViews();
+
+        createCategoryHeader("━ " + artist.name + " - " + album.name + " ━");
+
+        final com.themoon.y1.sync.SyncLedger ledger = com.themoon.y1.sync.SyncManager.getInstance(this).getLedger();
+        final Set<String> currentSelections = ledger.getLibrarySelections(jellyfinActiveLibrary.id);
+
+        long totalSize = 0;
+        for (com.themoon.y1.sync.jellyfin.JellyfinMediaItem s : album.songs) {
+            if (currentSelections.contains(s.id)) {
+                totalSize += s.fileSize;
+            }
+        }
+
+        int totalSelected = album.getSelectedCount(currentSelections);
+        addJellyfinStorageHeader(totalSize, totalSelected, album.allSongIds.size());
+
+        final com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState overallState =
+                album.getTriState(currentSelections);
+
+        View rowToggleAll = createJellyfinToggleAllRow(overallState, totalSelected, album.allSongIds.size(),
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        clickFeedback();
+                        if (overallState == com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.CHECKED) {
+                            ledger.removeLibrarySelections(jellyfinActiveLibrary.id, album.allSongIds);
+                        } else {
+                            ledger.addLibrarySelections(jellyfinActiveLibrary.id, album.allSongIds);
+                        }
+                        ledger.save();
+                        buildJellyfinMusicSongsListUI(artist, album);
+                    }
+                });
+        containerSettingsItems.addView(rowToggleAll);
+
+        for (final com.themoon.y1.sync.jellyfin.JellyfinMediaItem song : album.songs) {
+            boolean isSel = currentSelections.contains(song.id);
+            com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState st = isSel
+                    ? com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.CHECKED
+                    : com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.UNCHECKED;
+
+            String songTitle = (song.indexNumber > 0 ? (song.indexNumber < 10 ? "0" : "") + song.indexNumber + " - " : "") + song.name;
+            String sizeStr = song.fileSize > 0 ? formatStorageSize(song.fileSize) : "";
+
+            LinearLayout row = createJellyfinSelectRow(
+                    com.themoon.y1.views.TablerIcons.MUSIC,
+                    songTitle,
+                    sizeStr,
+                    st,
+                    false,
+                    new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            clickFeedback();
+                            ledger.toggleLibrarySelection(jellyfinActiveLibrary.id, song.id);
+                            ledger.save();
+                            buildJellyfinMusicSongsListUI(artist, album);
+                        }
+                    },
+                    new View.OnLongClickListener() {
+                        @Override
+                        public boolean onLongClick(View v) {
+                            clickFeedback();
+                            com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState cur =
+                                    album.getTriState(ledger.getLibrarySelections(jellyfinActiveLibrary.id));
+                            if (cur == com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.CHECKED) {
+                                ledger.removeLibrarySelections(jellyfinActiveLibrary.id, album.allSongIds);
+                            } else {
+                                ledger.addLibrarySelections(jellyfinActiveLibrary.id, album.allSongIds);
+                            }
+                            ledger.save();
+                            buildJellyfinMusicSongsListUI(artist, album);
+                            return true;
+                        }
+                    });
+            containerSettingsItems.addView(row);
+        }
+
+        restoreJellyfinFocus(5, lastJellyfinBrowseDepth5FocusIndex);
+    }
+
+    private void buildJellyfinMoviesListUI() {
+        if (currentJellyfinHierarchy == null || jellyfinActiveLibrary == null) return;
+        currentSettingsDepth = 3;
+        settingsSubMode = 5;
+        containerSettingsItems.removeAllViews();
+
+        createCategoryHeader("━ " + jellyfinActiveLibrary.name + " ━");
+
+        final com.themoon.y1.sync.SyncLedger ledger = com.themoon.y1.sync.SyncManager.getInstance(this).getLedger();
+        final Set<String> currentSelections = ledger.getLibrarySelections(jellyfinActiveLibrary.id);
+
+        long totalSize = 0;
+        for (com.themoon.y1.sync.jellyfin.JellyfinMediaItem m : currentJellyfinHierarchy.moviesList) {
+            if (currentSelections.contains(m.id)) {
+                totalSize += m.fileSize;
+            }
+        }
+
+        int totalSelected = com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.countSelected(
+                currentJellyfinHierarchy.allItemIds, currentSelections);
+        addJellyfinStorageHeader(totalSize, totalSelected, currentJellyfinHierarchy.allItemIds.size());
+
+        final com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState overallState =
+                com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.computeTriState(
+                        currentJellyfinHierarchy.allItemIds, currentSelections);
+
+        View rowToggleAll = createJellyfinToggleAllRow(overallState, totalSelected, currentJellyfinHierarchy.allItemIds.size(),
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        clickFeedback();
+                        if (overallState == com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.CHECKED) {
+                            ledger.removeLibrarySelections(jellyfinActiveLibrary.id, currentJellyfinHierarchy.allItemIds);
+                        } else {
+                            ledger.addLibrarySelections(jellyfinActiveLibrary.id, currentJellyfinHierarchy.allItemIds);
+                        }
+                        ledger.save();
+                        buildJellyfinMoviesListUI();
+                    }
+                });
+        containerSettingsItems.addView(rowToggleAll);
+
+        for (final com.themoon.y1.sync.jellyfin.JellyfinMediaItem movie : currentJellyfinHierarchy.moviesList) {
+            boolean isSel = currentSelections.contains(movie.id);
+            com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState st = isSel
+                    ? com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.CHECKED
+                    : com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.UNCHECKED;
+
+            String yearSuffix = (movie.year != null && !movie.year.contains("Unknown")) ? " (" + movie.year + ")" : "";
+            String movieTitle = movie.name + yearSuffix;
+            String sizeStr = movie.fileSize > 0 ? formatStorageSize(movie.fileSize) : "";
+
+            LinearLayout row = createJellyfinSelectRow(
+                    com.themoon.y1.views.TablerIcons.MOVIE,
+                    movieTitle,
+                    sizeStr,
+                    st,
+                    false,
+                    new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            clickFeedback();
+                            ledger.toggleLibrarySelection(jellyfinActiveLibrary.id, movie.id);
+                            ledger.save();
+                            buildJellyfinMoviesListUI();
+                        }
+                    },
+                    new View.OnLongClickListener() {
+                        @Override
+                        public boolean onLongClick(View v) {
+                            clickFeedback();
+                            com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState cur =
+                                    com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.computeTriState(
+                                            currentJellyfinHierarchy.allItemIds, ledger.getLibrarySelections(jellyfinActiveLibrary.id));
+                            if (cur == com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy.TriState.CHECKED) {
+                                ledger.removeLibrarySelections(jellyfinActiveLibrary.id, currentJellyfinHierarchy.allItemIds);
+                            } else {
+                                ledger.addLibrarySelections(jellyfinActiveLibrary.id, currentJellyfinHierarchy.allItemIds);
+                            }
+                            ledger.save();
+                            buildJellyfinMoviesListUI();
+                            return true;
+                        }
+                    });
+            containerSettingsItems.addView(row);
+        }
+
+        restoreJellyfinFocus(3, lastJellyfinBrowseDepth3FocusIndex);
     }
 
     private void startJellyfinQuickConnect() {
@@ -10117,6 +11218,153 @@ public class MainActivity extends Activity {
                         @Override
                         public void run() {
                             if (loaderDialog.isShowing()) loaderDialog.dismiss();
+                        }
+                    });
+                }
+            }
+        }).start();
+    }
+
+    private void fetchJellyfinLibrariesWithWifi() {
+        final com.themoon.y1.sync.jellyfin.JellyfinSyncProvider provider =
+                com.themoon.y1.sync.jellyfin.JellyfinSyncProvider.getInstance(this);
+
+        if (!provider.isConfigured()) {
+            Toast.makeText(this, t("Connect to discover libraries."), Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        final float d = getResources().getDisplayMetrics().density;
+        final android.app.Dialog loaderDialog = new android.app.Dialog(this);
+        loaderDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        if (loaderDialog.getWindow() != null) {
+            loaderDialog.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
+        }
+
+        LinearLayout loaderLayout = new LinearLayout(this);
+        loaderLayout.setOrientation(LinearLayout.VERTICAL);
+        loaderLayout.setGravity(Gravity.CENTER);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(ThemeManager.getOverlayBackgroundColor() | 0xEE000000);
+        bg.setCornerRadius(15 * d);
+        bg.setStroke((int) (1 * d), 0x33FFFFFF);
+        loaderLayout.setBackground(bg);
+        loaderLayout.setPadding((int) (24 * d), (int) (24 * d), (int) (24 * d), (int) (24 * d));
+
+        ProgressBar progressBar = new ProgressBar(this);
+        LinearLayout.LayoutParams pbLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        pbLp.gravity = Gravity.CENTER_HORIZONTAL;
+        pbLp.bottomMargin = (int) (14 * d);
+        loaderLayout.addView(progressBar, pbLp);
+
+        final TextView tvLoaderMsg = new TextView(this);
+        tvLoaderMsg.setText(t("Connecting to Wi-Fi..."));
+        tvLoaderMsg.setTextColor(ThemeManager.getTextColorPrimary());
+        tvLoaderMsg.setTextSize(15f);
+        tvLoaderMsg.setTypeface(ThemeManager.getCustomFontBold());
+        tvLoaderMsg.setGravity(Gravity.CENTER);
+        loaderLayout.addView(tvLoaderMsg);
+
+        loaderDialog.setContentView(loaderLayout);
+        loaderDialog.setCancelable(true);
+        loaderDialog.setCanceledOnTouchOutside(false);
+
+        Window window = loaderDialog.getWindow();
+        if (window != null) {
+            window.setLayout((int) (270 * d), ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        loaderDialog.show();
+
+        final boolean[] isCancelled = new boolean[]{false};
+        loaderDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
+            @Override
+            public void onCancel(DialogInterface dialog) {
+                isCancelled[0] = true;
+            }
+        });
+        loaderDialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
+            @Override
+            public void onDismiss(DialogInterface dialog) {
+                isCancelled[0] = true;
+            }
+        });
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                    boolean connected = isNetworkConnected();
+
+                    if (!connected) {
+                        if (wm != null && !wm.isWifiEnabled()) {
+                            wm.setWifiEnabled(true);
+                        }
+
+                        int waitCount = 0;
+                        while (!connected && waitCount < 20) {
+                            if (isCancelled[0]) return;
+                            try {
+                                Thread.sleep(500);
+                            } catch (InterruptedException e) {
+                                return;
+                            }
+                            waitCount++;
+                            connected = isNetworkConnected();
+                        }
+                    }
+
+                    if (isCancelled[0]) return;
+
+                    if (!connected) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (loaderDialog.isShowing()) {
+                                    loaderDialog.dismiss();
+                                }
+                                Toast.makeText(MainActivity.this,
+                                        t("Wi-Fi connection required. Please connect."),
+                                        Toast.LENGTH_LONG).show();
+                                isPendingJellyfinFetchLibrariesAfterWifi = true;
+                                changeScreen(STATE_WIFI);
+                            }
+                        });
+                        return;
+                    }
+
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (loaderDialog.isShowing()) {
+                                tvLoaderMsg.setText(t("Fetching libraries..."));
+                            }
+                        }
+                    });
+
+                    final java.util.List<com.themoon.y1.sync.MediaSyncProvider.LibraryInfo> libs =
+                            provider.fetchLibraries(new com.themoon.y1.sync.MediaSyncProvider.CancellationToken());
+
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (loaderDialog.isShowing()) loaderDialog.dismiss();
+                            Toast.makeText(MainActivity.this, t("Libraries updated"), Toast.LENGTH_SHORT).show();
+                            if (currentScreenState == STATE_SETTINGS) {
+                                buildJellyfinSettingsUI();
+                            }
+                        }
+                    });
+
+                } catch (final Exception e) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (loaderDialog.isShowing()) loaderDialog.dismiss();
+                            Toast.makeText(MainActivity.this,
+                                    t("Failed to fetch libraries") + ": " + (e.getMessage() != null ? e.getMessage() : ""),
+                                    Toast.LENGTH_LONG).show();
                         }
                     });
                 }
@@ -15796,6 +17044,17 @@ public class MainActivity extends Activity {
                         }
                         return true;
                     }
+                    if (currentScreenState == STATE_WIFI && isPendingJellyfinFetchLibrariesAfterWifi) {
+                        isPendingJellyfinFetchLibrariesAfterWifi = false;
+                        isNavigatingToSubMenu = true;
+                        changeScreen(STATE_SETTINGS);
+                        buildJellyfinSettingsUI();
+                        isNavigatingToSubMenu = false;
+                        if (isNetworkConnected()) {
+                            fetchJellyfinLibrariesWithWifi();
+                        }
+                        return true;
+                    }
                     if (currentScreenState == STATE_WIFI && isPendingJellyfinQuickConnectAfterWifi) {
                         isPendingJellyfinQuickConnectAfterWifi = false;
                         isNavigatingToSubMenu = true;
@@ -15858,6 +17117,30 @@ public class MainActivity extends Activity {
                     } else if (currentSettingsDepth == 3) {
                         if (settingsSubMode == 5 && jellyfinActiveLibrary != null) {
                             buildJellyfinLibraryConfigUI(jellyfinActiveLibrary);
+                        } else {
+                            buildSettingsUI();
+                        }
+                    } else if (currentSettingsDepth == 4) {
+                        if (settingsSubMode == 5 && jellyfinActiveLibrary != null) {
+                            if ("tvshows".equalsIgnoreCase(jellyfinActiveLibrary.collectionType)) {
+                                buildJellyfinTvSeriesListUI();
+                            } else if ("music".equalsIgnoreCase(jellyfinActiveLibrary.collectionType)) {
+                                buildJellyfinMusicArtistsListUI();
+                            } else {
+                                buildJellyfinLibraryConfigUI(jellyfinActiveLibrary);
+                            }
+                        } else {
+                            buildSettingsUI();
+                        }
+                    } else if (currentSettingsDepth == 5) {
+                        if (settingsSubMode == 5 && jellyfinActiveLibrary != null) {
+                            if ("tvshows".equalsIgnoreCase(jellyfinActiveLibrary.collectionType) && currentSelectedJellyfinSeries != null) {
+                                buildJellyfinTvSeasonsListUI(currentSelectedJellyfinSeries);
+                            } else if ("music".equalsIgnoreCase(jellyfinActiveLibrary.collectionType) && currentSelectedJellyfinArtist != null) {
+                                buildJellyfinMusicAlbumsListUI(currentSelectedJellyfinArtist);
+                            } else {
+                                buildJellyfinLibraryConfigUI(jellyfinActiveLibrary);
+                            }
                         } else {
                             buildSettingsUI();
                         }
@@ -16551,6 +17834,12 @@ public class MainActivity extends Activity {
 
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
             // 🚀 [방어막] 롱클릭(화면 끄기 또는 플레이리스트 팝업)이 이미 처리되었다면 숏클릭 루틴 파쇄
+            if (currentScreenState == STATE_SETTINGS && settingsSubMode == 5 && currentSettingsDepth >= 3) {
+                if (isLongPressConsumed || System.currentTimeMillis() - lastJellyfinLongClickTime < 600) {
+                    isLongPressConsumed = false;
+                    return true;
+                }
+            }
             if (isLongPressConsumed) {
                 isLongPressConsumed = false;
                 return true;
@@ -16753,6 +18042,17 @@ public class MainActivity extends Activity {
                     toggleMenuReorderMode(); // 지능형 순서 변경 엔진 기상!
                 }
                 return true; // 쇠말뚝을 박아 시스템 화면 끄기로 신호가 흘러가지 않게 원천 차단합니다.
+            }
+
+            // 🚀 [Jellyfin Sync Browse & Select] Long press toggles select all
+            if (currentScreenState == STATE_SETTINGS && settingsSubMode == 5 && currentSettingsDepth >= 3) {
+                View c = getCurrentFocus();
+                if (c != null) {
+                    isLongPressConsumed = true;
+                    lastJellyfinLongClickTime = System.currentTimeMillis();
+                    c.performLongClick();
+                }
+                return true;
             }
 
             // 🚀 [분기 1] 평상시 메인 화면, 플레이어 화면, 설정 화면 등에서는 원래대로 안전하게 화면 끄기 가동!

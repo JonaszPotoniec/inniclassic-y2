@@ -381,7 +381,6 @@
   "QuickConnect Paired!": "QuickConnect 配对成功！",
   "QuickConnect Expired / Failed": "QuickConnect 已过期或失败",
   "Server does not support QuickConnect": "服务器不支持 QuickConnect",
-  "Cancel": "取消",
   "Paired as ": "已配对为 ",
   "Sync Now": "立即同步",
   "Test Connection": "测试连接",
@@ -409,5 +408,15 @@
   "Libraries": "媒体库",
   "Sync": "同步",
   "Last Synced": "上次同步",
-  "Never": "从不"
+  "Never": "从不",
+  "Select All": "全选",
+  "Deselect All": "取消全选",
+  "Seasons": "季",
+  "Episodes": "剧集",
+  "Series": "剧集列表",
+  "Counting files...": "正在核对文件...",
+  "Fetch Libraries": "获取媒体库",
+  "Fetching libraries...": "正在获取媒体库...",
+  "Failed to fetch libraries": "获取媒体库失败",
+  "Libraries updated": "媒体库已更新"
 }

@@ -365,7 +365,6 @@
   "QuickConnect Paired!": "QuickConnect 連携完了！",
   "QuickConnect Expired / Failed": "QuickConnect が期限切れまたは失敗しました",
   "Server does not support QuickConnect": "サーバーが QuickConnect に対応していません",
-  "Cancel": "キャンセル",
   "Paired as ": "連携済み: ",
   "Sync Now": "今すぐ同期",
   "Test Connection": "接続テスト",
@@ -393,5 +392,15 @@
   "Libraries": "ライブラリ",
   "Sync": "同期",
   "Last Synced": "前回の同期",
-  "Never": "なし"
+  "Never": "なし",
+  "Select All": "すべて選択",
+  "Deselect All": "すべての選択を解除",
+  "Seasons": "シーズン",
+  "Episodes": "エピソード",
+  "Series": "シリーズ",
+  "Counting files...": "ファイルを確認中...",
+  "Fetch Libraries": "ライブラリを取得",
+  "Fetching libraries...": "ライブラリを取得中...",
+  "Failed to fetch libraries": "ライブラリの取得に失敗しました",
+  "Libraries updated": "ライブラリが更新されました"
 }

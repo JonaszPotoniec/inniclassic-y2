@@ -568,7 +568,6 @@
   "QuickConnect Paired!": "QuickConnect Paired!",
   "QuickConnect Expired / Failed": "QuickConnect Expired / Failed",
   "Server does not support QuickConnect": "Server does not support QuickConnect",
-  "Cancel": "Cancel",
   "Paired as ": "Paired as ",
   "Sync Now": "Sync Now",
   "Test Connection": "Test Connection",
@@ -595,5 +594,15 @@
   "Libraries": "Libraries",
   "Sync": "Sync",
   "Last Synced": "Last Synced",
-  "Never": "Never"
+  "Never": "Never",
+  "Select All": "Select All",
+  "Deselect All": "Deselect All",
+  "Seasons": "Seasons",
+  "Episodes": "Episodes",
+  "Series": "Series",
+  "Counting files...": "Counting files...",
+  "Fetch Libraries": "Fetch Libraries",
+  "Fetching libraries...": "Fetching libraries...",
+  "Failed to fetch libraries": "Failed to fetch libraries",
+  "Libraries updated": "Libraries updated"
 }

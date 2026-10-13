@@ -21,6 +21,9 @@ public class JellyfinMediaItem {
     public String collectionType;    // music, movies, tvshows
     public String libraryId;
     public String seriesName;        // for TV episodes
+    public String seriesId;          // for TV episodes
+    public String seasonId;          // for TV episodes
+    public String seasonName;        // for TV episodes
     public String serverDateModified;
 
     public JellyfinMediaItem() {}

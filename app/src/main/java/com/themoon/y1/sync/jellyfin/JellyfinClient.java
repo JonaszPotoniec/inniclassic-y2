@@ -446,6 +446,44 @@ public class JellyfinClient {
         return new ItemsQueryResult(total, resultList);
     }
 
+    public interface ItemsFetchProgressListener {
+        void onProgress(int loaded, int total);
+    }
+
+    /**
+     * Paginated fetch of all media items for a library.
+     */
+    public List<JellyfinMediaItem> fetchLibraryItemsAll(String token, String userId,
+                                                        String libraryId, String collectionType,
+                                                        ItemsFetchProgressListener progressListener) throws Exception {
+        return fetchLibraryItemsAll(token, userId, libraryId, collectionType, progressListener, null);
+    }
+
+    public List<JellyfinMediaItem> fetchLibraryItemsAll(String token, String userId,
+                                                        String libraryId, String collectionType,
+                                                        ItemsFetchProgressListener progressListener,
+                                                        MediaSyncProvider.CancellationToken cancelToken) throws Exception {
+        List<JellyfinMediaItem> result = new ArrayList<>();
+        int startIndex = 0;
+        int pageSize = 500;
+        int total = Integer.MAX_VALUE;
+
+        while (startIndex < total) {
+            if (cancelToken != null && cancelToken.isCancelled()) break;
+            ItemsQueryResult page = fetchItemsPage(token, userId, libraryId, collectionType,
+                    startIndex, pageSize, null, cancelToken);
+            total = page.totalRecordCount;
+            result.addAll(page.items);
+            if (progressListener != null) {
+                progressListener.onProgress(result.size(), total);
+            }
+            startIndex += pageSize;
+            if (page.items.isEmpty()) break;
+        }
+
+        return result;
+    }
+
     private JellyfinMediaItem parseItem(JSONObject o, String libraryId, String collectionType) {
         JellyfinMediaItem item = new JellyfinMediaItem();
         item.id = o.optString("Id", "");
@@ -489,6 +527,28 @@ public class JellyfinClient {
         item.indexNumber = o.optInt("IndexNumber", 0);
         item.parentIndexNumber = o.optInt("ParentIndexNumber", 0);
         item.seriesName = o.optString("SeriesName", null);
+        item.seriesId = o.optString("SeriesId", null);
+        item.seasonId = o.optString("SeasonId", null);
+        item.seasonName = o.optString("SeasonName", null);
+        if (item.seasonName == null || item.seasonName.trim().isEmpty()) {
+            if (item.parentIndexNumber > 0) {
+                item.seasonName = "Season " + item.parentIndexNumber;
+            } else if (item.parentIndexNumber == 0 && "tvshows".equalsIgnoreCase(collectionType)) {
+                item.seasonName = "Specials";
+            }
+        }
+        if (item.seriesName == null || item.seriesName.trim().isEmpty()) {
+            if ("tvshows".equalsIgnoreCase(collectionType)) {
+                item.seriesName = "Unknown Series";
+            }
+        }
+        if (item.seriesId == null || item.seriesId.trim().isEmpty()) {
+            item.seriesId = item.seriesName != null ? item.seriesName : item.id;
+        }
+        if (item.seasonId == null || item.seasonId.trim().isEmpty()) {
+            item.seasonId = item.seriesId + "_S" + item.parentIndexNumber;
+        }
+
         item.albumId = o.optString("AlbumId", null);
         item.albumPrimaryImageTag = o.optString("AlbumPrimaryImageTag", null);
 
