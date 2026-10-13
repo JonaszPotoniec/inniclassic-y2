@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
 }
 
 // Last.fm credentials are kept out of source control. Register a free API account at
@@ -28,11 +29,11 @@ android {
 
     defaultConfig {
         applicationId "com.themoon.y1"
-        minSdk 17
+        minSdk 19
         targetSdk 35
         versionCode appVersionCode
         versionName appVersionName
-// 🚀 [용량 방어막 추가] 상자에서 젤리빈(32비트) 부품 딱 하나만 쏙 빼서 APK에 담아라!
+        // Restrict APK packaging to 32-bit ARM (Cortex-A7) native libraries.
         ndk {
             abiFilters 'armeabi-v7a'
         }
@@ -61,6 +62,9 @@ android {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
     testOptions {
         unitTests.returnDefaultValues = true
     }
@@ -71,19 +75,21 @@ dependencies {
     testImplementation 'org.json:json:20231013'
     androidTestImplementation libs.ext.junit
     androidTestImplementation libs.espresso.core
+    implementation libs.kotlinx.coroutines.core
+    implementation libs.kotlinx.coroutines.android
     implementation 'com.google.android.exoplayer:exoplayer-core:2.13.3'
     implementation files('libs/extension-opus-release.aar')
     implementation files('libs/extension-flac-release.aar')
-    implementation files('libs/extension-ffmpeg-release.aar') // 🚀 [신규 무기 장착] FFmpeg 코어 결합!
+    implementation files('libs/extension-ffmpeg-release.aar')
     implementation 'com.squareup.okhttp3:okhttp:3.12.13'
     implementation 'org.conscrypt:conscrypt-android:2.5.2'
     implementation 'androidx.multidex:multidex:2.0.1'
-    // 🚀 [비디오 전용 엔진] ExoPlayer의 Pre-API21 프레임 타이밍 폴백이 이 기기(API 17)에서 깨져있어서
-    // (오디오/포지션 시계는 정상인데 화면만 배속으로 흘러가는 버그) 비디오만 VLC의 독자적인 네이티브
-    // AV 싱크 엔진으로 교체합니다. 음악(AudioPlayerManager)은 계속 ExoPlayer를 씁니다 - 여긴 안 건드림!
+    // KitKat MediaCodec has a pre-API 21 frame timing drift bug in ExoPlayer;
+    // LibVLC is used exclusively for video playback while ExoPlayer handles audio.
     implementation 'org.videolan.android:libvlc-all:3.3.14'
 }
-// 파일 맨 밑에 추가: 최신 라이브러리 버전 체크 안전장치를 강제로 끄는 코드
+
+// Disable CheckAarMetadataTask to allow building against older SDK targets without metadata rejections.
 tasks.withType(com.android.build.gradle.internal.tasks.CheckAarMetadataTask).configureEach {
     enabled = false
 }

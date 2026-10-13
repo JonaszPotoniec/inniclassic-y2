@@ -1,24 +1,24 @@
-package com.themoon.y1.migrations;
+package com.themoon.y1.migrations
 
 /**
  * Represents a single versioned migration step.
  */
-public interface Migration {
+interface Migration {
     /**
      * Monotonically increasing version number (e.g. 1, 2, 3...).
      * Migrations are executed in strictly ascending order of version.
      */
-    int getVersion();
+    val version: Int
 
     /**
      * Unique string identifier for logging, tracking, and diagnostics.
      */
-    String getId();
+    val id: String
 
     /**
      * Brief human-readable description of what this migration performs.
      */
-    String getDescription();
+    val description: String
 
     /**
      * Executes the migration logic.
@@ -29,5 +29,6 @@ public interface Migration {
      * @param context Migration context providing storage and preferences access.
      * @throws Exception If migration fails.
      */
-    void migrate(MigrationContext context) throws Exception;
+    @Throws(Exception::class)
+    fun migrate(context: MigrationContext)
 }
