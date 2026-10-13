@@ -84,8 +84,6 @@ class AudiobookManager private constructor(context: Context) {
     companion object {
         @Volatile
         private var instance: AudiobookManager? = null
-
-        @JvmStatic
         @Synchronized
         fun getInstance(context: Context): AudiobookManager {
             var inst = instance

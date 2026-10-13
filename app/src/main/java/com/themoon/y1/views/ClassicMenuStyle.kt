@@ -15,8 +15,6 @@ object ClassicMenuStyle {
     const val ROW_HEIGHT_DP: Int = 33
     const val STATUS_HEIGHT_DP: Int = 26
     const val PANE_WIDTH_DP: Int = 242
-
-    @JvmStatic
     fun apply(row: LinearLayout, title: TextView, arrow: TextView?, heightDp: Int) {
         if (!ThemeManager.isClassicTheme()) return
         val density = row.resources.displayMetrics.density

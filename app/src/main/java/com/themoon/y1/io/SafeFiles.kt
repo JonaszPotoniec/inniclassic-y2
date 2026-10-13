@@ -10,8 +10,6 @@ import java.io.InputStream
  * File operations shared by the upload server and bundled theme installer.
  */
 object SafeFiles {
-
-    @JvmStatic
     @Throws(IOException::class)
     fun resolve(root: File, path: String?): File {
         if (path == null || File(path).isAbsolute || path.indexOf('\u0000') >= 0) {
@@ -24,8 +22,6 @@ object SafeFiles {
         }
         return file
     }
-
-    @JvmStatic
     @Throws(IOException::class)
     fun child(root: File, name: String?): File {
         if (name.isNullOrEmpty() || name == "." || name == ".." ||
@@ -39,7 +35,7 @@ object SafeFiles {
     /**
      * Keep the old file intact until the complete request body is durable.
      */
-    @JvmStatic
+
     @Throws(IOException::class)
     fun replace(target: File, input: InputStream, length: Int) {
         if (length < 0) throw IOException("Invalid content length")

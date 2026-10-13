@@ -248,7 +248,7 @@ class ExternalSdMountMonitor(context: Context) {
         private const val CMD_TIMEOUT_MS = 8000
 
         /** True when primary storage is usable and readable. */
-        @JvmStatic
+
         fun isPrimaryReady(): Boolean {
             return try {
                 val pri = StoragePaths.getPrimaryRoot()
@@ -259,7 +259,7 @@ class ExternalSdMountMonitor(context: Context) {
         }
 
         /** True when apps can list the secondary volume (/storage/sdcard1). */
-        @JvmStatic
+
         fun isSecondaryReady(): Boolean {
             if (!hasSecondarySlot()) return false
             return try {
@@ -273,7 +273,7 @@ class ExternalSdMountMonitor(context: Context) {
         }
 
         /** True only if a physical secondary SD card device exists in hardware. */
-        @JvmStatic
+
         fun hasSecondarySlot(): Boolean {
             return try {
                 File("/sys/block/mmcblk1").exists() || File("/dev/block/mmcblk1").exists()
@@ -281,8 +281,6 @@ class ExternalSdMountMonitor(context: Context) {
                 false
             }
         }
-
-        @JvmStatic
         fun mountsContain(path: String): Boolean {
             var br: BufferedReader? = null
             try {
@@ -300,8 +298,6 @@ class ExternalSdMountMonitor(context: Context) {
             }
             return false
         }
-
-        @JvmStatic
         fun readProp(key: String): String {
             var p: Process? = null
             var br: BufferedReader? = null
@@ -318,8 +314,6 @@ class ExternalSdMountMonitor(context: Context) {
                 p?.destroy()
             }
         }
-
-        @JvmStatic
         fun runSuTimed(cmd: String): String {
             var p: Process? = null
             val out = StringBuilder()

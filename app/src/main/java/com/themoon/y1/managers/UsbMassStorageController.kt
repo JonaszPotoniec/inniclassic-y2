@@ -10,19 +10,15 @@ import java.util.regex.Pattern
  */
 object UsbMassStorageController {
     private const val TAG = "Y1Ums"
-
-    @JvmStatic
     fun isConnected(): Boolean {
         return parseBool(call("service call mount 3"))
     }
-
-    @JvmStatic
     fun isEnabled(): Boolean {
         return parseBool(call("service call mount 5"))
     }
 
     /** Returns the resulting enabled state (polls up to ~6 s for vold to settle). */
-    @JvmStatic
+
     fun setEnabled(enable: Boolean): Boolean {
         call("service call mount 4 i32 " + (if (enable) 1 else 0))
         for (i in 0 until 30) {
@@ -44,7 +40,7 @@ object UsbMassStorageController {
     }
 
     /** "Result: Parcel(00000000 00000001   '........')" -> second word == 1 */
-    @JvmStatic
+
     fun parseBool(out: String?): Boolean {
         if (out == null) return false
         val m = Pattern.compile("Parcel\\(\\s*[0-9a-fA-F]{8}\\s+([0-9a-fA-F]{8})").matcher(out)

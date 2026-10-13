@@ -9,6 +9,7 @@ import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.os.Build
 import android.os.Handler
+import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
@@ -204,7 +205,7 @@ class BluetoothController(
 
         if (ba.isDiscovering) {
             ba.cancelDiscovery()
-            Handler().postDelayed({ ba.startDiscovery() }, 500)
+            Handler(Looper.getMainLooper()).postDelayed({ ba.startDiscovery() }, 500)
         } else {
             ba.startDiscovery()
         }
@@ -511,7 +512,7 @@ class BluetoothController(
             e.printStackTrace()
         }
 
-        Handler().postDelayed({
+        Handler(Looper.getMainLooper()).postDelayed({
             startBluetoothScan()
         }, 500)
     }

@@ -189,8 +189,6 @@ class BluetoothAvrcpManager private constructor(private val context: Context) {
     companion object {
         @Volatile
         private var instance: BluetoothAvrcpManager? = null
-
-        @JvmStatic
         fun getInstance(context: Context): BluetoothAvrcpManager {
             return instance ?: synchronized(this) {
                 instance ?: BluetoothAvrcpManager(context.applicationContext).also { instance = it }

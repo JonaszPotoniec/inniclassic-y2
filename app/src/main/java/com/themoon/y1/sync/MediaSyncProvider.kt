@@ -6,9 +6,9 @@ package com.themoon.y1.sync
 interface MediaSyncProvider {
 
     class LibraryInfo(
-        @JvmField val id: String,
-        @JvmField val name: String,
-        @JvmField val collectionType: String // "music", "movies", "tvshows", etc.
+        val id: String,
+        val name: String,
+        val collectionType: String // "music", "movies", "tvshows", etc.
     )
 
     interface ConnectionCallback {

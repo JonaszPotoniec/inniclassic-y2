@@ -255,8 +255,6 @@ class JellyfinSyncProvider private constructor(context: Context) : MediaSyncProv
 
         @Volatile
         private var instance: JellyfinSyncProvider? = null
-
-        @JvmStatic
         @Synchronized
         fun getInstance(context: Context): JellyfinSyncProvider {
             var inst = instance

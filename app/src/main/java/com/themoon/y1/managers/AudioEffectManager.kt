@@ -248,8 +248,6 @@ class AudioEffectManager private constructor() {
     companion object {
         @Volatile
         private var instance: AudioEffectManager? = null
-
-        @JvmStatic
         @Synchronized
         fun getInstance(): AudioEffectManager {
             var inst = instance

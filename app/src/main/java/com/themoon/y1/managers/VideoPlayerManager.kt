@@ -171,8 +171,6 @@ class VideoPlayerManager private constructor() {
 
         @Volatile
         private var instance: VideoPlayerManager? = null
-
-        @JvmStatic
         fun getInstance(): VideoPlayerManager {
             var inst = instance
             if (inst == null) {

@@ -11,19 +11,15 @@ import java.util.Locale
 object MetadataReconciler {
 
     class ReconciliationResult {
-        @JvmField val itemsToDownload: MutableList<JellyfinMediaItem> = ArrayList()
-        @JvmField val updatedSongs: MutableList<SongItem> = ArrayList()
-        @JvmField val updatedTrackNumbers: MutableMap<String, Int> = HashMap() // absPath -> trackNum
-        @JvmField var isDirty: Boolean = false
+        val itemsToDownload: MutableList<JellyfinMediaItem> = ArrayList()
+        val updatedSongs: MutableList<SongItem> = ArrayList()
+        val updatedTrackNumbers: MutableMap<String, Int> = HashMap() // absPath -> trackNum
+        var isDirty: Boolean = false
     }
-
-    @JvmStatic
     fun normalizeText(text: String?): String {
         if (text == null) return ""
         return text.trim().lowercase(Locale.ROOT)
     }
-
-    @JvmStatic
     fun makeSongKey(title: String?, artist: String?, album: String?): String {
         return normalizeText(title) + "|" + normalizeText(artist) + "|" + normalizeText(album)
     }
@@ -31,7 +27,7 @@ object MetadataReconciler {
     /**
      * Reconciles remote music items against the local customLibrary and sync ledger.
      */
-    @JvmStatic
+
     fun reconcileMusic(
         remoteItems: List<JellyfinMediaItem>,
         localSongs: List<SongItem>?,
@@ -157,7 +153,7 @@ object MetadataReconciler {
     /**
      * Reconciles remote video (movie / tv) items against local files and sync ledger.
      */
-    @JvmStatic
+
     fun reconcileVideos(
         remoteItems: List<JellyfinMediaItem>,
         ledger: SyncLedger

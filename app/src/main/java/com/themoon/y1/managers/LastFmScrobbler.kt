@@ -344,8 +344,6 @@ class LastFmScrobbler private constructor(context: Context) {
 
         @Volatile
         private var instance: LastFmScrobbler? = null
-
-        @JvmStatic
         @Synchronized
         fun getInstance(context: Context? = null): LastFmScrobbler {
             var inst = instance

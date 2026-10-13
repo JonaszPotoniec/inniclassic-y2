@@ -19,8 +19,6 @@ class PowerBacklightManager private constructor(private val context: Context) {
 
         @Volatile
         private var instance: PowerBacklightManager? = null
-
-        @JvmStatic
         fun getInstance(context: Context): PowerBacklightManager {
             return instance ?: synchronized(this) {
                 instance ?: PowerBacklightManager(context.applicationContext).also { instance = it }

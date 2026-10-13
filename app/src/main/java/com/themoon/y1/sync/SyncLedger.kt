@@ -18,13 +18,13 @@ import java.io.FileWriter
 class SyncLedger {
 
     class LedgerItem(
-        @JvmField var jellyfinId: String,
-        @JvmField var libraryId: String?,
-        @JvmField var collectionType: String?,
-        @JvmField var localPath: String?,
-        @JvmField var fileSize: Long,
-        @JvmField var serverDateModified: String?,
-        @JvmField var orphaned: Boolean
+        var jellyfinId: String,
+        var libraryId: String?,
+        var collectionType: String?,
+        var localPath: String?,
+        var fileSize: Long,
+        var serverDateModified: String?,
+        var orphaned: Boolean
     ) {
         fun toJson(): JSONObject {
             return try {
@@ -42,7 +42,7 @@ class SyncLedger {
         }
 
         companion object {
-            @JvmStatic
+            
             fun fromJson(id: String, obj: JSONObject): LedgerItem {
                 return LedgerItem(
                     id,

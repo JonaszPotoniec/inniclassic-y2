@@ -9,7 +9,7 @@ object FileUtils {
      * Sanitizes filenames to be safe on FAT32/VFAT/Linux:
      * Strips illegal characters [/ \ : * ? " < > |], trims leading/trailing dots/spaces.
      */
-    @JvmStatic
+
     fun sanitizeFilename(name: String?): String {
         if (name.isNullOrBlank()) {
             return "Unknown"
@@ -23,7 +23,7 @@ object FileUtils {
     /**
      * Checks if the destination volume has at least requiredBytes + headroomBytes available.
      */
-    @JvmStatic
+
     fun hasAvailableSpace(targetDir: File, requiredBytes: Long, headroomBytes: Long): Boolean {
         return try {
             if (!targetDir.exists()) {

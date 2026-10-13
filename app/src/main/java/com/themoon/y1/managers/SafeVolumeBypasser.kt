@@ -18,7 +18,7 @@ object SafeVolumeBypasser {
     /**
      * Programmatic bypass using reflection on AudioManager, IAudioService, and Settings.
      */
-    @JvmStatic
+
     fun bypass(context: Context?, audioManager: AudioManager?) {
         if (context == null) return
 
@@ -75,7 +75,7 @@ object SafeVolumeBypasser {
     /**
      * Executes root commands asynchronously in the background. Never blocks the UI thread.
      */
-    @JvmStatic
+
     fun bypassWithRoot(context: Context?, audioManager: AudioManager?) {
         if (sRootInitialized) return
         Thread({
@@ -99,7 +99,7 @@ object SafeVolumeBypasser {
     /**
      * Sets stream volume directly and non-blockingly without any UI freeze.
      */
-    @JvmStatic
+
     fun setStreamVolumeWithBypass(
         context: Context?,
         audioManager: AudioManager?,
@@ -113,7 +113,7 @@ object SafeVolumeBypasser {
     /**
      * Initializes safe volume bypass on application boot/launch.
      */
-    @JvmStatic
+
     fun init(context: Context?, audioManager: AudioManager?) {
         bypass(context, audioManager)
         bypassWithRoot(context, audioManager)

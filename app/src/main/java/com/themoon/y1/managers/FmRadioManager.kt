@@ -21,20 +21,10 @@ class FmRadioManager private constructor(context: Context) {
 
     private val context: Context = context.applicationContext
     private val audioManager: AudioManager? = this.context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-
-    @JvmField
     var isDeviceOpen: Boolean = false
-
-    @JvmField
     var isPowerUp: Boolean = false
-
-    @JvmField
     var currentFreq: Float = 87.5f
-
-    @JvmField
     var isSpeakerOn: Boolean = false
-
-    @JvmField
     var lastError: String = ""
 
     private var fmNativeClass: Class<*>? = null
@@ -454,8 +444,6 @@ class FmRadioManager private constructor(context: Context) {
 
         @Volatile
         private var instance: FmRadioManager? = null
-
-        @JvmStatic
         @Synchronized
         fun getInstance(context: Context): FmRadioManager {
             var inst = instance
@@ -465,8 +453,6 @@ class FmRadioManager private constructor(context: Context) {
             }
             return inst
         }
-
-        @JvmStatic
         fun getInstance(): FmRadioManager? {
             return instance
         }

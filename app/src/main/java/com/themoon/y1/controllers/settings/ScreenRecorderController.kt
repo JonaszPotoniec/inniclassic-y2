@@ -3,6 +3,7 @@ package com.themoon.y1.controllers.settings
 import android.app.Activity
 import android.content.Intent
 import android.os.Handler
+import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
@@ -48,7 +49,7 @@ class ScreenRecorderController(
                         Toast.LENGTH_SHORT
                     ).show()
 
-                    Handler().postDelayed({
+                    Handler(Looper.getMainLooper()).postDelayed({
                         Thread {
                             try {
                                 Runtime.getRuntime().exec(arrayOf("su", "-c", "input tap 181 40"))

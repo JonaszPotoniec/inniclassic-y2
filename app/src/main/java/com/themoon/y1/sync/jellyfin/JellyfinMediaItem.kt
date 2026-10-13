@@ -4,25 +4,25 @@ package com.themoon.y1.sync.jellyfin
  * Unified data transfer object for all Jellyfin media items (music tracks, movies, TV episodes).
  */
 class JellyfinMediaItem {
-    @JvmField var id: String = ""
-    @JvmField var name: String = ""
-    @JvmField var album: String? = null
-    @JvmField var artist: String = ""
-    @JvmField var albumArtist: String = ""
-    @JvmField var composer: String = ""
-    @JvmField var year: String = ""
-    @JvmField var genre: String = ""
-    @JvmField var indexNumber: Int = 0
-    @JvmField var parentIndexNumber: Int = 0
-    @JvmField var container: String = ""
-    @JvmField var fileSize: Long = 0L
-    @JvmField var albumId: String? = null
-    @JvmField var albumPrimaryImageTag: String? = null
-    @JvmField var collectionType: String = ""
-    @JvmField var libraryId: String = ""
-    @JvmField var seriesName: String? = null
-    @JvmField var seriesId: String = ""
-    @JvmField var seasonId: String = ""
-    @JvmField var seasonName: String? = null
-    @JvmField var serverDateModified: String = ""
+    var id: String = ""
+    var name: String = ""
+    var album: String? = null
+    var artist: String = ""
+    var albumArtist: String = ""
+    var composer: String = ""
+    var year: String = ""
+    var genre: String = ""
+    var indexNumber: Int = 0
+    var parentIndexNumber: Int = 0
+    var container: String = ""
+    var fileSize: Long = 0L
+    var albumId: String? = null
+    var albumPrimaryImageTag: String? = null
+    var collectionType: String = ""
+    var libraryId: String = ""
+    var seriesName: String? = null
+    var seriesId: String = ""
+    var seasonId: String = ""
+    var seasonName: String? = null
+    var serverDateModified: String = ""
 }

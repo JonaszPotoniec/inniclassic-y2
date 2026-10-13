@@ -427,8 +427,6 @@ class SyncManager private constructor(context: Context) {
 
         @Volatile
         private var instance: SyncManager? = null
-
-        @JvmStatic
         @Synchronized
         fun getInstance(context: Context): SyncManager {
             var inst = instance
@@ -442,7 +440,7 @@ class SyncManager private constructor(context: Context) {
         /**
          * Resolves sync root according to Y2 SD-first priority.
          */
-        @JvmStatic
+
         fun getSyncRoot(): File {
             return if (StoragePaths.hasSecondaryStorage()) {
                 File(StoragePaths.SECONDARY_PATH)

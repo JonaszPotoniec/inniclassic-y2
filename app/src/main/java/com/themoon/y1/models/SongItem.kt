@@ -3,14 +3,14 @@ package com.themoon.y1.models
 import java.io.File
 
 class SongItem {
-    @JvmField var file: File
-    @JvmField var title: String
-    @JvmField var artist: String
-    @JvmField var album: String
-    @JvmField var year: String
-    @JvmField var genre: String
-    @JvmField var albumArtist: String
-    @JvmField var composer: String
+    var file: File
+    var title: String
+    var artist: String
+    var album: String
+    var year: String
+    var genre: String
+    var albumArtist: String
+    var composer: String
 
     constructor(file: File, title: String, artist: String?, album: String?) {
         this.file = file
@@ -74,7 +74,6 @@ class SongItem {
     }
 
     companion object {
-        @JvmStatic
         private fun safe(value: String?, fallback: String): String {
             return if (!value.isNullOrBlank()) value else fallback
         }

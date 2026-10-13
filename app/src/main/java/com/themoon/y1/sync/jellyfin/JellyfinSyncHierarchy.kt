@@ -19,12 +19,12 @@ class JellyfinSyncHierarchy {
     }
 
     class SeriesNode(
-        @JvmField val id: String,
-        @JvmField val name: String
+        val id: String,
+        val name: String
     ) {
-        @JvmField val seasons: MutableList<SeasonNode> = ArrayList()
-        @JvmField val allEpisodeIds: MutableSet<String> = HashSet()
-        @JvmField var totalSize: Long = 0
+        val seasons: MutableList<SeasonNode> = ArrayList()
+        val allEpisodeIds: MutableSet<String> = HashSet()
+        var totalSize: Long = 0
 
         fun getTriState(selectedIds: Set<String>?): TriState {
             return computeTriState(allEpisodeIds, selectedIds)
@@ -36,14 +36,14 @@ class JellyfinSyncHierarchy {
     }
 
     class SeasonNode(
-        @JvmField val id: String,
-        @JvmField val name: String,
-        @JvmField val seasonNumber: Int,
-        @JvmField val seriesName: String
+        val id: String,
+        val name: String,
+        val seasonNumber: Int,
+        val seriesName: String
     ) {
-        @JvmField val episodes: MutableList<JellyfinMediaItem> = ArrayList()
-        @JvmField val allEpisodeIds: MutableSet<String> = HashSet()
-        @JvmField var totalSize: Long = 0
+        val episodes: MutableList<JellyfinMediaItem> = ArrayList()
+        val allEpisodeIds: MutableSet<String> = HashSet()
+        var totalSize: Long = 0
 
         fun getTriState(selectedIds: Set<String>?): TriState {
             return computeTriState(allEpisodeIds, selectedIds)
@@ -55,11 +55,11 @@ class JellyfinSyncHierarchy {
     }
 
     class ArtistNode(
-        @JvmField val name: String
+        val name: String
     ) {
-        @JvmField val albums: MutableList<AlbumNode> = ArrayList()
-        @JvmField val allSongIds: MutableSet<String> = HashSet()
-        @JvmField var totalSize: Long = 0
+        val albums: MutableList<AlbumNode> = ArrayList()
+        val allSongIds: MutableSet<String> = HashSet()
+        var totalSize: Long = 0
 
         fun getTriState(selectedIds: Set<String>?): TriState {
             return computeTriState(allSongIds, selectedIds)
@@ -71,13 +71,13 @@ class JellyfinSyncHierarchy {
     }
 
     class AlbumNode(
-        @JvmField val id: String,
-        @JvmField val name: String,
-        @JvmField val artistName: String
+        val id: String,
+        val name: String,
+        val artistName: String
     ) {
-        @JvmField val songs: MutableList<JellyfinMediaItem> = ArrayList()
-        @JvmField val allSongIds: MutableSet<String> = HashSet()
-        @JvmField var totalSize: Long = 0
+        val songs: MutableList<JellyfinMediaItem> = ArrayList()
+        val allSongIds: MutableSet<String> = HashSet()
+        var totalSize: Long = 0
 
         fun getTriState(selectedIds: Set<String>?): TriState {
             return computeTriState(allSongIds, selectedIds)
@@ -88,14 +88,14 @@ class JellyfinSyncHierarchy {
         }
     }
 
-    @JvmField val seriesList: MutableList<SeriesNode> = ArrayList()
-    @JvmField val artistsList: MutableList<ArtistNode> = ArrayList()
-    @JvmField val moviesList: MutableList<JellyfinMediaItem> = ArrayList()
-    @JvmField val allItemIds: MutableSet<String> = HashSet()
-    @JvmField var totalLibrarySize: Long = 0
+    val seriesList: MutableList<SeriesNode> = ArrayList()
+    val artistsList: MutableList<ArtistNode> = ArrayList()
+    val moviesList: MutableList<JellyfinMediaItem> = ArrayList()
+    val allItemIds: MutableSet<String> = HashSet()
+    var totalLibrarySize: Long = 0
 
     companion object {
-        @JvmStatic
+
         fun computeTriState(itemIds: Collection<String>?, selectedIds: Set<String>?): TriState {
             if (itemIds.isNullOrEmpty() || selectedIds.isNullOrEmpty()) {
                 return TriState.UNCHECKED
@@ -112,8 +112,6 @@ class JellyfinSyncHierarchy {
                 else -> TriState.INDETERMINATE
             }
         }
-
-        @JvmStatic
         fun countSelected(itemIds: Collection<String>?, selectedIds: Set<String>?): Int {
             if (itemIds.isNullOrEmpty() || selectedIds.isNullOrEmpty()) {
                 return 0
@@ -126,8 +124,6 @@ class JellyfinSyncHierarchy {
             }
             return count
         }
-
-        @JvmStatic
         fun buildTvHierarchy(episodes: List<JellyfinMediaItem>?): JellyfinSyncHierarchy {
             val hierarchy = JellyfinSyncHierarchy()
             if (episodes.isNullOrEmpty()) return hierarchy
@@ -200,8 +196,6 @@ class JellyfinSyncHierarchy {
 
             return hierarchy
         }
-
-        @JvmStatic
         fun buildMusicHierarchy(songs: List<JellyfinMediaItem>?): JellyfinSyncHierarchy {
             val hierarchy = JellyfinSyncHierarchy()
             if (songs.isNullOrEmpty()) return hierarchy
@@ -272,8 +266,6 @@ class JellyfinSyncHierarchy {
 
             return hierarchy
         }
-
-        @JvmStatic
         fun buildMoviesHierarchy(movies: List<JellyfinMediaItem>?): JellyfinSyncHierarchy {
             val hierarchy = JellyfinSyncHierarchy()
             if (movies.isNullOrEmpty()) return hierarchy

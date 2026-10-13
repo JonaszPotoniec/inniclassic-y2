@@ -388,8 +388,6 @@ class AlbumCoverManager private constructor() {
 
         @Volatile
         private var sInstance: AlbumCoverManager? = null
-
-        @JvmStatic
         fun getInstance(): AlbumCoverManager {
             var inst = sInstance
             if (inst == null) {
@@ -403,15 +401,11 @@ class AlbumCoverManager private constructor() {
             }
             return inst!!
         }
-
-        @JvmStatic
         fun getAlbumKey(file: File?, album: String?): String {
             val parent = if (file?.parentFile != null) file.parentFile.absolutePath else ""
             val safeAlbum = album ?: "Unknown Album"
             return "$parent - $safeAlbum"
         }
-
-        @JvmStatic
         fun getHashKey(input: String?): String {
             val s = input ?: ""
             return try {
@@ -426,8 +420,6 @@ class AlbumCoverManager private constructor() {
                 s.hashCode().toString()
             }
         }
-
-        @JvmStatic
         fun decodeSampledBitmapFromFile(path: String, reqWidth: Int, reqHeight: Int): Bitmap? {
             return try {
                 val options = BitmapFactory.Options().apply {
@@ -443,8 +435,6 @@ class AlbumCoverManager private constructor() {
                 null
             }
         }
-
-        @JvmStatic
         fun decodeSampledBitmapFromByteArray(data: ByteArray, reqWidth: Int, reqHeight: Int): Bitmap? {
             return try {
                 val options = BitmapFactory.Options().apply {
@@ -460,8 +450,6 @@ class AlbumCoverManager private constructor() {
                 null
             }
         }
-
-        @JvmStatic
         fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
             val height = options.outHeight
             val width = options.outWidth
@@ -476,8 +464,6 @@ class AlbumCoverManager private constructor() {
             }
             return Math.max(1, inSampleSize)
         }
-
-        @JvmStatic
         fun generateReflection(src: Bitmap?): Bitmap? {
             if (src == null) return null
             return try {

@@ -52,6 +52,7 @@ class VideoPlayerController(
 
     override fun onEnter(state: ScreenState) {
         layoutVideoPlayer.visibility = View.VISIBLE
+        surfaceVideo.visibility = View.VISIBLE
         if (state is ScreenState.VideoPlayer) {
             play(state.videoFile)
         }
@@ -59,6 +60,7 @@ class VideoPlayerController(
 
     override fun onExit() {
         stop()
+        surfaceVideo.visibility = View.GONE
         layoutVideoPlayer.visibility = View.GONE
     }
 

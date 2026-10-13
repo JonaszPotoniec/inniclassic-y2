@@ -558,7 +558,7 @@
         android:background="#FF000000"
         android:visibility="gone">
 
-        <SurfaceView android:id="@+id/surface_video" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_gravity="center" />
+        <SurfaceView android:id="@+id/surface_video" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_gravity="center" android:visibility="gone" />
 
         <TextView android:id="@+id/tv_video_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="top" android:padding="14dp" android:text="Video" android:textColor="#FFFFFFFF" android:textSize="16sp" android:textStyle="bold" android:singleLine="true" android:ellipsize="end" android:shadowColor="#FF000000" android:shadowDx="1" android:shadowDy="1" android:shadowRadius="3"/>
 

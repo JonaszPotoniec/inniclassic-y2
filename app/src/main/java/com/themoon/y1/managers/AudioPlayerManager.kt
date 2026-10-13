@@ -47,20 +47,10 @@ import java.util.Locale
  * and audio metadata extraction across formats (Opus, OGG Vorbis, FLAC, ALAC/M4A).
  */
 class AudioPlayerManager private constructor() {
-
-    @JvmField
     var exoPlayer: SimpleExoPlayer? = null
-
-    @JvmField
     val customEqProcessor: Y1EqAudioProcessor = Y1EqAudioProcessor()
-
-    @JvmField
     val crossfeedProcessor: Y1CrossfeedAudioProcessor = Y1CrossfeedAudioProcessor()
-
-    @JvmField
     var legacyPlayer: MediaPlayer? = null
-
-    @JvmField
     var isUsingLegacyPlayer: Boolean = false
 
     private val flacLegacyFailedPaths: MutableSet<String> = HashSet()
@@ -1398,8 +1388,6 @@ class AudioPlayerManager private constructor() {
     companion object {
         @Volatile
         private var instance: AudioPlayerManager? = null
-
-        @JvmStatic
         @Synchronized
         fun getInstance(): AudioPlayerManager {
             var inst = instance

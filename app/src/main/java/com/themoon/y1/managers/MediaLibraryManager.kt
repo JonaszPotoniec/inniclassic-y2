@@ -495,8 +495,6 @@ class MediaLibraryManager private constructor() {
     companion object {
         @Volatile
         private var instance: MediaLibraryManager? = null
-
-        @JvmStatic
         fun getInstance(): MediaLibraryManager {
             return instance ?: synchronized(this) {
                 instance ?: MediaLibraryManager().also { instance = it }

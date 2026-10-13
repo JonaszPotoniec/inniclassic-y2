@@ -11,15 +11,13 @@ import java.util.TreeMap
 class M4bChapterParser {
 
     class ChapterResult {
-        @JvmField
-        var chaptersMap: TreeMap<Int, String> = TreeMap()
 
-        @JvmField
+        var chaptersMap: TreeMap<Int, String> = TreeMap()
         var timestamps: MutableList<Int> = ArrayList()
     }
 
     companion object {
-        @JvmStatic
+
         fun extractChapters(m4bFile: File?): ChapterResult {
             val result = ChapterResult()
             if (m4bFile == null || !m4bFile.exists() || !m4bFile.name.lowercase().endsWith(".m4b")) {

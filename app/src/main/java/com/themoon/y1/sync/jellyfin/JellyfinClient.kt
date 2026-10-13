@@ -77,10 +77,10 @@ class JellyfinClient(rawUrl: String?, deviceId: String?) {
     }
 
     class AuthResult(
-        @JvmField val accessToken: String,
-        @JvmField val userId: String,
-        @JvmField val serverId: String,
-        @JvmField val serverName: String
+        val accessToken: String,
+        val userId: String,
+        val serverId: String,
+        val serverName: String
     )
 
     /**
@@ -129,9 +129,9 @@ class JellyfinClient(rawUrl: String?, deviceId: String?) {
     }
 
     class QuickConnectSession(
-        @JvmField val code: String,
-        @JvmField val secret: String,
-        @JvmField val authenticated: Boolean
+        val code: String,
+        val secret: String,
+        val authenticated: Boolean
     )
 
     /**
@@ -334,8 +334,8 @@ class JellyfinClient(rawUrl: String?, deviceId: String?) {
     }
 
     class ItemsQueryResult(
-        @JvmField val totalRecordCount: Int,
-        @JvmField val items: List<JellyfinMediaItem>
+        val totalRecordCount: Int,
+        val items: List<JellyfinMediaItem>
     )
 
     /**
@@ -734,8 +734,6 @@ class JellyfinClient(rawUrl: String?, deviceId: String?) {
     companion object {
         private const val TAG = "JellyfinClient"
         private val JSON_MEDIA_TYPE = MediaType.parse("application/json; charset=utf-8")
-
-        @JvmStatic
         fun normalizeUrl(raw: String?): String {
             if (raw == null) return ""
             var url = raw.trim()

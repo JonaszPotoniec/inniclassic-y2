@@ -119,8 +119,6 @@ open class MigrationManager {
 
         @Volatile
         private var instance: MigrationManager? = null
-
-        @JvmStatic
         fun getInstance(context: Context): MigrationManager {
             val existing = instance
             if (existing != null) return existing

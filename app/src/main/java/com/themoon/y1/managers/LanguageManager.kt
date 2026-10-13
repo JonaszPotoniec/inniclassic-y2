@@ -18,11 +18,7 @@ class LanguageManager private constructor(context: Context) {
 
     private val context: Context = context.applicationContext
     private val dictionary: HashMap<String, String> = HashMap()
-
-    @JvmField
     var availableLangFiles: MutableList<File> = ArrayList()
-
-    @JvmField
     var currentLangFileName: String = "English (Default)"
 
     init {
@@ -155,8 +151,6 @@ class LanguageManager private constructor(context: Context) {
     companion object {
         @Volatile
         private var instance: LanguageManager? = null
-
-        @JvmStatic
         @Synchronized
         fun getInstance(context: Context?): LanguageManager {
             var inst = instance
