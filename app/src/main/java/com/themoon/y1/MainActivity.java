@@ -107,6 +107,8 @@ public class MainActivity extends Activity {
     private com.themoon.y1.controllers.settings.SettingsController settingsController;
     private com.themoon.y1.controllers.settings.EqualizerController equalizerController;
     private com.themoon.y1.controllers.podcasts.PodcastController podcastController;
+    private com.themoon.y1.controllers.videos.VideoBrowserController videoBrowserController;
+    private com.themoon.y1.controllers.videos.VideoPlayerController videoPlayerController;
 
     private static final String TAG = "MainActivity";
     // OTA Update URL pointing to GitHub Releases
@@ -800,17 +802,6 @@ public class MainActivity extends Activity {
     private ProgressBar videoProgressBar;
     private List<File> videoLibrary = new ArrayList<>();
     private int currentVideoIndex = -1;
-    private boolean videoSeekModeActive = false;
-    private long videoCenterDownTime = 0;
-    private boolean isVideoCenterLongPressed = false;
-    private final Handler videoProgressHandler = new Handler();
-    private final Runnable updateVideoProgressTask = new Runnable() {
-        @Override
-        public void run() {
-            updateVideoProgressUI();
-            videoProgressHandler.postDelayed(this, 500);
-        }
-    };
 
     private LinearLayout containerBrowserItems, containerSettingsItems;
     // 🚀 [신규 추가] Music Quiz 게임 화면 전용 뷰들
@@ -3137,6 +3128,54 @@ public class MainActivity extends Activity {
                 }
         );
 
+        videoBrowserController = new com.themoon.y1.controllers.videos.VideoBrowserController(
+                this,
+                (ViewGroup) findViewById(android.R.id.content),
+                () -> {
+                    scanVideoLibrary();
+                    return videoLibrary;
+                },
+                (file) -> {
+                    if (com.themoon.y1.managers.AudioPlayerManager.getInstance().isPlaying()) {
+                        com.themoon.y1.managers.AudioPlayerManager.getInstance().playOrPauseMusic();
+                    }
+                    changeScreen(STATE_VIDEO_PLAYER);
+                    if (videoPlayerController != null) {
+                        videoPlayerController.play(file);
+                    }
+                    return kotlin.Unit.INSTANCE;
+                },
+                () -> { clickFeedback(); return kotlin.Unit.INSTANCE; },
+                () -> {
+                    clickFeedback();
+                    changeScreen(STATE_MENU);
+                    return kotlin.Unit.INSTANCE;
+                },
+                (key) -> t(key),
+                (title) -> {
+                    showFastScrollLetter(title);
+                    return kotlin.Unit.INSTANCE;
+                }
+        );
+
+        videoPlayerController = new com.themoon.y1.controllers.videos.VideoPlayerController(
+                this,
+                (ViewGroup) findViewById(android.R.id.content),
+                () -> {
+                    changeScreen(STATE_VIDEOS);
+                    if (videoBrowserController != null) {
+                        videoBrowserController.buildVideoListUI();
+                    }
+                    return kotlin.Unit.INSTANCE;
+                },
+                (up) -> {
+                    adjustVolume(up);
+                    return kotlin.Unit.INSTANCE;
+                },
+                () -> { clickFeedback(); return kotlin.Unit.INSTANCE; },
+                (key) -> t(key)
+        );
+
         // 🚀 [신규 추가] Videos 목록 + 전체화면 재생 화면 뷰 연결
         layoutVideosMode = findViewById(R.id.layout_videos_mode);
         containerVideoItems = findViewById(R.id.container_video_items);
@@ -5343,11 +5382,11 @@ public class MainActivity extends Activity {
         layoutVideosMode.setVisibility(state == STATE_VIDEOS ? View.VISIBLE : View.GONE);
         layoutVideoPlayerMode.setVisibility(state == STATE_VIDEO_PLAYER ? View.VISIBLE : View.GONE);
         if (state != STATE_VIDEO_PLAYER) {
-            // 🚀 다른 화면으로 나가면 재생을 멈추고 진행률 갱신 루프도 정지시켜 배터리/자원을 아낍니다.
-            videoProgressHandler.removeCallbacks(updateVideoProgressTask);
-            com.themoon.y1.managers.VideoPlayerManager.getInstance().stopAndRelease();
-            videoSeekModeActive = false;
-            if (tvVideoModeHint != null) tvVideoModeHint.setVisibility(View.GONE);
+            if (videoPlayerController != null) {
+                videoPlayerController.stop();
+            } else {
+                com.themoon.y1.managers.VideoPlayerManager.getInstance().stopAndRelease();
+            }
         }
         updateKeepScreenOnState();
         layoutVolumeOverlay.setVisibility(View.GONE);
@@ -9809,227 +9848,20 @@ public class MainActivity extends Activity {
     }
 
     private void buildVideoListUI() {
-        if (containerVideoItems == null) return;
-        float density = getResources().getDisplayMetrics().density;
-        boolean classic = ThemeManager.isClassicTheme();
-        layoutVideosMode.setBackgroundColor(classic ? ThemeManager.getOverlayBackgroundColor() : 0x66000000);
-        layoutVideosMode.setPadding(classic ? 0 : (int) (10 * density),
-                (int) ((classic ? 0 : 36) * density), classic ? 0 : (int) (10 * density),
-                classic ? 0 : (int) (10 * density));
-        android.widget.FrameLayout.LayoutParams videoListParams =
-                (android.widget.FrameLayout.LayoutParams) layoutVideosMode.getLayoutParams();
-        videoListParams.topMargin = classic ? (int) (26 * density) : 0;
-        layoutVideosMode.setLayoutParams(videoListParams);
-        ((ViewGroup) layoutVideosMode).getChildAt(0).setVisibility(classic ? View.GONE : View.VISIBLE);
-        scanVideoLibrary();
-        containerVideoItems.removeAllViews();
-
-        if (videoLibrary.isEmpty()) {
-            TextView tvEmpty = new TextView(this);
-            tvEmpty.setText(t("No videos found.\nCopy videos into the \"Videos\" folder on your SD card."));
-            tvEmpty.setTextSize(16f);
-            tvEmpty.setTextColor(ThemeManager.getTextColorSecondary());
-            tvEmpty.setGravity(Gravity.CENTER);
-            tvEmpty.setPadding(0, 50, 0, 0);
-            containerVideoItems.addView(tvEmpty);
-            return;
+        if (videoBrowserController != null) {
+            videoBrowserController.buildVideoListUI();
         }
-
-        for (int i = 0; i < videoLibrary.size(); i++) {
-            final int index = i;
-            final File videoFile = videoLibrary.get(i);
-            String title = videoFile.getName();
-            int dot = title.lastIndexOf(".");
-            if (dot > 0) title = title.substring(0, dot);
-
-            View row = createVideoRowView(videoFile, title);
-            row.setOnClickListener(v -> {
-                clickFeedback();
-                openVideoPlayer(index);
-            });
-            containerVideoItems.addView(row);
-        }
-
-        // 🚀 [버그 수리] 행을 추가만 하고 아무 데도 포커스를 준 적이 없어서, 휠로 방향키를 눌러도 focusSearch가
-        // "지금 포커스된 뷰"를 못 찾아 아예 움직이지 않았습니다(클릭 피드백 소리만 나고 하이라이트도, 재생도
-        // 안 되던 원인). Settings/Podcasts와 동일하게 첫 번째 행에 명시적으로 포커스를 줍니다.
-        containerVideoItems.post(() -> {
-            if (containerVideoItems.getChildCount() > 0) {
-                containerVideoItems.getChildAt(0).requestFocus();
-            }
-        });
-    }
-
-    // 🚀 [비디오 썸네일 캐시] 프레임 추출은 MediaMetadataRetriever로 하는데 이게 느릴 수 있어서(특히 이
-    // 기기), Albums ANR 버그에서 배운 대로 절대 메인 스레드에서 동기로 하지 않고, 백그라운드 스레드 +
-    // 메모리 캐시로 처리합니다.
-    private LruCache<String, Bitmap> videoThumbCache;
-
-    // 🚀 [신규 추가] 썸네일이 있는 비디오 목록 행 - Albums 행과 같은 느낌(작은 정사각 미리보기 + 제목)이지만
-    // 서브타이틀 없이 단순하게 구성합니다.
-    private View createVideoRowView(final File videoFile, String title) {
-        float d = getResources().getDisplayMetrics().density;
-        int coverSize = (int) (52 * d);
-
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setFocusable(true);
-        row.setClickable(true);
-        row.setSoundEffectsEnabled(false);
-        row.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
-        row.setPadding((int) (8 * d), (int) (6 * d), (int) (10 * d), (int) (6 * d));
-        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        rowLp.setMargins(0, ThemeManager.isClassicTheme() ? 0 : 2, 0, ThemeManager.isClassicTheme() ? 0 : 2);
-        row.setLayoutParams(rowLp);
-
-        final ImageView ivThumb = new ImageView(this);
-        ivThumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        LinearLayout.LayoutParams thumbLp = new LinearLayout.LayoutParams(coverSize, coverSize);
-        thumbLp.rightMargin = (int) (10 * d);
-        ivThumb.setLayoutParams(thumbLp);
-        row.addView(ivThumb);
-
-        final TextView tvTitle = new TextView(this);
-        tvTitle.setText(title);
-        tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, ThemeManager.getListTextSize() * d);
-        tvTitle.setTypeface(ThemeManager.getCustomFontBold());
-        tvTitle.setSingleLine(true);
-        tvTitle.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
-        tvTitle.setMarqueeRepeatLimit(-1);
-        tvTitle.setHorizontalFadingEdgeEnabled(true);
-        LinearLayout.LayoutParams textLp = new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        tvTitle.setLayoutParams(textLp);
-        row.addView(tvTitle);
-
-        final TextView tvArrow = new TextView(this);
-        tvArrow.setText("〉");
-        tvArrow.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 20f * d);
-        tvArrow.setTextColor(0xFFFFFFFF);
-        tvArrow.setVisibility(View.GONE);
-        LinearLayout.LayoutParams arrowLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        arrowLp.leftMargin = (int) (10 * d);
-        tvArrow.setLayoutParams(arrowLp);
-        row.addView(tvArrow);
-
-        final int normalColor = ThemeManager.getTextColorPrimary();
-        tvTitle.setTextColor(normalColor);
-        ClassicMenuStyle.apply(row, tvTitle, tvArrow, 64);
-        row.setOnFocusChangeListener(new View.OnFocusChangeListener() {
-            @Override
-            public void onFocusChange(View v, boolean hasFocus) {
-                if (hasFocus) {
-                    row.setBackground(createFocusedButtonBackground());
-                    tvTitle.setTextColor(ThemeManager.getListButtonFocusedTextColor());
-                    tvTitle.setSelected(true);
-                    tvArrow.setVisibility(View.VISIBLE);
-                    showFastScrollLetter(tvTitle.getText().toString());
-                } else {
-                    row.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
-                    tvTitle.setTextColor(normalColor);
-                    tvTitle.setSelected(false);
-                    tvArrow.setVisibility(View.GONE);
-                }
-            }
-        });
-
-        String path = videoFile.getAbsolutePath();
-        if (videoThumbCache == null) videoThumbCache = new LruCache<>(30);
-        Bitmap cached = videoThumbCache.get(path);
-        if (cached != null) {
-            ivThumb.setImageBitmap(cached);
-        } else {
-            ivThumb.setImageResource(R.drawable.video_circle);
-            ivThumb.setTag(path);
-            loadVideoThumbnailAsync(videoFile, coverSize, ivThumb);
-        }
-
-        return row;
-    }
-
-    private void loadVideoThumbnailAsync(final File videoFile, final int coverSize, final ImageView targetView) {
-        final String path = videoFile.getAbsolutePath();
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                Bitmap thumb = null;
-                android.media.MediaMetadataRetriever mmr = new android.media.MediaMetadataRetriever();
-                try {
-                    mmr.setDataSource(path);
-                    // 🚀 1초 지점에서 프레임을 뽑습니다 - 0초는 종종 완전히 까맣거나 빈 인트로 프레임인 경우가 많습니다.
-                    Bitmap frame = mmr.getFrameAtTime(1000000, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
-                    if (frame == null) frame = mmr.getFrameAtTime(); // 실패하면 그냥 첫 프레임이라도!
-                    if (frame != null) {
-                        thumb = Bitmap.createScaledBitmap(frame, coverSize, coverSize, true);
-                        if (thumb != frame) frame.recycle();
-                    }
-                } catch (Exception e) {
-                } finally {
-                    try { mmr.release(); } catch (Exception e) {}
-                }
-                final Bitmap finalThumb = thumb;
-                if (finalThumb != null && videoThumbCache != null) {
-                    videoThumbCache.put(path, finalThumb);
-                }
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (finalThumb != null && path.equals(targetView.getTag())) {
-                            targetView.setImageBitmap(finalThumb);
-                        }
-                    }
-                });
-            }
-        }).start();
     }
 
     private void openVideoPlayer(int index) {
-        if (index < 0 || index >= videoLibrary.size() || surfaceVideo == null) return;
+        if (index < 0 || index >= videoLibrary.size()) return;
         if (com.themoon.y1.managers.AudioPlayerManager.getInstance().isPlaying()) {
             com.themoon.y1.managers.AudioPlayerManager.getInstance().playOrPauseMusic();
         }
-        currentVideoIndex = index;
         File videoFile = videoLibrary.get(index);
-
         changeScreen(STATE_VIDEO_PLAYER);
-
-        String title = videoFile.getName();
-        int dot = title.lastIndexOf(".");
-        if (dot > 0) title = title.substring(0, dot);
-        if (tvVideoTitle != null) tvVideoTitle.setText(title);
-
-        videoSeekModeActive = false;
-        if (tvVideoModeHint != null) tvVideoModeHint.setVisibility(View.GONE);
-
-        com.themoon.y1.managers.VideoPlayerManager.getInstance().playVideo(this, videoFile, surfaceVideo);
-        videoProgressHandler.removeCallbacks(updateVideoProgressTask);
-        videoProgressHandler.post(updateVideoProgressTask);
-    }
-
-    private void updateVideoProgressUI() {
-        com.themoon.y1.managers.VideoPlayerManager vm = com.themoon.y1.managers.VideoPlayerManager.getInstance();
-        int pos = (int) vm.getCurrentPosition();
-        int dur = (int) vm.getDuration();
-
-        if (tvVideoTimeCurrent != null) tvVideoTimeCurrent.setText(formatTime(pos));
-        if (tvVideoTimeTotal != null) tvVideoTimeTotal.setText("-" + formatTime(Math.max(0, dur - pos)));
-        if (videoProgressBar != null && dur > 0) {
-            videoProgressBar.setProgress((int) (((long) pos * 100) / dur));
-        }
-    }
-
-    // 🚀 [탐색/볼륨 모드 전환] 비디오 재생 중 길게 누르면 휠의 역할을 바꿉니다 (탐색 <-> 볼륨).
-    private void toggleVideoSeekMode() {
-        videoSeekModeActive = !videoSeekModeActive;
-        if (tvVideoModeHint != null) {
-            tvVideoModeHint.setText(videoSeekModeActive ? t("Seek Mode") : t("Volume Mode"));
-            tvVideoModeHint.setVisibility(View.VISIBLE);
-            videoProgressHandler.postDelayed(() -> {
-                if (tvVideoModeHint != null) tvVideoModeHint.setVisibility(View.GONE);
-            }, 1200);
+        if (videoPlayerController != null) {
+            videoPlayerController.play(videoFile);
         }
     }
 
@@ -13736,9 +13568,7 @@ public class MainActivity extends Activity {
         }
 
         if (currentScreenState == STATE_VIDEOS) {
-            if (keyCode == KeyEvent.KEYCODE_BACK) {
-                changeScreen(STATE_MENU);
-                clickFeedback();
+            if (videoBrowserController != null && videoBrowserController.onKeyDown(keyCode, event)) {
                 return true;
             }
         }
@@ -14006,6 +13836,16 @@ public class MainActivity extends Activity {
                         return true;
                     }
                     changeScreen(backTargetForUtility);
+                } else if (currentScreenState == STATE_VIDEOS) {
+                    if (videoBrowserController != null) {
+                        return videoBrowserController.onBackPressed();
+                    }
+                    changeScreen(STATE_MENU);
+                } else if (currentScreenState == STATE_VIDEO_PLAYER) {
+                    if (videoPlayerController != null) {
+                        return videoPlayerController.onBackPressed();
+                    }
+                    changeScreen(STATE_VIDEOS);
                 } else if (currentScreenState == STATE_MUSIC_QUIZ) {
                     exitMusicQuiz();
                 } else if (currentScreenState == STATE_SETTINGS) {
@@ -14568,50 +14408,7 @@ public class MainActivity extends Activity {
         // 여기서 완전히 독립적으로, 가장 먼저 처리하고 return 합니다.
         // =======================================================
         if (currentScreenState == STATE_VIDEO_PLAYER) {
-            if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
-                    || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY || keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE) {
-                // Consume both edges here so the shared music handler never sees video controls.
-                if (action == KeyEvent.ACTION_UP && !event.isCanceled()) {
-                    com.themoon.y1.managers.VideoPlayerManager vm = com.themoon.y1.managers.VideoPlayerManager.getInstance();
-                    if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
-                            || (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY && !vm.isPlaying())
-                            || (keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE && vm.isPlaying())) {
-                        vm.togglePlayPause();
-                    }
-                    clickFeedback();
-                }
-                return true;
-            }
-            if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS) {
-                if (action == KeyEvent.ACTION_DOWN) {
-                    com.themoon.y1.managers.VideoPlayerManager.getInstance().seekRelative(
-                            keyCode == KeyEvent.KEYCODE_MEDIA_NEXT ? 10000 : -10000);
-                }
-                return true;
-            }
-            if (keyCode == 21 || keyCode == 22) {
-                if (action == KeyEvent.ACTION_DOWN) {
-                    if (videoSeekModeActive) {
-                        com.themoon.y1.managers.VideoPlayerManager.getInstance().seekRelative(keyCode == 22 ? 10000 : -10000);
-                    } else {
-                        adjustVolume(keyCode == 22);
-                    }
-                    clickFeedback();
-                }
-                return true;
-            }
-            if (keyCode == KeyEvent.KEYCODE_BACK) {
-                if (action == KeyEvent.ACTION_DOWN) {
-                    clickFeedback();
-                    changeScreen(STATE_VIDEOS);
-                }
-                return true;
-            }
-            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
-                if (action == KeyEvent.ACTION_UP) {
-                    clickFeedback();
-                    com.themoon.y1.managers.VideoPlayerManager.getInstance().togglePlayPause();
-                }
+            if (videoPlayerController != null && videoPlayerController.dispatchKeyEvent(event)) {
                 return true;
             }
         }

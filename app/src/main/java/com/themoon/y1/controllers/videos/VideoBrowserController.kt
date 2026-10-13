@@ -31,7 +31,8 @@ class VideoBrowserController(
     private val onVideoSelected: (file: File) -> Unit,
     private val clickFeedback: () -> Unit,
     private val onNavigateBack: () -> Unit,
-    private val localize: (String) -> String
+    private val localize: (String) -> String,
+    private val onFocusItem: ((title: String) -> Unit)? = null
 ) : ScreenController {
 
     private val layoutVideos: LinearLayout = rootView.findViewById(R.id.layout_videos_mode)
@@ -111,17 +112,21 @@ class VideoBrowserController(
             isFocusable = true
             isClickable = true
             setBackgroundColor(0)
-            setPadding((12 * d).toInt(), (6 * d).toInt(), (12 * d).toInt(), (6 * d).toInt())
+            setPadding((8 * d).toInt(), (6 * d).toInt(), (10 * d).toInt(), (6 * d).toInt())
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
-            )
+            ).apply {
+                setMargins(0, if (ThemeManager.isClassicTheme()) 0 else 2, 0, if (ThemeManager.isClassicTheme()) 0 else 2)
+            }
         }
 
-        val ivCover = SquareImageView(activity).apply {
+        val ivCover = ImageView(activity).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
-            setImageResource(R.drawable.default_album)
-            layoutParams = LinearLayout.LayoutParams(coverSize, coverSize)
+            setImageResource(R.drawable.video_circle)
+            layoutParams = LinearLayout.LayoutParams(coverSize, coverSize).apply {
+                rightMargin = (10 * d).toInt()
+            }
         }
         row.addView(ivCover)
 
@@ -137,21 +142,38 @@ class VideoBrowserController(
                 0,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 1.0f
-            ).apply {
-                leftMargin = (12 * d).toInt()
-            }
+            )
         }
         row.addView(tvTitle)
+
+        val tvArrow = TextView(activity).apply {
+            text = "〉"
+            textSize = 20f
+            setTextColor(0xFFFFFFFF.toInt())
+            visibility = View.GONE
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                leftMargin = (10 * d).toInt()
+            }
+        }
+        row.addView(tvArrow)
+
+        com.themoon.y1.views.ClassicMenuStyle.apply(row, tvTitle, tvArrow, 64)
 
         row.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
             if (hasFocus) {
                 row.setBackgroundColor(ThemeManager.getListButtonFocusedBg())
-                tvTitle.setTextColor(0xFFFFFFFF.toInt())
+                tvTitle.setTextColor(ThemeManager.getListButtonFocusedTextColor())
                 tvTitle.isSelected = true
+                tvArrow.visibility = View.VISIBLE
+                onFocusItem?.invoke(tvTitle.text.toString())
             } else {
                 row.setBackgroundColor(0)
                 tvTitle.setTextColor(ThemeManager.getTextColorPrimary())
                 tvTitle.isSelected = false
+                tvArrow.visibility = View.GONE
             }
         }
 

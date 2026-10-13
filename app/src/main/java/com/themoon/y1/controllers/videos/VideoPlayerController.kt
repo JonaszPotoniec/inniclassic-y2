@@ -94,11 +94,74 @@ class VideoPlayerController(
 
     fun toggleSeekMode() {
         isSeekModeActive = !isSeekModeActive
-        tvVideoModeHint?.text = if (isSeekModeActive) localize("Seek Mode") else localize("Volume Mode")
-        tvVideoModeHint?.visibility = View.VISIBLE
-        tvVideoModeHint?.postDelayed({
-            tvVideoModeHint?.visibility = View.GONE
-        }, 1500)
+        tvVideoModeHint?.let { hint ->
+            hint.text = if (isSeekModeActive) localize("Seek Mode") else localize("Volume Mode")
+            hint.visibility = View.VISIBLE
+            hint.postDelayed({
+                hint.visibility = View.GONE
+            }, 1500)
+        }
+    }
+
+    fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val keyCode = event.keyCode
+        val action = event.action
+
+        if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+            || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY || keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE
+        ) {
+            if (action == KeyEvent.ACTION_UP && !event.isCanceled) {
+                val vm = VideoPlayerManager.getInstance()
+                if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+                    || (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY && !vm.isPlaying())
+                    || (keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE && vm.isPlaying())
+                ) {
+                    vm.togglePlayPause()
+                }
+                clickFeedback()
+            }
+            return true
+        }
+
+        if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS) {
+            if (action == KeyEvent.ACTION_DOWN) {
+                VideoPlayerManager.getInstance().seekRelative(
+                    if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT) 10000L else -10000L
+                )
+            }
+            return true
+        }
+
+        if (keyCode == 21 || keyCode == 22) {
+            if (action == KeyEvent.ACTION_DOWN) {
+                if (isSeekModeActive) {
+                    VideoPlayerManager.getInstance().seekRelative(if (keyCode == 22) 10000L else -10000L)
+                } else {
+                    onAdjustVolume(keyCode == 22)
+                }
+                clickFeedback()
+            }
+            return true
+        }
+
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            if (action == KeyEvent.ACTION_DOWN) {
+                clickFeedback()
+                stop()
+                onExitRequested()
+            }
+            return true
+        }
+
+        if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+            if (action == KeyEvent.ACTION_UP) {
+                clickFeedback()
+                VideoPlayerManager.getInstance().togglePlayPause()
+            }
+            return true
+        }
+
+        return false
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
@@ -114,7 +177,13 @@ class VideoPlayerController(
             return true
         }
 
-        if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+        if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS) {
+            val delta = if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT) 10000L else -10000L
+            VideoPlayerManager.getInstance().seekRelative(delta)
+            return true
+        }
+
+        if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
             clickFeedback()
             VideoPlayerManager.getInstance().togglePlayPause()
             return true
