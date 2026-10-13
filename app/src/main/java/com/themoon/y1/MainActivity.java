@@ -470,15 +470,6 @@ public class MainActivity extends Activity {
     private static final String[] BACKLIGHT_TIMER_LABELS = {"10 Seconds", "20 Seconds", "30 Seconds", "1 Minute", "2 Minutes", "Always On"};
     // 🚀 [기본값 완화] 10초는 신규 사용자에게 너무 공격적이어서 "설정 화면 넘기다가도 꺼진다"는
     // 신고가 반복됐습니다 - "1분"을 기본값으로, 원하면 여전히 10초까지 줄일 수 있습니다.
-    private int backlightTimerIndex = 3;
-    private final Handler backlightHandler = new Handler();
-    private final Runnable backlightTimeoutRunnable = new Runnable() {
-        @Override
-        public void run() {
-            turnOffScreen();
-        }
-    };
-
     public void updateKeepScreenOnState() {
         runOnUiThread(new Runnable() {
             @Override
@@ -491,9 +482,10 @@ public class MainActivity extends Activity {
                     // 4. 비디오 재생 모드
                     // 5. 백라이트 타이머가 "Always On" (0ms)
                     // 6. USB 마스 스토리지 오버레이 표시 중
+                    int bIndex = com.themoon.y1.managers.PowerBacklightManager.getInstance(MainActivity.this).getBacklightTimerIndex();
                     boolean needed = isCustomScanning || isRadioScanning || isServerRunning
                             || currentScreenState == STATE_VIDEO_PLAYER
-                            || (BACKLIGHT_TIMER_OPTIONS_MS[backlightTimerIndex] == 0)
+                            || (com.themoon.y1.managers.PowerBacklightManager.Companion.getBACKLIGHT_TIMER_OPTIONS_MS()[bIndex] == 0)
                             || (activePodcastDownloads != null && !activePodcastDownloads.isEmpty())
                             || (usbStorageOverlay != null);
 
@@ -509,11 +501,12 @@ public class MainActivity extends Activity {
     }
 
     private void resetBacklightTimer() {
-        backlightHandler.removeCallbacks(backlightTimeoutRunnable);
-        long ms = BACKLIGHT_TIMER_OPTIONS_MS[backlightTimerIndex];
-        if (ms > 0) {
-            backlightHandler.postDelayed(backlightTimeoutRunnable, ms);
-        }
+        com.themoon.y1.managers.PowerBacklightManager pbm = com.themoon.y1.managers.PowerBacklightManager.getInstance(this);
+        pbm.setTimeoutAction(() -> {
+            turnOffScreen();
+            return kotlin.Unit.INSTANCE;
+        });
+        pbm.resetTimer();
         updateKeepScreenOnState();
     }
     public boolean isAutoFetchEnabled = true; // 🚀 [추가] 인터넷 자동 검색 스위치 기본값
@@ -1875,7 +1868,8 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
         }
         try {
-            backlightTimerIndex = prefs.getInt("backlight_timer_index", 3);
+            int bIndex = prefs.getInt("backlight_timer_index", 3);
+            com.themoon.y1.managers.PowerBacklightManager.getInstance(this).setBacklightTimerIndex(bIndex);
             resetBacklightTimer();
         } catch (Exception e) {
         }
