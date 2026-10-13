@@ -101,6 +101,9 @@ public class MainActivity extends Activity {
     private com.themoon.y1.controllers.storage.StorageController storageController;
     private com.themoon.y1.controllers.connectivity.WebServerController webServerController;
     private com.themoon.y1.controllers.settings.BrightnessController brightnessController;
+    private com.themoon.y1.controllers.connectivity.BluetoothController bluetoothController;
+    private com.themoon.y1.controllers.connectivity.WifiController wifiController;
+    private com.themoon.y1.controllers.connectivity.WifiKeyboardController wifiKeyboardController;
 
     private static final String TAG = "MainActivity";
     // OTA Update URL pointing to GitHub Releases
@@ -1598,7 +1601,9 @@ public class MainActivity extends Activity {
                 // 1번만 갱신합니다!
                 if (currentScreenState == STATE_BLUETOOTH
                         && (state == BluetoothAdapter.STATE_ON || state == BluetoothAdapter.STATE_OFF)) {
-                    startBluetoothScan();
+                    if (bluetoothController != null) {
+                        bluetoothController.startBluetoothScan();
+                    }
                 }
                 // 🚀 [버그 해결 1] 사용자가 메인 셋팅창(깊이 0)에 있을 때만 새로고침 하도록 방어막 전개!
                 if (currentScreenState == STATE_SETTINGS && currentSettingsDepth == 0)
@@ -1616,8 +1621,11 @@ public class MainActivity extends Activity {
                 // 🚀 [버그 해결 2] 와이파이 센서에도 똑같이 깊이 0 조건 추가!
                 if (currentScreenState == STATE_SETTINGS && currentSettingsDepth == 0)
                     buildSettingsUI();
-                else if (currentScreenState == STATE_WIFI)
-                    startWifiScan();
+                else if (currentScreenState == STATE_WIFI) {
+                    if (wifiController != null) {
+                        wifiController.startWifiScan();
+                    }
+                }
             } else if (WifiManager.NETWORK_STATE_CHANGED_ACTION.equals(action)) {
                 NetworkInfo networkInfo = intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
                 if (networkInfo != null && networkInfo.isConnected()) {
@@ -1683,7 +1691,9 @@ public class MainActivity extends Activity {
                             }
                         });
                     } else if (currentScreenState == STATE_WIFI) {
-                        startWifiScan();
+                        if (wifiController != null) {
+                            wifiController.startWifiScan();
+                        }
                     }
                 } else {
                     updateStatusBarWifi(false);
@@ -1692,16 +1702,8 @@ public class MainActivity extends Activity {
                 BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                 if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return;
                 if (device == null) return;
-                String deviceName = device.getName();
-                String deviceAddress = device.getAddress();
-                // 🚀 ⭕ [수정] 이름이 아직 안 뜬 기기(null)라도 절대 버리지 말고 'Unknown Device (맥주소)'로 목록에 띄웁니다!
-                String displayName = (deviceName != null && !deviceName.trim().isEmpty()) ? deviceName
-                        : "Unknown (" + deviceAddress + ")";
-
-                if (!foundBtDevices.contains(deviceAddress)) {
-                    foundBtDevices.add(deviceAddress);
-                    // 새로 발견된 기기는 무조건 목록에 추가!
-                    addBluetoothItemToUI(displayName, device, false);
+                if (bluetoothController != null) {
+                    bluetoothController.onDeviceDiscovered(device);
                 }
             } else if ("android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED".equals(action)) {
                 int profileState = intent.getIntExtra("android.bluetooth.profile.extra.STATE", -1);
@@ -1737,7 +1739,9 @@ public class MainActivity extends Activity {
                         new Handler().postDelayed(new Runnable() {
                             @Override
                             public void run() {
-                                startBluetoothScan();
+                                if (bluetoothController != null) {
+                                    bluetoothController.startBluetoothScan();
+                                }
                             }
                         }, 300);
                     }
@@ -1757,7 +1761,9 @@ public class MainActivity extends Activity {
                 if (currentScreenState == STATE_BLUETOOTH && !isBtConnectingState) {
                     new Handler().postDelayed(new Runnable() {
                         public void run() {
-                            startBluetoothScan();
+                            if (bluetoothController != null) {
+                                bluetoothController.startBluetoothScan();
+                            }
                         }
                     }, 300);
                 }
@@ -1789,14 +1795,19 @@ public class MainActivity extends Activity {
             } else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
                 targetDeviceForAudio = null;
             } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
-                btnScanBt.setText(t("Scan Complete (Retry)"));
+                if (bluetoothController != null) {
+                    bluetoothController.onDiscoveryFinished();
+                } else {
+                    btnScanBt.setText(t("Scan Complete (Retry)"));
+                }
             } else if (WifiManager.SCAN_RESULTS_AVAILABLE_ACTION.equals(action)) {
                 WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
                 if (wm != null) {
                     if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return;
                     List<ScanResult> results = wm.getScanResults();
-                    btnScanWifi.setText(t("Scan Complete (Retry)"));
-                    updateWifiUI(results);
+                    if (wifiController != null) {
+                        wifiController.updateWifiUI(results);
+                    }
                 }
             }
             // 🚀 [여기에 추가!] 시스템 미디어 스캐너 감지 센서
@@ -2055,7 +2066,9 @@ public class MainActivity extends Activity {
             @Override
             public void run() {
                 if (currentScreenState == STATE_BLUETOOTH) {
-                    startBluetoothScan();
+                    if (bluetoothController != null) {
+                        bluetoothController.startBluetoothScan();
+                    }
                 }
             }
         }, 500);
@@ -2729,49 +2742,6 @@ public class MainActivity extends Activity {
         layoutWifiKeyboard = findViewById(R.id.layout_wifi_keyboard);
         layoutKeyboardOriginal = findViewById(R.id.layout_keyboard_original);
         keyboardQwertyView = findViewById(R.id.keyboard_qwerty_view);
-        if (keyboardQwertyView != null) {
-            keyboardQwertyView.setOnKeyboardActionListener(new com.themoon.y1.views.QwertyKeyboardView.OnKeyboardActionListener() {
-                @Override
-                public void onText(String text) {
-                    clickFeedback();
-                    typedPassword += text;
-                    updateKeyboardUI();
-                }
-
-                @Override
-                public void onDelete() {
-                    clickFeedback();
-                    if (typedPassword.length() > 0) {
-                        typedPassword = typedPassword.substring(0, typedPassword.length() - 1);
-                        updateKeyboardUI();
-                    }
-                }
-
-                @Override
-                public void onClear() {
-                    clickFeedback();
-                    typedPassword = "";
-                    updateKeyboardUI();
-                }
-
-                @Override
-                public void onSubmit() {
-                    clickFeedback();
-                    submitKeyboard();
-                }
-
-                @Override
-                public void onSpecialChar(String specialChar, boolean replaceLast) {
-                    clickFeedback();
-                    if (replaceLast && typedPassword.length() > 0) {
-                        typedPassword = typedPassword.substring(0, typedPassword.length() - 1) + specialChar;
-                    } else {
-                        typedPassword += specialChar;
-                    }
-                    updateKeyboardUI();
-                }
-            });
-        }
         tvKeyboardSsid = findViewById(R.id.tv_keyboard_ssid);
         tvKeyboardInput = findViewById(R.id.tv_keyboard_input);
         tvKeyPprev = findViewById(R.id.tv_key_pprev);
@@ -2844,6 +2814,150 @@ public class MainActivity extends Activity {
                     } else {
                         changeScreen(backTargetForUtility);
                     }
+                    return kotlin.Unit.INSTANCE;
+                },
+                (key) -> t(key)
+        );
+
+        bluetoothController = new com.themoon.y1.controllers.connectivity.BluetoothController(
+                this,
+                (ViewGroup) findViewById(android.R.id.content),
+                (title, value) -> createSettingRow(title, value),
+                (iconPaths, text, rightIconPaths, iconColor, textColor) -> createTablerListButton(iconPaths, text, rightIconPaths, iconColor, textColor),
+                () -> { clickFeedback(); return kotlin.Unit.INSTANCE; },
+                () -> { changeScreen(backTargetForUtility); return kotlin.Unit.INSTANCE; },
+                (key) -> t(key)
+        );
+
+        wifiController = new com.themoon.y1.controllers.connectivity.WifiController(
+                this,
+                (ViewGroup) findViewById(android.R.id.content),
+                (title, value) -> createSettingRow(title, value),
+                (iconPaths, text, rightIconPaths, iconColor, textColor) -> createTablerListButton(iconPaths, text, rightIconPaths, iconColor, textColor),
+                () -> { clickFeedback(); return kotlin.Unit.INSTANCE; },
+                (ssid, netId) -> {
+                    return kotlin.Unit.INSTANCE;
+                },
+                (ssid, isOpen) -> {
+                    targetWifiSsid = ssid;
+                    isTargetWifiOpen = isOpen;
+                    if (wifiKeyboardController != null) {
+                        wifiKeyboardController.setTargetWifiSsid(ssid);
+                        wifiKeyboardController.setTargetWifiOpen(isOpen);
+                    }
+                    changeScreen(STATE_WIFI_KEYBOARD);
+                    return kotlin.Unit.INSTANCE;
+                },
+                () -> { changeScreen(backTargetForUtility); return kotlin.Unit.INSTANCE; },
+                (key) -> t(key)
+        );
+
+        wifiKeyboardController = new com.themoon.y1.controllers.connectivity.WifiKeyboardController(
+                this,
+                (ViewGroup) findViewById(android.R.id.content),
+                () -> { clickFeedback(); return kotlin.Unit.INSTANCE; },
+                (mode) -> {
+                    if (mode == 1 || mode == 4) {
+                        changeScreen(STATE_BROWSER);
+                    } else if (mode == 2 || mode == 3 || mode == 5 || mode == 6 || mode == 7 || mode == 8) {
+                        changeScreen(STATE_SETTINGS);
+                    } else {
+                        changeScreen(STATE_WIFI);
+                    }
+                    return kotlin.Unit.INSTANCE;
+                },
+                (keyword) -> {
+                    changeScreen(STATE_BROWSER);
+                    searchPodcastFromApple(keyword);
+                    return kotlin.Unit.INSTANCE;
+                },
+                (keyword) -> {
+                    currentBrowserMode = BROWSER_VIRTUAL_SONGS;
+                    virtualQueryType = "SEARCH";
+                    virtualQueryValue = keyword;
+                    changeScreen(STATE_BROWSER);
+                    buildVirtualSongs();
+                    return kotlin.Unit.INSTANCE;
+                },
+                (username) -> {
+                    pendingLastFmUsername = username;
+                    return kotlin.Unit.INSTANCE;
+                },
+                (password) -> {
+                    final String username = pendingLastFmUsername;
+                    changeScreen(STATE_SETTINGS);
+                    Toast.makeText(MainActivity.this, t("Logging in to Last.fm..."), Toast.LENGTH_SHORT).show();
+                    com.themoon.y1.managers.LastFmScrobbler.getInstance(MainActivity.this).login(username, password,
+                            new com.themoon.y1.managers.LastFmScrobbler.LoginCallback() {
+                                @Override
+                                public void onResult(final boolean success, final String message) {
+                                    runOnUiThread(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            Toast.makeText(MainActivity.this,
+                                                    success ? (t("Logged in to Last.fm as ") + "@" + message)
+                                                            : (t("Last.fm login failed: ") + message),
+                                                    Toast.LENGTH_LONG).show();
+                                            if (currentScreenState == STATE_SETTINGS) buildSettingsUI();
+                                        }
+                                    });
+                                }
+                            });
+                    return kotlin.Unit.INSTANCE;
+                },
+                (url) -> {
+                    com.themoon.y1.sync.jellyfin.JellyfinSyncProvider.getInstance(MainActivity.this).setServerUrl(url);
+                    changeScreen(STATE_SETTINGS);
+                    buildJellyfinSettingsUI();
+                    clickFeedback();
+                    return kotlin.Unit.INSTANCE;
+                },
+                (username) -> {
+                    jellyfinPendingUsername = username;
+                    com.themoon.y1.sync.jellyfin.JellyfinSyncProvider provider = com.themoon.y1.sync.jellyfin.JellyfinSyncProvider.getInstance(MainActivity.this);
+                    provider.setUsername(username);
+                    if (wifiKeyboardController != null) {
+                        wifiKeyboardController.setTypedText(provider.getPassword());
+                        wifiKeyboardController.openKeyboard();
+                    }
+                    return kotlin.Unit.INSTANCE;
+                },
+                (password) -> {
+                    com.themoon.y1.sync.jellyfin.JellyfinSyncProvider provider = com.themoon.y1.sync.jellyfin.JellyfinSyncProvider.getInstance(MainActivity.this);
+                    provider.setPassword(password);
+                    provider.setAccessToken("");
+                    changeScreen(STATE_SETTINGS);
+                    buildJellyfinSettingsUI();
+                    testJellyfinConnection();
+                    clickFeedback();
+                    return kotlin.Unit.INSTANCE;
+                },
+                (token) -> {
+                    com.themoon.y1.sync.jellyfin.JellyfinSyncProvider.getInstance(MainActivity.this).setAccessToken(token);
+                    changeScreen(STATE_SETTINGS);
+                    buildJellyfinSettingsUI();
+                    testJellyfinConnection();
+                    clickFeedback();
+                    return kotlin.Unit.INSTANCE;
+                },
+                (ssid, password, isOpen) -> {
+                    Toast.makeText(MainActivity.this, t("Connecting to ") + ssid + "...", Toast.LENGTH_SHORT).show();
+                    WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                    if (wm != null) {
+                        WifiConfiguration conf = new WifiConfiguration();
+                        conf.SSID = "\"" + ssid + "\"";
+                        if (isOpen) {
+                            conf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE);
+                        } else {
+                            conf.preSharedKey = "\"" + password + "\"";
+                        }
+                        int netId = wm.addNetwork(conf);
+                        wm.disconnect();
+                        wm.enableNetwork(netId, true);
+                        wm.reconnect();
+                        wm.saveConfiguration();
+                    }
+                    changeScreen(STATE_WIFI);
                     return kotlin.Unit.INSTANCE;
                 },
                 (key) -> t(key)
@@ -3403,13 +3517,17 @@ public class MainActivity extends Activity {
         btnScanBt.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                startBluetoothScan();
+                if (bluetoothController != null) {
+                    bluetoothController.startBluetoothScan();
+                }
             }
         });
         btnScanWifi.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                startWifiScan();
+                if (wifiController != null) {
+                    wifiController.startWifiScan();
+                }
             }
         });
 
@@ -5241,11 +5359,24 @@ public class MainActivity extends Activity {
             }
 
         } else if (state == STATE_BLUETOOTH) {
-            startBluetoothScan();
+            if (bluetoothController != null) {
+                bluetoothController.setGlobalA2dpProxy(globalA2dp);
+                bluetoothController.startBluetoothScan();
+            }
         } else if (state == STATE_WIFI) {
-            startWifiScan();
+            if (wifiController != null) {
+                wifiController.startWifiScan();
+            }
         } else if (state == STATE_WIFI_KEYBOARD) {
-            openKeyboard();
+            if (wifiKeyboardController != null) {
+                wifiKeyboardController.setCurrentKeyboardMode(currentKeyboardMode);
+                wifiKeyboardController.setTargetWifiSsid(targetWifiSsid);
+                wifiKeyboardController.setTargetWifiOpen(isTargetWifiOpen);
+                wifiKeyboardController.setPendingLastFmUsername(pendingLastFmUsername);
+                wifiKeyboardController.setPendingJellyfinUsername(jellyfinPendingUsername);
+                wifiKeyboardController.setTypedText(typedPassword);
+                wifiKeyboardController.openKeyboard();
+            }
         } else if (state == STATE_BRIGHTNESS) {
             if (brightnessController != null) {
                 brightnessController.loadBrightnessUI();
@@ -5326,12 +5457,6 @@ public class MainActivity extends Activity {
             }
             updateNowPlayingBottomBarState();
             clickFeedback();
-        } else if (currentScreenState == STATE_WIFI_KEYBOARD) {
-            if (isQwertyKeyboard()) {
-                if (keyboardQwertyView != null) keyboardQwertyView.performCenterClick();
-            } else {
-                handleKeyboardInput();
-            }
         } else if (currentScreenState != STATE_BRIGHTNESS && currentScreenState != STATE_PLAYER) {
             if (isRadioUIShowing && !isRadioSettingsMode) {
                 View c = getCurrentFocus();
@@ -5452,767 +5577,7 @@ public class MainActivity extends Activity {
         return "qwerty".equalsIgnoreCase(prefs.getString("keyboard_layout", "qwerty"));
     }
 
-    private void exitKeyboard() {
-        if (currentKeyboardMode == 1) {
-            currentKeyboardMode = 0; // 모드 초기화
-            changeScreen(STATE_BROWSER); // 다시 팟캐스트 화면으로 복귀!
-            return;
-        }
-        if (currentKeyboardMode == 2 || currentKeyboardMode == 3) {
-            currentKeyboardMode = 0; // 모드 초기화 (로그인 취소)
-            changeScreen(STATE_SETTINGS);
-            clickFeedback();
-            return;
-        }
-        if (currentKeyboardMode == 4) {
-            currentKeyboardMode = 0; // 모드 초기화 (검색 취소)
-            currentBrowserMode = BROWSER_ROOT;
-            changeScreen(STATE_BROWSER); // 다시 Music 메뉴로 복귀!
-            clickFeedback();
-            return;
-        }
-        if (currentKeyboardMode >= 5 && currentKeyboardMode <= 8) {
-            currentKeyboardMode = 0;
-            changeScreen(STATE_SETTINGS);
-            buildJellyfinSettingsUI();
-            clickFeedback();
-            return;
-        }
-        changeScreen(STATE_WIFI);
-        clickFeedback();
-    }
 
-    private void submitKeyboard() {
-        if (currentKeyboardMode == 1) {
-            if (typedPassword.trim().isEmpty()) {
-                Toast.makeText(this, t("Please enter a keyword."), Toast.LENGTH_SHORT).show();
-                return;
-            }
-            changeScreen(STATE_BROWSER); // 💡 검색 버튼을 누르면 키보드를 닫고 브라우저로 복귀!
-            searchPodcastFromApple(typedPassword.trim()); // 🍏 애플 검색 엔진 발사!
-        } else if (currentKeyboardMode == 4) {
-            if (typedPassword.trim().isEmpty()) {
-                Toast.makeText(this, t("Please enter a keyword."), Toast.LENGTH_SHORT).show();
-                return;
-            }
-            currentBrowserMode = BROWSER_VIRTUAL_SONGS;
-            virtualQueryType = "SEARCH";
-            virtualQueryValue = typedPassword.trim();
-            currentKeyboardMode = 0;
-            changeScreen(STATE_BROWSER);
-            buildVirtualSongs();
-        } else if (currentKeyboardMode == 2) {
-            if (typedPassword.trim().isEmpty()) {
-                Toast.makeText(this, t("Please enter a username."), Toast.LENGTH_SHORT).show();
-                return;
-            }
-            pendingLastFmUsername = typedPassword.trim();
-            currentKeyboardMode = 3; // 다음은 비밀번호 입력!
-            openKeyboard();
-        } else if (currentKeyboardMode == 3) {
-            if (typedPassword.isEmpty()) {
-                Toast.makeText(this, t("Please enter a password."), Toast.LENGTH_SHORT).show();
-                return;
-            }
-            final String username = pendingLastFmUsername;
-            final String password = typedPassword;
-            currentKeyboardMode = 0;
-            changeScreen(STATE_SETTINGS);
-            Toast.makeText(this, t("Logging in to Last.fm..."), Toast.LENGTH_SHORT).show();
-            com.themoon.y1.managers.LastFmScrobbler.getInstance(this).login(username, password,
-                    new com.themoon.y1.managers.LastFmScrobbler.LoginCallback() {
-                        @Override
-                        public void onResult(final boolean success, final String message) {
-                            runOnUiThread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    Toast.makeText(MainActivity.this,
-                                            success ? (t("Logged in to Last.fm as ") + "@" + message)
-                                                    : (t("Last.fm login failed: ") + message),
-                                            Toast.LENGTH_LONG).show();
-                                    if (currentScreenState == STATE_SETTINGS) buildSettingsUI();
-                                }
-                            });
-                        }
-                    });
-        } else if (currentKeyboardMode == 5) {
-            if (typedPassword.trim().isEmpty()) {
-                Toast.makeText(this, t("Please enter a keyword."), Toast.LENGTH_SHORT).show();
-                return;
-            }
-            com.themoon.y1.sync.jellyfin.JellyfinSyncProvider.getInstance(this).setServerUrl(typedPassword.trim());
-            currentKeyboardMode = 0;
-            changeScreen(STATE_SETTINGS);
-            buildJellyfinSettingsUI();
-            clickFeedback();
-        } else if (currentKeyboardMode == 6) {
-            if (typedPassword.trim().isEmpty()) {
-                Toast.makeText(this, t("Please enter a username."), Toast.LENGTH_SHORT).show();
-                return;
-            }
-            jellyfinPendingUsername = typedPassword.trim();
-            com.themoon.y1.sync.jellyfin.JellyfinSyncProvider provider = com.themoon.y1.sync.jellyfin.JellyfinSyncProvider.getInstance(this);
-            provider.setUsername(jellyfinPendingUsername);
-            currentKeyboardMode = 7; // Next to password
-            typedPassword = provider.getPassword();
-            openKeyboard();
-        } else if (currentKeyboardMode == 7) {
-            final String password = typedPassword;
-            if (password.isEmpty()) {
-                Toast.makeText(this, t("Please enter a password."), Toast.LENGTH_SHORT).show();
-                return;
-            }
-            com.themoon.y1.sync.jellyfin.JellyfinSyncProvider provider = com.themoon.y1.sync.jellyfin.JellyfinSyncProvider.getInstance(this);
-            provider.setPassword(password);
-            provider.setAccessToken(""); // Invalidate cached token so fresh auth is performed with new password
-            currentKeyboardMode = 0;
-            changeScreen(STATE_SETTINGS);
-            buildJellyfinSettingsUI();
-            testJellyfinConnection();
-            clickFeedback();
-        } else if (currentKeyboardMode == 8) {
-            if (typedPassword.trim().isEmpty()) {
-                Toast.makeText(this, t("Please enter a keyword."), Toast.LENGTH_SHORT).show();
-                return;
-            }
-            com.themoon.y1.sync.jellyfin.JellyfinSyncProvider.getInstance(this).setAccessToken(typedPassword.trim());
-            currentKeyboardMode = 0;
-            changeScreen(STATE_SETTINGS);
-            buildJellyfinSettingsUI();
-            testJellyfinConnection();
-            clickFeedback();
-        } else {
-            connectToWifi(); // 기존 와이파이 접속 엔진 발사!
-        }
-    }
-
-    private void openKeyboard() {
-        if (currentKeyboardMode != 5 && currentKeyboardMode != 6 && currentKeyboardMode != 7 && currentKeyboardMode != 8) {
-            typedPassword = "";
-        }
-        keyboardIndex = 0;
-        try {
-            Settings.System.putInt(getContentResolver(), Settings.System.HAPTIC_FEEDBACK_ENABLED, 0);
-        } catch (Exception e) {}
-        // 🚀 모드에 따라 상단 제목 다르게 표시!
-        if (currentKeyboardMode == 1) {
-            tvKeyboardSsid.setText("🔍 " + t("Search Podcast"));
-        } else if (currentKeyboardMode == 2) {
-            tvKeyboardSsid.setText(t("Last.fm Username"));
-        } else if (currentKeyboardMode == 3) {
-            tvKeyboardSsid.setText(t("Last.fm Password") + ": " + pendingLastFmUsername);
-        } else if (currentKeyboardMode == 4) {
-            tvKeyboardSsid.setText("🔍 " + t("Search"));
-        } else if (currentKeyboardMode == 5) {
-            tvKeyboardSsid.setText(t("Server URL"));
-        } else if (currentKeyboardMode == 6) {
-            tvKeyboardSsid.setText(t("Username"));
-        } else if (currentKeyboardMode == 7) {
-            tvKeyboardSsid.setText(t("Password") + ": " + jellyfinPendingUsername);
-        } else if (currentKeyboardMode == 8) {
-            tvKeyboardSsid.setText(t("API Token"));
-        } else {
-            tvKeyboardSsid.setText(t("Target") + ": " + targetWifiSsid);
-        }
-
-        if (isQwertyKeyboard()) {
-            if (layoutKeyboardOriginal != null) layoutKeyboardOriginal.setVisibility(View.GONE);
-            if (keyboardQwertyView != null) {
-                keyboardQwertyView.setVisibility(View.VISIBLE);
-                String actionLabel = t("Connect");
-                if (currentKeyboardMode == 1 || currentKeyboardMode == 4) actionLabel = t("Search");
-                else if (currentKeyboardMode == 2 || currentKeyboardMode == 6) actionLabel = t("Next");
-                else if (currentKeyboardMode == 3 || currentKeyboardMode == 7 || currentKeyboardMode == 8) actionLabel = t("Login");
-                else if (currentKeyboardMode == 5) actionLabel = t("Save");
-                keyboardQwertyView.setSubmitActionLabel(actionLabel);
-                keyboardQwertyView.resetState();
-            }
-        } else {
-            if (layoutKeyboardOriginal != null) layoutKeyboardOriginal.setVisibility(View.VISIBLE);
-            if (keyboardQwertyView != null) keyboardQwertyView.setVisibility(View.GONE);
-        }
-
-        updateKeyboardUI();
-    }
-
-    private void updateKeyboardUI() {
-        int len = KEYBOARD_CHARS.length;
-        int idxPprev = (keyboardIndex - 2 + len) % len;
-        int idxPrev = (keyboardIndex - 1 + len) % len;
-        int idxNext = (keyboardIndex + 1) % len;
-        int idxNnext = (keyboardIndex + 2) % len;
-        tvKeyPprev.setText(KEYBOARD_CHARS[idxPprev]);
-        tvKeyPrev.setText(KEYBOARD_CHARS[idxPrev]);
-        tvKeyCurrent.setText(KEYBOARD_CHARS[keyboardIndex]);
-        tvKeyNext.setText(KEYBOARD_CHARS[idxNext]);
-        tvKeyNnext.setText(KEYBOARD_CHARS[idxNnext]);
-
-        // 🚀 와이파이 모드일 때만 '개방형 네트워크' 텍스트 표시
-        if (isTargetWifiOpen && currentKeyboardMode == 0) {
-            tvKeyboardInput.setText(t("Open Network (Direct Connect)"));
-            tvKeyboardInput.setTextColor(0x77FFFFFF);
-            keyboardIndex = len - 1;
-            tvKeyCurrent.setText(KEYBOARD_CHARS[keyboardIndex]);
-        } else {
-            if (typedPassword.length() == 0) {
-                tvKeyboardInput.setTextColor(0x77FFFFFF); // 💡 Dimmed gray placeholder
-                if (currentKeyboardMode == 1) {
-                    tvKeyboardInput.setText(t("Enter keyword..."));
-                } else if (currentKeyboardMode == 2) {
-                    tvKeyboardInput.setText(t("Enter Last.fm username..."));
-                } else if (currentKeyboardMode == 3) {
-                    tvKeyboardInput.setText(t("Enter Last.fm password..."));
-                } else if (currentKeyboardMode == 4) {
-                    tvKeyboardInput.setText(t("Enter search term..."));
-                } else if (currentKeyboardMode == 5) {
-                    tvKeyboardInput.setText("http://...");
-                } else if (currentKeyboardMode == 6) {
-                    tvKeyboardInput.setText(t("Username"));
-                } else if (currentKeyboardMode == 7) {
-                    tvKeyboardInput.setText(t("Password"));
-                } else if (currentKeyboardMode == 8) {
-                    tvKeyboardInput.setText(t("API Token"));
-                } else {
-                    tvKeyboardInput.setText(t("Enter Password..."));
-                }
-            } else {
-                tvKeyboardInput.setTextColor(0xFFFFFFFF); // 💡 Solid white for actual user typed text
-                tvKeyboardInput.setText(typedPassword);
-            }
-        }
-    }
-
-    private void handleKeyboardInput() {
-        String selectedChar = KEYBOARD_CHARS[keyboardIndex];
-        clickFeedback();
-
-        if (selectedChar.equals("[DEL]")) {
-            if (typedPassword.length() > 0)
-                typedPassword = typedPassword.substring(0, typedPassword.length() - 1);
-        } else if (selectedChar.equals("[SPACE]")) {
-            // 🚀 스페이스바 누르면 띄어쓰기 추가!
-            typedPassword += " ";
-        } else if (selectedChar.equals("[CONN]")) {
-            submitKeyboard();
-            return;
-        } else {
-            typedPassword += selectedChar;
-        }
-        updateKeyboardUI();
-    }
-
-    private void connectToWifi() {
-        Toast.makeText(this, t("Connecting to ") + targetWifiSsid + "...", Toast.LENGTH_SHORT).show();
-        WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-        if (wm != null) {
-            WifiConfiguration conf = new WifiConfiguration();
-            conf.SSID = "\"" + targetWifiSsid + "\"";
-            if (isTargetWifiOpen)
-                conf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE);
-            else
-                conf.preSharedKey = "\"" + typedPassword + "\"";
-            int netId = wm.addNetwork(conf);
-            wm.disconnect();
-            wm.enableNetwork(netId, true);
-            wm.reconnect();
-            wm.saveConfiguration();
-        }
-        changeScreen(STATE_WIFI);
-    }
-
-    @android.annotation.SuppressLint("MissingPermission")
-    private void startBluetoothScan() {
-        int currentFocusIndex = 0;
-        if (containerBtItems != null) {
-            for (int i = 0; i < containerBtItems.getChildCount(); i++) {
-                if (containerBtItems.getChildAt(i).hasFocus()) {
-                    currentFocusIndex = i;
-                    break;
-                }
-            }
-        }
-        final int targetFocusIndex = currentFocusIndex;
-
-        final BluetoothAdapter ba = BluetoothAdapter.getDefaultAdapter();
-        boolean isOn = false;
-        String statusText = "OFF";
-
-        if (ba != null) {
-            int state = ba.getState();
-            if (state == BluetoothAdapter.STATE_ON) {
-                isOn = true;
-                statusText = "ON";
-            } else if (state == BluetoothAdapter.STATE_TURNING_ON || state == BluetoothAdapter.STATE_TURNING_OFF) {
-                statusText = "Wait...";
-            }
-        }
-
-        containerBtItems.removeAllViews();
-
-        // 1. 전원 토글 버튼
-        final LinearLayout btnToggle = createSettingRow(t("Bluetooth Power"), t(statusText));
-        btnToggle.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                // 🚀 [광클 폭주 방어막 1] 1.5초 이내의 중복 클릭은 완벽하게 씹어버립니다!
-                long now = System.currentTimeMillis();
-                if (now - lastBtToggleTime < 1500) {
-                    Toast.makeText(MainActivity.this, t("Please wait a moment..."), Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                lastBtToggleTime = now;
-                clickFeedback();
-
-                if (ba != null) {
-                    if (ba.isEnabled()) {
-                        // 🚀 [무한루프 방어막 2] 의도적으로 끄는 것이므로 즉시 좀비 타겟을 삭제합니다!
-                        targetDeviceForAudio = null;
-                        ba.disable();
-                    } else {
-                        // 🚀 [MTK 수정] mtkbt 데몬을 먼저 살려낸 뒤 블루투스를 켭니다!
-                        ((TextView) btnToggle.getChildAt(1)).setText(t("Wait..."));
-                        new Thread(new Runnable() {
-                            @Override
-                            public void run() {
-                                try {
-                                    Runtime.getRuntime().exec(new String[]{"su", "-c", "setprop ctl.start mtkbt"}).waitFor();
-                                    Thread.sleep(1500); // give mtkbt time to create its socket
-                                } catch (Exception ignored) {}
-                                runOnUiThread(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        ba.enable();
-                                    }
-                                });
-                            }
-                        }).start();
-                        return; // setText("Wait...") already done above
-                    }
-                    ((TextView) btnToggle.getChildAt(1)).setText(t("Wait..."));
-                }
-            }
-        });
-        containerBtItems.addView(btnToggle);
-
-        if (!isOn) {
-            btnScanBt.setText(t("Bluetooth is OFF"));
-            if (btnScanBt.getParent() != null)
-                ((ViewGroup) btnScanBt.getParent()).removeView(btnScanBt);
-            containerBtItems.addView(btnScanBt);
-            restoreBluetoothFocus(targetFocusIndex);
-            return;
-        }
-
-        // 🚀 2. 순정 런처 완벽 구현: 나의 기기 (PAIRED DEVICES) 목록
-        TextView tvPaired = new TextView(this);
-        tvPaired.setText("━ " + t("PAIRED DEVICES") + " ━");
-        tvPaired.setTextColor(ThemeManager.getTextColorSecondary());
-        tvPaired.setTextSize(14);
-        tvPaired.setTypeface(ThemeManager.getCustomFontBold());
-        tvPaired.setPadding(10, 30, 10, 5);
-        containerBtItems.addView(tvPaired);
-
-        try {
-            Set<BluetoothDevice> pairedDevices = ba.getBondedDevices();
-            if (pairedDevices != null && pairedDevices.size() > 0) {
-                for (BluetoothDevice device : pairedDevices) {
-                    addPairedBluetoothItemToUI(device); // 등록된 기기 전용 UI 호출
-                }
-            } else {
-                TextView tvEmpty = new TextView(this);
-                tvEmpty.setText(t("No paired devices."));
-                tvEmpty.setTextColor(ThemeManager.getTextColorSecondary());
-                tvEmpty.setPadding(10, 10, 10, 10);
-                containerBtItems.addView(tvEmpty);
-            }
-        } catch (Exception e) {
-        }
-
-        // 🚀 3. 새로 찾은 기기 (AVAILABLE DEVICES) 목록
-        TextView tvAvailable = new TextView(this);
-        tvAvailable.setText("━ " + t("AVAILABLE DEVICES") + " ━");
-        tvAvailable.setTextColor(ThemeManager.getTextColorSecondary());
-        tvAvailable.setTextSize(14);
-        tvAvailable.setTypeface(ThemeManager.getCustomFontBold());
-        tvAvailable.setPadding(10, 30, 10, 5);
-        containerBtItems.addView(tvAvailable);
-
-        btnScanBt.setText(t("Scanning..."));
-        foundBtDevices.clear();
-
-        if (btnScanBt.getParent() != null)
-            ((ViewGroup) btnScanBt.getParent()).removeView(btnScanBt);
-        containerBtItems.addView(btnScanBt);
-
-        if (ba.isDiscovering()) {
-            ba.cancelDiscovery();
-            new Handler().postDelayed(new Runnable() {
-                public void run() {
-                    ba.startDiscovery();
-                }
-            }, 500);
-        } else {
-            ba.startDiscovery();
-        }
-
-        restoreBluetoothFocus(targetFocusIndex);
-    }
-
-    // 🚀 [신규] 등록된 기기(Paired) 전용 리스트 및 삭제(Unpair) 메뉴
-    private void addPairedBluetoothItemToUI(final BluetoothDevice device) {
-        if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return;
-        String name = (device.getName() != null && !device.getName().isEmpty()) ? device.getName()
-                : "Unknown (" + device.getAddress() + ")";
-
-        boolean isConnected = false;
-        if (globalA2dp != null) {
-            try {
-                int state = (int) globalA2dp.getClass().getMethod("getConnectionState", BluetoothDevice.class)
-                        .invoke(globalA2dp, device);
-                isConnected = (state == BluetoothProfile.STATE_CONNECTED);
-            } catch (Exception e) {
-            }
-        }
-
-        int accentColor = 0xFF00FFFF;
-        try {
-            accentColor = ThemeManager.getListButtonFocusedBg() | 0xFF000000;
-        } catch (Exception e) {
-        }
-
-        String[] devIcon = com.themoon.y1.views.TablerIcons.BLUETOOTH;
-        try {
-            BluetoothClass btClass = device.getBluetoothClass();
-            if (btClass != null && (btClass.doesClassMatch(BluetoothClass.PROFILE_A2DP)
-                    || btClass.doesClassMatch(BluetoothClass.PROFILE_HEADSET))) {
-                devIcon = com.themoon.y1.views.TablerIcons.HEADPHONES;
-            }
-        } catch (Exception ignored) {
-        }
-
-        final View btnDevice;
-        if (isConnected) {
-            btnDevice = createTablerListButton(devIcon, name, accentColor, accentColor);
-        } else {
-            btnDevice = createTablerListButton(devIcon, name, ThemeManager.getTextColorSecondary(), ThemeManager.getTextColorPrimary());
-        }
-
-        // 🚀 [치명적 버그 수정] 서브 메뉴용 투명 폴더(LinearLayout)를 박살내고 리스트에 직속으로 붙입니다!
-
-        final boolean isConnectedDevice = isConnected;
-        final View btnConnect;
-        if (isConnectedDevice) {
-            btnConnect = createTablerListButton(com.themoon.y1.views.TablerIcons.UNLINK, t("Disconnect Audio"));
-            btnConnect.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    clickFeedback();
-                    btnDevice.requestFocus();
-                    disconnectBluetoothAudio(device);
-                }
-            });
-        } else {
-            btnConnect = createTablerListButton(com.themoon.y1.views.TablerIcons.HEADPHONES, t("Connect Audio"));
-            btnConnect.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    clickFeedback();
-                    connectBluetoothAudio(device); // 🚀 중앙 엔진 호출!
-                }
-            });
-        }
-
-        btnConnect.setVisibility(View.GONE); // 초기엔 숨겨둡니다.
-
-        final View btnUnpair = createTablerListButton(com.themoon.y1.views.TablerIcons.TRASH, t("Delete Device"), 0xFFFF5555, 0xFFFF5555);
-
-        btnUnpair.setVisibility(View.GONE); // 초기엔 숨겨둡니다.
-        btnUnpair.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                clickFeedback();
-                try {
-                    if (isConnectedDevice) {
-                        disconnectBluetoothAudio(device);
-                    }
-                    Object result = device.getClass().getMethod("removeBond").invoke(device);
-                    boolean removed = (result instanceof Boolean) && (Boolean) result;
-                    if (removed) {
-                        Toast.makeText(MainActivity.this, t("Removing device..."), Toast.LENGTH_SHORT).show();
-                        // Don't scan immediately — ACTION_BOND_STATE_CHANGED will trigger scan when BOND_NONE arrives
-                    } else {
-                        Toast.makeText(MainActivity.this, t("Failed to remove device. Try restarting Bluetooth."), Toast.LENGTH_LONG).show();
-                    }
-                } catch (Exception e) {
-                    Toast.makeText(MainActivity.this, t("Error: ") + e.getMessage(), Toast.LENGTH_LONG).show();
-                }
-            }
-        });
-
-        // 부모 버튼 클릭 시 숨겨둔 서브 메뉴 버튼들의 투명 망토를 벗깁니다.
-        btnDevice.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                clickFeedback();
-                if (btnConnect.getVisibility() == View.GONE) {
-                    btnConnect.setVisibility(View.VISIBLE);
-                    btnUnpair.setVisibility(View.VISIBLE);
-
-                    // 💡 서브 메뉴가 열리자마자 휠 커서가 'Connect Audio' 버튼으로 자연스럽게 빨려 들어가도록 유도합니다!
-                    btnConnect.post(new Runnable() {
-                        public void run() {
-                            btnConnect.requestFocus();
-                        }
-                    });
-                } else {
-                    btnConnect.setVisibility(View.GONE);
-                    btnUnpair.setVisibility(View.GONE);
-                }
-            }
-        });
-
-        // 🚀 인덱스 꼬임 방지: 화면 구조를 만들 때 그냥 차곡차곡 쌓아 올립니다.
-        containerBtItems.addView(btnDevice);
-
-        // 💡 [버그 수정] 서브 메뉴 버튼에 좌측 들여쓰기(indent)를 줘서 시각적으로 중첩됨을 표시합니다.
-        float d = getResources().getDisplayMetrics().density;
-        int indentPx = (int) (32 * d);
-        if (btnConnect.getLayoutParams() instanceof ViewGroup.MarginLayoutParams) {
-            ((ViewGroup.MarginLayoutParams) btnConnect.getLayoutParams()).leftMargin = indentPx;
-        }
-        if (btnUnpair.getLayoutParams() instanceof ViewGroup.MarginLayoutParams) {
-            ((ViewGroup.MarginLayoutParams) btnUnpair.getLayoutParams()).leftMargin = indentPx;
-        }
-        containerBtItems.addView(btnConnect);
-        containerBtItems.addView(btnUnpair);
-    }
-
-    // 🚀 [신규] 새로 스캔된 기기(Available) 전용
-    private void addBluetoothItemToUI(String name, final BluetoothDevice device, boolean isPaired) {
-        if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return;
-        if (device.getBondState() == BluetoothDevice.BOND_BONDED)
-            return; // 페어링된 기기는 위에서 그리므로 무시
-
-        String[] devIcon = com.themoon.y1.views.TablerIcons.BLUETOOTH;
-        try {
-            BluetoothClass btClass = device.getBluetoothClass();
-            if (btClass != null && (btClass.doesClassMatch(BluetoothClass.PROFILE_A2DP)
-                    || btClass.doesClassMatch(BluetoothClass.PROFILE_HEADSET))) {
-                devIcon = com.themoon.y1.views.TablerIcons.HEADPHONES;
-            }
-        } catch (Exception ignored) {
-        }
-
-        final View btnDevice = createTablerListButton(devIcon, name, ThemeManager.getTextColorSecondary(), ThemeManager.getTextColorPrimary());
-
-        btnDevice.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                clickFeedback();
-                connectBluetoothAudio(device); // 🚀 페어링 안 된 상태여도 중앙 엔진이 알아서 페어링부터 꽂아줍니다!
-            }
-        });
-
-        containerBtItems.addView(btnDevice, containerBtItems.getChildCount() - 1);
-    }
-
-    // 🚀 [포커스 복구 전용 도구]
-    private void restoreBluetoothFocus(final int targetFocusIndex) {
-        containerBtItems.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                if (containerBtItems.getChildCount() > 0) {
-                    if (targetFocusIndex >= 0 && targetFocusIndex < containerBtItems.getChildCount()) {
-                        View target = containerBtItems.getChildAt(targetFocusIndex);
-                        if (target.isFocusable() && target.getVisibility() == View.VISIBLE) {
-                            target.requestFocus();
-                            return;
-                        }
-                    }
-                    for (int i = 0; i < containerBtItems.getChildCount(); i++) {
-                        View v = containerBtItems.getChildAt(i);
-                        if (v.isFocusable() && v.getVisibility() == View.VISIBLE) {
-                            v.requestFocus();
-                            return;
-                        }
-                    }
-                }
-            }
-        }, 50);
-    }
-
-    // 🚀 [가장 강력했던 연결 엔진 복구] 서브 메뉴, 매크로 모두 삭제!
-
-    private void startWifiScan() {
-        WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-        boolean isOn = wm != null && wm.isWifiEnabled();
-        updateWifiUI(null);
-
-        if (isOn) {
-            btnScanWifi.setText(t("Scanning..."));
-            foundWifiNetworks.clear();
-            // 💡 무조건 최상단 전원 버튼으로 포커스 강제 이동!
-            if (containerWifiItems.getChildCount() > 0)
-                containerWifiItems.getChildAt(0).requestFocus();
-            wm.startScan();
-        } else {
-            btnScanWifi.setText(t("Wi-Fi is OFF"));
-            // 💡 무조건 최상단 전원 버튼으로 포커스 강제 이동!
-            if (containerWifiItems.getChildCount() > 0)
-                containerWifiItems.getChildAt(0).requestFocus();
-        }
-    }
-
-    private void updateWifiUI(List<ScanResult> results) {
-        final WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-        boolean isOn = false;
-        String statusText = "OFF";
-
-        if (wm != null) {
-            int state = wm.getWifiState();
-            if (state == WifiManager.WIFI_STATE_ENABLED) {
-                isOn = true;
-                statusText = "ON";
-            } else if (state == WifiManager.WIFI_STATE_ENABLING || state == WifiManager.WIFI_STATE_DISABLING) {
-                statusText = "Wait...";
-            }
-        }
-
-        View existingToggle = containerWifiItems.findViewById(dynamicViewId(999992));
-        if (existingToggle == null) {
-            final LinearLayout btnToggle = createSettingRow(t("Wi-Fi Power"), t(statusText));
-            btnToggle.setId(dynamicViewId(999992));
-            btnToggle.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    clickFeedback();
-                    if (wm != null) {
-                        boolean isCurrentlyOn = wm.isWifiEnabled();
-                        if (isCurrentlyOn) {
-                            Toast.makeText(MainActivity.this, t("Turning Wi-Fi OFF..."), Toast.LENGTH_SHORT).show();
-                            wm.setWifiEnabled(false);
-                        } else {
-                            Toast.makeText(MainActivity.this, t("Turning Wi-Fi ON..."), Toast.LENGTH_SHORT).show();
-                            wm.setWifiEnabled(true);
-                        }
-                        TextView tvRight = (TextView) btnToggle.getChildAt(1);
-                        tvRight.setText(t("Wait..."));
-                        if (!btnToggle.hasFocus())
-                            tvRight.setTextColor(0xFFFFFF00);
-                    }
-                }
-            });
-            containerWifiItems.addView(btnToggle, 0);
-
-            if (btnScanWifi.getParent() != null) {
-                ((ViewGroup) btnScanWifi.getParent()).removeView(btnScanWifi);
-            }
-            containerWifiItems.addView(btnScanWifi);
-        } else {
-            LinearLayout btnToggle = (LinearLayout) existingToggle;
-            TextView tvRight = (TextView) btnToggle.getChildAt(1);
-            tvRight.setText(t(statusText));
-            if (!btnToggle.hasFocus()) {
-                if (statusText.equals("ON"))
-                    tvRight.setTextColor(ThemeManager.getTextColorPrimary());
-                else if (statusText.equals("OFF"))
-                    tvRight.setTextColor(ThemeManager.getTextColorSecondary());
-                else
-                    tvRight.setTextColor(ThemeManager.getTextColorPrimary());
-            }
-            for (int i = containerWifiItems.getChildCount() - 1; i > 0; i--) {
-                View v = containerWifiItems.getChildAt(i);
-                if (v != btnScanWifi) {
-                    containerWifiItems.removeViewAt(i);
-                }
-            }
-        }
-
-        if (!isOn)
-            return;
-
-        if (results != null) {
-            foundWifiNetworks.clear();
-            WifiManager manager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-            WifiInfo wifiInfo = manager.getConnectionInfo();
-            String connectedSSID = "";
-            if (wifiInfo != null && wifiInfo.getSSID() != null) {
-                connectedSSID = wifiInfo.getSSID().replace("\"", "");
-            }
-
-            // 🚀 1순위: 현재 연결된 와이파이를 가장 먼저 찾아서 최상단에 배치!
-            for (ScanResult result : results) {
-                if (result.SSID != null && !result.SSID.isEmpty() && !foundWifiNetworks.contains(result.SSID)) {
-                    if (result.SSID.equals(connectedSSID)) {
-                        foundWifiNetworks.add(result.SSID);
-                        addWifiItemToUI(result.SSID, result.capabilities, true);
-                    }
-                }
-            }
-
-            // 🚀 2순위: 연결되지 않은 나머지 잡다한 와이파이들을 그 밑으로 나열
-            for (ScanResult result : results) {
-                if (result.SSID != null && !result.SSID.isEmpty() && !foundWifiNetworks.contains(result.SSID)) {
-                    foundWifiNetworks.add(result.SSID);
-                    addWifiItemToUI(result.SSID, result.capabilities, false);
-                }
-            }
-        }
-    }
-
-    // 💡 연결 상태(isConnected)를 파라미터로 직접 전달받도록 개조된 함수
-    private void addWifiItemToUI(final String ssid, String capabilities, final boolean isConnected) {
-        final boolean isOpen = !capabilities.contains("WPA") && !capabilities.contains("WEP");
-        final String[] leftIcon = isConnected ? com.themoon.y1.views.TablerIcons.CHECK : com.themoon.y1.views.TablerIcons.WIFI;
-        final String[] rightIcon = isOpen ? null : com.themoon.y1.views.TablerIcons.LOCK;
-
-        final View btnWifi;
-        if (isConnected) {
-            btnWifi = createTablerListButton(leftIcon, ssid, rightIcon, 0xFF00FF00, 0xFF00FF00);
-        } else {
-            btnWifi = createTablerListButton(leftIcon, ssid, rightIcon, ThemeManager.getTextColorSecondary(), ThemeManager.getTextColorPrimary());
-        }
-
-        btnWifi.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                clickFeedback();
-                if (isConnected) {
-                    return;
-                }
-
-                WifiManager manager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-                boolean isSaved = false;
-                int savedNetId = -1;
-                try {
-                    if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return;
-                    List<WifiConfiguration> configuredNetworks = manager.getConfiguredNetworks();
-                    if (configuredNetworks != null) {
-                        for (WifiConfiguration conf : configuredNetworks) {
-                            if (conf.SSID != null && conf.SSID.equals("\"" + ssid + "\"")) {
-                                isSaved = true;
-                                savedNetId = conf.networkId;
-                                break;
-                            }
-                        }
-                    }
-                } catch (Exception e) {
-                }
-
-                if (isSaved && savedNetId != -1) {
-                    Toast.makeText(MainActivity.this, t("Connecting to saved network..."), Toast.LENGTH_SHORT).show();
-                    manager.disconnect();
-                    manager.enableNetwork(savedNetId, true);
-                    manager.reconnect();
-                } else {
-                    targetWifiSsid = ssid;
-                    isTargetWifiOpen = isOpen;
-                    changeScreen(STATE_WIFI_KEYBOARD);
-                }
-            }
-        });
-        containerWifiItems.addView(btnWifi);
-    }
 
     private void createCategoryHeader(String title) {
         TextView tv = new TextView(this);
@@ -8420,7 +7785,11 @@ public class MainActivity extends Activity {
                 currentKeyboardMode = 5;
                 typedPassword = provider.getServerUrl();
                 changeScreen(STATE_WIFI_KEYBOARD);
-                openKeyboard();
+                if (wifiKeyboardController != null) {
+                    wifiKeyboardController.setCurrentKeyboardMode(5);
+                    wifiKeyboardController.setTypedText(provider.getServerUrl());
+                    wifiKeyboardController.openKeyboard();
+                }
             }
         });
         containerSettingsItems.addView(rowUrl);
@@ -8484,7 +7853,11 @@ public class MainActivity extends Activity {
                     currentKeyboardMode = 8;
                     typedPassword = provider.getAccessToken();
                     changeScreen(STATE_WIFI_KEYBOARD);
-                    openKeyboard();
+                    if (wifiKeyboardController != null) {
+                        wifiKeyboardController.setCurrentKeyboardMode(8);
+                        wifiKeyboardController.setTypedText(provider.getAccessToken());
+                        wifiKeyboardController.openKeyboard();
+                    }
                 }
             });
             containerSettingsItems.addView(rowToken);
@@ -8499,7 +7872,11 @@ public class MainActivity extends Activity {
                     currentKeyboardMode = 6;
                     typedPassword = provider.getUsername();
                     changeScreen(STATE_WIFI_KEYBOARD);
-                    openKeyboard();
+                    if (wifiKeyboardController != null) {
+                        wifiKeyboardController.setCurrentKeyboardMode(6);
+                        wifiKeyboardController.setTypedText(provider.getUsername());
+                        wifiKeyboardController.openKeyboard();
+                    }
                 }
             });
             containerSettingsItems.addView(rowUser);
@@ -8515,7 +7892,12 @@ public class MainActivity extends Activity {
                     currentKeyboardMode = 7;
                     typedPassword = provider.getPassword();
                     changeScreen(STATE_WIFI_KEYBOARD);
-                    openKeyboard();
+                    if (wifiKeyboardController != null) {
+                        wifiKeyboardController.setCurrentKeyboardMode(7);
+                        wifiKeyboardController.setPendingJellyfinUsername(provider.getUsername());
+                        wifiKeyboardController.setTypedText(provider.getPassword());
+                        wifiKeyboardController.openKeyboard();
+                    }
                 }
             });
             containerSettingsItems.addView(rowPass);
@@ -15753,76 +15135,7 @@ public class MainActivity extends Activity {
         }
 
         if (currentScreenState == STATE_WIFI_KEYBOARD) {
-            if (isQwertyKeyboard()) {
-                if (keyCode == KeyEvent.KEYCODE_BACK) {
-                    if (event.getRepeatCount() == 0) {
-                        event.startTracking();
-                    }
-                    return true;
-                }
-                if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == 19) {
-                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(0, -1, false);
-                    clickFeedback();
-                    return true;
-                }
-                if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == 85
-                        || keyCode == KeyEvent.KEYCODE_MEDIA_STOP || keyCode == 86
-                        || keyCode == 126 || keyCode == 127
-                        || keyCode == KeyEvent.KEYCODE_DPAD_DOWN || keyCode == 20) {
-                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(0, 1, false);
-                    clickFeedback();
-                    return true;
-                }
-                if (keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS || keyCode == 88) {
-                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(-1, 0, false);
-                    clickFeedback();
-                    return true;
-                }
-                if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == 87) {
-                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(1, 0, false);
-                    clickFeedback();
-                    return true;
-                }
-                if (keyCode == 21) { // Wheel CCW
-                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(-1, 0, true);
-                    clickFeedback();
-                    return true;
-                }
-                if (keyCode == 22) { // Wheel CW
-                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(1, 0, true);
-                    clickFeedback();
-                    return true;
-                }
-                if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
-                    if (event.getRepeatCount() == 0) {
-                        event.startTracking();
-                    }
-                    return true;
-                }
-                return true;
-            }
-
-            // Legacy original keyboard logic
-            if (keyCode == 21) {
-                keyboardIndex = (keyboardIndex - 1 + KEYBOARD_CHARS.length) % KEYBOARD_CHARS.length;
-                updateKeyboardUI();
-                clickFeedback();
-                return true;
-            }
-            if (keyCode == 22) {
-                keyboardIndex = (keyboardIndex + 1) % KEYBOARD_CHARS.length;
-                updateKeyboardUI();
-                clickFeedback();
-                return true;
-            }
-            if (keyCode == KeyEvent.KEYCODE_BACK) {
-                exitKeyboard();
-                return true;
-            }
-            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
-                if (event.getRepeatCount() == 0) {
-                    event.startTracking();
-                }
+            if (wifiKeyboardController != null && wifiKeyboardController.onKeyDown(keyCode, event)) {
                 return true;
             }
             return true;
@@ -16955,18 +16268,10 @@ public class MainActivity extends Activity {
         }
 
         if (currentScreenState == STATE_WIFI_KEYBOARD) {
-            if (isQwertyKeyboard() && keyCode == KeyEvent.KEYCODE_BACK) {
-                if (isBackLongPressConsumed) {
-                    isBackLongPressConsumed = false;
-                    return true;
-                }
-                if ((event.getFlags() & KeyEvent.FLAG_CANCELED_LONG_PRESS) == 0) {
-                    if (keyboardQwertyView != null) keyboardQwertyView.moveFocus(0, -1, false);
-                    clickFeedback();
-                    return true;
-                }
+            if (wifiKeyboardController != null && wifiKeyboardController.onKeyUp(keyCode, event)) {
                 return true;
             }
+            return true;
         }
 
         // 💡 [핵심 차단 구역] 휠 조작(21, 22)이나 뒤로가기(BACK)를 '뗄 때'
@@ -17135,18 +16440,8 @@ public class MainActivity extends Activity {
     @Override
     public boolean onKeyLongPress(int keyCode, KeyEvent event) {
         if (currentScreenState == STATE_WIFI_KEYBOARD) {
-            if (isQwertyKeyboard()) {
-                if (keyCode == KeyEvent.KEYCODE_BACK) {
-                    isBackLongPressConsumed = true;
-                    clickFeedback();
-                    exitKeyboard();
-                    return true;
-                }
-                if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
-                    isLongPressConsumed = true;
-                    if (keyboardQwertyView != null) keyboardQwertyView.performCenterLongPress(typedPassword);
-                    return true;
-                }
+            if (wifiKeyboardController != null && wifiKeyboardController.onKeyLongPress(keyCode, event)) {
+                return true;
             }
             return true;
         }
