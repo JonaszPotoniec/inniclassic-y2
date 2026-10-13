@@ -57,4 +57,6 @@ sealed interface SettingsSubMode {
     data object Equalizer10Band : SettingsSubMode
     data object MenuReorder : SettingsSubMode
     data class Jellyfin(val depth: Int = 0) : SettingsSubMode
+    data object Radio : SettingsSubMode
+    data object RadioSavedChannels : SettingsSubMode
 }

@@ -118,6 +118,7 @@ public class MainActivity extends Activity {
     private com.themoon.y1.controllers.player.PlayerController playerController;
     private com.themoon.y1.controllers.player.LyricsOverlayController lyricsOverlayController;
     private com.themoon.y1.controllers.browser.BrowserController browserController;
+    private com.themoon.y1.controllers.radio.FmRadioController fmRadioController;
 
     private static final String TAG = "MainActivity";
     // OTA Update URL pointing to GitHub Releases
@@ -3108,6 +3109,35 @@ public class MainActivity extends Activity {
                 () -> { clickFeedback(); return kotlin.Unit.INSTANCE; },
                 () -> { rebootAudioEngine(); return kotlin.Unit.INSTANCE; },
                 () -> { buildSettingsUI(); return kotlin.Unit.INSTANCE; },
+                (key) -> t(key)
+        );
+
+        fmRadioController = new com.themoon.y1.controllers.radio.FmRadioController(
+                this,
+                (ViewGroup) findViewById(android.R.id.content),
+                (title, value) -> createSettingRow(title, value),
+                (title) -> { createCategoryHeader(title); return kotlin.Unit.INSTANCE; },
+                (text) -> createListButton(text),
+                (icon, text) -> createListButtonWithIcon(icon, text),
+                () -> { clickFeedback(); return kotlin.Unit.INSTANCE; },
+                () -> { updateGlobalStatusPlayIcon(); return kotlin.Unit.INSTANCE; },
+                () -> {
+                    applyThemeToMainMenu();
+                    changeScreen(STATE_MENU);
+                    return kotlin.Unit.INSTANCE;
+                },
+                () -> { showLoadingPopup(); return kotlin.Unit.INSTANCE; },
+                () -> { dismissLoadingOverlay(); return kotlin.Unit.INSTANCE; },
+                (progress, msg) -> {
+                    if (pbLoadingProgress != null) {
+                        pbLoadingProgress.setIndeterminate(false);
+                        pbLoadingProgress.setProgress(progress);
+                    }
+                    if (tvLoadingProgress != null) {
+                        tvLoadingProgress.setText(msg);
+                    }
+                    return kotlin.Unit.INSTANCE;
+                },
                 (key) -> t(key)
         );
 
@@ -6272,277 +6302,18 @@ public class MainActivity extends Activity {
 
     private void buildRadioUI() {
         currentSettingsDepth = 1;
-        isRadioUIShowing = true; // 🚀 내가 지금 라디오 화면에 있다는 걸 시스템에 알림!
+        isRadioUIShowing = true;
         activePlayer = 1;
         containerSettingsItems.removeAllViews();
 
-        // 🚀 상단 "Settings" 유령 타이틀 원천 차단 숨김 처리
         ViewGroup settingsGroup = (ViewGroup) layoutSettingsMode;
         if (settingsGroup != null && settingsGroup.getChildCount() > 0
                 && settingsGroup.getChildAt(0) instanceof TextView) {
             settingsGroup.getChildAt(0).setVisibility(View.GONE);
         }
 
-        final com.themoon.y1.managers.FmRadioManager fmManager = com.themoon.y1.managers.FmRadioManager
-                .getInstance(this);
-
-        if (savedRadioStations.isEmpty()) {
-            loadSavedRadioStations();
-        }
-
-        final float density = getResources().getDisplayMetrics().density;
-
-        // ==========================================================
-        // 🎧 [모드 1] 기본 플레이어 모드 (🔮 네온 하이라이트 글로우 + 하단 정렬)
-        // ==========================================================
-        if (!isRadioSettingsMode) {
-
-            // 고급 외곽 프레임 패널 세팅
-            FrameLayout freqPanel = new FrameLayout(this);
-            freqPanel.setTag("radio_main_freq_panel");
-            freqPanel.setFocusable(true);
-            freqPanel.setClickable(true);
-            freqPanel.setOnClickListener(v -> toggleRadioPower());
-
-            LinearLayout.LayoutParams panelLp = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            panelLp.setMargins((int) (15 * density), (int) (20 * density), (int) (15 * density), (int) (12 * density));
-            freqPanel.setLayoutParams(panelLp);
-
-            GradientDrawable panelBg = new GradientDrawable();
-            panelBg.setShape(GradientDrawable.RECTANGLE);
-            panelBg.setCornerRadius(18 * density);
-
-            int themeHighlightColor = ThemeManager.getListButtonFocusedBg() | 0xFF000000;
-
-            if (fmManager.isPowerUp) {
-                int backlitColor = (themeHighlightColor & 0x00FFFFFF) | 0x42000000;
-                panelBg.setColor(backlitColor);
-                panelBg.setStroke((int) (4 * density), themeHighlightColor);
-            } else {
-                panelBg.setColor(0x15FFFFFF);
-                panelBg.setStroke((int) (1 * density), 0x33FFFFFF);
-            }
-            freqPanel.setBackground(panelBg);
-
-            LinearLayout freqInnerLayout = new LinearLayout(this);
-            freqInnerLayout.setOrientation(LinearLayout.VERTICAL);
-            freqInnerLayout.setGravity(Gravity.CENTER);
-            freqInnerLayout.setPadding(0, (int) (25 * density), 0, (int) (20 * density));
-
-            // 대형 디지털 주파수 텍스트 뷰
-            final TextView tvFreq = new TextView(this);
-            tvFreq.setTag("radio_main_freq_text");
-            tvFreq.setText(String.format(Locale.US, "%.1f MHz", fmManager.currentFreq));
-            tvFreq.setTextColor(fmManager.isPowerUp ? themeHighlightColor : 0xFF888888);
-            tvFreq.setTextSize(50);
-            tvFreq.setGravity(Gravity.CENTER);
-            tvFreq.setTypeface(ThemeManager.getCustomFontBold());
-            freqInnerLayout.addView(tvFreq);
-
-            // 상태 서브 텍스트 뷰 (PLAYING / OFF)
-            final TextView tvStatus = new TextView(this);
-            tvStatus.setTag("radio_main_status_text");
-            if (fmManager.isPowerUp) {
-                tvStatus.setText("● " + t("PLAYING"));
-                tvStatus.setTextColor(themeHighlightColor);
-            } else {
-                tvStatus.setText(t("OFF") + " (" + t("Press Center or Play to Turn ON") + ")");
-                tvStatus.setTextColor(0xFF888888);
-            }
-            tvStatus.setTextSize(14);
-            tvStatus.setGravity(Gravity.CENTER);
-            tvStatus.setPadding(0, (int) (6 * density), 0, 0);
-            freqInnerLayout.addView(tvStatus);
-
-            freqPanel.addView(freqInnerLayout);
-            containerSettingsItems.addView(freqPanel);
-
-            // 🍬 가로 스크롤형 알약 채널 컨테이너
-            if (!savedRadioStations.isEmpty()) {
-                android.widget.HorizontalScrollView hzScroll = new android.widget.HorizontalScrollView(this);
-                hzScroll.setHorizontalScrollBarEnabled(false);
-                hzScroll.setClipChildren(false);
-                hzScroll.setClipToPadding(false);
-                hzScroll.setFillViewport(true);
-                hzScroll.setPadding(0, 15, 0, 15);
-
-                LinearLayout candyContainer = new LinearLayout(this);
-                candyContainer.setOrientation(LinearLayout.HORIZONTAL);
-                candyContainer.setGravity(Gravity.CENTER);
-
-                for (int i = 0; i < savedRadioStations.size(); i++) {
-                    final float stationFreq = savedRadioStations.get(i);
-
-                    TextView tvCandy = new TextView(this);
-                    tvCandy.setText(String.format(Locale.US, "%.1f", stationFreq));
-                    tvCandy.setTextSize(18f);
-                    tvCandy.setGravity(Gravity.CENTER);
-                    tvCandy.setPadding((int) (14 * density), (int) (6 * density), (int) (14 * density),
-                            (int) (6 * density));
-                    tvCandy.setTypeface(ThemeManager.getCustomFontBold());
-                    tvCandy.setTag(stationFreq);
-                    tvCandy.setClickable(true);
-                    tvCandy.setOnClickListener(v -> {
-                        clickFeedback();
-                        if (fmManager.isPowerUp) {
-                            fmManager.tune(stationFreq);
-                        } else {
-                            fmManager.currentFreq = stationFreq;
-                        }
-                        saveLastRadioFreq(stationFreq);
-                        updateRadioMainPlayerUI();
-                    });
-
-                    GradientDrawable candyBg = new GradientDrawable();
-                    candyBg.setCornerRadius(20 * density);
-
-                    if (Math.abs(fmManager.currentFreq - stationFreq) < 0.05f) {
-                        candyBg.setColor(themeHighlightColor);
-                        tvCandy.setTextColor(ThemeManager.getListButtonFocusedTextColor());
-
-                        final View targetChild = tvCandy;
-                        final android.widget.HorizontalScrollView finalHzScroll = hzScroll;
-                        hzScroll.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                int scrollX = targetChild.getLeft() - (finalHzScroll.getWidth() / 2)
-                                        + (targetChild.getWidth() / 2);
-                                if (scrollX < 0)
-                                    scrollX = 0;
-                                finalHzScroll.scrollTo(scrollX, 0);
-                            }
-                        });
-                    } else {
-                        candyBg.setColor(ThemeManager.getListButtonNormalBg());
-                        tvCandy.setTextColor(ThemeManager.getTextColorSecondary());
-                    }
-
-                    tvCandy.setBackground(candyBg);
-
-                    LinearLayout.LayoutParams candyLp = new LinearLayout.LayoutParams(
-                            ViewGroup.LayoutParams.WRAP_CONTENT,
-                            ViewGroup.LayoutParams.WRAP_CONTENT);
-                    candyLp.setMargins((int) (6 * density), 0, (int) (6 * density), 0);
-                    tvCandy.setLayoutParams(candyLp);
-
-                    candyContainer.addView(tvCandy);
-                }
-
-                FrameLayout.LayoutParams containerLp = new FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT);
-
-                hzScroll.addView(candyContainer, containerLp);
-                containerSettingsItems.addView(hzScroll);
-                layoutRadioCandyContainer = candyContainer;
-            }
-
-            // 하단 조작계 배정을 위한 가중치 스페이서
-            View spacer = new View(this);
-            LinearLayout.LayoutParams spacerLp = new LinearLayout.LayoutParams(0, 0,
-                    1.0f);
-            spacer.setLayoutParams(spacerLp);
-            containerSettingsItems.addView(spacer);
-
-            // 3. 설정 모드 진입 버튼 (최하단 안착)
-            Button btnSettings = createListButton(t("Radio Settings"));
-            btnSettings.setTag("radio_settings_button");
-            btnSettings.setGravity(Gravity.CENTER);
-
-            LinearLayout.LayoutParams settingsLp = (LinearLayout.LayoutParams) btnSettings
-                    .getLayoutParams();
-            if (settingsLp != null) {
-                settingsLp.bottomMargin = (int) (15 * density);
-                btnSettings.setLayoutParams(settingsLp);
-            }
-
-            btnSettings.setOnClickListener(v -> {
-                clickFeedback();
-                isRadioSettingsMode = true;
-                buildRadioUI();
-            });
-            containerSettingsItems.addView(btnSettings);
-
-            containerSettingsItems.postDelayed(() -> {
-                freqPanel.requestFocus();
-            }, 50);
-
-        }
-        // ==========================================================
-        // ⚙️ [모드 2] 설정 서브 페이지 모드
-        // ==========================================================
-        else {
-            Button btnClose = createListButton(t("Close Settings"));
-            btnClose.setTextColor(0xFFFF8800);
-            btnClose.setOnClickListener(v -> {
-                clickFeedback();
-                isRadioSettingsMode = false;
-                buildRadioUI();
-            });
-            containerSettingsItems.addView(btnClose);
-
-            final LinearLayout btnPower = createSettingRow("Radio Power",
-                    fmManager.isPowerUp ? t("ON") : t("OFF"));
-            btnPower.setOnLongClickListener(globalScreenOffLongClickListener);
-            btnPower.setOnClickListener(v -> {
-                toggleRadioPower();
-            });
-            containerSettingsItems.addView(btnPower);
-
-            boolean isSaved = savedRadioStations.contains(fmManager.currentFreq);
-            final LinearLayout btnSaveFreq = createSettingRow("Save Channel",
-                    isSaved ? "★ " + t("SAVED") : "☆ " + t("SAVE"));
-            if (isSaved)
-                ((TextView) btnSaveFreq.getChildAt(1)).setTextColor(0xFFFF8800);
-            btnSaveFreq.setOnLongClickListener(globalScreenOffLongClickListener);
-            btnSaveFreq.setOnClickListener(v -> {
-                clickFeedback();
-                if (isSaved) {
-                    savedRadioStations.remove(Float.valueOf(fmManager.currentFreq));
-                    Toast.makeText(MainActivity.this, t("Removed from saved channels."),
-                            Toast.LENGTH_SHORT).show();
-                } else {
-                    float cleanFreq = Math.round(fmManager.currentFreq * 10.0f) / 10.0f;
-                    if (!savedRadioStations.contains(cleanFreq)) {
-                        savedRadioStations.add(cleanFreq);
-                    }
-                    java.util.Collections.sort(savedRadioStations);
-                    Toast.makeText(MainActivity.this, t("Channel saved!"), Toast.LENGTH_SHORT).show();
-                }
-                saveRadioStationsToPrefs();
-                buildRadioUI();
-            });
-            containerSettingsItems.addView(btnSaveFreq);
-
-            final LinearLayout btnManageChannels = createSettingRow("Saved Channels", t("Edit") + " 〉");
-            btnManageChannels.setOnLongClickListener(globalScreenOffLongClickListener);
-            btnManageChannels.setOnClickListener(v -> {
-                clickFeedback();
-                buildRadioSavedChannelsUI();
-            });
-            containerSettingsItems.addView(btnManageChannels);
-
-            final LinearLayout btnAutoScan = createSettingRow("Auto Scan All", t("Start") + " >");
-            btnAutoScan.setOnLongClickListener(globalScreenOffLongClickListener);
-            btnAutoScan.setOnClickListener(v -> {
-                clickFeedback();
-                startRadioAutoScan();
-            });
-            containerSettingsItems.addView(btnAutoScan);
-
-            if (fmManager.isPowerUp) {
-                setVolumeControlStream(fmManager.getFmStreamType());
-            }
-
-            containerSettingsItems.postDelayed(() -> {
-                int targetIdx = lastRadioFocusIndex;
-                if (targetIdx >= 0 && targetIdx < containerSettingsItems.getChildCount()) {
-                    containerSettingsItems.getChildAt(targetIdx).requestFocus();
-                } else if (containerSettingsItems.getChildCount() > 0) {
-                    containerSettingsItems.getChildAt(0).requestFocus();
-                }
-            }, 50);
+        if (fmRadioController != null) {
+            fmRadioController.buildRadioUI();
         }
     }
 
@@ -12666,83 +12437,12 @@ public class MainActivity extends Activity {
         return prefs.getBoolean("hide_music_btn_" + id, false);
     }
 
-    // 🚀 [신규 엔진] 저장된 라디오 채널들을 한눈에 보고 삭제/이동할 수 있는 전용 관리 스튜디오!
     private void buildRadioSavedChannelsUI() {
-        currentSettingsDepth = 2; // 💡 깊이(Depth) 2로 설정하여 뒤로 가기 시 라디오 설정창으로 복귀하게 만듭니다.
+        currentSettingsDepth = 2;
         containerSettingsItems.removeAllViews();
-        createCategoryHeader("━ " + t("SAVED CHANNELS") + " ━");
-
-        if (savedRadioStations.isEmpty()) {
-            TextView tvEmpty = new TextView(this);
-            tvEmpty.setText("   " + t("No saved channels."));
-            tvEmpty.setTextColor(0xFF888888);
-            tvEmpty.setPadding(20, 10, 20, 10);
-            containerSettingsItems.addView(tvEmpty);
-        } else {
-            for (int i = 0; i < savedRadioStations.size(); i++) {
-                final Float freq = savedRadioStations.get(i);
-
-                // CH 1: 89.1 MHz 형식으로 예쁘게 렌더링
-                String label = "CH " + (i + 1) + " :  " + String.format(Locale.US, "%.1f MHz", freq);
-                View btnFreq = createListButtonWithIcon("\uE03E", label); // 📻 라디오 유니코드 아이콘
-
-                // 🚀 [숏클릭 액션] 짧게 누르면: 해당 주파수로 즉시 튜닝하고 라디오 메인 플레이어 화면으로 복귀!
-                btnFreq.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        clickFeedback();
-                        com.themoon.y1.managers.FmRadioManager fm = com.themoon.y1.managers.FmRadioManager
-                                .getInstance(MainActivity.this);
-                        if (fm.isPowerUp)
-                            fm.tune(freq);
-                        else
-                            fm.currentFreq = freq;
-
-                        saveLastRadioFreq(freq);
-                        isRadioSettingsMode = false; // 메인 플레이어로 상태 전환
-                        buildRadioUI(); // 화면 갱신
-                    }
-                });
-
-                // 🚀 [롱클릭 액션] 길게 누르면: 즉시 삭제 팝업 가동!
-                btnFreq.setOnLongClickListener(new View.OnLongClickListener() {
-                    @Override
-                    public boolean onLongClick(View v) {
-                        clickFeedback();
-                        isLongPressConsumed = true; // 손 뗄 때 클릭되는 안드로이드 고질병 방어막
-
-                        new AlertDialog.Builder(MainActivity.this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                                .setTitle(t("Delete Channel"))
-                                .setMessage(String.format(Locale.US,
-                                        t("Remove %.1f MHz from saved channels?"), freq))
-                                .setPositiveButton(t("Delete"), new DialogInterface.OnClickListener() {
-                                    public void onClick(DialogInterface dialog, int which) {
-                                        clickFeedback();
-                                        savedRadioStations.remove(freq); // 리스트에서 삭제
-                                        saveRadioStationsToPrefs();
-                                        Toast.makeText(MainActivity.this, t("Channel deleted."), Toast.LENGTH_SHORT)
-                                                .show();
-
-                                        buildRadioSavedChannelsUI(); // 리스트 갱신 (지운 항목 화면에서 즉시 증발)
-                                    }
-                                })
-                                .setNegativeButton(t("Cancel"), null)
-                                .show();
-                        return true;
-                    }
-                });
-                containerSettingsItems.addView(btnFreq);
-            }
+        if (fmRadioController != null) {
+            fmRadioController.buildRadioSavedChannelsUI();
         }
-
-        // 🚀 화면 렌더링 직후 가장 첫 번째 채널에 자석처럼 휠 포커스 록온!
-        containerSettingsItems.postDelayed(new Runnable() {
-            public void run() {
-                if (containerSettingsItems.getChildCount() > 1) { // 0번은 헤더 텍스트이므로 1번을 타겟팅
-                    containerSettingsItems.getChildAt(1).requestFocus();
-                }
-            }
-        }, 50);
     }
 
     // =======================================================
@@ -12846,369 +12546,9 @@ public class MainActivity extends Activity {
     // 🚀 [애플 팟캐스트 검색 엔진] 리미트 200개 해제 & 썸네일 아트 추출!
     // =======================================================
     private void searchPodcastFromApple(final String keyword) {
-        showLoadingPopup();
-
-        new Thread(() -> {
-            try {
-                String encodedKeyword = java.net.URLEncoder.encode(keyword, "UTF-8");
-                // 🚀 [리미트 해제] 200개까지 검색 결과를 미친 듯이 긁어옵니다!
-                String urlString = "https://itunes.apple.com/search?term=" + encodedKeyword
-                        + "&entity=podcast&limit=200";
-
-                okhttp3.OkHttpClient.Builder builder = new okhttp3.OkHttpClient.Builder();
-                javax.net.ssl.TrustManager[] trustAllCerts = new javax.net.ssl.TrustManager[] {
-                        new javax.net.ssl.X509TrustManager() {
-                            public java.security.cert.X509Certificate[] getAcceptedIssuers() {
-                                return new java.security.cert.X509Certificate[] {};
-                            }
-
-                            public void checkClientTrusted(java.security.cert.X509Certificate[] certs,
-                                    String authType) {
-                            }
-
-                            public void checkServerTrusted(java.security.cert.X509Certificate[] certs,
-                                    String authType) {
-                            }
-                        }
-                };
-                javax.net.ssl.SSLContext sslContext = javax.net.ssl.SSLContext.getInstance("TLS", "Conscrypt");
-                sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
-                builder.sslSocketFactory(sslContext.getSocketFactory(),
-                        (javax.net.ssl.X509TrustManager) trustAllCerts[0]);
-                builder.hostnameVerifier((hostname, session) -> true);
-
-                okhttp3.OkHttpClient client = builder.build();
-                okhttp3.Request request = new okhttp3.Request.Builder().url(urlString).build();
-                okhttp3.Response response = client.newCall(request).execute();
-
-                if (!response.isSuccessful())
-                    throw new java.io.IOException("Apple API Error");
-
-                String jsonResponse = response.body().string();
-                org.json.JSONObject root = new org.json.JSONObject(jsonResponse);
-                org.json.JSONArray results = root.getJSONArray("results");
-
-                final List<String[]> searchResults = new ArrayList<>();
-
-                for (int i = 0; i < results.length(); i++) {
-                    org.json.JSONObject item = results.getJSONObject(i);
-                    if (item.has("feedUrl") && item.has("collectionName")) {
-                        String name = item.getString("collectionName");
-                        String author = item.has("artistName") ? item.getString("artistName") : "Unknown";
-                        String rss = item.getString("feedUrl");
-
-                        // 🚀 애플 서버가 제공하는 100x100 픽셀 썸네일 주소 획득!
-                        String artUrl = item.has("artworkUrl100") ? item.getString("artworkUrl100") : "";
-
-                        searchResults.add(new String[] { name, author, rss, artUrl });
-                    }
-                }
-
-                runOnUiThread(() -> {
-                    if (layoutLoadingOverlay != null)
-                        layoutLoadingOverlay.setVisibility(View.GONE);
-                    getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-
-                    if (searchResults.isEmpty()) {
-                        Toast.makeText(MainActivity.this, t("No podcasts found for: ") + keyword, Toast.LENGTH_SHORT)
-                                .show();
-                    } else {
-                        // 대망의 무한 스크롤 팝업창 호출
-                        showPodcastSearchResultsDialog(searchResults);
-                    }
-                });
-
-            } catch (Exception e) {
-                runOnUiThread(() -> {
-                    if (layoutLoadingOverlay != null)
-                        layoutLoadingOverlay.setVisibility(View.GONE);
-                    getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-                    Toast.makeText(MainActivity.this, "Search Failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                });
-            }
-        }).start();
-    }
-
-    // =======================================================
-    // 🚀 [애플 팟캐스트 검색 결과 창] 썸네일 보안 우회 + ListView 폴링 엔진!
-    // =======================================================
-    private void showPodcastSearchResultsDialog(final List<String[]> results) {
-        final float d = getResources().getDisplayMetrics().density;
-
-        final android.app.Dialog dialog = new android.app.Dialog(this);
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        dialog.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
-
-        LinearLayout rootLayout = new LinearLayout(this);
-        rootLayout.setOrientation(LinearLayout.VERTICAL);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(ThemeManager.getOverlayBackgroundColor() | 0xFF000000);
-        bg.setCornerRadius(15 * d);
-        rootLayout.setBackground(bg);
-        rootLayout.setPadding((int) (10 * d), (int) (20 * d), (int) (10 * d), (int) (10 * d));
-
-        TextView tvTitle = new TextView(this);
-        tvTitle.setText("🔍 " + t("Search Results") + " (" + results.size() + ")");
-        tvTitle.setTextColor(0xFF00FFFF);
-        tvTitle.setTextSize(18f);
-        tvTitle.setTypeface(ThemeManager.getCustomFontBold());
-        tvTitle.setGravity(Gravity.CENTER);
-        tvTitle.setPadding(0, 0, 0, (int) (15 * d));
-        rootLayout.addView(tvTitle);
-
-        // =======================================================
-        // 🚀 [핵심 추가] 이미지 전용 '무적의 우회 통신망' 1개 개통! (메모리 절약)
-        // =======================================================
-        okhttp3.OkHttpClient tempClient = null;
-        try {
-            okhttp3.OkHttpClient.Builder builder = new okhttp3.OkHttpClient.Builder();
-            javax.net.ssl.TrustManager[] trustAllCerts = new javax.net.ssl.TrustManager[] {
-                    new javax.net.ssl.X509TrustManager() {
-                        public java.security.cert.X509Certificate[] getAcceptedIssuers() {
-                            return new java.security.cert.X509Certificate[] {};
-                        }
-
-                        public void checkClientTrusted(java.security.cert.X509Certificate[] certs, String authType) {
-                        }
-
-                        public void checkServerTrusted(java.security.cert.X509Certificate[] certs, String authType) {
-                        }
-                    }
-            };
-            javax.net.ssl.SSLContext sslContext = javax.net.ssl.SSLContext.getInstance("TLS", "Conscrypt");
-            sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
-            builder.sslSocketFactory(sslContext.getSocketFactory(), (javax.net.ssl.X509TrustManager) trustAllCerts[0]);
-            builder.hostnameVerifier((hostname, session) -> true);
-            tempClient = builder.build();
-        } catch (Exception e) {
+        if (podcastController != null) {
+            podcastController.searchApplePodcasts(keyword);
         }
-
-        final okhttp3.OkHttpClient imageClient = tempClient;
-
-        // 🚀 ListView 조립
-        final ListView listView = new ListView(this);
-        listView.setDivider(new ColorDrawable(0x00000000));
-        listView.setDividerHeight((int) (4 * d));
-        listView.setSelector(new ColorDrawable(android.graphics.Color.TRANSPARENT));
-        listView.setScrollbarFadingEnabled(false);
-        listView.setItemsCanFocus(true);
-
-        android.widget.BaseAdapter adapter = new android.widget.BaseAdapter() {
-            @Override
-            public int getCount() {
-                return results.size();
-            }
-
-            @Override
-            public Object getItem(int position) {
-                return results.get(position);
-            }
-
-            @Override
-            public long getItemId(int position) {
-                return position;
-            }
-
-            @Override
-            public View getView(final int position, View convertView, ViewGroup parent) {
-                LinearLayout itemBtn;
-                ImageView ivThumb;
-                TextView t1, t2;
-
-                if (convertView == null) {
-                    itemBtn = new LinearLayout(MainActivity.this);
-                    itemBtn.setOrientation(LinearLayout.HORIZONTAL);
-                    itemBtn.setGravity(Gravity.CENTER_VERTICAL);
-                    itemBtn.setFocusable(true);
-                    itemBtn.setClickable(true);
-                    itemBtn.setSoundEffectsEnabled(false);
-                    itemBtn.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
-                    itemBtn.setPadding((int) (10 * d), (int) (10 * d), (int) (10 * d), (int) (10 * d));
-
-                    android.widget.AbsListView.LayoutParams btnLp = new android.widget.AbsListView.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-                    itemBtn.setLayoutParams(btnLp);
-
-                    ivThumb = new ImageView(MainActivity.this);
-                    LinearLayout.LayoutParams thumbLp = new LinearLayout.LayoutParams((int) (55 * d), (int) (55 * d));
-                    thumbLp.rightMargin = (int) (15 * d);
-                    ivThumb.setLayoutParams(thumbLp);
-                    ivThumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
-                    ivThumb.setBackgroundColor(0x22FFFFFF);
-
-                    LinearLayout textContainer = new LinearLayout(MainActivity.this);
-                    textContainer.setOrientation(LinearLayout.VERTICAL);
-                    textContainer.setLayoutParams(
-                            new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
-
-                    t1 = new TextView(MainActivity.this);
-                    t1.setTextColor(ThemeManager.getTextColorPrimary());
-                    t1.setTextSize(16f);
-                    t1.setTypeface(ThemeManager.getCustomFontBold());
-                    t1.setSingleLine(true);
-                    t1.setEllipsize(android.text.TextUtils.TruncateAt.END);
-
-                    t2 = new TextView(MainActivity.this);
-                    t2.setTextColor(ThemeManager.getTextColorSecondary());
-                    t2.setTextSize(13f);
-                    t2.setTypeface(ThemeManager.getCustomFont(), Typeface.NORMAL);
-                    t2.setSingleLine(true);
-                    t2.setEllipsize(android.text.TextUtils.TruncateAt.END);
-
-                    textContainer.addView(t1);
-                    textContainer.addView(t2);
-
-                    itemBtn.addView(ivThumb);
-                    itemBtn.addView(textContainer);
-
-                    itemBtn.setTag(new Object[] { ivThumb, t1, t2 });
-                } else {
-                    itemBtn = (LinearLayout) convertView;
-                    Object[] holder = (Object[]) itemBtn.getTag();
-                    ivThumb = (ImageView) holder[0];
-                    t1 = (TextView) holder[1];
-                    t2 = (TextView) holder[2];
-                }
-
-                final String[] selected = results.get(position);
-                final String channelName = selected[0];
-                final String author = selected[1];
-                final String rssUrl = selected[2];
-                final String artUrl = selected[3];
-
-                t1.setText(channelName);
-                t2.setText(author);
-
-                ivThumb.setImageBitmap(null); // 이전 껍데기 잔상 초기화
-                ivThumb.setTag(artUrl); // 목표 주소 각인
-
-                // =======================================================
-                // 🚀 [이미지 다운로드] 무적 통신망(OkHttp)으로 애플 보안 서버 박살내기!
-                // =======================================================
-                if (!artUrl.isEmpty() && imageClient != null) {
-                    new Thread(() -> {
-                        try {
-                            okhttp3.Request request = new okhttp3.Request.Builder().url(artUrl).build();
-                            okhttp3.Response response = imageClient.newCall(request).execute();
-
-                            if (response.isSuccessful() && response.body() != null) {
-                                java.io.InputStream is = response.body().byteStream();
-                                final Bitmap bmp = BitmapFactory.decodeStream(is);
-                                is.close();
-
-                                runOnUiThread(() -> {
-                                    // 휠을 돌려 뷰가 재활용되었어도 원래 주소와 일치할 때만 그림 그리기!
-                                    if (artUrl.equals(ivThumb.getTag())) {
-                                        ivThumb.setImageBitmap(bmp);
-                                    }
-                                });
-                            }
-                        } catch (Exception e) {
-                        }
-                    }).start();
-                }
-
-                // 포커스 처리
-                final TextView finalT1 = t1;
-                final TextView finalT2 = t2;
-                itemBtn.setOnFocusChangeListener((v, hasFocus) -> {
-                    if (hasFocus) {
-                        v.setBackground(createFocusedButtonBackground());
-                        finalT1.setTextColor(ThemeManager.getListButtonFocusedTextColor());
-                        finalT2.setTextColor(ThemeManager.getListButtonFocusedTextColor());
-                    } else {
-                        v.setBackground(createButtonBackground(ThemeManager.getListButtonNormalBg()));
-                        finalT1.setTextColor(ThemeManager.getTextColorPrimary());
-                        finalT2.setTextColor(ThemeManager.getTextColorSecondary());
-                    }
-                });
-
-                // 특수 휠 우회 엔진
-                itemBtn.setOnKeyListener((v, keyCode, event) -> {
-                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                        if (keyCode == 21 || keyCode == 19) {
-                            int targetPos = position - 1;
-                            if (targetPos >= 0) {
-                                listView.setSelectionFromTop(targetPos, (int) (10 * d));
-                                listView.post(() -> {
-                                    int visibleIdx = targetPos - listView.getFirstVisiblePosition();
-                                    if (visibleIdx >= 0 && visibleIdx < listView.getChildCount()) {
-                                        listView.getChildAt(visibleIdx).requestFocus();
-                                    }
-                                });
-                                clickFeedback();
-                            }
-                            return true;
-                        }
-                        if (keyCode == 22 || keyCode == 20) {
-                            int targetPos = position + 1;
-                            if (targetPos < results.size()) {
-                                listView.setSelectionFromTop(targetPos, (int) (10 * d));
-                                listView.post(() -> {
-                                    int visibleIdx = targetPos - listView.getFirstVisiblePosition();
-                                    if (visibleIdx >= 0 && visibleIdx < listView.getChildCount()) {
-                                        listView.getChildAt(visibleIdx).requestFocus();
-                                    }
-                                });
-                                clickFeedback();
-                            }
-                            return true;
-                        }
-                    }
-                    return false;
-                });
-
-                // 클릭 (구독)
-                itemBtn.setOnClickListener(v -> {
-                    clickFeedback();
-                    try {
-                        File podcastDir = StoragePaths.getPodcastsDir();
-                        if (!podcastDir.exists())
-                            podcastDir.mkdirs();
-                        File subFile = new File(podcastDir, "subscriptions.txt");
-
-                        FileOutputStream fos = new FileOutputStream(subFile, true);
-                        java.io.BufferedWriter bw = new java.io.BufferedWriter(
-                                new java.io.OutputStreamWriter(fos, "UTF-8"));
-
-                        String safeName = channelName.replace("|", "-");
-                        bw.write("\n" + safeName + "|" + rssUrl);
-                        bw.close();
-
-                        Toast.makeText(MainActivity.this, "✅ " + t("Subscribed: ") + safeName, Toast.LENGTH_SHORT)
-                                .show();
-                        dialog.dismiss();
-
-                        buildPodcastChannelsUI();
-                    } catch (Exception e) {
-                        Toast.makeText(MainActivity.this, "Error saving: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                    }
-                });
-
-                return itemBtn;
-            }
-        };
-        listView.setAdapter(adapter);
-
-        LinearLayout listWrapper = new LinearLayout(this);
-        listWrapper.setPadding(0, 0, 0, 0);
-        listWrapper.addView(listView,
-                new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (int) (320 * d)));
-
-        rootLayout.addView(listWrapper);
-
-        dialog.setContentView(rootLayout);
-        Window window = dialog.getWindow();
-        if (window != null) {
-            window.setLayout((int) (340 * d), ViewGroup.LayoutParams.WRAP_CONTENT);
-        }
-        dialog.show();
-
-        listView.postDelayed(() -> {
-            if (listView.getChildCount() > 0) {
-                listView.getChildAt(0).requestFocus();
-            }
-        }, 100);
     }
 
     private void buildPodcastManageUI() {

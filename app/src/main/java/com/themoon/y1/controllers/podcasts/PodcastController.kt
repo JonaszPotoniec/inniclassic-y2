@@ -472,7 +472,258 @@ class PodcastController(
         dialog.show()
     }
 
+    fun searchApplePodcasts(keyword: String) {
+        showLoadingPopup()
+
+        Thread {
+            try {
+                val results = com.themoon.y1.podcasts.PodcastSearchClient.getInstance().search(keyword, 200)
+
+                activity.runOnUiThread {
+                    onHideLoadingPopup()
+                    if (results.isEmpty()) {
+                        Toast.makeText(activity, "${localize("No podcasts found for: ")}$keyword", Toast.LENGTH_SHORT).show()
+                    } else {
+                        showSearchResultsDialog(results)
+                    }
+                }
+            } catch (e: Exception) {
+                activity.runOnUiThread {
+                    onHideLoadingPopup()
+                    Toast.makeText(activity, "Search Failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
+    }
+
+    private fun showSearchResultsDialog(results: List<com.themoon.y1.podcasts.PodcastSearchClient.PodcastSearchResult>) {
+        val d = activity.resources.displayMetrics.density
+
+        val dialog = Dialog(activity)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+
+        val rootLayout = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            background = GradientDrawable().apply {
+                setColor(ThemeManager.getOverlayBackgroundColor() or -0x1000000)
+                cornerRadius = 15 * d
+            }
+            setPadding((10 * d).toInt(), (20 * d).toInt(), (10 * d).toInt(), (10 * d).toInt())
+        }
+
+        val tvTitle = TextView(activity).apply {
+            text = "🔍 ${localize("Search Results")} (${results.size})"
+            setTextColor(0xFF00FFFF.toInt())
+            textSize = 18f
+            typeface = ThemeManager.getCustomFontBold()
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, (15 * d).toInt())
+        }
+        rootLayout.addView(tvTitle)
+
+        val listView = ListView(activity).apply {
+            divider = ColorDrawable(0x00000000)
+            dividerHeight = (4 * d).toInt()
+            selector = ColorDrawable(Color.TRANSPARENT)
+            isScrollbarFadingEnabled = false
+            itemsCanFocus = true
+        }
+
+        val adapter = object : android.widget.BaseAdapter() {
+            override fun getCount(): Int = results.size
+            override fun getItem(position: Int): Any = results[position]
+            override fun getItemId(position: Int): Long = position.toLong()
+
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
+                val itemBtn: LinearLayout
+                val ivThumb: android.widget.ImageView
+                val t1: TextView
+                val t2: TextView
+
+                if (convertView == null) {
+                    itemBtn = LinearLayout(activity).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER_VERTICAL
+                        isFocusable = true
+                        isClickable = true
+                        isSoundEffectsEnabled = false
+                        background = GradientDrawable().apply {
+                            shape = GradientDrawable.RECTANGLE
+                            setColor(ThemeManager.getListButtonNormalBg())
+                            cornerRadius = 6 * d
+                        }
+                        setPadding((10 * d).toInt(), (10 * d).toInt(), (10 * d).toInt(), (10 * d).toInt())
+                        layoutParams = android.widget.AbsListView.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT
+                        )
+                    }
+
+                    ivThumb = android.widget.ImageView(activity).apply {
+                        layoutParams = LinearLayout.LayoutParams((55 * d).toInt(), (55 * d).toInt()).apply {
+                            rightMargin = (15 * d).toInt()
+                        }
+                        scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                        setBackgroundColor(0x22FFFFFF)
+                    }
+
+                    val textContainer = LinearLayout(activity).apply {
+                        orientation = LinearLayout.VERTICAL
+                        layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f)
+                    }
+
+                    t1 = TextView(activity).apply {
+                        setTextColor(ThemeManager.getTextColorPrimary())
+                        textSize = 16f
+                        typeface = ThemeManager.getCustomFontBold()
+                        isSingleLine = true
+                        ellipsize = android.text.TextUtils.TruncateAt.END
+                    }
+
+                    t2 = TextView(activity).apply {
+                        setTextColor(ThemeManager.getTextColorSecondary())
+                        textSize = 13f
+                        typeface = ThemeManager.getCustomFont()
+                        isSingleLine = true
+                        ellipsize = android.text.TextUtils.TruncateAt.END
+                    }
+
+                    textContainer.addView(t1)
+                    textContainer.addView(t2)
+                    itemBtn.addView(ivThumb)
+                    itemBtn.addView(textContainer)
+                    itemBtn.tag = arrayOf(ivThumb, t1, t2)
+                } else {
+                    itemBtn = convertView as LinearLayout
+                    val holder = itemBtn.tag as Array<*>
+                    ivThumb = holder[0] as android.widget.ImageView
+                    t1 = holder[1] as TextView
+                    t2 = holder[2] as TextView
+                }
+
+                val item = results[position]
+                t1.text = item.name
+                t2.text = item.author
+
+                ivThumb.setImageBitmap(null)
+                ivThumb.tag = item.artworkUrl
+
+                if (item.artworkUrl.isNotEmpty()) {
+                    Thread {
+                        try {
+                            val request = okhttp3.Request.Builder().url(item.artworkUrl).build()
+                            val response = okhttp3.OkHttpClient().newCall(request).execute()
+                            if (response.isSuccessful) {
+                                val stream = response.body()?.byteStream()
+                                val bmp = android.graphics.BitmapFactory.decodeStream(stream)
+                                stream?.close()
+                                activity.runOnUiThread {
+                                    if (item.artworkUrl == ivThumb.tag && bmp != null) {
+                                        ivThumb.setImageBitmap(bmp)
+                                    }
+                                }
+                            }
+                        } catch (ignored: Exception) {}
+                    }.start()
+                }
+
+                itemBtn.setOnFocusChangeListener { v, hasFocus ->
+                    val focusedBg = GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        setColor(ThemeManager.getListButtonFocusedBg())
+                        cornerRadius = 6 * d
+                    }
+                    val normalBg = GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        setColor(ThemeManager.getListButtonNormalBg())
+                        cornerRadius = 6 * d
+                    }
+                    if (hasFocus) {
+                        v.background = focusedBg
+                        t1.setTextColor(ThemeManager.getListButtonFocusedTextColor())
+                        t2.setTextColor(ThemeManager.getListButtonFocusedTextColor())
+                    } else {
+                        v.background = normalBg
+                        t1.setTextColor(ThemeManager.getTextColorPrimary())
+                        t2.setTextColor(ThemeManager.getTextColorSecondary())
+                    }
+                }
+
+                itemBtn.setOnKeyListener { _, keyCode, event ->
+                    if (event.action == KeyEvent.ACTION_DOWN) {
+                        if (keyCode == 21 || keyCode == 19) {
+                            val targetPos = position - 1
+                            if (targetPos >= 0) {
+                                listView.setSelectionFromTop(targetPos, (10 * d).toInt())
+                                listView.post {
+                                    val visibleIdx = targetPos - listView.firstVisiblePosition
+                                    if (visibleIdx in 0 until listView.childCount) {
+                                        listView.getChildAt(visibleIdx).requestFocus()
+                                    }
+                                }
+                                clickFeedback()
+                            }
+                            return@setOnKeyListener true
+                        }
+                        if (keyCode == 22 || keyCode == 20) {
+                            val targetPos = position + 1
+                            if (targetPos < results.size) {
+                                listView.setSelectionFromTop(targetPos, (10 * d).toInt())
+                                listView.post {
+                                    val visibleIdx = targetPos - listView.firstVisiblePosition
+                                    if (visibleIdx in 0 until listView.childCount) {
+                                        listView.getChildAt(visibleIdx).requestFocus()
+                                    }
+                                }
+                                clickFeedback()
+                            }
+                            return@setOnKeyListener true
+                        }
+                    }
+                    false
+                }
+
+                itemBtn.setOnClickListener {
+                    clickFeedback()
+                    try {
+                        val podcastDir = StoragePaths.getPodcastsDir()
+                        if (!podcastDir.exists()) podcastDir.mkdirs()
+                        val subFile = File(podcastDir, "subscriptions.txt")
+                        val safeName = item.name.replace("|", "-")
+                        subFile.appendText("\n$safeName|${item.feedUrl}")
+
+                        Toast.makeText(activity, "✅ ${localize("Subscribed: ")}$safeName", Toast.LENGTH_SHORT).show()
+                        dialog.dismiss()
+                        buildChannelsUI()
+                    } catch (e: Exception) {
+                        Toast.makeText(activity, "Error saving: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                return itemBtn
+            }
+        }
+        listView.adapter = adapter
+
+        val listWrapper = LinearLayout(activity).apply {
+            addView(listView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (320 * d).toInt()))
+        }
+        rootLayout.addView(listWrapper)
+
+        dialog.setContentView(rootLayout)
+        dialog.window?.setLayout((340 * d).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT)
+        dialog.show()
+
+        listView.postDelayed({
+            if (listView.childCount > 0) {
+                listView.getChildAt(0).requestFocus()
+            }
+        }, 100)
+    }
+
     private fun sanitize(input: String): String {
         return input.replace(Regex("[\\\\/:*?\"<>|]"), "_")
     }
 }
+
