@@ -490,15 +490,18 @@ class CategoryListAdapter(
     private fun loadAlbumArtAsync(name: String, sampleFile: File?, targetView: ImageView) {
         if (sampleFile == null) return
         val stubItem = SongItem(sampleFile, "", "", name)
-        AlbumCoverManager.getInstance().loadCoverAsync(stubItem) { _, cover, _ ->
-            if (cover != null) {
-                val result = BitmapDrawable(MainActivity.instance.resources, cover)
-                coverCache?.put(name, result)
-                if (name == targetView.tag) {
-                    targetView.setImageDrawable(result)
+        AlbumCoverManager.getInstance().loadCoverAsync(stubItem, object : AlbumCoverManager.CoverCallback {
+            override fun onCoverLoaded(albumKey: String, cover: Bitmap?, reflection: Bitmap?) {
+                if (cover != null) {
+                    val res = MainActivity.instance?.resources ?: targetView.resources
+                    val result = BitmapDrawable(res, cover)
+                    coverCache?.put(name, result)
+                    if (name == targetView.tag) {
+                        targetView.setImageDrawable(result)
+                    }
                 }
             }
-        }
+        })
     }
 
     private fun getSimpleRowView(position: Int, convertView: View?, name: String): View {
