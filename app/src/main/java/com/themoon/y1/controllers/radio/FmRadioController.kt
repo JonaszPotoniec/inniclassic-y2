@@ -131,6 +131,46 @@ class FmRadioController(
         return prefs.getFloat("radio_last_freq", 87.5f)
     }
 
+    fun tuneToNextSavedRadioChannel(isNext: Boolean) {
+        if (savedRadioStations.isEmpty()) {
+            Toast.makeText(activity, localize("No saved channels."), Toast.LENGTH_SHORT).show()
+            return
+        }
+        var target = savedRadioStations[0]
+        if (isNext) {
+            for (f in savedRadioStations) {
+                if (f > fmManager.currentFreq) {
+                    target = f
+                    break
+                }
+            }
+        } else {
+            target = savedRadioStations[savedRadioStations.size - 1]
+            for (i in savedRadioStations.size - 1 downTo 0) {
+                if (savedRadioStations[i] < fmManager.currentFreq) {
+                    target = savedRadioStations[i]
+                    break
+                }
+            }
+        }
+        target = Math.round(target * 10.0f) / 10.0f
+        if (fmManager.isPowerUp) {
+            fmManager.tune(target)
+        } else {
+            fmManager.currentFreq = target
+        }
+
+        saveLastRadioFreq(target)
+
+        if (isRadioUIShowing) {
+            if (!isRadioSettingsMode) {
+                updateRadioMainPlayerUI()
+            } else {
+                buildRadioUI()
+            }
+        }
+    }
+
     fun toggleRadioPower() {
         val now = System.currentTimeMillis()
         if (now - lastRadioPowerToggleTime < 800) {

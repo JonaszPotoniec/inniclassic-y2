@@ -298,259 +298,59 @@ public class MainActivity extends Activity {
         });
     }
 
-    // 🚀 [신규 도구] 하드웨어 버튼용 좌/우 저장된 채널 점프 기능
     private void tuneToNextSavedRadioChannel(boolean isNext) {
-        com.themoon.y1.managers.FmRadioManager fm = com.themoon.y1.managers.FmRadioManager.getInstance(this);
-        if (savedRadioStations.isEmpty()) {
-            Toast.makeText(this, t("No saved channels."), Toast.LENGTH_SHORT).show();
-            return;
-        }
-        float target = savedRadioStations.get(0);
-        if (isNext) {
-            for (float f : savedRadioStations) {
-                if (f > fm.currentFreq) {
-                    target = f;
-                    break;
-                }
-            }
-        } else {
-            target = savedRadioStations.get(savedRadioStations.size() - 1);
-            for (int i = savedRadioStations.size() - 1; i >= 0; i--) {
-                if (savedRadioStations.get(i) < fm.currentFreq) {
-                    target = savedRadioStations.get(i);
-                    break;
-                }
-            }
-        }
-        target = Math.round(target * 10.0f) / 10.0f;
-        if (fm.isPowerUp)
-            fm.tune(target);
-        else
-            fm.currentFreq = target;
-
-        saveLastRadioFreq(target);
-
-        // 🚀 [수정 완료] 전체 리로드를 차단하고, 플레이어 화면일 때는 초고속 부분 새로고침만 작동시켜 깜빡임을 방지합니다!
-        if (currentScreenState == STATE_SETTINGS) {
-            if (isRadioUIShowing && !isRadioSettingsMode) {
-                updateRadioMainPlayerUI();
-            } else {
-                buildRadioUI();
-            }
+        if (fmRadioController != null) {
+            fmRadioController.tuneToNextSavedRadioChannel(isNext);
         }
     }
 
     public void loadSavedRadioStations() {
-        savedRadioStations.clear();
-        try {
-            if (prefs == null) prefs = getSharedPreferences("Y1_SETTINGS", MODE_PRIVATE);
-            String savedStationsStr = prefs.getString("radio_stations", "");
-            if (!savedStationsStr.isEmpty()) {
-                for (String s : savedStationsStr.split(",")) {
-                    s = s.trim();
-                    if (!s.isEmpty()) {
-                        float f = Float.parseFloat(s);
-                        f = Math.round(f * 10.0f) / 10.0f;
-                        if (!savedRadioStations.contains(f)) {
-                            savedRadioStations.add(f);
-                        }
-                    }
-                }
-                java.util.Collections.sort(savedRadioStations);
-            }
-        } catch (Exception e) {
-            Log.w("MainActivity", "Failed to load radio stations: " + e.getMessage());
+        if (fmRadioController != null) {
+            fmRadioController.loadSavedRadioStations();
         }
     }
 
     public void saveRadioStationsToPrefs() {
-        try {
-            if (prefs == null) prefs = getSharedPreferences("Y1_SETTINGS", MODE_PRIVATE);
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < savedRadioStations.size(); i++) {
-                sb.append(String.format(Locale.US, "%.1f", savedRadioStations.get(i)));
-                if (i < savedRadioStations.size() - 1)
-                    sb.append(",");
-            }
-            prefs.edit().putString("radio_stations", sb.toString()).commit();
-        } catch (Exception e) {
-            Log.w("MainActivity", "Failed to save radio stations: " + e.getMessage());
+        if (fmRadioController != null) {
+            fmRadioController.saveRadioStationsToPrefs();
         }
     }
 
     public void saveLastRadioFreq(float freq) {
-        try {
-            if (prefs == null) prefs = getSharedPreferences("Y1_SETTINGS", MODE_PRIVATE);
-            freq = Math.round(freq * 10.0f) / 10.0f;
-            prefs.edit().putFloat("radio_last_freq", freq).commit();
-        } catch (Exception e) {}
+        if (fmRadioController != null) {
+            fmRadioController.saveLastRadioFreq(freq);
+        }
     }
 
     public float loadLastRadioFreq() {
-        try {
-            if (prefs == null) prefs = getSharedPreferences("Y1_SETTINGS", MODE_PRIVATE);
-            return prefs.getFloat("radio_last_freq", 87.5f);
-        } catch (Exception e) {
-            return 87.5f;
+        if (fmRadioController != null) {
+            return fmRadioController.loadLastRadioFreq();
         }
+        return 87.5f;
     }
 
-    private long lastRadioPowerToggleTime = 0;
-
     public void toggleRadioPower() {
-        long now = System.currentTimeMillis();
-        if (now - lastRadioPowerToggleTime < 800) {
-            return;
-        }
-        lastRadioPowerToggleTime = now;
-        clickFeedback();
-
-        com.themoon.y1.managers.FmRadioManager fm = com.themoon.y1.managers.FmRadioManager.getInstance(this);
-        if (fm.isPowerUp) {
-            fm.powerDown();
-            setVolumeControlStream(AudioManager.STREAM_MUSIC);
-        } else {
-            com.themoon.y1.managers.AudioPlayerManager am = com.themoon.y1.managers.AudioPlayerManager.getInstance();
-            if (am.isPlaying()) {
-                am.playOrPauseMusic();
-            }
-            try {
-                Thread.sleep(50);
-            } catch (Exception e) {}
-
-            activePlayer = 1;
-            if (fm.powerUp(fm.currentFreq)) {
-                fm.routeFmAudio();
-                setVolumeControlStream(fm.getFmStreamType());
-            } else {
-                Toast.makeText(this, "Radio Error: " + fm.lastError, Toast.LENGTH_SHORT).show();
-            }
-        }
-        updateGlobalStatusPlayIcon();
-        if (isRadioUIShowing) {
-            if (!isRadioSettingsMode) {
-                updateRadioMainPlayerUI();
-            } else {
-                buildRadioUI();
-            }
+        if (fmRadioController != null) {
+            fmRadioController.toggleRadioPower();
         }
     }
 
     private void seekRadioStation(boolean isUp) {
-        com.themoon.y1.managers.FmRadioManager fm = com.themoon.y1.managers.FmRadioManager.getInstance(this);
-        if (!fm.isPowerUp) return;
-        Toast.makeText(this, t("Seeking FM Station..."), Toast.LENGTH_SHORT).show();
-        float found = fm.seekStation(isUp);
-        if (found > 0) {
-            found = Math.round(found * 10.0f) / 10.0f;
-            saveLastRadioFreq(found);
-            if (isRadioUIShowing && !isRadioSettingsMode) {
-                updateRadioMainPlayerUI();
-            } else {
-                buildRadioUI();
-            }
+        if (fmRadioController != null) {
+            fmRadioController.seekRadioStation(isUp);
         }
     }
 
-    private boolean hasPromptedRadioScan = false;
-
     private void promptInitialRadioScan() {
-        if (!savedRadioStations.isEmpty() || hasPromptedRadioScan) return;
-        hasPromptedRadioScan = true;
-
-        new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                .setTitle(t("FM Radio"))
-                .setMessage(t("No saved stations found.\nWould you like to scan for FM channels now?"))
-                .setPositiveButton(t("Scan"), (dialog, which) -> {
-                    startRadioAutoScan();
-                })
-                .setNegativeButton(t("Cancel"), null)
-                .show();
+        if (fmRadioController != null) {
+            fmRadioController.promptInitialRadioScan();
+        }
     }
 
     private void startRadioAutoScan() {
-        final com.themoon.y1.managers.FmRadioManager fmManager = com.themoon.y1.managers.FmRadioManager.getInstance(this);
-        if (isRadioScanning) return;
-
-        if (!fmManager.isPowerUp) {
-            com.themoon.y1.managers.AudioPlayerManager am = com.themoon.y1.managers.AudioPlayerManager.getInstance();
-            if (am.isPlaying()) am.playOrPauseMusic();
-            if (!fmManager.powerUp(fmManager.currentFreq)) {
-                Toast.makeText(this, "Radio Error: " + fmManager.lastError, Toast.LENGTH_SHORT).show();
-                return;
-            }
-            activePlayer = 1;
-            fmManager.routeFmAudio();
-            setVolumeControlStream(fmManager.getFmStreamType());
-            updateGlobalStatusPlayIcon();
+        if (fmRadioController != null) {
+            fmRadioController.startRadioAutoScan();
         }
-
-        isRadioScanning = true;
-        showLoadingPopup();
-
-        new Thread(() -> {
-            float fakeFreq = 87.5f;
-            int progress = 0;
-            while (isRadioScanning) {
-                final int p = progress;
-                final float f = fakeFreq;
-                runOnUiThread(() -> {
-                    if (pbLoadingProgress != null) {
-                        pbLoadingProgress.setIndeterminate(false);
-                        pbLoadingProgress.setProgress(p);
-                    }
-                    if (tvLoadingProgress != null) {
-                        tvLoadingProgress.setText(String.format(Locale.US,
-                                t("Scanning FM Frequencies...\nSearching around %.1f MHz"), f));
-                    }
-                });
-                try {
-                    Thread.sleep(70);
-                } catch (Exception e) {}
-                progress += 1;
-                if (progress > 100) progress = 0;
-                fakeFreq += 0.1f;
-                if (fakeFreq > 108.0f) fakeFreq = 87.5f;
-            }
-        }).start();
-
-        new Thread(() -> {
-            final float[] foundStations = fmManager.autoScan();
-            isRadioScanning = false;
-
-            runOnUiThread(() -> {
-                if (layoutLoadingOverlay != null)
-                    layoutLoadingOverlay.setVisibility(View.GONE);
-                if (tvLoadingProgress != null)
-                    tvLoadingProgress.setText(t("Preparing to scan...\nPlease wait."));
-
-                if (foundStations != null && foundStations.length > 0) {
-                    savedRadioStations.clear();
-                    for (float f : foundStations) {
-                        float cleanF = Math.round(f * 10.0f) / 10.0f;
-                        if (!savedRadioStations.contains(cleanF)) {
-                            savedRadioStations.add(cleanF);
-                        }
-                    }
-                    java.util.Collections.sort(savedRadioStations);
-                    saveRadioStationsToPrefs();
-
-                    float first = savedRadioStations.get(0);
-                    fmManager.tune(first);
-                    saveLastRadioFreq(first);
-
-                    Toast.makeText(MainActivity.this,
-                            t("Scan Complete!\nFound") + " " + savedRadioStations.size()
-                                    + " " + t("channels.\nTuning to") + " " + String.format(Locale.US, "%.1f MHz", first),
-                            Toast.LENGTH_LONG).show();
-                } else {
-                    Toast.makeText(MainActivity.this,
-                            t("No stations found.") + (fmManager.lastError != null ? " (" + fmManager.lastError + ")" : ""),
-                            Toast.LENGTH_LONG).show();
-                }
-                buildRadioUI();
-            });
-        }).start();
     }
 
     // 🚀 [신규 추가] 머티리얼 아이콘 폰트를 담아둘 메모리 공간
