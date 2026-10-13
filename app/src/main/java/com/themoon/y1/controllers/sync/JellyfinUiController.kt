@@ -9,6 +9,7 @@ import android.os.StatFs
 import android.text.TextUtils
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
@@ -104,6 +105,23 @@ class JellyfinUiController(
 
     override fun onExit() {
         currentDepth = 1
+    }
+
+    override fun onKeyLongPress(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+            val c = activity.currentFocus
+            if (c != null && currentDepth >= 3) {
+                lastLongClickTime = System.currentTimeMillis()
+                val main = activity as? com.themoon.y1.MainActivity
+                if (main != null) {
+                    main.lastJellyfinLongClickTime = lastLongClickTime
+                    main.isLongPressConsumed = true
+                }
+                c.performLongClick()
+                return true
+            }
+        }
+        return false
     }
 
     override fun onBackPressed(): Boolean {

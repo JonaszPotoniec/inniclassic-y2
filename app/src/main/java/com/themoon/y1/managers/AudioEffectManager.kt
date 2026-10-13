@@ -28,15 +28,15 @@ class AudioEffectManager private constructor() {
             val sessionId = AudioPlayerManager.getInstance().getAudioSessionId()
             if (main.equalizer == null || main.currentAudioSessionId != sessionId) {
                 main.equalizer?.release()
-                main.equalizer = Equalizer(0, sessionId).apply { enabled = true }
+                main.equalizer = Equalizer(0, sessionId).apply { setEnabled(true) }
             }
             if (main.bassBoost == null || main.currentAudioSessionId != sessionId) {
                 main.bassBoost?.release()
-                main.bassBoost = BassBoost(0, sessionId).apply { enabled = true }
+                main.bassBoost = BassBoost(0, sessionId).apply { setEnabled(true) }
             }
             if (main.virtualizer == null || main.currentAudioSessionId != sessionId) {
                 main.virtualizer?.release()
-                main.virtualizer = Virtualizer(0, sessionId).apply { enabled = true }
+                main.virtualizer = Virtualizer(0, sessionId).apply { setEnabled(true) }
             }
             if (Build.VERSION.SDK_INT >= 19 && (main.loudnessEnhancer == null || main.currentAudioSessionId != sessionId)) {
                 main.loudnessEnhancer?.release()
@@ -73,9 +73,9 @@ class AudioEffectManager private constructor() {
         try {
             if (main.isSoundCheckEnabled) {
                 main.loudnessEnhancer?.setTargetGain(500)
-                main.loudnessEnhancer?.enabled = true
+                main.loudnessEnhancer?.setEnabled(true)
             } else {
-                main.loudnessEnhancer?.enabled = false
+                main.loudnessEnhancer?.setEnabled(false)
             }
         } catch (ignored: Exception) {}
     }
@@ -86,7 +86,7 @@ class AudioEffectManager private constructor() {
 
         try {
             if (main.isSoftwareEqEnabled) {
-                main.equalizer?.enabled = false
+                main.equalizer?.setEnabled(false)
                 AudioPlayerManager.getInstance().customEqProcessor.setEnabled(true)
 
                 var name = main.currentEqProfile.replace("custom_", "")
@@ -101,7 +101,7 @@ class AudioEffectManager private constructor() {
             } else {
                 AudioPlayerManager.getInstance().customEqProcessor.setEnabled(false)
                 val eq = main.equalizer ?: return
-                eq.enabled = true
+                eq.setEnabled(true)
 
                 if (main.currentEqProfile.startsWith("preset_")) {
                     val pIdx = main.currentEqProfile.replace("preset_", "").toInt()

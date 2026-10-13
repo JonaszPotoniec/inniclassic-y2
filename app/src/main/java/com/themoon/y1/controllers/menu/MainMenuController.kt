@@ -9,6 +9,7 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.util.SparseIntArray
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -804,5 +805,56 @@ class MainMenuController(
         ).apply {
             cornerRadius = 0f
         }
+    }
+
+    override fun onWheel(delta: Int, event: KeyEvent): Boolean {
+        val c = activity.currentFocus
+        if (c != null) {
+            val targetId = if (delta < 0) c.nextFocusUpId else c.nextFocusDownId
+            if (targetId != View.NO_ID) {
+                val target = activity.findViewById<View>(targetId)
+                if (target != null) {
+                    target.requestFocus()
+                    clickFeedback()
+                    return true
+                }
+            }
+        } else {
+            val firstBtn = activity.findViewById<View>(dynamicViewId(10000))
+            if (firstBtn != null) {
+                firstBtn.requestFocus()
+                clickFeedback()
+                return true
+            }
+        }
+        return false
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == 21 || keyCode == 22) {
+            return onWheel(if (keyCode == 22) 1 else -1, event)
+        }
+        if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == 23 || keyCode == KeyEvent.KEYCODE_ENTER) {
+            if (event.repeatCount == 0) {
+                event.startTracking()
+            }
+            return true
+        }
+        return false
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == 23 || keyCode == KeyEvent.KEYCODE_ENTER) {
+            if ((event.flags and KeyEvent.FLAG_CANCELED_LONG_PRESS) == 0) {
+                val c = activity.currentFocus
+                if (c != null) {
+                    clickFeedback()
+                    c.performClick()
+                    return true
+                }
+            }
+            return true
+        }
+        return false
     }
 }

@@ -82,7 +82,6 @@ class PodcastSearchClient private constructor() {
         @Volatile
         private var instance: PodcastSearchClient? = null
 
-        @JvmStatic
         fun getInstance(): PodcastSearchClient {
             return instance ?: synchronized(this) {
                 instance ?: PodcastSearchClient().also { instance = it }

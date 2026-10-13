@@ -18,7 +18,6 @@ class NavigationManager private constructor() {
         private set
 
     var activeController: ScreenController? = null
-        private set
 
     interface StateChangeListener {
         fun onScreenTransition(from: ScreenState, to: ScreenState)
@@ -94,7 +93,6 @@ class NavigationManager private constructor() {
         @Volatile
         private var instance: NavigationManager? = null
 
-        @JvmStatic
         fun getInstance(): NavigationManager {
             return instance ?: synchronized(this) {
                 instance ?: NavigationManager().also { instance = it }

@@ -1,0 +1,131 @@
+package com.themoon.y1
+
+import android.graphics.Color
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.TextView
+
+internal fun MainActivity.initViewBindings() {
+    layoutMainMenu = findViewById(R.id.layout_main_menu)
+    layoutBrowserMode = findViewById(R.id.layout_browser_mode)
+    layoutPlayerMode = findViewById(R.id.layout_player_mode)
+    layoutSettingsMode = findViewById(R.id.layout_settings_mode)
+    layoutBluetoothMode = findViewById(R.id.layout_bluetooth_mode)
+    layoutWifiMode = findViewById(R.id.layout_wifi_mode)
+    layoutWifiKeyboard = findViewById(R.id.layout_wifi_keyboard)
+    layoutBrightnessMode = findViewById(R.id.layout_brightness_mode)
+    layoutStorageMode = findViewById(R.id.layout_storage_mode)
+    layoutWebServerMode = findViewById(R.id.layout_webserver_mode)
+    layoutVideosMode = findViewById(R.id.layout_videos_mode)
+    layoutVideoPlayerMode = findViewById(R.id.layout_video_player_mode)
+    layoutVolumeOverlay = findViewById(R.id.layout_volume_overlay)
+
+    val rootContent = findViewById<ViewGroup>(android.R.id.content)
+    tvFastScrollLetter = TextView(this).apply {
+        textSize = 64f
+        gravity = Gravity.CENTER
+        visibility = View.GONE
+        val lp = FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            gravity = Gravity.CENTER
+        }
+        rootContent.addView(this, lp)
+    }
+
+    volumeProgress = findViewById(R.id.volume_progress)
+    volumeProgress?.max = MainActivity.VIRTUAL_VOLUME_STEPS
+
+    findViewById<View>(R.id.tv_overlay_volume_down)?.setOnClickListener {
+        adjustVolume(false)
+        clickFeedback()
+    }
+    findViewById<View>(R.id.tv_overlay_volume_up)?.setOnClickListener {
+        adjustVolume(true)
+        clickFeedback()
+    }
+
+    ivMainBg = findViewById(R.id.iv_main_bg)
+    ivAlbumArt = findViewById(R.id.iv_album_art)
+    ivAlbumReflection = findViewById(R.id.iv_album_reflection)
+    ivPlayerBgBlur = findViewById(R.id.iv_player_bg_blur)
+    ivPauseOverlay = findViewById(R.id.iv_pause_overlay)
+    tvPlayerTitle = findViewById(R.id.tv_player_title)
+    tvPlayerArtist = findViewById(R.id.tv_player_artist)
+    tvPlayerAlbum = findViewById(R.id.tv_player_album)
+    tvPlayerTrackCount = findViewById(R.id.tv_player_track_count)
+    tvPlayerTimeCurrent = findViewById(R.id.tv_player_time_current)
+    tvPlayerTimeTotal = findViewById(R.id.tv_player_time_total)
+    playerProgress = findViewById(R.id.player_progress)
+
+    layoutLoadingOverlay = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER
+        setBackgroundColor(0xDD000000.toInt())
+        isClickable = true
+        isFocusable = true
+        visibility = View.GONE
+        val pb = ProgressBar(this@initViewBindings)
+        pbLoadingProgress = pb
+        addView(pb)
+        val tv = TextView(this@initViewBindings).apply {
+            setTextColor(Color.WHITE)
+            textSize = 16f
+            setPadding(0, 16, 0, 0)
+        }
+        tvLoadingProgress = tv
+        addView(tv)
+    }
+    rootContent.addView(layoutLoadingOverlay, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+
+    tvStatusBarTitle = findViewById(R.id.tv_status_clock)
+    ivStatusWifi = findViewById(R.id.iv_status_wifi)
+    ivStatusBluetooth = findViewById(R.id.iv_status_bluetooth)
+    ivStatusHeadphone = findViewById(R.id.iv_status_headphone)
+    tvStatusBattery = findViewById(R.id.tv_status_battery)
+}
+
+internal fun MainActivity.applyRootSystemSettings() {
+    try {
+        val pkg = packageName
+        val combinedCmd = "setprop persist.bluetooth.avrcpversion 1.6 && " +
+                "setprop persist.sys.timezone GMT && " +
+                "settings put global wifi_sleep_policy 2 && " +
+                "pm grant $pkg android.permission.DUMP && " +
+                "pm grant $pkg android.permission.BATTERY_STATS && " +
+                "pm grant $pkg android.permission.PACKAGE_USAGE_STATS && " +
+                "pm grant $pkg android.permission.WRITE_SECURE_SETTINGS"
+        Runtime.getRuntime().exec(arrayOf("su", "-c", combinedCmd))
+    } catch (_: Exception) {}
+}
+
+internal fun MainActivity.loadPreferences() {
+    isShuffleMode = prefs.getBoolean("shuffle", false)
+    repeatMode = prefs.getInt("repeat_mode", 0)
+    isSoundEffectEnabled = prefs.getBoolean("sound_effect", true)
+    isVibrationEnabled = prefs.getBoolean("vibration", true)
+    vibrationStrengthLevel = prefs.getInt("vibration_level", 1)
+    isScreenOffControlEnabled = prefs.getBoolean("screen_off_control", false)
+    isUsbPromptEnabled = prefs.getBoolean("usb_prompt", true)
+    isAutoFetchEnabled = prefs.getBoolean("auto_fetch", true)
+    is24HourFormat = prefs.getBoolean("is_24_hour_format", false)
+    isTimeInTitleBar = prefs.getBoolean("time_in_title_bar", false)
+    isShowBatteryPercentage = prefs.getBoolean("show_battery_percentage", false)
+    isSoundCheckEnabled = prefs.getBoolean("sound_check", false)
+    isAlbumTiltEnabled = prefs.getBoolean("album_tilt_effect", true)
+    volumeLimitMax = prefs.getInt("volume_limit_max", -1)
+    isSoftwareEqEnabled = prefs.getBoolean("software_eq", false)
+    currentTimeoutIndex = prefs.getInt("screen_timeout_index", 1)
+    currentSystemBrightness = prefs.getInt("brightness_level", 255)
+
+    eqPresetNames.clear()
+    eqPresetNames.addAll(listOf("Off", "Acoustic", "Bass Booster", "Bass Reducer", "Classical", "Electronic", "Hip Hop", "Jazz", "Latin", "Loudness", "Pop", "R&B", "Rock", "Vocal Booster"))
+
+    favoritePaths.clear()
+    favoritePaths.addAll(prefs.getStringSet("favorite_songs_set", emptySet()) ?: emptySet())
+
+    blacklist.clear()
+    blacklist.addAll(prefs.getStringSet("blacklisted_files", emptySet()) ?: emptySet())
+}

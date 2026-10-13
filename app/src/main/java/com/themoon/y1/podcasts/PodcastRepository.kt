@@ -264,7 +264,6 @@ class PodcastRepository private constructor() {
         @Volatile
         private var instance: PodcastRepository? = null
 
-        @JvmStatic
         fun getInstance(): PodcastRepository {
             return instance ?: synchronized(this) {
                 instance ?: PodcastRepository().also { instance = it }

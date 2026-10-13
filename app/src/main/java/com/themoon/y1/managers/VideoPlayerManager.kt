@@ -80,8 +80,7 @@ class VideoPlayerManager private constructor() {
             val h = surfaceView.height
             if (w > 0 && h > 0) {
                 vlcVout.setWindowSize(w, h)
-                val stretchFill = MainActivity.instance != null &&
-                        MainActivity.instance.prefs.getBoolean("video_stretch_fill", false)
+                val stretchFill = MainActivity.instance?.prefs?.getBoolean("video_stretch_fill", false) == true
                 player.aspectRatio = if (stretchFill) "$w:$h" else null
             }
         }
@@ -95,8 +94,8 @@ class VideoPlayerManager private constructor() {
         player.play()
         applyMasterVolume()
 
-        if (MainActivity.instance != null) {
-            val savedPos = MainActivity.instance.prefs.getLong("video_pos_" + videoFile.absolutePath, 0)
+        MainActivity.instance?.let { act ->
+            val savedPos = act.prefs.getLong("video_pos_" + videoFile.absolutePath, 0)
             if (savedPos > 0) {
                 player.time = savedPos
             }
@@ -116,15 +115,15 @@ class VideoPlayerManager private constructor() {
     private fun saveResumePositionIfNeeded() {
         val player = mediaPlayer ?: return
         val file = currentVideoFile ?: return
-        if (MainActivity.instance == null) return
+        val act = MainActivity.instance ?: return
 
         val pos = player.time
         val dur = player.length
         val key = "video_pos_" + file.absolutePath
         if (pos < RESUME_MIN_POS_MS || (dur > 0 && pos > dur - RESUME_END_MARGIN_MS)) {
-            MainActivity.instance.prefs.edit().remove(key).apply()
+            act.prefs.edit().remove(key).apply()
         } else {
-            MainActivity.instance.prefs.edit().putLong(key, pos).apply()
+            act.prefs.edit().putLong(key, pos).apply()
         }
     }
 

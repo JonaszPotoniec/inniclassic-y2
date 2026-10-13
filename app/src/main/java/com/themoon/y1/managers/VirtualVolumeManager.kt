@@ -163,7 +163,6 @@ class VirtualVolumeManager private constructor() {
         @Volatile
         private var instance: VirtualVolumeManager? = null
 
-        @JvmStatic
         @Synchronized
         fun getInstance(): VirtualVolumeManager {
             var inst = instance
@@ -178,7 +177,6 @@ class VirtualVolumeManager private constructor() {
          * Maps 30-step virtual volume (0..30) to digital software attenuation gain (0.0f..1.0f).
          * Steps 1..5 provide fine-grained sub-steps down to -28 dBFS for sensitive headphones at hardware volume 1.
          */
-        @JvmStatic
         fun virtualToSoftwareGain(virtualVol: Int): Float {
             if (virtualVol <= 0) return 0.0f
             return when (virtualVol) {
@@ -194,7 +192,6 @@ class VirtualVolumeManager private constructor() {
         /**
          * Maps 30-step virtual volume to Android hardware/system volume (0..sysMaxVol, typically 15).
          */
-        @JvmStatic
         fun virtualToSystemVolume(virtualVol: Int, sysMaxVol: Int): Int {
             if (virtualVol <= 0) return 0
             if (virtualVol <= 6) return 1
@@ -207,7 +204,6 @@ class VirtualVolumeManager private constructor() {
         /**
          * Converts Android system volume to closest 30-step virtual volume.
          */
-        @JvmStatic
         fun systemToVirtualVolume(sysVol: Int, sysMaxVol: Int, currentVirtualVol: Int): Int {
             if (sysVol <= 0) return 0
             if (sysVol == 1) {

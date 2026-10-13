@@ -180,8 +180,9 @@ class AlbumCoverManager private constructor() {
         var rawBmp: Bitmap? = null
 
         try {
-            if (MainActivity.instance?.prefs != null) {
-                val cachedArtPath = MainActivity.instance.prefs.getString("album_art_$trackPath", null)
+            val act = MainActivity.instance
+            if (act != null) {
+                val cachedArtPath = act.prefs.getString("album_art_$trackPath", null)
                 if (cachedArtPath != null && File(cachedArtPath).exists()) {
                     rawBmp = decodeSampledBitmapFromFile(cachedArtPath, THUMB_SIZE, THUMB_SIZE)
                 }
@@ -202,8 +203,9 @@ class AlbumCoverManager private constructor() {
 
         if (rawBmp == null) {
             try {
-                if (MainActivity.instance != null) {
-                    val folderCover = MainActivity.instance.findFolderCover(item.file.parentFile)
+                val act = MainActivity.instance
+                if (act != null) {
+                    val folderCover = act.findFolderCover(item.file.parentFile)
                     if (folderCover != null && folderCover.exists()) {
                         rawBmp = decodeSampledBitmapFromFile(folderCover.absolutePath, THUMB_SIZE, THUMB_SIZE)
                     }
@@ -361,11 +363,11 @@ class AlbumCoverManager private constructor() {
                             + finalGenerated + ", Skipped: " + finalSkipped
                 )
 
-                if (finalGenerated > 0 && MainActivity.instance != null) {
-                    MainActivity.instance.runOnUiThread {
-                        if (MainActivity.instance != null) {
+                if (finalGenerated > 0) {
+                    MainActivity.instance?.let { act ->
+                        act.runOnUiThread {
                             Toast.makeText(
-                                MainActivity.instance,
+                                act,
                                 "Cover cache updated ($finalGenerated thumbnails ready)",
                                 Toast.LENGTH_SHORT
                             ).show()

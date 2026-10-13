@@ -16,6 +16,7 @@ import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import com.themoon.y1.MainActivity
 import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
@@ -744,6 +745,20 @@ class FmRadioController(
                 }
                 return true
             }
+        }
+        return false
+    }
+
+    override fun onKeyLongPress(keyCode: Int, event: KeyEvent): Boolean {
+        if (!isRadioSettingsMode && (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == 85
+                || keyCode == KeyEvent.KEYCODE_MEDIA_STOP || keyCode == 86 || keyCode == 126 || keyCode == 127)) {
+            clickFeedback()
+            (activity as? MainActivity)?.let { main ->
+                main.isMediaLongPressConsumed = true
+            }
+            isRadioSettingsMode = true
+            buildRadioUI()
+            return true
         }
         return false
     }

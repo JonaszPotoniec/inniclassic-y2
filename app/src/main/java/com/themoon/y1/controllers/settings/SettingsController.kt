@@ -178,6 +178,26 @@ class SettingsController(
         return false
     }
 
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (isMenuReorderMode && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
+            toggleMenuReorderMode()
+            clickFeedback()
+            return true
+        }
+        return false
+    }
+
+    override fun onKeyLongPress(keyCode: Int, event: KeyEvent): Boolean {
+        if (settingsSubMode == 4 && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
+            if (!isMenuReorderMode) {
+                toggleMenuReorderMode()
+                clickFeedback()
+            }
+            return true
+        }
+        return false
+    }
+
     fun buildSettingsUI() {
         currentSettingsDepth = 0
         settingsSubMode = 0

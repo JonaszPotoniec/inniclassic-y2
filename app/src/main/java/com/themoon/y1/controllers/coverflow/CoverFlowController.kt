@@ -474,6 +474,14 @@ class CoverFlowController(
         tvBrowserPath.text = localize("Cover Flow") + " (" + (currentCoverFlowIndex + 1) + "/" + total + ")"
     }
 
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN && (event.keyCode == 21 || event.keyCode == 22)) {
+            handleCoverFlowWheelInput(event.keyCode, event)
+            return true
+        }
+        return false
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (keyCode == 21 || keyCode == 22) {
             handleCoverFlowWheelInput(keyCode, event)

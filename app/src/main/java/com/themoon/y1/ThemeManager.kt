@@ -15,59 +15,55 @@ import java.util.zip.ZipInputStream
 object ThemeManager {
 
     class MenuElement(
-        @JvmField var id: String,
-        @JvmField var type: String,
-        @JvmField var parentId: String,
-        @JvmField var visibleOnFocus: String,
-        @JvmField var x: Int,
-        @JvmField var y: Int,
-        @JvmField var width: Int,
-        @JvmField var height: Int,
-        @JvmField var textNormal: String,
-        @JvmField var textFocused: String,
-        @JvmField var textRight: String,
-        @JvmField var textRightColor: String,
-        @JvmField var textRightFocusedColor: String,
-        @JvmField var iconNormal: String,
-        @JvmField var iconFocused: String,
-        @JvmField var previewImage: String,
-        @JvmField var action: String,
-        @JvmField var gravity: String,
-        @JvmField var radius: Int,
-        @JvmField var focusIndex: Int,
-        @JvmField var textSize: Int,
-        @JvmField var textSecondarySize: Int,
-        @JvmField var textPosition: String,
-        @JvmField var textAlign: String,
-        @JvmField var bgColor: String,
-        @JvmField var padding: Int,
-        @JvmField var focusOffsetX: Int,
-        @JvmField var focusOffsetY: Int,
-        @JvmField var focusScale: Float
+        var id: String,
+        var type: String,
+        var parentId: String,
+        var visibleOnFocus: String,
+        var x: Int,
+        var y: Int,
+        var width: Int,
+        var height: Int,
+        var textNormal: String,
+        var textFocused: String,
+        var textRight: String,
+        var textRightColor: String,
+        var textRightFocusedColor: String,
+        var iconNormal: String,
+        var iconFocused: String,
+        var previewImage: String,
+        var action: String,
+        var gravity: String,
+        var radius: Int,
+        var focusIndex: Int,
+        var textSize: Int,
+        var textSecondarySize: Int,
+        var textPosition: String,
+        var textAlign: String,
+        var bgColor: String,
+        var padding: Int,
+        var focusOffsetX: Int,
+        var focusOffsetY: Int,
+        var focusScale: Float
     )
 
     class ThemeData(
-        @JvmField var folderPath: String,
-        @JvmField var name: String,
-        @JvmField var bgImage: String,
-        @JvmField var customFont: Typeface,
-        @JvmField var textPrimary: Int,
-        @JvmField var textSecondary: Int,
-        @JvmField var bgOverlay: Int,
-        @JvmField var statusBarBg: Int,
-        @JvmField var btnNormal: Int,
-        @JvmField var btnFocused: Int,
-        @JvmField var btnFocusedText: Int,
-        @JvmField var buttonRadius: Int
+        var folderPath: String,
+        var name: String,
+        var bgImage: String,
+        var customFont: Typeface,
+        var textPrimary: Int,
+        var textSecondary: Int,
+        var bgOverlay: Int,
+        var statusBarBg: Int,
+        var btnNormal: Int,
+        var btnFocused: Int,
+        var btnFocusedText: Int,
+        var buttonRadius: Int
     ) {
-        @JvmField
         var customFontBold: Typeface? = null
-
-        @JvmField
         var menuElements: MutableList<MenuElement> = ArrayList()
     }
 
-    @JvmField
     var availableThemes: MutableList<ThemeData> = ArrayList()
 
     private var currentThemeIndex: Int = 0
@@ -91,7 +87,6 @@ object ThemeManager {
         return defaultColor
     }
 
-    @JvmStatic
     fun getCustomIcon(iconFileName: String?, context: Context, defaultResId: Int): Bitmap? {
         if (availableThemes.isNotEmpty() && !iconFileName.isNullOrEmpty()) {
             val folder = getCurrentTheme().folderPath
@@ -127,13 +122,11 @@ object ThemeManager {
         return null
     }
 
-    @JvmStatic
     fun getStatusBarBackgroundColor(): Int {
         if (availableThemes.isEmpty()) return 0x66000000
         return availableThemes[currentThemeIndex].statusBarBg
     }
 
-    @JvmStatic
     fun loadThemesFromStorage(themeFolder: File) {
         availableThemes.clear()
 
@@ -317,12 +310,10 @@ object ThemeManager {
         }
     }
 
-    @JvmStatic
     fun setThemeIndex(index: Int) {
         currentThemeIndex = if (index in 0 until availableThemes.size) index else 0
     }
 
-    @JvmStatic
     fun findThemeIndexByName(name: String?): Int {
         if (name == null) return -1
         for (i in availableThemes.indices) {
@@ -331,10 +322,8 @@ object ThemeManager {
         return -1
     }
 
-    @JvmStatic
     fun getCurrentThemeIndex(): Int = currentThemeIndex
 
-    @JvmStatic
     fun getCurrentTheme(): ThemeData {
         if (availableThemes.isEmpty() || currentThemeIndex < 0 || currentThemeIndex >= availableThemes.size) {
             return DEFAULT_FALLBACK_THEME
@@ -342,13 +331,11 @@ object ThemeManager {
         return availableThemes[currentThemeIndex]
     }
 
-    @JvmStatic
     fun getCustomFont(): Typeface {
         if (availableThemes.isEmpty()) return Typeface.DEFAULT
         return availableThemes[currentThemeIndex].customFont
     }
 
-    @JvmStatic
     fun getCustomFontBold(): Typeface {
         if (availableThemes.isNotEmpty()) {
             val realBold = getCurrentTheme().customFontBold
@@ -363,36 +350,26 @@ object ThemeManager {
         return cachedBoldFont ?: Typeface.DEFAULT_BOLD
     }
 
-    @JvmStatic
     fun isClassicTheme(): Boolean {
         val name = getCurrentTheme().name
         return "iPod Classic" == name || "iPod Classic Dark" == name
     }
 
-    @JvmStatic
     fun isClassicLightTheme(): Boolean = "iPod Classic" == getCurrentTheme().name
 
-    @JvmStatic
     fun getListTextSize(): Float = if (isClassicTheme()) 21f else 23f
 
-    @JvmStatic
     fun getTextColorPrimary(): Int = getCurrentTheme().textPrimary
 
-    @JvmStatic
     fun getTextColorSecondary(): Int = getCurrentTheme().textSecondary
 
-    @JvmStatic
     fun getOverlayBackgroundColor(): Int = getCurrentTheme().bgOverlay
 
-    @JvmStatic
     fun getListButtonNormalBg(): Int = getCurrentTheme().btnNormal
 
-    @JvmStatic
     fun getListButtonFocusedBg(): Int = getCurrentTheme().btnFocused
 
-    @JvmStatic
     fun getListButtonFocusedTextColor(): Int = getCurrentTheme().btnFocusedText
 
-    @JvmStatic
     fun getButtonRadius(): Int = getCurrentTheme().buttonRadius
 }

@@ -20,6 +20,8 @@ import com.themoon.y1.MainActivity
 import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
+import com.themoon.y1.controllers.browser.BrowserController
+import com.themoon.y1.navigation.BrowserMode
 import com.themoon.y1.managers.AlbumCoverManager
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.views.ClassicMenuStyle
@@ -44,22 +46,25 @@ class CategoryListAdapter(
         if (type == "ALBUM" || type == "GENRE_ALBUM") {
             val counts = HashMap<String, Int>()
             val filesMap = HashMap<String, MutableList<File>>()
-            val main = MainActivity.instance
+            val bc = MainActivity.instance?.browserController
+            val genreFilter = bc?.categoryGenreFilter ?: ""
+            val artistFilter = bc?.categoryArtistFilter ?: ""
+            val isTrackArtist = bc?.categoryArtistFilterIsTrackArtist == true
 
             for (song in MainActivity.customLibrary) {
                 if (type == "GENRE_ALBUM") {
-                    if (song.genre.isEmpty() || !song.genre.equals(main?.categoryGenreFilter, ignoreCase = true)) {
+                    if (song.genre.isEmpty() || !song.genre.equals(genreFilter, ignoreCase = true)) {
                         continue
                     }
-                    if (!main?.categoryArtistFilter.isNullOrEmpty()) {
-                        val matchField = if (main?.categoryArtistFilterIsTrackArtist == true) song.artist else song.albumArtist
-                        if (!main?.categoryArtistFilter.equals(matchField, ignoreCase = true)) {
+                    if (artistFilter.isNotEmpty()) {
+                        val matchField = if (isTrackArtist) song.artist else song.albumArtist
+                        if (!artistFilter.equals(matchField, ignoreCase = true)) {
                             continue
                         }
                     }
-                } else if (!main?.categoryArtistFilter.isNullOrEmpty()) {
-                    val matchField = if (main?.categoryArtistFilterIsTrackArtist == true) song.artist else song.albumArtist
-                    if (!main?.categoryArtistFilter.equals(matchField, ignoreCase = true)) {
+                } else if (artistFilter.isNotEmpty()) {
+                    val matchField = if (isTrackArtist) song.artist else song.albumArtist
+                    if (!artistFilter.equals(matchField, ignoreCase = true)) {
                         continue
                     }
                 }
@@ -90,7 +95,7 @@ class CategoryListAdapter(
     override fun getItemViewType(position: Int): Int {
         val name = items[position]
         return when {
-            MainActivity.ALL_SONGS_SENTINEL == name -> 0
+            BrowserController.ALL_SONGS_SENTINEL == name -> 0
             type == "ALBUM" || type == "GENRE_ALBUM" -> 1
             else -> 2
         }
@@ -99,7 +104,7 @@ class CategoryListAdapter(
     override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
         val name = items[position]
         return when {
-            MainActivity.ALL_SONGS_SENTINEL == name -> getAllSongsRowView(position, convertView)
+            BrowserController.ALL_SONGS_SENTINEL == name -> getAllSongsRowView(position, convertView)
             type == "ALBUM" || type == "GENRE_ALBUM" -> getAlbumRowView(position, convertView, name)
             else -> getSimpleRowView(position, convertView, name)
         }
@@ -209,27 +214,28 @@ class CategoryListAdapter(
 
         if (cachedAllSongsCount < 0) {
             var allCount = 0
+            val bc = main.browserController
             if (type == "GENRE_ARTIST") {
                 for (song in MainActivity.customLibrary) {
-                    if (song.genre.isNotEmpty() && song.genre.equals(main.categoryGenreFilter, ignoreCase = true)) {
+                    if (song.genre.isNotEmpty() && song.genre.equals(bc.categoryGenreFilter, ignoreCase = true)) {
                         allCount++
                     }
                 }
             } else if (type == "GENRE_ALBUM") {
-                val isTrack = main.categoryArtistFilterIsTrackArtist
+                val isTrack = bc.categoryArtistFilterIsTrackArtist
                 for (song in MainActivity.customLibrary) {
-                    if (song.genre.isNotEmpty() && song.genre.equals(main.categoryGenreFilter, ignoreCase = true)) {
+                    if (song.genre.isNotEmpty() && song.genre.equals(bc.categoryGenreFilter, ignoreCase = true)) {
                         val matchField = if (isTrack) song.artist else song.albumArtist
-                        if (main.categoryArtistFilter.equals(matchField, ignoreCase = true)) {
+                        if (bc.categoryArtistFilter.equals(matchField, ignoreCase = true)) {
                             allCount++
                         }
                     }
                 }
             } else {
-                val isTrackArtistMode = main.categoryArtistFilterIsTrackArtist
+                val isTrackArtistMode = bc.categoryArtistFilterIsTrackArtist
                 for (song in MainActivity.customLibrary) {
                     val matchField = if (isTrackArtistMode) song.artist else song.albumArtist
-                    if (main.categoryArtistFilter == matchField) {
+                    if (bc.categoryArtistFilter == matchField) {
                         allCount++
                     }
                 }
@@ -264,51 +270,53 @@ class CategoryListAdapter(
         }
 
         row.setOnClickListener {
-            main.virtualListSelectedIndex = position
+            val bc = main.browserController
+            bc.virtualListSelectedIndex = position
             main.clickFeedback()
             when (type) {
                 "GENRE_ARTIST" -> {
-                    main.virtualQueryType = "GENRE"
-                    main.virtualQueryValue = main.categoryGenreFilter
+                    bc.virtualQueryType = "GENRE"
+                    bc.virtualQueryValue = bc.categoryGenreFilter
                 }
                 "GENRE_ALBUM" -> {
-                    main.virtualQueryType = "GENRE_ARTIST_SONGS"
-                    main.virtualQueryValue = main.categoryArtistFilter
+                    bc.virtualQueryType = "GENRE_ARTIST_SONGS"
+                    bc.virtualQueryValue = bc.categoryArtistFilter
                 }
                 else -> {
-                    main.virtualQueryType = if (main.categoryArtistFilterIsTrackArtist) "ARTIST" else "ARTIST_ALL_ALBUMS"
-                    main.virtualQueryValue = main.categoryArtistFilter
+                    bc.virtualQueryType = if (bc.categoryArtistFilterIsTrackArtist) "ARTIST" else "ARTIST_ALL_ALBUMS"
+                    bc.virtualQueryValue = bc.categoryArtistFilter
                 }
             }
-            main.currentBrowserMode = MainActivity.BROWSER_VIRTUAL_SONGS
-            main.buildVirtualSongs()
+            bc.currentBrowserMode = BrowserMode.VirtualSongs
+            bc.buildVirtualSongs()
         }
 
         row.setOnLongClickListener {
             main.clickFeedback()
             main.isLongPressConsumed = true
+            val bc = main.browserController
             val tracks = ArrayList<File>()
             if (type == "GENRE_ARTIST") {
                 for (song in MainActivity.customLibrary) {
-                    if (song.genre.isNotEmpty() && song.genre.equals(main.categoryGenreFilter, ignoreCase = true)) {
+                    if (song.genre.isNotEmpty() && song.genre.equals(bc.categoryGenreFilter, ignoreCase = true)) {
                         tracks.add(song.file)
                     }
                 }
             } else if (type == "GENRE_ALBUM") {
-                val isTrack = main.categoryArtistFilterIsTrackArtist
+                val isTrack = bc.categoryArtistFilterIsTrackArtist
                 for (song in MainActivity.customLibrary) {
-                    if (song.genre.isNotEmpty() && song.genre.equals(main.categoryGenreFilter, ignoreCase = true)) {
+                    if (song.genre.isNotEmpty() && song.genre.equals(bc.categoryGenreFilter, ignoreCase = true)) {
                         val matchField = if (isTrack) song.artist else song.albumArtist
-                        if (main.categoryArtistFilter.equals(matchField, ignoreCase = true)) {
+                        if (bc.categoryArtistFilter.equals(matchField, ignoreCase = true)) {
                             tracks.add(song.file)
                         }
                     }
                 }
             } else {
-                val isTrack = main.categoryArtistFilterIsTrackArtist
+                val isTrack = bc.categoryArtistFilterIsTrackArtist
                 for (song in MainActivity.customLibrary) {
                     val matchField = if (isTrack) song.artist else song.albumArtist
-                    if (main.categoryArtistFilter == matchField) {
+                    if (bc.categoryArtistFilter == matchField) {
                         tracks.add(song.file)
                     }
                 }
@@ -472,16 +480,17 @@ class CategoryListAdapter(
         }
 
         row.setOnClickListener {
-            main.virtualListSelectedIndex = position
+            val bc = main.browserController
+            bc.virtualListSelectedIndex = position
             main.clickFeedback()
             if (type == "GENRE_ALBUM") {
-                main.virtualQueryType = "GENRE_ALBUM_SONGS"
+                bc.virtualQueryType = "GENRE_ALBUM_SONGS"
             } else {
-                main.virtualQueryType = type
+                bc.virtualQueryType = type
             }
-            main.virtualQueryValue = name
-            main.currentBrowserMode = MainActivity.BROWSER_VIRTUAL_SONGS
-            main.buildVirtualSongs()
+            bc.virtualQueryValue = name
+            bc.currentBrowserMode = BrowserMode.VirtualSongs
+            bc.buildVirtualSongs()
         }
 
         return row
@@ -590,36 +599,37 @@ class CategoryListAdapter(
         }
 
         row.setOnClickListener {
-            main.virtualListSelectedIndex = position
+            val bc = main.browserController
+            bc.virtualListSelectedIndex = position
             main.clickFeedback()
             when (type) {
                 "GENRE" -> {
-                    main.categoryGenreFilter = name
-                    main.categoryArtistFilter = ""
-                    main.categoryArtistFilterIsTrackArtist = true
-                    main.currentBrowserMode = MainActivity.BROWSER_GENRE_ARTISTS
-                    main.virtualQueryValue = ""
-                    main.buildVirtualCategories("GENRE_ARTIST")
+                    bc.categoryGenreFilter = name
+                    bc.categoryArtistFilter = ""
+                    bc.categoryArtistFilterIsTrackArtist = true
+                    bc.currentBrowserMode = BrowserMode.GenreArtists(name)
+                    bc.virtualQueryValue = ""
+                    bc.buildVirtualCategories("GENRE_ARTIST")
                 }
                 "GENRE_ARTIST" -> {
-                    main.categoryArtistFilter = name
-                    main.categoryArtistFilterIsTrackArtist = true
-                    main.currentBrowserMode = MainActivity.BROWSER_GENRE_ALBUMS
-                    main.virtualQueryValue = ""
-                    main.buildVirtualCategories("GENRE_ALBUM")
+                    bc.categoryArtistFilter = name
+                    bc.categoryArtistFilterIsTrackArtist = true
+                    bc.currentBrowserMode = BrowserMode.GenreAlbums(bc.categoryGenreFilter, name)
+                    bc.virtualQueryValue = ""
+                    bc.buildVirtualCategories("GENRE_ALBUM")
                 }
                 "ARTIST", "TRACK_ARTIST" -> {
-                    main.categoryArtistFilter = name
-                    main.categoryArtistFilterIsTrackArtist = (type == "TRACK_ARTIST")
-                    main.virtualQueryValue = ""
-                    main.currentBrowserMode = MainActivity.BROWSER_ALBUMS
-                    main.buildVirtualCategories("ALBUM")
+                    bc.categoryArtistFilter = name
+                    bc.categoryArtistFilterIsTrackArtist = (type == "TRACK_ARTIST")
+                    bc.virtualQueryValue = ""
+                    bc.currentBrowserMode = BrowserMode.Albums(name, type == "TRACK_ARTIST")
+                    bc.buildVirtualCategories("ALBUM")
                 }
                 else -> {
-                    main.virtualQueryType = type
-                    main.virtualQueryValue = name
-                    main.currentBrowserMode = MainActivity.BROWSER_VIRTUAL_SONGS
-                    main.buildVirtualSongs()
+                    bc.virtualQueryType = type
+                    bc.virtualQueryValue = name
+                    bc.currentBrowserMode = BrowserMode.VirtualSongs
+                    bc.buildVirtualSongs()
                 }
             }
         }
@@ -627,9 +637,9 @@ class CategoryListAdapter(
         return row
     }
 
-    private fun t1Song(): String = "1 " + MainActivity.instance.t("Song")
+    private fun t1Song(): String = "1 " + (MainActivity.instance?.t("Song") ?: "Song")
 
-    private fun tSongs(): String = MainActivity.instance.t("Songs")
+    private fun tSongs(): String = MainActivity.instance?.t("Songs") ?: "Songs"
 
     companion object {
         private var coverCache: LruCache<String, Drawable>? = null

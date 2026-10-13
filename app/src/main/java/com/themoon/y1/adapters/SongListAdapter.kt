@@ -18,6 +18,7 @@ import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.models.SongItem
+import com.themoon.y1.podcasts.PodcastDownloadManager
 import com.themoon.y1.views.ClassicMenuStyle
 import com.themoon.y1.views.TablerIcons
 import java.io.File
@@ -91,8 +92,9 @@ class SongListAdapter(
                     progressText = String.format(" [⏱ %02d:%02d]", min, sec)
                 }
 
-                if (main.activePodcastDownloads.containsKey(audioUrl)) {
-                    val prog = main.podcastDownloadProgress[audioUrl] ?: 0
+                val pdm = PodcastDownloadManager.getInstance()
+                if (pdm.isDownloading(audioUrl)) {
+                    val prog = pdm.getProgress(audioUrl)
                     displayTitle = "⏳ [$prog%] $datePrefix${song.title}"
                     customColor = 0xFFFF8800.toInt()
                 } else if (localFile.exists() && localFile.length() > 0) {

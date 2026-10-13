@@ -96,6 +96,9 @@ class PlayerController(
     private var displayedPlayerPath: String? = null
     private val uiHandler = Handler(Looper.getMainLooper())
     private val progressHandler = Handler(Looper.getMainLooper())
+    private var lastCenterUpTime: Long = 0
+    private val doubleClickHandler = Handler(Looper.getMainLooper())
+    private val singleClickRunnable = Runnable { cycleBottomState() }
 
     private val updateProgressTask = object : Runnable {
         override fun run() {
@@ -425,18 +428,16 @@ class PlayerController(
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_CENTER, 23 -> {
-                if (event.isLongPress) {
-                    showContextMenu()
-                } else {
-                    cycleBottomState()
+            KeyEvent.KEYCODE_DPAD_CENTER, 23, KeyEvent.KEYCODE_ENTER -> {
+                if (event.repeatCount == 0) {
+                    event.startTracking()
                 }
                 return true
             }
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, 85 -> {
-                clickFeedback()
-                onTogglePlayback()
-                updatePlayerUI()
+                if (event.repeatCount == 0) {
+                    event.startTracking()
+                }
                 return true
             }
             KeyEvent.KEYCODE_MEDIA_NEXT, 87 -> {
@@ -453,6 +454,50 @@ class PlayerController(
             }
             KeyEvent.KEYCODE_BACK, 4 -> {
                 onBackPressed()
+                return true
+            }
+        }
+        return false
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == 23 || keyCode == KeyEvent.KEYCODE_ENTER) {
+            if ((event.flags and KeyEvent.FLAG_CANCELED_LONG_PRESS) == 0) {
+                val now = System.currentTimeMillis()
+                if (now - lastCenterUpTime < 300) {
+                    doubleClickHandler.removeCallbacks(singleClickRunnable)
+                    lastCenterUpTime = 0
+                    clickFeedback()
+                    onToggleFavorite()
+                } else {
+                    lastCenterUpTime = now
+                    doubleClickHandler.postDelayed(singleClickRunnable, 300)
+                }
+            }
+            return true
+        }
+        if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == 85) {
+            val main = MainActivity.instance
+            if (main != null && main.isMediaLongPressConsumed) {
+                main.isMediaLongPressConsumed = false
+                return true
+            }
+            clickFeedback()
+            onTogglePlayback()
+            updatePlayerUI()
+            return true
+        }
+        return false
+    }
+
+    override fun onKeyLongPress(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == 85 || keyCode == 86 || keyCode == 126 || keyCode == 127) {
+            val main = MainActivity.instance
+            if (main != null && main.currentPlaylist.isNotEmpty() && main.currentIndex in main.currentPlaylist.indices) {
+                clickFeedback()
+                main.isMediaLongPressConsumed = true
+                val currentSong = main.currentPlaylist[main.currentIndex]
+                main.showAddToPlaylistDialog(currentSong)
                 return true
             }
         }

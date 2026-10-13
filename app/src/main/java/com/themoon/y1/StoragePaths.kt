@@ -24,7 +24,6 @@ object StoragePaths {
     private var cachedSecondaryAvailable: Boolean? = null
 
     /** Primary writable root - same volume Y1 always used. */
-    @JvmStatic
     fun getPrimaryRoot(): File {
         cachedPrimary?.let { return it }
         val primary = firstUsableRoot(PRIMARY_PATH, "/storage/emulated/legacy", "/sdcard")
@@ -36,7 +35,6 @@ object StoragePaths {
     /**
      * True when /storage/sdcard1 exists. Does not call list() to prevent hanging on wedged mounts.
      */
-    @JvmStatic
     fun hasSecondaryStorage(): Boolean {
         cachedSecondaryAvailable?.let { return it }
         var available = false
@@ -55,7 +53,6 @@ object StoragePaths {
     /**
      * Primary always; secondary only when hasSecondaryStorage() is true.
      */
-    @JvmStatic
     fun getAllRoots(): List<File> {
         cachedRoots?.let { return it }
 
@@ -93,7 +90,6 @@ object StoragePaths {
     }
 
     /** Force re-probe after SD card mount or unmount. */
-    @JvmStatic
     fun invalidate() {
         cachedPrimary = null
         cachedRoots = null
@@ -101,57 +97,40 @@ object StoragePaths {
     }
 
     /** Folder-browser / mkdir default - always primary. */
-    @JvmStatic
     fun getMusicDir(): File = primaryMediaDir("Music")
 
-    @JvmStatic
     fun getAudiobooksDir(): File = primaryMediaDir("Audiobooks")
 
-    @JvmStatic
     fun getVideosDir(): File = primaryMediaDir("Videos")
 
     /** All Music folders to scan (primary + readable secondary). */
-    @JvmStatic
     fun getMusicDirs(): List<File> = mediaDirs("Music")
 
-    @JvmStatic
     fun getAudiobooksDirs(): List<File> = mediaDirs("Audiobooks")
 
-    @JvmStatic
     fun getVideosDirs(): List<File> = mediaDirs("Videos")
 
-    @JvmStatic
     fun getPodcastsDir(): File = File(getPrimaryRoot(), "Podcasts")
 
-    @JvmStatic
     fun getPodcastChannelDir(safeChannel: String): File = File(getPodcastsDir(), safeChannel)
 
-    @JvmStatic
     fun getCoversDir(): File = ensureDir(File(getPrimaryRoot(), "Y1_Covers"))
 
-    @JvmStatic
     fun getThumbsCacheDir(): File = ensureDir(File(getPrimaryRoot(), ".y1_thumbs_cache"))
 
-    @JvmStatic
     fun getThemesDir(): File = ensureDir(File(getPrimaryRoot(), "Y1_Themes"))
 
-    @JvmStatic
     fun getLanguagesDir(): File = ensureDir(File(getPrimaryRoot(), "Y1_Languages"))
 
-    @JvmStatic
     fun getPlaylistsDir(): File = ensureDir(File(getPrimaryRoot(), "Y1_Playlists"))
 
-    @JvmStatic
     fun getEqDir(): File = ensureDir(File(getPrimaryRoot(), "Y1_EQs"))
 
-    @JvmStatic
     fun primaryFile(relativePath: String): File = File(getPrimaryRoot(), relativePath)
 
     /** Web upload root stays on primary so URL paths are unchanged. */
-    @JvmStatic
     fun getWebServerRoot(): File = getPrimaryRoot()
 
-    @JvmStatic
     fun isStorageVolumeName(name: String?): Boolean {
         if (name == null) return false
         val n = name.lowercase(Locale.US)
@@ -159,7 +138,6 @@ object StoragePaths {
             n == "legacy" || n == "media_rw"
     }
 
-    @JvmStatic
     fun isAnyStorageRoot(absolutePath: String?): Boolean {
         if (absolutePath == null) return false
         if (absolutePath == PRIMARY_PATH || absolutePath == SECONDARY_PATH) return true
@@ -169,7 +147,6 @@ object StoragePaths {
         return false
     }
 
-    @JvmStatic
     fun isVideosRoot(absolutePath: String?): Boolean {
         if (absolutePath == null) return false
         if (absolutePath == "$PRIMARY_PATH/Videos" || absolutePath == "$SECONDARY_PATH/Videos") return true
@@ -179,7 +156,6 @@ object StoragePaths {
         return false
     }
 
-    @JvmStatic
     fun isAudiobooksRoot(absolutePath: String?): Boolean {
         if (absolutePath == null) return false
         if (absolutePath == "$PRIMARY_PATH/Audiobooks" || absolutePath == "$SECONDARY_PATH/Audiobooks") return true
@@ -189,7 +165,6 @@ object StoragePaths {
         return false
     }
 
-    @JvmStatic
     fun isUnderAudiobooks(absolutePath: String?): Boolean {
         if (absolutePath == null) return false
         if (absolutePath.startsWith("$PRIMARY_PATH/Audiobooks") ||
@@ -202,11 +177,9 @@ object StoragePaths {
         return false
     }
 
-    @JvmStatic
     fun isUnderAudiobooks(file: File?): Boolean =
         file != null && isUnderAudiobooks(file.absolutePath)
 
-    @JvmStatic
     fun isUnderMusic(absolutePath: String?): Boolean {
         if (absolutePath == null) return false
         if (absolutePath.startsWith("$PRIMARY_PATH/Music") ||
@@ -219,12 +192,10 @@ object StoragePaths {
         return false
     }
 
-    @JvmStatic
     fun isUnderMusic(file: File?): Boolean =
         file != null && isUnderMusic(file.absolutePath)
 
     /** Strip known volume prefixes so the browser path stays short. */
-    @JvmStatic
     fun toDisplayPath(absolutePath: String?): String {
         if (absolutePath == null) return ""
         val path = absolutePath

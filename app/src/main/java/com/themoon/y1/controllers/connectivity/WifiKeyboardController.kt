@@ -343,6 +343,46 @@ class WifiKeyboardController(
         return true
     }
 
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val keyCode = event.keyCode
+        val action = event.action
+        if (isQwertyKeyboard()) {
+            if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == 85
+                || keyCode == KeyEvent.KEYCODE_MEDIA_STOP || keyCode == 86
+                || keyCode == 126 || keyCode == 127
+                || keyCode == KeyEvent.KEYCODE_DPAD_DOWN || keyCode == 20) {
+                if (action == KeyEvent.ACTION_DOWN) {
+                    keyboardQwertyView?.moveFocus(0, 1, false)
+                    clickFeedback()
+                }
+                return true
+            }
+            if (keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS || keyCode == 88) {
+                if (action == KeyEvent.ACTION_DOWN) {
+                    keyboardQwertyView?.moveFocus(-1, 0, false)
+                    clickFeedback()
+                }
+                return true
+            }
+            if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == 87) {
+                if (action == KeyEvent.ACTION_DOWN) {
+                    keyboardQwertyView?.moveFocus(1, 0, false)
+                    clickFeedback()
+                }
+                return true
+            }
+        } else {
+            if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == 85
+                || keyCode == KeyEvent.KEYCODE_MEDIA_STOP || keyCode == 86
+                || keyCode == 126 || keyCode == 127
+                || keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS || keyCode == 88
+                || keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == 87) {
+                return true
+            }
+        }
+        return false
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (isQwertyKeyboard()) {
             if (keyCode == KeyEvent.KEYCODE_BACK) {
@@ -451,7 +491,7 @@ class WifiKeyboardController(
         return false
     }
 
-    fun onKeyLongPress(keyCode: Int, event: KeyEvent): Boolean {
+    override fun onKeyLongPress(keyCode: Int, event: KeyEvent): Boolean {
         if (isQwertyKeyboard()) {
             if (keyCode == KeyEvent.KEYCODE_BACK) {
                 isBackLongPressConsumed = true

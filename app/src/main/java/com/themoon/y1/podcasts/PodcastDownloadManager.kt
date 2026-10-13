@@ -124,7 +124,6 @@ class PodcastDownloadManager private constructor() {
         @Volatile
         private var instance: PodcastDownloadManager? = null
 
-        @JvmStatic
         fun getInstance(): PodcastDownloadManager {
             return instance ?: synchronized(this) {
                 instance ?: PodcastDownloadManager().also { instance = it }

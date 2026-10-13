@@ -249,4 +249,39 @@ class HomeWidgetsController(
         opts.inSampleSize = sample
         return BitmapFactory.decodeByteArray(data, 0, data.size, opts)
     }
+
+    fun updateFocusPreview(focusedElement: ThemeManager.MenuElement) {
+        var hasLiveWidgetActivated = false
+        for ((widgetView, el) in widgetViewRegistry) {
+            if (focusedElement.id == el.visibleOnFocus) {
+                widgetView.visibility = View.VISIBLE
+                hasLiveWidgetActivated = true
+                if (el.type == "widget_album") {
+                    refreshWidgets()
+                }
+            } else if (el.visibleOnFocus.isNullOrBlank()) {
+                when (el.type) {
+                    "widget_clock" -> widgetView.visibility = if (isWidgetClockOn) View.VISIBLE else View.GONE
+                    "widget_battery" -> widgetView.visibility = if (isWidgetBatteryOn) View.VISIBLE else View.GONE
+                    "widget_album" -> widgetView.visibility = if (isWidgetAlbumOn) View.VISIBLE else View.GONE
+                    "widget_analog_clock" -> widgetView.visibility = if (isWidgetAnalogClockOn) View.VISIBLE else View.GONE
+                    "widget_circular_battery" -> widgetView.visibility = if (isWidgetCircularBatteryOn) View.VISIBLE else View.GONE
+                    "widget_focus_image" -> widgetView.visibility = if (isWidgetFocusImageOn) View.VISIBLE else View.GONE
+                }
+            } else {
+                widgetView.visibility = View.GONE
+            }
+        }
+
+        ivWidgetFocusImage?.let { iv ->
+            if (!hasLiveWidgetActivated && !focusedElement.previewImage.isNullOrEmpty()) {
+                iv.visibility = View.VISIBLE
+                val bmp = ThemeManager.getCustomIcon(focusedElement.previewImage, context, 0)
+                iv.setImageBitmap(bmp)
+            } else if (!hasLiveWidgetActivated) {
+                iv.setImageDrawable(null)
+            }
+        }
+    }
 }
+

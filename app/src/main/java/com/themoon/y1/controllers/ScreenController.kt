@@ -14,8 +14,10 @@ interface ScreenController {
     fun onExit() {}
     fun onRefreshUI() {}
 
+    fun dispatchKeyEvent(event: KeyEvent): Boolean = false
     fun onWheel(delta: Int, event: KeyEvent): Boolean = false
     fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean = false
     fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean = false
+    fun onKeyLongPress(keyCode: Int, event: KeyEvent): Boolean = false
     fun onBackPressed(): Boolean = false
 }

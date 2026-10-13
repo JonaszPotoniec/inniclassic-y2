@@ -103,7 +103,7 @@ class VideoPlayerController(
         }
     }
 
-    fun dispatchKeyEvent(event: KeyEvent): Boolean {
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val keyCode = event.keyCode
         val action = event.action
 

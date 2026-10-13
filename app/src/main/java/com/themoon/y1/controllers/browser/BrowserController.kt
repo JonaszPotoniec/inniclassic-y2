@@ -1,6 +1,7 @@
 package com.themoon.y1.controllers.browser
 
 import android.app.Activity
+import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.ClipDrawable
 import android.graphics.drawable.GradientDrawable
@@ -1279,5 +1280,46 @@ class BrowserController(
                 return true
             }
         }
+    }
+
+    override fun onWheel(delta: Int, event: KeyEvent): Boolean {
+        val list = listVirtualSongs
+        if (list != null && list.visibility == View.VISIBLE) {
+            val totalCount = list.count
+            if (totalCount <= 0) return true
+            val isLoopScrollOn = activity.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
+                .getBoolean("loop_scroll_on", true)
+
+            val curFocused = list.findFocus()
+            if (curFocused != null) {
+                val p = list.getPositionForView(curFocused)
+                if (p in 0 until totalCount) {
+                    virtualListSelectedIndex = p
+                }
+            }
+            if (virtualListSelectedIndex < 0) virtualListSelectedIndex = 0
+            if (virtualListSelectedIndex >= totalCount) virtualListSelectedIndex = totalCount - 1
+
+            var targetPos = virtualListSelectedIndex
+            if (delta < 0) {
+                if (virtualListSelectedIndex > 0) {
+                    targetPos = virtualListSelectedIndex - 1
+                } else if (isLoopScrollOn) {
+                    targetPos = totalCount - 1
+                }
+            } else if (delta > 0) {
+                if (virtualListSelectedIndex < totalCount - 1) {
+                    targetPos = virtualListSelectedIndex + 1
+                } else if (isLoopScrollOn) {
+                    targetPos = 0
+                }
+            }
+            if (targetPos != virtualListSelectedIndex) {
+                navigateVirtualListTo(targetPos)
+            }
+            clickFeedback()
+            return true
+        }
+        return false
     }
 }
