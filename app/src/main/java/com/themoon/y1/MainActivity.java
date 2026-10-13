@@ -106,6 +106,7 @@ public class MainActivity extends Activity {
     private com.themoon.y1.controllers.connectivity.WifiKeyboardController wifiKeyboardController;
     private com.themoon.y1.controllers.settings.SettingsController settingsController;
     private com.themoon.y1.controllers.settings.EqualizerController equalizerController;
+    private com.themoon.y1.controllers.podcasts.PodcastController podcastController;
 
     private static final String TAG = "MainActivity";
     // OTA Update URL pointing to GitHub Releases
@@ -3095,6 +3096,45 @@ public class MainActivity extends Activity {
                 () -> { rebootAudioEngine(); return kotlin.Unit.INSTANCE; },
                 () -> { buildSettingsUI(); return kotlin.Unit.INSTANCE; },
                 (key) -> t(key)
+        );
+
+        podcastController = new com.themoon.y1.controllers.podcasts.PodcastController(
+                this,
+                (ViewGroup) findViewById(android.R.id.content),
+                containerBrowserItems,
+                listVirtualSongs,
+                tvBrowserPath,
+                com.themoon.y1.podcasts.PodcastRepository.getInstance(),
+                com.themoon.y1.podcasts.PodcastDownloadManager.getInstance(),
+                () -> {
+                    currentKeyboardMode = 1;
+                    changeScreen(STATE_WIFI_KEYBOARD);
+                    return kotlin.Unit.INSTANCE;
+                },
+                () -> {
+                    changeScreen(STATE_PLAYER);
+                    return kotlin.Unit.INSTANCE;
+                },
+                (icon, text, color) -> createListButtonWithIcon(icon, text, color != null ? color : 0),
+                (icon, text, textColor, iconColor) -> createTablerListButton(icon, text, null, iconColor, textColor),
+                () -> { clickFeedback(); return kotlin.Unit.INSTANCE; },
+                (key) -> t(key),
+                () -> { showLoadingPopup(); return kotlin.Unit.INSTANCE; },
+                () -> {
+                    if (layoutLoadingOverlay != null) layoutLoadingOverlay.setVisibility(View.GONE);
+                    return kotlin.Unit.INSTANCE;
+                },
+                () -> {
+                    if (isPodcastOpenedFromLibrary) {
+                        isPodcastOpenedFromLibrary = false;
+                        lastBrowserFocusText = t("Podcasts");
+                        currentBrowserMode = BROWSER_ROOT;
+                        buildFileBrowserUI();
+                    } else {
+                        changeScreen(STATE_MENU);
+                    }
+                    return kotlin.Unit.INSTANCE;
+                }
         );
 
         // 🚀 [신규 추가] Videos 목록 + 전체화면 재생 화면 뷰 연결
@@ -10425,696 +10465,27 @@ public class MainActivity extends Activity {
         });
     }
 
-    // =======================================================
-    // 🚀 [팟캐스트 엔진 1단계] 메모장 자동 생성 및 채널 해독기
-    // =======================================================
-    private void buildPodcastChannelsUI() {
-        hideBrowserCoverPane();
-        if (scrollViewBrowser != null)
-            scrollViewBrowser.setVisibility(View.VISIBLE);
-        if (listVirtualSongs != null)
-            listVirtualSongs.setVisibility(View.GONE);
-        containerBrowserItems.removeAllViews();
-        tvBrowserPath.setText(t("Podcasts"));
-        // =======================================================
-        // 🚀 [새 팟캐스트 검색 버튼 (휠 키보드 호출 버전)]
-        // =======================================================
-        View btnSearch = createListButtonWithIcon("\uE8B6", t("Search New Podcasts"), 0xFF00FFFF);
-        btnSearch.setOnClickListener(v -> {
-            clickFeedback();
-            currentKeyboardMode = 1; // 🚀 팟캐스트 검색 모드로 키보드 장전!
-            changeScreen(STATE_WIFI_KEYBOARD); // 와이파이 키보드 화면으로 즉시 이동!
-        });
-        containerBrowserItems.addView(btnSearch);
-
-        View btnManage = createListButtonWithIcon("\uE872", t("Manage Subscriptions"), 0xFFFF5555); // 빨간색 휴지통
-        btnManage.setOnClickListener(v -> {
-            clickFeedback();
-            buildPodcastManageUI(); // 대망의 전용 삭제 스튜디오 오픈!
-        });
-        containerBrowserItems.addView(btnManage);
-
-        // =======================================================
-        // 1. 팟캐스트 전용 폴더가 없으면 뚫어줍니다.
-        File podcastDir = StoragePaths.getPodcastsDir();
-        if (!podcastDir.exists())
-            podcastDir.mkdirs();
-
-        File subFile = new File(podcastDir, "subscriptions.txt");
-
-        // 🚀 [신규 장착] 파일이 없으면? 글로벌 베스트셀러 팟캐스트 주소로 자동 생성해 버립니다!
-        if (!subFile.exists()) {
-            try {
-                java.io.BufferedWriter bw = new java.io.BufferedWriter(
-                        new java.io.OutputStreamWriter(new FileOutputStream(subFile), "UTF-8"));
-                bw.write("# Y1 Podcast Subscriptions\n");
-                bw.write("# " + t("Format: Channel Name|RSS_URL") + "\n\n");
-
-                bw.close();
-            } catch (Exception e) {
-            }
-        }
-
-        List<String[]> channels = new ArrayList<>();
-
-        // 2. 텍스트 파일을 0.01초 만에 훑어서 배열 바구니에 담습니다.
-        if (subFile.exists()) {
-            try {
-                java.io.BufferedReader br = new java.io.BufferedReader(
-                        new java.io.InputStreamReader(new java.io.FileInputStream(subFile), "UTF-8"));
-                String line;
-                while ((line = br.readLine()) != null) {
-                    if (line.trim().isEmpty() || line.startsWith("#"))
-                        continue;
-
-                    String[] parts = line.split("\\|");
-                    if (parts.length >= 2) {
-                        channels.add(new String[] { parts[0].trim(), parts[1].trim() });
-                    } else {
-                        channels.add(new String[] { "Unknown Channel", parts[0].trim() });
-                    }
-                }
-                br.close();
-            } catch (Exception e) {
-            }
-        }
-
-        // 3. 화면에 버튼들(또는 텅 빈 안내문)을 뿌려줍니다!
-        if (channels.isEmpty()) {
-            TextView tvEmpty = new TextView(this);
-            tvEmpty.setText("⚠️ " + t("No subscriptions found.") + "\n\n" +
-                    t("Create a 'subscriptions.txt' file in the Podcasts folder.") + "\n" +
-                    t("Format: Channel Name|RSS_URL"));
-            tvEmpty.setTextColor(0xFF888888);
-            tvEmpty.setGravity(Gravity.CENTER);
-            tvEmpty.setPadding(20, 100, 20, 50);
-            tvEmpty.setLineSpacing(15f, 1.2f);
-            containerBrowserItems.addView(tvEmpty);
-        } else {
-            // ... (기존 subscriptions.txt 파일 읽어오는 부분은 그대로 유지) ...
-
-            for (final String[] channel : channels) {
-                View btnCh = createListButtonWithIcon("\uE03E", channel[0]);
-
-                // 🚀 [해결책 2-1] 나중에 포커스를 찾을 수 있도록 버튼에 채널 이름표를 몰래 달아둡니다.
-                btnCh.setTag(channel[0]);
-
-                btnCh.setOnClickListener(v -> {
-                    clickFeedback();
-                    currentBrowserMode = BROWSER_PODCAST_EPISODES;
-                    currentPodcastUrl = channel[1];
-
-                    // 🚀 [해결책 2-2] 방금 누른 채널 이름을 기억 장부(lastBrowserFocusText)에 적어둡니다!
-                    lastBrowserFocusText = channel[0];
-
-                    buildPodcastEpisodesUI(channel[0], currentPodcastUrl);
-                    Toast.makeText(MainActivity.this, t("Connecting to server: ") + channel[0], Toast.LENGTH_SHORT)
-                            .show();
-                });
-                containerBrowserItems.addView(btnCh);
-            }
-        }
-
-        // 🚀 [해결책 2-3] 화면 로딩이 끝난 후, 기억해둔 채널을 찾아 포커스를 정확히 꽂아줍니다!
-        if (containerBrowserItems.getChildCount() > 0) {
-            boolean focused = false;
-            if (lastBrowserFocusText != null && !lastBrowserFocusText.isEmpty()) {
-                // 컨테이너 안의 버튼들을 훑어서 방금 저장한 이름표(Tag)와 똑같은 녀석을 찾습니다.
-                for (int i = 0; i < containerBrowserItems.getChildCount(); i++) {
-                    View child = containerBrowserItems.getChildAt(i);
-                    if (lastBrowserFocusText.equals(child.getTag())) {
-                        child.requestFocus(); // 🎯 찾았다! 포커스 록온!
-                        focused = true;
-                        break;
-                    }
-                }
-            }
-            // 만약 처음 들어왔거나 기억된 채널이 없다면 맨 위(0번)를 포커스합니다.
-            if (!focused) {
-                containerBrowserItems.getChildAt(0).requestFocus();
-            }
-        }
-    }
-
-    // =======================================================
-    // =======================================================
-    // 🚀 [팟캐스트 전용] Y1 독자적 OkHttp 백그라운드 다운로드 엔진!
-    // =======================================================
-    public void startPodcastDownload(final String title, final String audioUrl, final String channelName) {
-        Toast.makeText(this, "⬇️ " + t("Downloading: ") + title, Toast.LENGTH_SHORT).show();
-
-        // 🚀 2. 다운로드 폴더도 채널별로 완벽 격리!
-        String safeChannel = channelName.replaceAll("[\\\\/:*?\"<>|]", "_");
-        String safeTitle = title.replaceAll("[\\\\/:*?\"<>|]", "_") + ".mp3";
-        final File podcastDir = StoragePaths.getPodcastChannelDir(safeChannel);
-        if (!podcastDir.exists())
-            podcastDir.mkdirs();
-        final File destFile = new File(podcastDir, safeTitle);
-
-        // 🚀 1. 메모장에 주소를 적고 다운로드 준비 상태(0%)로 만듭니다.
-        activePodcastDownloads.put(audioUrl, -1L); // 자체 엔진이므로 ID 대신 -1 사용
-        podcastDownloadProgress.put(audioUrl, 0);
-
-        // 🚀 2. 다운로드 도중 화면이 꺼져 와이파이가 날아가는 것을 철통 방어합니다!
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        if (listVirtualSongs != null && listVirtualSongs.getAdapter() != null) {
-            ((android.widget.BaseAdapter) listVirtualSongs.getAdapter()).notifyDataSetChanged();
-        }
-
-        // 🚀 3. 무적의 백그라운드 다운로드 스레드 가동!
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    okhttp3.OkHttpClient.Builder builder = new okhttp3.OkHttpClient.Builder();
-
-                    // 💡 [핵심] 서버를 완벽하게 속이는 프리패스 보안 캡슐 장착!
-                    javax.net.ssl.TrustManager[] trustAllCerts = new javax.net.ssl.TrustManager[] {
-                            new javax.net.ssl.X509TrustManager() {
-                                public java.security.cert.X509Certificate[] getAcceptedIssuers() {
-                                    return new java.security.cert.X509Certificate[] {};
-                                }
-
-                                public void checkClientTrusted(java.security.cert.X509Certificate[] certs,
-                                        String authType) {
-                                }
-
-                                public void checkServerTrusted(java.security.cert.X509Certificate[] certs,
-                                        String authType) {
-                                }
-                            }
-                    };
-                    javax.net.ssl.SSLContext sslContext = javax.net.ssl.SSLContext.getInstance("TLS", "Conscrypt");
-                    sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
-                    builder.sslSocketFactory(sslContext.getSocketFactory(),
-                            (javax.net.ssl.X509TrustManager) trustAllCerts[0]);
-
-                    builder.hostnameVerifier(new javax.net.ssl.HostnameVerifier() {
-                        @Override
-                        public boolean verify(String hostname, javax.net.ssl.SSLSession session) {
-                            return true;
-                        }
-                    });
-
-                    okhttp3.OkHttpClient client = builder.build();
-
-                    // 💡 위장 신분증과 함께 '압축 해제(identity)' 명령을 내려 퍼센트 오류를 막습니다!
-                    okhttp3.Request request = new okhttp3.Request.Builder()
-                            .url(audioUrl)
-                            .header("User-Agent",
-                                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/114.0.0.0 Safari/537.36")
-                            .header("Accept-Encoding", "identity")
-                            .build();
-
-                    okhttp3.Response response = client.newCall(request).execute();
-                    if (!response.isSuccessful())
-                        throw new java.io.IOException("Server rejected connection");
-
-                    java.io.InputStream is = response.body().byteStream();
-                    long totalLength = response.body().contentLength();
-                    FileOutputStream fos = new FileOutputStream(destFile);
-
-                    byte[] buffer = new byte[8192];
-                    int len;
-                    long downloaded = 0;
-                    int lastProgress = 0;
-
-                    // 🚀 파일을 쓰면서 동시에 퍼센트(%)를 계산하여 리스트를 실시간으로 그립니다!
-                    while ((len = is.read(buffer)) != -1) {
-                        fos.write(buffer, 0, len);
-                        downloaded += len;
-
-                        if (totalLength > 0) {
-                            int progress = (int) ((downloaded * 100L) / totalLength);
-
-                            // 1%가 오를 때마다 화면 갱신 지시
-                            if (progress > lastProgress) {
-                                lastProgress = progress;
-                                podcastDownloadProgress.put(audioUrl, progress);
-
-                                runOnUiThread(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        if (currentBrowserMode == 14 && listVirtualSongs != null
-                                                && listVirtualSongs.getAdapter() != null) {
-                                            ((android.widget.BaseAdapter) listVirtualSongs.getAdapter())
-                                                    .notifyDataSetChanged();
-                                        }
-                                    }
-                                });
-                            }
-                        }
-                    }
-                    fos.flush();
-                    fos.close();
-                    is.close();
-
-                    // 🚀 4. 다운로드 100% 완료 처리
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            activePodcastDownloads.remove(audioUrl);
-                            podcastDownloadProgress.remove(audioUrl);
-                            Toast.makeText(MainActivity.this, "✅ " + t("Download Complete!"), Toast.LENGTH_SHORT)
-                                    .show();
-
-                            if (currentBrowserMode == 14 && listVirtualSongs != null
-                                    && listVirtualSongs.getAdapter() != null) {
-                                ((android.widget.BaseAdapter) listVirtualSongs.getAdapter()).notifyDataSetChanged();
-                            }
-
-                            // 모든 다운로드가 끝났다면 화면 꺼짐 방지(Wakelock) 해제!
-                            if (activePodcastDownloads.isEmpty() && !isCustomScanning && !isRadioScanning
-                                    && !isServerRunning) {
-                                getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-                            }
-                        }
-                    });
-
-                } catch (final Exception e) {
-                    if (destFile.exists())
-                        destFile.delete(); // 에러 발생 시 찌꺼기 파일 폭파!
-
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            activePodcastDownloads.remove(audioUrl);
-                            podcastDownloadProgress.remove(audioUrl);
-                            Toast.makeText(MainActivity.this, "🚨 Download Failed: " + e.getMessage(),
-                                    Toast.LENGTH_LONG).show();
-
-                            if (currentBrowserMode == 14 && listVirtualSongs != null
-                                    && listVirtualSongs.getAdapter() != null) {
-                                ((android.widget.BaseAdapter) listVirtualSongs.getAdapter()).notifyDataSetChanged();
-                            }
-                            if (activePodcastDownloads.isEmpty() && !isCustomScanning && !isRadioScanning
-                                    && !isServerRunning) {
-                                getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-                            }
-                        }
-                    });
-                }
-            }
-        }).start();
-    }
-
-    // =======================================================
-    // 🚀 [스마트 팝업 엔진] 휠 조작이 완벽하게 지원되는 머티리얼 팝업!
-    // =======================================================
     public void showPodcastActionDialog(final String title, final String audioUrl, final String imageUrl,
             final String channelName) {
-        // 🚀 1. 채널 이름으로 고유 폴더 경로를 생성합니다!
-        String safeChannel = channelName.replaceAll("[\\\\/:*?\"<>|]", "_");
-        String safeTitle = title.replaceAll("[\\\\/:*?\"<>|]", "_") + ".mp3";
-        final File localFile = new File(StoragePaths.getPodcastChannelDir(safeChannel), safeTitle);
-        // 1. 투명한 배경의 껍데기 다이얼로그 생성
-        final android.app.Dialog dialog = new android.app.Dialog(this);
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        dialog.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
-
-        float d = getResources().getDisplayMetrics().density;
-
-        // 2. 예쁜 모서리 라운딩과 테마 색상이 들어간 알맹이 박스 조립
-        final LinearLayout rootLayout = new LinearLayout(this);
-        rootLayout.setOrientation(LinearLayout.VERTICAL);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(ThemeManager.getOverlayBackgroundColor() | 0x88000000); // 메인 테마색 바탕
-        bg.setCornerRadius(15 * d);
-        bg.setStroke((int) (1 * d), 0x33FFFFFF); // 은은한 테두리
-        rootLayout.setBackground(bg);
-        rootLayout.setPadding((int) (15 * d), (int) (20 * d), (int) (15 * d), (int) (15 * d));
-
-        // 3. 상단 팟캐스트 제목
-        TextView tvTitle = new TextView(this);
-        tvTitle.setText(title);
-        tvTitle.setTextColor(ThemeManager.getTextColorPrimary());
-        tvTitle.setTextSize(17f);
-        tvTitle.setTypeface(ThemeManager.getCustomFontBold());
-        tvTitle.setGravity(Gravity.CENTER);
-        tvTitle.setPadding(0, 0, 0, (int) (20 * d));
-        rootLayout.addView(tvTitle);
-
-        // 🚀 [휠 조향 장치 추가] 팝업창 안에서 휠(21, 22)을 돌릴 때 위아래로 움직이게 만듭니다!
-        View.OnKeyListener dialogWheelListener = new View.OnKeyListener() {
-            @Override
-            public boolean onKey(View v, int keyCode, KeyEvent event) {
-                if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                    if (keyCode == 21) { // 휠 위로 (UP)
-                        int idx = rootLayout.indexOfChild(v);
-                        for (int i = idx - 1; i >= 0; i--) {
-                            if (rootLayout.getChildAt(i).isFocusable()) {
-                                rootLayout.getChildAt(i).requestFocus();
-                                clickFeedback();
-                                return true;
-                            }
-                        }
-                        return true;
-                    }
-                    if (keyCode == 22) { // 휠 아래로 (DOWN)
-                        int idx = rootLayout.indexOfChild(v);
-                        for (int i = idx + 1; i < rootLayout.getChildCount(); i++) {
-                            if (rootLayout.getChildAt(i).isFocusable()) {
-                                rootLayout.getChildAt(i).requestFocus();
-                                clickFeedback();
-                                return true;
-                            }
-                        }
-                        return true;
-                    }
-                }
-                return false;
-            }
-        };
-
-        // ... (showPodcastActionDialog 내부) ...
-        // 4. 기기에 파일이 이미 존재한다면? (다운로드 완료 상태)
-        if (localFile.exists() && localFile.length() > 0) {
-            View btnPlay = createListButtonWithIcon("\uE037", t("Play (Downloaded)"), 0xFF00FF00); // 초록색 재생
-            btnPlay.setOnKeyListener(dialogWheelListener);
-            btnPlay.setOnClickListener(v -> {
-                clickFeedback();
-                dialog.dismiss();
-
-                // 🚀 [이어서 듣기] 금고에서 기록을 꺼내옵니다!
-                String streamKey = "/PODCAST_STREAM/" + safeChannel + "/" + safeTitle;
-                int savedPos = prefs.getInt("book_pos_" + localFile.getAbsolutePath(), 0);
-                if (savedPos == 0)
-                    savedPos = prefs.getInt("book_pos_" + streamKey, 0); // 스트리밍 기록 백업
-
-                List<File> playList = new ArrayList<>();
-                playList.add(localFile);
-
-                // 💡 기록이 있으면 해당 시간으로 점프(Offset)하고, 없으면 처음(0)부터 재생합니다!
-                if (savedPos > 0) {
-                    com.themoon.y1.managers.AudioPlayerManager.getInstance().playTrackListWithOffset(playList, 0,
-                            savedPos);
-                } else {
-                    com.themoon.y1.managers.AudioPlayerManager.getInstance().playTrackList(playList, 0);
-                }
-                changeScreen(3);
-            });
-            rootLayout.addView(btnPlay);
-            // ... (삭제 버튼 코드는 동일) ...
-
+        if (podcastController != null) {
+            podcastController.showActionDialog(title, audioUrl, imageUrl, channelName);
         }
-        // 5. 파일이 없다면? (스트리밍 or 다운로드 대기 상태)
-        else {
-            View btnStream = createListButtonWithIcon("\uE037", t("Stream (Play)"));
-            btnStream.setOnKeyListener(dialogWheelListener);
-            btnStream.setOnClickListener(v -> {
-                clickFeedback();
-                dialog.dismiss();
-                Toast.makeText(MainActivity.this, t("Connecting to server: ") + "\n" + title, Toast.LENGTH_SHORT)
-                        .show();
-
-                // 🚀 [이어서 듣기] 스트리밍용 기록 꺼내오기!
-                String streamKey = "/PODCAST_STREAM/" + safeChannel + "/" + safeTitle;
-                int savedPos = prefs.getInt("book_pos_" + streamKey, 0);
-                if (savedPos == 0)
-                    savedPos = prefs.getInt("book_pos_" + localFile.getAbsolutePath(), 0);
-
-                // 엔진 호출 시 '채널 이름'과 '기억된 시간(savedPos)'을 추가로 넘겨줍니다!
-                com.themoon.y1.managers.AudioPlayerManager.getInstance().playPodcastStream(audioUrl, title, imageUrl,
-                        channelName, savedPos);
-                changeScreen(3);
-            });
-            rootLayout.addView(btnStream);
-            // ... (다운로드 버튼 코드는 동일) ...j
-
-            // 🚀 다운로드 중인지 검사 (containsKey로 변경!)
-            if (activePodcastDownloads.containsKey(audioUrl)) {
-                View btnDownloading = createListButtonWithIcon("\uE863", t("Downloading..."), 0xFFFF8800); // 오렌지색
-                btnDownloading.setOnKeyListener(dialogWheelListener);
-                rootLayout.addView(btnDownloading);
-            } else {
-                View btnDown = createListButtonWithIcon("\uE2C4", t("Download"));
-                btnDown.setOnKeyListener(dialogWheelListener);
-                btnDown.setOnClickListener(v -> {
-                    clickFeedback();
-                    dialog.dismiss();
-                    startPodcastDownload(title, audioUrl, channelName); // 🎯 채널 이름 함께 전달!
-                });
-                rootLayout.addView(btnDown);
-            }
-        }
-
-        dialog.setContentView(rootLayout);
-
-        // 🚀 팝업창 크기를 스마트하게 조절
-        Window window = dialog.getWindow();
-        if (window != null) {
-            window.setLayout((int) (300 * d), ViewGroup.LayoutParams.WRAP_CONTENT);
-        }
-
-        dialog.show();
-
-        // 🚀 [포커스 자동 록온] 팝업이 열리면 첫 번째 버튼(인덱스 1)에 자석처럼 휠 포커스 강제 고정!
-        rootLayout.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                if (rootLayout.getChildCount() > 1) {
-                    rootLayout.getChildAt(1).requestFocus();
-                }
-            }
-        }, 50);
     }
 
-    // =======================================================
-    // 🚀 [팟캐스트 엔진 2단계] 인터넷 RSS 연결 및 에피소드 정밀 파서
-    // =======================================================
-    private void buildPodcastEpisodesUI(final String channelName, final String rssUrl) {
-        scrollViewBrowser.setVisibility(View.GONE);
-        listVirtualSongs.setVisibility(View.VISIBLE);
-        tvBrowserPath.setText(t("Podcast") + ": " + channelName);
-        // 🚀 [해결책 1] 새 데이터를 긁어오기 전에, 화면에 남아있는 이전 에피소드 잔상을 즉시 폭파시킵니다!
-        virtualSongList.clear();
-        currentScrollIndexList.clear();
-        if (listVirtualSongs.getAdapter() != null) {
-            listVirtualSongs.setAdapter(null); // 리스트뷰를 백지로 만듭니다.
+    private void buildPodcastChannelsUI() {
+        hideBrowserCoverPane();
+        currentBrowserMode = BROWSER_PODCAST_CHANNELS;
+        if (podcastController != null) {
+            podcastController.buildChannelsUI();
         }
-        // 1. 인터넷에서 긁어올 동안 사용자가 지루하지 않게 로딩 팝업을 켭니다.
-        showLoadingPopup();
+    }
 
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                final List<SongItem> episodes = new ArrayList<>();
-                // 🚀 [버그 수리] 아래 catch가 실제 에러를 통째로 삼켜버려서, 원인이 뭐든(잘못된 URL,
-                // SSL 실패, 404, XML 파싱 실패 등) 항상 똑같이 "No internet connection"만 떴습니다 -
-                // 진짜 인터넷이 되는데도 이 메시지가 뜨면 사용자는 자기 와이파이를 의심할 수밖에 없었습니다.
-                // 실패 원인을 붙잡아뒀다가 아래에서 그대로 보여줍니다.
-                final Exception[] fetchError = new Exception[1];
-                try {
-                    okhttp3.OkHttpClient.Builder builder = new okhttp3.OkHttpClient.Builder();
-
-                    javax.net.ssl.TrustManager[] trustAllCerts = new javax.net.ssl.TrustManager[] {
-                            new javax.net.ssl.X509TrustManager() {
-                                public java.security.cert.X509Certificate[] getAcceptedIssuers() {
-                                    return new java.security.cert.X509Certificate[] {};
-                                }
-
-                                public void checkClientTrusted(java.security.cert.X509Certificate[] certs,
-                                        String authType) {
-                                }
-
-                                public void checkServerTrusted(java.security.cert.X509Certificate[] certs,
-                                        String authType) {
-                                }
-                            }
-                    };
-                    javax.net.ssl.SSLContext sslContext = javax.net.ssl.SSLContext.getInstance("TLS", "Conscrypt");
-                    sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
-                    builder.sslSocketFactory(sslContext.getSocketFactory(),
-                            (javax.net.ssl.X509TrustManager) trustAllCerts[0]);
-                    builder.hostnameVerifier((hostname, session) -> true);
-
-                    // 🚀 [해결 1] 컬투쇼 같은 거대 XML을 버텨내도록 타임아웃을 60초로 대폭 늘립니다!
-                    okhttp3.OkHttpClient client = builder
-                            .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-                            .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
-                            .build();
-
-                    okhttp3.Request request = new okhttp3.Request.Builder()
-                            .url(rssUrl)
-                            .header("User-Agent",
-                                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/114.0.0.0 Safari/537.36")
-                            .header("Accept", "application/rss+xml, application/xml, text/xml, */*")
-                            .build();
-
-                    okhttp3.Response response = client.newCall(request).execute();
-                    if (!response.isSuccessful())
-                        throw new java.io.IOException("HTTP Error Code: " + response.code());
-
-                    java.io.InputStream is = response.body().byteStream();
-                    org.xmlpull.v1.XmlPullParserFactory factory = org.xmlpull.v1.XmlPullParserFactory.newInstance();
-                    org.xmlpull.v1.XmlPullParser parser = factory.newPullParser();
-                    parser.setInput(is, "UTF-8");
-
-                    int eventType = parser.getEventType();
-                    boolean insideItem = false;
-                    String title = "";
-                    String pubDate = "";
-                    String audioUrl = "";
-                    String imageUrl = "";
-                    String channelImageUrl = ""; // 🚀 간판 이미지 저장용 변수 추가
-
-                    while (eventType != org.xmlpull.v1.XmlPullParser.END_DOCUMENT && episodes.size() < 300) {
-                        String name = parser.getName();
-                        if (name == null)
-                            name = "";
-
-                        switch (eventType) {
-                            case org.xmlpull.v1.XmlPullParser.START_TAG:
-                                if (name.equalsIgnoreCase("item"))
-                                    insideItem = true;
-                                else if (insideItem && name.equalsIgnoreCase("title"))
-                                    title = parser.nextText();
-                                else if (insideItem && name.equalsIgnoreCase("pubDate")) {
-                                    pubDate = parser.nextText();
-                                    if (pubDate.length() > 16)
-                                        pubDate = pubDate.substring(0, 16);
-                                } else if (insideItem && name.equalsIgnoreCase("enclosure"))
-                                    audioUrl = parser.getAttributeValue(null, "url");
-                                // 🚀 [간판 훔치기 1] itunes:image 태그일 때
-                                else if (name.equalsIgnoreCase("itunes:image")) {
-                                    String href = parser.getAttributeValue(null, "href");
-                                    if (insideItem)
-                                        imageUrl = href;
-                                    else if (channelImageUrl.isEmpty() && href != null)
-                                        channelImageUrl = href;
-                                }
-                                // 🚀 [간판 훔치기 2] 기본 image > url 태그일 때
-                                else if (!insideItem && name.equalsIgnoreCase("url")) {
-                                    try {
-                                        String urlText = parser.nextText();
-                                        if (channelImageUrl.isEmpty() && urlText.startsWith("http"))
-                                            channelImageUrl = urlText;
-                                    } catch (Exception e) {
-                                    }
-                                }
-                                break;
-                            case org.xmlpull.v1.XmlPullParser.END_TAG:
-                                if (name.equalsIgnoreCase("item")) {
-                                    if (audioUrl != null && !audioUrl.isEmpty()) {
-                                        episodes.add(new SongItem(new File("/PODCAST"), title, channelName, imageUrl,
-                                                pubDate, audioUrl));
-                                    }
-                                    insideItem = false;
-                                    title = "";
-                                    pubDate = "";
-                                    audioUrl = "";
-                                    imageUrl = "";
-                                }
-                                break;
-                        }
-                        eventType = parser.next();
-                    }
-                    is.close();
-
-                    // =======================================================
-                    // 🚀 [간판 자동 저장 엔진] 채널 간판 이미지를 찾았다면 cover.jpg로 조용히 다운로드!
-                    // =======================================================
-                    if (!channelImageUrl.isEmpty()) {
-                        String safeChannel = channelName.replaceAll("[\\\\/:*?\"<>|]", "_");
-                        File podcastDir = StoragePaths.getPodcastChannelDir(safeChannel);
-                        if (!podcastDir.exists())
-                            podcastDir.mkdirs();
-
-                        File coverFile = new File(podcastDir, "cover.jpg");
-
-                        // 💡 이미 cover.jpg가 있으면 데이터 절약을 위해 다운로드 생략
-                        if (!coverFile.exists()) {
-                            try {
-                                okhttp3.Request imgReq = new okhttp3.Request.Builder().url(channelImageUrl).build();
-                                okhttp3.Response imgRes = client.newCall(imgReq).execute();
-                                if (imgRes.isSuccessful() && imgRes.body() != null) {
-                                    java.io.InputStream imgIs = imgRes.body().byteStream();
-                                    FileOutputStream imgFos = new FileOutputStream(coverFile);
-                                    byte[] buf = new byte[8192];
-                                    int len;
-                                    while ((len = imgIs.read(buf)) != -1) {
-                                        imgFos.write(buf, 0, len);
-                                    }
-                                    imgFos.flush();
-                                    imgFos.close();
-                                    imgIs.close();
-                                }
-                            } catch (Exception e) {
-                            }
-                        }
-                    }
-                } catch (final Exception e) {
-                    fetchError[0] = e;
-                }
-
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (layoutLoadingOverlay != null)
-                            layoutLoadingOverlay.setVisibility(View.GONE);
-
-                        // 🚀 [해결 3] 오프라인 생존 엔진: 내가 클릭한 '그 채널의 방'에서만 파일을 긁어옵니다!
-                        if (episodes.isEmpty()) {
-                            String safeChannel = channelName.replaceAll("[\\\\/:*?\"<>|]", "_");
-                            File podcastDir = StoragePaths.getPodcastChannelDir(safeChannel);
-
-                            if (podcastDir.exists()) {
-                                File[] localFiles = podcastDir.listFiles();
-                                if (localFiles != null) {
-                                    // 🚀 [오프라인 날짜 복구 엔진] 기기에 맞춰 예쁜 포맷(예: 23.10.25)으로 준비!
-                                    SimpleDateFormat sdf = new SimpleDateFormat("yy.MM.dd", Locale.US);
-
-                                    for (File f : localFiles) {
-                                        if (f.isFile() && f.getName().toLowerCase().endsWith(".mp3")) {
-                                            String localTitle = f.getName().substring(0, f.getName().length() - 4);
-
-                                            // 💡 다운로드된 파일의 '마지막 수정일(다운로드 시간)'을 추출해서 날짜로 변환합니다.
-                                            String offlineDate = sdf.format(new Date(f.lastModified()));
-
-                                            // 💡 비어있던 날짜 자리에 offlineDate를 쏙 끼워 넣어줍니다!
-                                            episodes.add(new SongItem(f, localTitle, channelName, "", offlineDate, ""));
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (episodes.isEmpty()) {
-                                String detail = fetchError[0] != null
-                                        ? fetchError[0].getClass().getSimpleName()
-                                                + (fetchError[0].getMessage() != null ? ": " + fetchError[0].getMessage() : "")
-                                        : t("no episodes found in feed");
-                                Toast.makeText(MainActivity.this,
-                                        "📡 " + t("Couldn't load this feed") + " (" + detail + ")", Toast.LENGTH_LONG)
-                                        .show();
-                            } else {
-                                Toast.makeText(MainActivity.this,
-                                        "📡 " + t("Offline Mode: Showing downloaded episodes only."), Toast.LENGTH_LONG)
-                                        .show();
-                            }
-                        }
-
-                        virtualSongList.clear();
-                        currentScrollIndexList.clear();
-                        for (SongItem ep : episodes) {
-                            virtualSongList.add(ep.file);
-                            currentScrollIndexList.add(ep.title);
-                        }
-
-                        SongListAdapter adapter = new SongListAdapter(episodes);
-                        listVirtualSongs.setAdapter(adapter);
-                        if (listVirtualSongs.getChildCount() > 0) {
-                            listVirtualSongs.getChildAt(0).requestFocus();
-                        }
-
-                        // =======================================================
-                        // 🚀 [버그 해결] 팟캐스트 화면 세팅이 끝나면 알파벳 퀵 바도 새로 조립!
-                        // (이 함수 안에 퀵 바를 다시 GONE으로 숨겨주는 초기화 기능이 포함되어 있음)
-                        // =======================================================
-                        buildAlphabetIndexBar();
-                    }
-                });
-            }
-        }).start();
+    private void buildPodcastEpisodesUI(final String channelName, final String rssUrl) {
+        hideBrowserCoverPane();
+        currentBrowserMode = BROWSER_PODCAST_EPISODES;
+        if (podcastController != null) {
+            podcastController.buildEpisodesUI(channelName, rssUrl);
+        }
     }
 
     // 💡 3. 자체 DB에서 아티스트/앨범 카테고리 추출 (초고속 엔진 적용!)
@@ -14570,27 +13941,12 @@ public class MainActivity extends Activity {
                             lastBrowserFocusText = t("Recently Added");
                             buildFileBrowserUI();
                         }
-                        // 🚀 [팟캐스트 탈출구 추가!]
-                        else if (currentBrowserMode == BROWSER_PODCAST_CHANNELS) {
-                            clickFeedback();
-                            if (isPodcastOpenedFromLibrary) {
-                                isPodcastOpenedFromLibrary = false;
-
-                                // 🚀 [버그 수리 2] 뒤로 가기 전에 메모지에 "Podcasts" 버튼을 찾으라고 지시!
-                                lastBrowserFocusText = t("Podcasts");
-
-                                currentBrowserMode = BROWSER_ROOT;
-                                buildFileBrowserUI();
-                            } else {
-                                changeScreen(STATE_MENU);
+                        else if (currentBrowserMode == BROWSER_PODCAST_CHANNELS
+                                || currentBrowserMode == BROWSER_PODCAST_EPISODES
+                                || currentBrowserMode == BROWSER_PODCAST_MANAGE) {
+                            if (podcastController != null) {
+                                podcastController.onBackPressed();
                             }
-                        } else if (currentBrowserMode == BROWSER_PODCAST_EPISODES) {
-                            currentBrowserMode = BROWSER_PODCAST_CHANNELS;
-                            buildPodcastChannelsUI(); // 에피소드 창에서 뒤로 가면 채널 리스트로 복귀!
-                        } else if (currentBrowserMode == BROWSER_PODCAST_MANAGE) {
-                            clickFeedback();
-                            currentBrowserMode = BROWSER_PODCAST_CHANNELS;
-                            buildPodcastChannelsUI();
                         }
                     }
                 } else if (currentScreenState == STATE_BLUETOOTH || currentScreenState == STATE_WIFI) {
@@ -18288,228 +17644,11 @@ public class MainActivity extends Activity {
         }, 100);
     }
 
-    // =======================================================
-    // 🚀 [팟캐스트 삭제 엔진] 구독 해지와 동시에 다운로드된 파일까지 싹 다 날립니다!
-    // =======================================================
-    private void removePodcastSubscription(String channelName, String targetRssUrl) {
-        try {
-            File podcastDir = StoragePaths.getPodcastsDir();
-            File subFile = new File(podcastDir, "subscriptions.txt");
-            if (!subFile.exists())
-                return;
-
-            // 1. 메모장(subscriptions.txt)에서 해당 채널 줄 지우기
-            List<String> lines = new ArrayList<>();
-            java.io.BufferedReader br = new java.io.BufferedReader(
-                    new java.io.InputStreamReader(new java.io.FileInputStream(subFile), "UTF-8"));
-            String line;
-            while ((line = br.readLine()) != null) {
-                if (line.trim().isEmpty() || line.startsWith("#")) {
-                    lines.add(line);
-                    continue;
-                }
-                String[] parts = line.split("\\|");
-                if (parts.length >= 2 && parts[1].trim().equals(targetRssUrl.trim()))
-                    continue;
-                lines.add(line);
-            }
-            br.close();
-
-            java.io.BufferedWriter bw = new java.io.BufferedWriter(
-                    new java.io.OutputStreamWriter(new FileOutputStream(subFile), "UTF-8"));
-            for (String l : lines)
-                bw.write(l + "\n");
-            bw.close();
-
-            // 🚀 2. [신규 장착] 폴더 및 내부 파일 (음원, cover.jpg) 싹 다 폭파!
-            String safeChannel = channelName.replaceAll("[\\\\/:*?\"<>|]", "_");
-            File channelFolder = new File(podcastDir, safeChannel);
-            if (channelFolder.exists()) {
-                File[] files = channelFolder.listFiles();
-                if (files != null) {
-                    for (File f : files)
-                        f.delete(); // 폴더 안의 파일들 모두 삭제
-                }
-                channelFolder.delete(); // 텅 빈 폴더 최종 삭제
-            }
-
-            Toast.makeText(this, "🗑️ " + t("Channel deleted."), Toast.LENGTH_SHORT).show();
-
-        } catch (Exception e) {
-            Toast.makeText(this, "Error deleting: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    // =======================================================
-    // 🚀 [팟캐스트 삭제 머티리얼 팝업] 휠 포커스 완벽 지원!
-    // =======================================================
-    private void showDeletePodcastMaterialDialog(final String channelName, final String rssUrl) {
-        float d = getResources().getDisplayMetrics().density;
-        final android.app.Dialog dialog = new android.app.Dialog(this);
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        dialog.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
-
-        LinearLayout rootLayout = new LinearLayout(this);
-        rootLayout.setOrientation(LinearLayout.VERTICAL);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(ThemeManager.getOverlayBackgroundColor() | 0xFF000000); // 메인 테마색 바탕
-        bg.setCornerRadius(15 * d);
-        bg.setStroke((int) (1 * d), 0x33FFFFFF); // 은은한 테두리
-        rootLayout.setBackground(bg);
-        rootLayout.setPadding((int) (15 * d), (int) (20 * d), (int) (15 * d), (int) (15 * d));
-
-        // 1. 제목 텍스트 (빨간색 강조)
-        TextView tvTitle = new TextView(this);
-        tvTitle.setText("🗑️ " + t("Delete Channel"));
-        tvTitle.setTextColor(0xFFFF5555);
-        tvTitle.setTextSize(18f);
-        tvTitle.setTypeface(ThemeManager.getCustomFontBold());
-        tvTitle.setGravity(Gravity.CENTER);
-        tvTitle.setPadding(0, 0, 0, (int) (10 * d));
-        rootLayout.addView(tvTitle);
-
-        // 2. 메시지 텍스트
-        TextView tvMsg = new TextView(this);
-        tvMsg.setText(t("Do you want to delete '") + channelName + "'?");
-        tvMsg.setTextColor(ThemeManager.getTextColorPrimary());
-        tvMsg.setTextSize(16f);
-        tvMsg.setGravity(Gravity.CENTER);
-        tvMsg.setPadding(0, 0, 0, (int) (20 * d));
-        tvMsg.setLineSpacing(5f, 1.2f);
-        rootLayout.addView(tvMsg);
-
-        // 3. 휠 조향 센서 (위아래 완벽 이동)
-        View.OnKeyListener dialogWheelListener = new View.OnKeyListener() {
-            @Override
-            public boolean onKey(View v, int keyCode, KeyEvent event) {
-                if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                    if (keyCode == 21 || keyCode == 19) {
-                        int idx = rootLayout.indexOfChild(v);
-                        for (int i = idx - 1; i >= 0; i--) {
-                            if (rootLayout.getChildAt(i).isFocusable()) {
-                                rootLayout.getChildAt(i).requestFocus();
-                                clickFeedback();
-                                return true;
-                            }
-                        }
-                        return true;
-                    }
-                    if (keyCode == 22 || keyCode == 20) {
-                        int idx = rootLayout.indexOfChild(v);
-                        for (int i = idx + 1; i < rootLayout.getChildCount(); i++) {
-                            if (rootLayout.getChildAt(i).isFocusable()) {
-                                rootLayout.getChildAt(i).requestFocus();
-                                clickFeedback();
-                                return true;
-                            }
-                        }
-                        return true;
-                    }
-                }
-                return false;
-            }
-        };
-
-        // 4. [삭제] 버튼
-        View btnDelete = createTablerListButton(com.themoon.y1.views.TablerIcons.TRASH, t("Delete"), 0xFFFF5555, 0xFFFF5555);
-        btnDelete.setOnKeyListener(dialogWheelListener);
-        btnDelete.setOnClickListener(v -> {
-            clickFeedback();
-            dialog.dismiss();
-            removePodcastSubscription(channelName, rssUrl);
-            buildPodcastManageUI(); // 화면 새로고침
-        });
-        rootLayout.addView(btnDelete);
-
-        // 5. [취소] 버튼
-        View btnCancel = createListButtonWithIcon("\uE14C", t("Cancel"), ThemeManager.getTextColorSecondary());
-        btnCancel.setOnKeyListener(dialogWheelListener);
-        btnCancel.setOnClickListener(v -> {
-            clickFeedback();
-            dialog.dismiss();
-        });
-        rootLayout.addView(btnCancel);
-
-        dialog.setContentView(rootLayout);
-        Window window = dialog.getWindow();
-        if (window != null) {
-            window.setLayout((int) (320 * d), ViewGroup.LayoutParams.WRAP_CONTENT);
-        }
-        dialog.show();
-
-        // 🚀 팝업이 열리면 안전하게 '취소' 버튼에 먼저 포커스! (실수 방지)
-        rootLayout.postDelayed(() -> btnCancel.requestFocus(), 50);
-    }
-
-    // =======================================================
-    // 🚀 [팟캐스트 구독 관리 화면] 휠로 돌려서 삭제할 채널을 고르는 스튜디오!
-    // =======================================================
     private void buildPodcastManageUI() {
-        currentBrowserMode = BROWSER_PODCAST_MANAGE; // 🚀 [핵심] 나 지금 구독 관리 화면에 있다고 시스템에 신고!
-        if (scrollViewBrowser != null)
-            scrollViewBrowser.setVisibility(View.VISIBLE);
-        if (listVirtualSongs != null)
-            listVirtualSongs.setVisibility(View.GONE);
-        containerBrowserItems.removeAllViews();
-        tvBrowserPath.setText(t("Podcasts") + ": " + t("Manage Subscriptions"));
-
-        // 🚀 1. 뒤로 가기 버튼 (가장 위에 배치)
-        View btnBack = createListButtonWithIcon("\uE5C4", t("Back to Podcasts")); // 뒤로가기 화살표 아이콘
-        btnBack.setOnClickListener(v -> {
-            clickFeedback();
-            buildPodcastChannelsUI(); // 원래의 팟캐스트 메인 화면으로 복귀!
-        });
-        containerBrowserItems.addView(btnBack);
-
-        // 메모장에서 채널 목록 읽어오기
-        File podcastDir = StoragePaths.getPodcastsDir();
-        File subFile = new File(podcastDir, "subscriptions.txt");
-        List<String[]> channels = new ArrayList<>();
-
-        if (subFile.exists()) {
-            try {
-                java.io.BufferedReader br = new java.io.BufferedReader(
-                        new java.io.InputStreamReader(new java.io.FileInputStream(subFile), "UTF-8"));
-                String line;
-                while ((line = br.readLine()) != null) {
-                    if (line.trim().isEmpty() || line.startsWith("#"))
-                        continue;
-                    String[] parts = line.split("\\|");
-                    if (parts.length >= 2) {
-                        channels.add(new String[] { parts[0].trim(), parts[1].trim() });
-                    }
-                }
-                br.close();
-            } catch (Exception e) {
-            }
-        }
-
-        // 🚀 2. 삭제할 채널 목록 그리기
-        if (channels.isEmpty()) {
-            TextView tvEmpty = new TextView(this);
-            tvEmpty.setText("⚠️ " + t("No subscriptions found."));
-            tvEmpty.setTextColor(0xFF888888);
-            tvEmpty.setGravity(Gravity.CENTER);
-            tvEmpty.setPadding(20, 100, 20, 50);
-            containerBrowserItems.addView(tvEmpty);
-        } else {
-            for (final String[] channel : channels) {
-                View btnDel = createTablerListButton(com.themoon.y1.views.TablerIcons.TRASH, channel[0], 0xFFFF5555, 0xFFFF5555);
-
-                // 기존의 new AlertDialog.Builder(...) 부분을 통째로 지우고 이 한 줄로 교체하세요!
-                btnDel.setOnClickListener(v -> {
-                    clickFeedback();
-                    showDeletePodcastMaterialDialog(channel[0], channel[1]); // 🚀 머티리얼 팝업 호출
-                });
-                containerBrowserItems.addView(btnDel);
-            }
-        }
-
-        // 🚀 3. 화면이 열리면 첫 번째 채널(인덱스 1번)에 자동으로 휠 포커스 고정!
-        if (containerBrowserItems.getChildCount() > 1) {
-            containerBrowserItems.postDelayed(() -> {
-                containerBrowserItems.getChildAt(1).requestFocus();
-            }, 50);
+        hideBrowserCoverPane();
+        currentBrowserMode = BROWSER_PODCAST_MANAGE;
+        if (podcastController != null) {
+            podcastController.buildManageUI();
         }
     }
 

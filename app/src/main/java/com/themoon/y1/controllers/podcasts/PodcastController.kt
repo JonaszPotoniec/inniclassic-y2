@@ -48,12 +48,40 @@ class PodcastController(
     private val createListButton: (icon: String, text: String, color: Int?) -> View,
     private val createTablerButton: (icon: Array<String>, text: String, textColor: Int, iconColor: Int) -> View,
     private val clickFeedback: () -> Unit,
-    private val localize: (String) -> String
+    private val localize: (String) -> String,
+    private val showLoadingPopup: () -> Unit = {},
+    private val onHideLoadingPopup: () -> Unit = {},
+    private val onExitPodcasts: () -> Unit = {}
 ) : ScreenController {
 
     private val scrollViewBrowser: View? = containerBrowserItems.parent as? View
     private var currentMode: BrowserMode = BrowserMode.PodcastChannels
     private var lastFocusText: String? = null
+
+    val isChannelsMode: Boolean
+        get() = currentMode is BrowserMode.PodcastChannels
+
+    val isEpisodesMode: Boolean
+        get() = currentMode is BrowserMode.PodcastEpisodes
+
+    val isManageMode: Boolean
+        get() = currentMode is BrowserMode.PodcastManage
+
+    override fun onBackPressed(): Boolean {
+        return when (currentMode) {
+            is BrowserMode.PodcastEpisodes, is BrowserMode.PodcastManage -> {
+                clickFeedback()
+                buildChannelsUI()
+                true
+            }
+            is BrowserMode.PodcastChannels -> {
+                clickFeedback()
+                onExitPodcasts()
+                true
+            }
+            else -> false
+        }
+    }
 
     override fun onEnter(state: ScreenState) {
         if (state is ScreenState.Browser) {
@@ -313,7 +341,7 @@ class PodcastController(
         btnDelete.requestFocus()
     }
 
-    private fun showActionDialog(title: String, audioUrl: String, imageUrl: String, channelName: String) {
+    fun showActionDialog(title: String, audioUrl: String, imageUrl: String, channelName: String) {
         val safeChannel = sanitize(channelName)
         val safeTitle = "${sanitize(title)}.mp3"
         val localFile = File(StoragePaths.getPodcastChannelDir(safeChannel), safeTitle)
