@@ -1,0 +1,60 @@
+package com.themoon.y1.navigation
+
+import java.io.File
+
+/**
+ * Top-level screen states representing currently active application views.
+ */
+sealed interface ScreenState {
+    data object MainMenu : ScreenState
+    data class Browser(val mode: BrowserMode) : ScreenState
+    data object Player : ScreenState
+    data class Settings(val subMode: SettingsSubMode = SettingsSubMode.Root) : ScreenState
+    data object Bluetooth : ScreenState
+    data object Wifi : ScreenState
+    data class WifiKeyboard(val ssid: String) : ScreenState
+    data object Brightness : ScreenState
+    data object Storage : ScreenState
+    data object WebServer : ScreenState
+    data object MusicQuiz : ScreenState
+    data object Videos : ScreenState
+    data class VideoPlayer(val videoFile: File) : ScreenState
+}
+
+/**
+ * Browser navigation modes for music library, file tree, playlists, and podcasts.
+ */
+sealed interface BrowserMode {
+    data object Root : BrowserMode
+    data class Folder(val dir: File) : BrowserMode
+    data object Artists : BrowserMode
+    data object TrackArtists : BrowserMode
+    data class Albums(val artistFilter: String? = null, val byTrackArtist: Boolean = false) : BrowserMode
+    data object Genres : BrowserMode
+    data class GenreArtists(val genre: String) : BrowserMode
+    data class GenreAlbums(val genre: String, val artist: String? = null) : BrowserMode
+    data object Composers : BrowserMode
+    data object Years : BrowserMode
+    data object VirtualSongs : BrowserMode
+    data object Favorites : BrowserMode
+    data object RecentlyAdded : BrowserMode
+    data object Audiobooks : BrowserMode
+    data object Playlists : BrowserMode
+    data class M3uSongs(val m3uFile: File) : BrowserMode
+    data object CoverFlow : BrowserMode
+    data object PodcastChannels : BrowserMode
+    data class PodcastEpisodes(val channelTitle: String, val rssUrl: String) : BrowserMode
+    data object PodcastManage : BrowserMode
+}
+
+/**
+ * Sub-modes within settings navigation (EQ studio, Jellyfin, reordering, date/time).
+ */
+sealed interface SettingsSubMode {
+    data object Root : SettingsSubMode
+    data object DateTime : SettingsSubMode
+    data object Equalizer5Band : SettingsSubMode
+    data object Equalizer10Band : SettingsSubMode
+    data object MenuReorder : SettingsSubMode
+    data class Jellyfin(val depth: Int = 0) : SettingsSubMode
+}
