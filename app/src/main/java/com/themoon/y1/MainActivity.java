@@ -197,64 +197,10 @@ public class MainActivity extends Activity {
      * to open in O(1) instant time without main-thread UI freezes.
      */
     public void rebuildUniqueAlbumList() {
-        List<SongItem> combinedLibrary = new ArrayList<>();
-        synchronized (customLibrary) {
-            combinedLibrary.addAll(customLibrary);
-        }
-        synchronized (audiobookLibrary) {
-            combinedLibrary.addAll(audiobookLibrary);
-        }
-
-        java.util.LinkedHashMap<String, List<SongItem>> albumMap = new java.util.LinkedHashMap<>();
-
-        for (SongItem song : combinedLibrary) {
-            if (song == null || song.file == null) continue;
-            String album = (song.album != null && !song.album.trim().isEmpty()) ? song.album.trim() : "Unknown Album";
-            String key = album.toLowerCase(Locale.US);
-            List<SongItem> list = albumMap.get(key);
-            if (list == null) {
-                list = new ArrayList<>();
-                albumMap.put(key, list);
-            }
-            list.add(song);
-        }
-
-        List<SongItem> result = new ArrayList<>();
-        for (List<SongItem> tracks : albumMap.values()) {
-            if (tracks.isEmpty()) continue;
-            // Determine consensus albumArtist (most frequent albumArtist across tracks of this album)
-            java.util.Map<String, Integer> artistCounts = new java.util.HashMap<>();
-            String bestArtist = null;
-            int maxCount = -1;
-            for (SongItem t : tracks) {
-                String a = (t.albumArtist != null && !t.albumArtist.trim().isEmpty()) ? t.albumArtist.trim()
-                        : ((t.artist != null && !t.artist.trim().isEmpty()) ? t.artist.trim() : "Unknown Artist");
-                int cnt = (artistCounts.containsKey(a) ? artistCounts.get(a) : 0) + 1;
-                artistCounts.put(a, cnt);
-                if (cnt > maxCount) {
-                    maxCount = cnt;
-                    bestArtist = a;
-                }
-            }
-            if (bestArtist == null) bestArtist = "Unknown Artist";
-
-            SongItem first = tracks.get(0);
-            SongItem rep = new SongItem(first.file, first.title, bestArtist, first.album, first.year, first.genre, bestArtist, first.composer);
-            result.add(rep);
-        }
-
-        java.util.Collections.sort(result, new java.util.Comparator<SongItem>() {
-            @Override
-            public int compare(SongItem s1, SongItem s2) {
-                int byArtist = s1.albumArtist.compareToIgnoreCase(s2.albumArtist);
-                if (byArtist != 0) return byArtist;
-                return s1.album.compareToIgnoreCase(s2.album);
-            }
-        });
-
+        com.themoon.y1.managers.MediaLibraryManager.getInstance().rebuildUniqueAlbumList();
         synchronized (uniqueAlbumList) {
             uniqueAlbumList.clear();
-            uniqueAlbumList.addAll(result);
+            uniqueAlbumList.addAll(com.themoon.y1.managers.MediaLibraryManager.getInstance().getUniqueAlbumList());
         }
     }
 
@@ -4021,128 +3967,39 @@ public class MainActivity extends Activity {
 
     // 🚀 [신규 추가] 스캔 완료된 라이브러리를 디스크에 저장해서, 다음 부팅 때 처음부터 다시 스캔하지 않도록!
     private void saveLibraryCache() {
-        File cacheFile = StoragePaths.primaryFile(".y1_library_cache.json");
-        File tempFile = StoragePaths.primaryFile(".y1_library_cache.json.tmp");
-        java.io.BufferedWriter bw = null;
-        try {
-            File parent = cacheFile.getParentFile();
-            if (parent != null && !parent.exists()) {
-                parent.mkdirs();
-            }
-            bw = new java.io.BufferedWriter(new java.io.FileWriter(tempFile), 32768);
-            bw.write("{\"music\":[");
-            writeSongListJson(bw, customLibrary);
-            bw.write("],\"books\":[");
-            writeSongListJson(bw, audiobookLibrary);
-            bw.write("]}");
-            bw.flush();
-            bw.close();
-            bw = null;
-            if (tempFile.exists() && tempFile.length() > 0) {
-                if (cacheFile.exists()) {
-                    cacheFile.delete();
-                }
-                tempFile.renameTo(cacheFile);
-            }
-        } catch (Throwable t) {
-            Log.e(TAG, "Failed to save library cache: " + t.getMessage());
-            try {
-                if (tempFile.exists()) {
-                    tempFile.delete();
-                }
-            } catch (Throwable ignored) {}
-        } finally {
-            if (bw != null) {
-                try {
-                    bw.close();
-                } catch (Throwable ignored) {}
-            }
+        com.themoon.y1.managers.MediaLibraryManager m = com.themoon.y1.managers.MediaLibraryManager.getInstance();
+        synchronized (m.getMusicLibrary()) {
+            m.getMusicLibrary().clear();
+            m.getMusicLibrary().addAll(customLibrary);
         }
-    }
-
-    private void writeSongListJson(java.io.Writer w, List<SongItem> list) throws java.io.IOException {
-        if (list == null) return;
-        boolean first = true;
-        for (SongItem song : list) {
-            if (song == null || song.file == null) continue;
-            if (!first) w.write(",");
-            first = false;
-            w.write("{\"path\":");
-            w.write(org.json.JSONObject.quote(song.file.getAbsolutePath()));
-            w.write(",\"title\":");
-            w.write(org.json.JSONObject.quote(song.title != null ? song.title : ""));
-            w.write(",\"artist\":");
-            w.write(org.json.JSONObject.quote(song.artist != null ? song.artist : ""));
-            w.write(",\"album\":");
-            w.write(org.json.JSONObject.quote(song.album != null ? song.album : ""));
-            w.write(",\"year\":");
-            w.write(org.json.JSONObject.quote(song.year != null ? song.year : ""));
-            w.write(",\"genre\":");
-            w.write(org.json.JSONObject.quote(song.genre != null ? song.genre : ""));
-            w.write(",\"albumArtist\":");
-            w.write(org.json.JSONObject.quote(song.albumArtist != null ? song.albumArtist : ""));
-            w.write(",\"composer\":");
-            w.write(org.json.JSONObject.quote(song.composer != null ? song.composer : ""));
-            Integer trackNum = trackNumberMap.get(song.file.getAbsolutePath());
-            w.write(",\"trackNum\":");
-            w.write(String.valueOf(trackNum != null ? trackNum : 0));
-            w.write("}");
+        synchronized (m.getAudiobookLibrary()) {
+            m.getAudiobookLibrary().clear();
+            m.getAudiobookLibrary().addAll(audiobookLibrary);
         }
+        synchronized (m.getTrackNumberMap()) {
+            m.getTrackNumberMap().clear();
+            m.getTrackNumberMap().putAll(trackNumberMap);
+        }
+        m.saveLibraryCache();
     }
 
     private void loadLibraryCache() {
-        File cacheFile = StoragePaths.primaryFile(".y1_library_cache.json");
-        if (!cacheFile.exists() || cacheFile.length() == 0) {
-            File secFile = new File(StoragePaths.SECONDARY_PATH, ".y1_library_cache.json");
-            if (secFile.exists() && secFile.length() > 0) {
-                cacheFile = secFile;
-            } else {
-                return;
+        com.themoon.y1.managers.MediaLibraryManager m = com.themoon.y1.managers.MediaLibraryManager.getInstance();
+        if (m.loadLibraryCache()) {
+            synchronized (customLibrary) {
+                customLibrary.clear();
+                customLibrary.addAll(m.getMusicLibrary());
             }
-        }
-        try {
-            java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(cacheFile), 32768);
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line);
+            synchronized (audiobookLibrary) {
+                audiobookLibrary.clear();
+                audiobookLibrary.addAll(m.getAudiobookLibrary());
             }
-            reader.close();
-            org.json.JSONObject root = new org.json.JSONObject(sb.toString());
-            jsonToSongList(root.optJSONArray("music"), customLibrary, false);
-            jsonToSongList(root.optJSONArray("books"), audiobookLibrary, true);
+            synchronized (trackNumberMap) {
+                trackNumberMap.clear();
+                trackNumberMap.putAll(m.getTrackNumberMap());
+            }
             rebuildUniqueAlbumList();
             com.themoon.y1.managers.AlbumCoverManager.getInstance().pregenerateThumbnails(uniqueAlbumList, false);
-        } catch (Throwable t) {
-            Log.e(TAG, "Failed to load library cache: " + t.getMessage());
-        }
-    }
-
-    private void jsonToSongList(org.json.JSONArray arr, List<SongItem> target, boolean isAudiobook) {
-        if (arr == null)
-            return;
-        target.clear();
-        for (int i = 0; i < arr.length(); i++) {
-            try {
-                org.json.JSONObject o = arr.getJSONObject(i);
-                File f = new File(o.getString("path"));
-                if (!f.exists())
-                    continue; // 🚀 그 사이 삭제된 파일은 캐시에서도 조용히 걸러냅니다
-                if (isAudiobook) {
-                    if (!StoragePaths.isUnderAudiobooks(f))
-                        continue;
-                } else {
-                    if (!StoragePaths.isUnderMusic(f))
-                        continue;
-                }
-                SongItem song = new SongItem(f, o.optString("title", f.getName()),
-                        o.optString("artist", "Unknown Artist"), o.optString("album", "Unknown Album"),
-                        o.optString("year", "Unknown Year"), o.optString("genre", "Unknown Genre"),
-                        o.optString("albumArtist", ""), o.optString("composer", ""));
-                target.add(song);
-                trackNumberMap.put(f.getAbsolutePath(), o.optInt("trackNum", 0));
-            } catch (Throwable t) {
-            }
         }
     }
 

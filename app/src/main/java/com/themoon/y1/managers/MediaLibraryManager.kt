@@ -165,24 +165,57 @@ class MediaLibraryManager private constructor() {
     }
 
     fun rebuildUniqueAlbumList() {
-        val albums = LinkedHashMap<String, SongItem>()
+        val combinedLibrary = ArrayList<SongItem>()
         synchronized(musicLibrary) {
-            for (song in musicLibrary) {
-                val album = song.album?.trim()
-                if (!album.isNullOrBlank() && !album.equals("Unknown Album", ignoreCase = true)) {
-                    val key = album.lowercase()
-                    if (!albums.containsKey(key)) {
-                        albums[key] = song
-                    }
+            combinedLibrary.addAll(musicLibrary)
+        }
+        synchronized(audiobookLibrary) {
+            combinedLibrary.addAll(audiobookLibrary)
+        }
+
+        val albumMap = LinkedHashMap<String, ArrayList<SongItem>>()
+        for (song in combinedLibrary) {
+            if (song.file == null) continue
+            val album = if (!song.album.isNullOrBlank()) song.album.trim() else "Unknown Album"
+            val key = album.lowercase(java.util.Locale.US)
+            val list = albumMap.getOrPut(key) { ArrayList() }
+            list.add(song)
+        }
+
+        val result = ArrayList<SongItem>()
+        for (tracks in albumMap.values) {
+            if (tracks.isEmpty()) continue
+            val artistCounts = HashMap<String, Int>()
+            var bestArtist: String? = null
+            var maxCount = -1
+            for (t in tracks) {
+                val a = if (!t.albumArtist.isNullOrBlank()) t.albumArtist.trim()
+                else if (!t.artist.isNullOrBlank()) t.artist.trim()
+                else "Unknown Artist"
+                val cnt = (artistCounts[a] ?: 0) + 1
+                artistCounts[a] = cnt
+                if (cnt > maxCount) {
+                    maxCount = cnt
+                    bestArtist = a
                 }
             }
+            val resolvedArtist = bestArtist ?: "Unknown Artist"
+            val first = tracks[0]
+            val rep = SongItem(
+                first.file, first.title, resolvedArtist, first.album, first.year, first.genre, resolvedArtist, first.composer
+            )
+            result.add(rep)
         }
+
+        result.sortWith { s1, s2 ->
+            val byArtist = (s1.albumArtist ?: "").compareTo(s2.albumArtist ?: "", ignoreCase = true)
+            if (byArtist != 0) byArtist
+            else (s1.album ?: "").compareTo(s2.album ?: "", ignoreCase = true)
+        }
+
         synchronized(uniqueAlbumList) {
             uniqueAlbumList.clear()
-            uniqueAlbumList.addAll(albums.values)
-            uniqueAlbumList.sortWith { s1, s2 ->
-                (s1.album ?: "").compareTo(s2.album ?: "", ignoreCase = true)
-            }
+            uniqueAlbumList.addAll(result)
         }
     }
 
