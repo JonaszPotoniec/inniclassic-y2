@@ -39,7 +39,6 @@ class StorageController(
     private val tvStorageHeader: TextView? = rootView.findViewById(R.id.tv_storage_header)
 
     override fun onEnter(state: ScreenState) {
-        layoutStorage.visibility = View.VISIBLE
         buildStorageUI()
     }
 
@@ -138,6 +137,10 @@ class StorageController(
         val rowModel = createSettingRow(localize("Model"), Build.MODEL)
         rowModel.setOnClickListener { clickFeedback() }
         containerStorageItems.addView(rowModel)
+
+        val rowFormat = createSettingRow(localize("Format"), "FAT32")
+        rowFormat.setOnClickListener { clickFeedback() }
+        containerStorageItems.addView(rowFormat)
 
         if (containerStorageItems.childCount > 0) {
             containerStorageItems.post {

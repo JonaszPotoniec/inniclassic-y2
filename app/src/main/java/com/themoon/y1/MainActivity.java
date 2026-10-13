@@ -98,6 +98,9 @@ import android.util.Log;
 
 public class MainActivity extends Activity {
     private com.themoon.y1.controllers.quiz.MusicQuizController musicQuizController;
+    private com.themoon.y1.controllers.storage.StorageController storageController;
+    private com.themoon.y1.controllers.connectivity.WebServerController webServerController;
+    private com.themoon.y1.controllers.settings.BrightnessController brightnessController;
 
     private static final String TAG = "MainActivity";
     // OTA Update URL pointing to GitHub Releases
@@ -2791,6 +2794,61 @@ public class MainActivity extends Activity {
         tvServerIp = findViewById(R.id.tv_server_ip);
         btnServerToggle = findViewById(R.id.btn_server_toggle);
 
+        storageController = new com.themoon.y1.controllers.storage.StorageController(
+                this,
+                (ViewGroup) findViewById(android.R.id.content),
+                () -> customLibrary,
+                () -> videoLibrary,
+                (title, value) -> createSettingRow(title, value),
+                () -> { clickFeedback(); return kotlin.Unit.INSTANCE; },
+                () -> { changeScreen(backTargetForUtility); return kotlin.Unit.INSTANCE; },
+                (key) -> t(key)
+        );
+
+        brightnessController = new com.themoon.y1.controllers.settings.BrightnessController(
+                this,
+                (ViewGroup) findViewById(android.R.id.content),
+                () -> { clickFeedback(); return kotlin.Unit.INSTANCE; },
+                () -> { changeScreen(backTargetForUtility); return kotlin.Unit.INSTANCE; }
+        );
+
+        webServerController = new com.themoon.y1.controllers.connectivity.WebServerController(
+                this,
+                (ViewGroup) findViewById(android.R.id.content),
+                (isRunning) -> {
+                    isServerRunning = isRunning;
+                    if (ivStatusServer != null) {
+                        ivStatusServer.setVisibility(isRunning ? View.VISIBLE : View.GONE);
+                    }
+                    return kotlin.Unit.INSTANCE;
+                },
+                () -> { startMediaLibraryScan(); return kotlin.Unit.INSTANCE; },
+                () -> { clickFeedback(); return kotlin.Unit.INSTANCE; },
+                () -> {
+                    if (isServerRunning) {
+                        new AlertDialog.Builder(MainActivity.this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                                .setTitle(t("Server is Running"))
+                                .setMessage(t("The Web Server is still active. Do you want to shut it down completely and exit?"))
+                                .setPositiveButton(t("Stop Server"), new DialogInterface.OnClickListener() {
+                                    public void onClick(DialogInterface dialog, int which) {
+                                        if (webServerController != null) webServerController.toggleServer();
+                                        changeScreen(backTargetForUtility);
+                                    }
+                                })
+                                .setNegativeButton(t("Keep Running"), new DialogInterface.OnClickListener() {
+                                    public void onClick(DialogInterface dialog, int which) {
+                                        changeScreen(backTargetForUtility);
+                                    }
+                                })
+                                .show();
+                    } else {
+                        changeScreen(backTargetForUtility);
+                    }
+                    return kotlin.Unit.INSTANCE;
+                },
+                (key) -> t(key)
+        );
+
         // 🚀 [신규 추가] Videos 목록 + 전체화면 재생 화면 뷰 연결
         layoutVideosMode = findViewById(R.id.layout_videos_mode);
         containerVideoItems = findViewById(R.id.container_video_items);
@@ -2887,8 +2945,9 @@ public class MainActivity extends Activity {
             @Override
             public void onClick(View v) {
                 clickFeedback();
-                toggleWebServer();
-                updateWebServerUI();
+                if (webServerController != null) {
+                    webServerController.toggleServer();
+                }
             }
         });
 
@@ -4780,87 +4839,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void toggleWebServer() {
-        if (isServerRunning) {
-            if (webServer != null)
-                webServer.stopServer();
-            isServerRunning = false;
 
-            // 🚀 [웹 서버 절전 해제] 서버가 꺼지면 자물쇠를 풀고 시스템을 놔줍니다.
-            try {
-                if (serverWakeLock != null && serverWakeLock.isHeld()) {
-                    serverWakeLock.release();
-                    serverWakeLock = null;
-                }
-                if (serverWifiLock != null && serverWifiLock.isHeld()) {
-                    serverWifiLock.release();
-                    serverWifiLock = null;
-                }
-                // 스캔 작업 중이 아닐 때만 화면 꺼짐 방지(FLAG) 해제
-                if (!isCustomScanning && !isRadioScanning) {
-                    getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-                }
-            } catch (Exception e) {
-            }
-
-            // 🎯 [신규 엔진 장착] PC에서 파일 업로드가 끝난 후 서버를 끄면, 즉시 백그라운드에서 자동 스캔을 돌려 새로 들어온 곡을 '최근
-            // 추가된 곡' 1등으로 올립니다!
-            startMediaLibraryScan();
-
-        } else {
-            WifiManager wm = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
-            if (wm == null || !wm.isWifiEnabled()) {
-                Toast.makeText(this, t("Please turn ON Wi-Fi first"), Toast.LENGTH_SHORT).show();
-                return;
-            }
-            webServer = new Y1WebServer(getApplicationContext(), StoragePaths.getWebServerRoot());
-            webServer.start();
-            isServerRunning = true;
-
-            // 🚀 [웹 서버 무중단 백그라운드 엔진 가동!]
-            try {
-                // 1. 시스템 타임아웃에 의해 화면이 물리적으로 꺼지는 것을 차단!
-                getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-
-                // 2. CPU(WakeLock)와 Wi-Fi(WifiLock)가 딥슬립(절전 모드)에 빠지지 않도록 시스템 멱살 잡기!
-                PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-                serverWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Y1:WebServerLock");
-                serverWakeLock.acquire();
-
-                serverWifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL, "Y1:WebServerWifiLock");
-                serverWifiLock.acquire();
-            } catch (Exception e) {
-                // (앱 매니페스트에 권한이 없더라도 가상 암전 모드가 있기 때문에 2차 우회 방어가 완벽히 작동합니다)
-            }
-        }
-    }
-
-    private void updateWebServerUI() {
-        if (isServerRunning) {
-            // 🚀 [테마 대응] 하드코딩된 흰색 대신 테마 기본 텍스트 색상 사용 - 밝은 테마(예: iPod Classic)에서
-            // 흰 배경 위에 흰 글씨가 되어 안 보이던 버그 수정!
-            tvServerStatus.setText(t("SERVER RUNNING"));
-            tvServerStatus.setTextColor(ThemeManager.getTextColorPrimary());
-            tvServerIp.setText("http://" + webServer.getLocalIpAddress() + ":8080");
-            tvServerIp.setTextColor(ThemeManager.getTextColorPrimary());
-            btnServerToggle.setText(t("STOP SERVER"));
-
-            // 🚀 [상태바 동기화] 서버가 켜지면 상단에 서버 아이콘 표시!
-            if (ivStatusServer != null)
-                ivStatusServer.setVisibility(View.VISIBLE);
-        } else {
-            // 🚀 [테마 대응] 여기도 동일하게 테마 보조 텍스트 색상 사용
-            tvServerStatus.setText(t("SERVER STOPPED"));
-            tvServerStatus.setTextColor(ThemeManager.getTextColorSecondary());
-            tvServerIp.setText("http://---.---.---.---:8080");
-            tvServerIp.setTextColor(ThemeManager.getTextColorSecondary());
-            btnServerToggle.setText(t("START SERVER"));
-
-            // 🚀 [상태바 동기화] 서버가 꺼지면 상단 서버 아이콘 즉시 숨김!
-            if (ivStatusServer != null)
-                ivStatusServer.setVisibility(View.GONE);
-        }
-    }
 
     // 💡 [수정] 메인 화면 배경 자동 업데이트 (지능형 테마 배경 최우선 렌더링)
     public void updateMainMenuBackground() {
@@ -5268,11 +5247,17 @@ public class MainActivity extends Activity {
         } else if (state == STATE_WIFI_KEYBOARD) {
             openKeyboard();
         } else if (state == STATE_BRIGHTNESS) {
-            loadBrightnessUI();
+            if (brightnessController != null) {
+                brightnessController.loadBrightnessUI();
+            }
         } else if (state == STATE_STORAGE) {
-            loadStorageUI();
+            if (storageController != null) {
+                storageController.buildStorageUI();
+            }
         } else if (state == STATE_WEBSERVER) {
-            updateWebServerUI();
+            if (webServerController != null) {
+                webServerController.updateUI();
+            }
             btnServerToggle.requestFocus();
         } else if (state == STATE_MUSIC_QUIZ) {
             startMusicQuizSession();
@@ -5295,34 +5280,6 @@ public class MainActivity extends Activity {
         }
         changeScreen(backTargetForUtility);
     }
-private void loadBrightnessUI() {
-        try {
-            currentSystemBrightness = Settings.System.getInt(getContentResolver(), Settings.System.SCREEN_BRIGHTNESS,
-                    255);
-        } catch (Exception e) {
-        }
-        pbBrightness.setProgress(currentSystemBrightness);
-        int percent = (int) (((float) currentSystemBrightness / 255.0f) * 100);
-        tvBrightnessVal.setText(percent + "%");
-    }
-
-    private void updateBrightness(int newBrightness) {
-        currentSystemBrightness = newBrightness;
-        pbBrightness.setProgress(currentSystemBrightness);
-        int percent = (int) (((float) currentSystemBrightness / 255.0f) * 100);
-        tvBrightnessVal.setText(percent + "%");
-
-        try {
-            Settings.System.putInt(getContentResolver(), Settings.System.SCREEN_BRIGHTNESS_MODE,
-                    Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL);
-            Settings.System.putInt(getContentResolver(), Settings.System.SCREEN_BRIGHTNESS, currentSystemBrightness);
-            WindowManager.LayoutParams layoutParams = getWindow().getAttributes();
-            layoutParams.screenBrightness = currentSystemBrightness / 255.0f;
-            getWindow().setAttributes(layoutParams);
-        } catch (Exception e) {
-        }
-    }
-
     private String formatStorageSize(long bytes) {
         if (bytes <= 0) return "0 MB";
         double gb = (double) bytes / (1024.0 * 1024.0 * 1024.0);
@@ -5333,135 +5290,6 @@ private void loadBrightnessUI() {
         return mb + " MB";
     }
 
-    // 🚀 [iPod 스타일 About] 클래식 iPod의 Two-Column 정보 리스트 구현 (내장 메모리 & SD 카드 분리)
-    private void loadStorageUI() {
-        if (containerStorageItems == null) return;
-        containerStorageItems.removeAllViews();
-
-        if (layoutStorageMode != null) {
-            layoutStorageMode.setBackgroundColor(ThemeManager.getOverlayBackgroundColor());
-        }
-        if (tvStorageHeader != null) {
-            tvStorageHeader.setText(t("About"));
-            tvStorageHeader.setTextColor(ThemeManager.getTextColorPrimary());
-        }
-
-        try {
-            // 1. Name
-            LinearLayout rowName = createSettingRow("Name", "iPod");
-            rowName.setOnClickListener(v -> clickFeedback());
-            containerStorageItems.addView(rowName);
-
-            // 2. Songs
-            int songCount = (customLibrary != null) ? customLibrary.size() : 0;
-            LinearLayout rowSongs = createSettingRow("Songs", String.valueOf(songCount));
-            rowSongs.setOnClickListener(v -> clickFeedback());
-            containerStorageItems.addView(rowSongs);
-
-            // 3. Videos
-            int videoCount = (videoLibrary != null) ? videoLibrary.size() : 0;
-            LinearLayout rowVideos = createSettingRow("Videos", String.valueOf(videoCount));
-            rowVideos.setOnClickListener(v -> clickFeedback());
-            containerStorageItems.addView(rowVideos);
-
-            // 4. Albums & Artists
-            HashSet<String> uniqueAlbums = new HashSet<>();
-            HashSet<String> uniqueArtists = new HashSet<>();
-            if (customLibrary != null) {
-                for (SongItem song : customLibrary) {
-                    if (song.album != null && !song.album.trim().isEmpty()) uniqueAlbums.add(song.album);
-                    if (song.albumArtist != null && !song.albumArtist.trim().isEmpty()) uniqueArtists.add(song.albumArtist);
-                }
-            }
-            LinearLayout rowAlbums = createSettingRow("Albums", String.valueOf(uniqueAlbums.size()));
-            rowAlbums.setOnClickListener(v -> clickFeedback());
-            containerStorageItems.addView(rowAlbums);
-
-            LinearLayout rowArtists = createSettingRow("Artists", String.valueOf(uniqueArtists.size()));
-            rowArtists.setOnClickListener(v -> clickFeedback());
-            containerStorageItems.addView(rowArtists);
-
-            // 5. Internal Storage (내장 메모리)
-            try {
-                android.os.StatFs statInternal = new android.os.StatFs(StoragePaths.getPrimaryRoot().getAbsolutePath());
-                long blockSize = (long) statInternal.getBlockSize();
-                long totalInternal = (long) statInternal.getBlockCount() * blockSize;
-                long freeInternal = (long) statInternal.getAvailableBlocks() * blockSize;
-
-                LinearLayout rowIntCap = createSettingRow("Internal Capacity", formatStorageSize(totalInternal));
-                rowIntCap.setOnClickListener(v -> clickFeedback());
-                containerStorageItems.addView(rowIntCap);
-
-                LinearLayout rowIntAvail = createSettingRow("Internal Available", formatStorageSize(freeInternal));
-                rowIntAvail.setOnClickListener(v -> clickFeedback());
-                containerStorageItems.addView(rowIntAvail);
-            } catch (Exception e) {
-                LinearLayout rowIntCap = createSettingRow("Internal Capacity", "0 MB");
-                rowIntCap.setOnClickListener(v -> clickFeedback());
-                containerStorageItems.addView(rowIntCap);
-            }
-
-            // 6. MicroSD Card (SD 카드)
-            boolean hasSecondary = StoragePaths.hasSecondaryStorage();
-            if (hasSecondary) {
-                try {
-                    android.os.StatFs statSd = new android.os.StatFs(StoragePaths.SECONDARY_PATH);
-                    long sdBlockSize = (long) statSd.getBlockSize();
-                    long totalSd = (long) statSd.getBlockCount() * sdBlockSize;
-                    long freeSd = (long) statSd.getAvailableBlocks() * sdBlockSize;
-
-                    LinearLayout rowSdCap = createSettingRow("SD Card Capacity", formatStorageSize(totalSd));
-                    rowSdCap.setOnClickListener(v -> clickFeedback());
-                    containerStorageItems.addView(rowSdCap);
-
-                    LinearLayout rowSdAvail = createSettingRow("SD Card Available", formatStorageSize(freeSd));
-                    rowSdAvail.setOnClickListener(v -> clickFeedback());
-                    containerStorageItems.addView(rowSdAvail);
-                } catch (Exception e) {
-                    LinearLayout rowSd = createSettingRow("SD Card", t("Not Inserted"));
-                    rowSd.setOnClickListener(v -> clickFeedback());
-                    containerStorageItems.addView(rowSd);
-                }
-            } else {
-                LinearLayout rowSd = createSettingRow("SD Card", t("Not Inserted"));
-                rowSd.setOnClickListener(v -> clickFeedback());
-                containerStorageItems.addView(rowSd);
-            }
-
-            // 7. Software Version
-            String versionName = "";
-            try {
-                versionName = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
-            } catch (Exception ignored) {
-            }
-            LinearLayout rowVer = createSettingRow("Software Version", versionName);
-            rowVer.setOnClickListener(v -> clickFeedback());
-            containerStorageItems.addView(rowVer);
-
-            // 8. Model
-            LinearLayout rowModel = createSettingRow("Model", android.os.Build.MODEL);
-            rowModel.setOnClickListener(v -> clickFeedback());
-            containerStorageItems.addView(rowModel);
-
-            // 9. Format
-            LinearLayout rowFormat = createSettingRow("Format", "FAT32");
-            rowFormat.setOnClickListener(v -> clickFeedback());
-            containerStorageItems.addView(rowFormat);
-
-            // 첫 번째 항목으로 포커스 자동 지정
-            containerStorageItems.post(new Runnable() {
-                @Override
-                public void run() {
-                    if (containerStorageItems != null && containerStorageItems.getChildCount() > 0) {
-                        containerStorageItems.getChildAt(0).requestFocus();
-                    }
-                }
-            });
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
 
     // 🚀 [직결 성공] 포커스 시스템을 우회하여 정중앙 앨범의 노래 리스트로 다이렉트 진입합니다!
     private void handleCenterShortClick() {
@@ -16083,32 +15911,14 @@ private void loadBrightnessUI() {
         }
 
         if (currentScreenState == STATE_BRIGHTNESS) {
-            if (keyCode == 21) {
-                currentSystemBrightness = Math.max(10, currentSystemBrightness - 15);
-                updateBrightness(currentSystemBrightness);
-                clickFeedback();
-                return true;
-            }
-            if (keyCode == 22) {
-                currentSystemBrightness = Math.min(255, currentSystemBrightness + 15);
-                updateBrightness(currentSystemBrightness);
-                clickFeedback();
-                return true;
-            }
-            if (keyCode == KeyEvent.KEYCODE_BACK) {
-                // 🚀 [복귀 경로 지정]
-                changeScreen(backTargetForUtility);
-                clickFeedback();
+            if (brightnessController != null && brightnessController.onKeyDown(keyCode, event)) {
                 return true;
             }
             return true;
         }
 
         if (currentScreenState == STATE_STORAGE) {
-            if (keyCode == KeyEvent.KEYCODE_BACK) {
-                // 🚀 [복귀 경로 지정]
-                changeScreen(backTargetForUtility);
-                clickFeedback();
+            if (storageController != null && storageController.onKeyDown(keyCode, event)) {
                 return true;
             }
         }
@@ -16122,28 +15932,7 @@ private void loadBrightnessUI() {
         }
 
         if (currentScreenState == STATE_WEBSERVER) {
-            if (keyCode == KeyEvent.KEYCODE_BACK) {
-                clickFeedback();
-                if (isServerRunning) {
-                    new AlertDialog.Builder(MainActivity.this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                            .setTitle(t("Server is Running"))
-                            .setMessage(
-                                    t("The Web Server is still active. Do you want to shut it down completely and exit?"))
-                            .setPositiveButton(t("Stop Server"), new DialogInterface.OnClickListener() {
-                                public void onClick(DialogInterface dialog, int which) {
-                                    toggleWebServer();
-                                    changeScreen(backTargetForUtility); // 🚀 복귀!
-                                }
-                            })
-                            .setNegativeButton(t("Keep Running"), new DialogInterface.OnClickListener() {
-                                public void onClick(DialogInterface dialog, int which) {
-                                    changeScreen(backTargetForUtility); // 🚀 복귀!
-                                }
-                            })
-                            .show();
-                } else {
-                    changeScreen(backTargetForUtility); // 🚀 복귀!
-                }
+            if (webServerController != null && webServerController.onKeyDown(keyCode, event)) {
                 return true;
             }
         }
