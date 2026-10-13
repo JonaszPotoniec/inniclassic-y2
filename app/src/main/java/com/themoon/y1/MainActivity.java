@@ -1656,224 +1656,29 @@ public class MainActivity extends Activity {
 
     // 🚀 [순정 런처 완벽 이식] 중앙 통제형 블루투스 연결 엔진
     private void connectBluetoothAudio(final BluetoothDevice targetDevice) {
-        if (targetDevice == null)
-            return;
-        lastManualDisconnectAddress = null;
-        lastManualDisconnectTime = 0;
-        targetDeviceForAudio = targetDevice; // 1. 목표물 영구 고정!
-
-        BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
-        if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(android.Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) return;
-        if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return;
-        if (adapter != null && adapter.isDiscovering()) {
-            adapter.cancelDiscovery(); // 2. 과부하 방지를 위해 스캔 무조건 중지
-        }
-
-        // 3. 페어링이 안 되어 있다면 페어링부터 꽂습니다! (완료되면 수신기가 이 함수를 다시 부릅니다)
-        if (targetDevice.getBondState() != BluetoothDevice.BOND_BONDED) {
-            Toast.makeText(this, t("Pairing with ") + targetDevice.getName() + "...", Toast.LENGTH_SHORT).show();
-            try {
-                targetDevice.getClass().getMethod("createBond").invoke(targetDevice);
-            } catch (Exception e) {
-            }
-            return;
-        }
-
-        Toast.makeText(this, t("Connecting Audio..."), Toast.LENGTH_SHORT).show();
-
-        // 4. 엔진이 살아있으면 즉시 연결, 죽어있으면 백그라운드에서 살려낸 뒤 연결!
-        if (globalA2dp != null) {
-            executeA2dpConnect(targetDevice);
-        } else {
-            if (adapter != null) {
-                adapter.getProfileProxy(this, new BluetoothProfile.ServiceListener() {
-                    @Override
-                    public void onServiceConnected(int profile, BluetoothProfile proxy) {
-                        if (profile == BluetoothProfile.A2DP) {
-                            globalA2dp = proxy;
-                            runOnUiThread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    executeA2dpConnect(targetDevice);
-                                }
-                            });
-                        }
-                    }
-
-                    @Override
-                    public void onServiceDisconnected(int profile) {
-                        if (profile == BluetoothProfile.A2DP)
-                            globalA2dp = null;
-                    }
-                }, BluetoothProfile.A2DP);
-            }
+        if (bluetoothController != null) {
+            bluetoothController.connectBluetoothAudio(targetDevice);
         }
     }
 
-    // 🚀 [핵심 디테일] 오디오 연결 실무 담당자
     private void executeA2dpConnect(BluetoothDevice targetDevice) {
-        if (globalA2dp == null || targetDevice == null)
-            return;
-        lastManualDisconnectAddress = null;
-        lastManualDisconnectTime = 0;
-        try {
-            // Restore priority so Bluetooth stack allows connection
-            try {
-                Method setPriorityMethod = globalA2dp.getClass().getMethod("setPriority", BluetoothDevice.class, int.class);
-                if (setPriorityMethod != null) {
-                    setPriorityMethod.invoke(globalA2dp, targetDevice, 100); // BluetoothProfile.PRIORITY_ON
-                }
-            } catch (Exception ignored) {
-            }
-
-            // 💡 [순정 코드의 비밀] 연결 전, 이미 물려있는 다른 오디오 기기가 있다면 가차 없이 끊어버립니다!
-            List<BluetoothDevice> connectedDevices = null;
-            try {
-                connectedDevices = globalA2dp.getConnectedDevices();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-
-            if (connectedDevices != null) {
-                for (BluetoothDevice connected : connectedDevices) {
-                    if (!connected.getAddress().equals(targetDevice.getAddress())) {
-                        try {
-                            Method disconnectMethod = globalA2dp.getClass().getDeclaredMethod("disconnect",
-                                    BluetoothDevice.class);
-                            disconnectMethod.setAccessible(true);
-                            disconnectMethod.invoke(globalA2dp, connected);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-                    }
-                }
-            }
-
-            // 💡 방해물이 사라지면, 마침내 타겟 기기에 오디오 빔 발사!
-            Method connectMethod = null;
-            try {
-                connectMethod = globalA2dp.getClass().getDeclaredMethod("connect", BluetoothDevice.class);
-            } catch (NoSuchMethodException e) {
-                // If not found, try to iterate
-                for (Method m : globalA2dp.getClass().getMethods()) {
-                    if (m.getName().equals("connect") && m.getParameterTypes().length == 1) {
-                        connectMethod = m;
-                        break;
-                    }
-                }
-            }
-
-            if (connectMethod == null) {
-                Toast.makeText(this, t("Audio connection error: connect method not found"), Toast.LENGTH_LONG).show();
-                return;
-            }
-
-            connectMethod.setAccessible(true);
-            boolean result = (Boolean) connectMethod.invoke(globalA2dp, targetDevice);
-            if (!result) {
-                Toast.makeText(this, t("Audio connection rejected by system."), Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(this, t("Audio connection initiated."), Toast.LENGTH_SHORT).show();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-            String errorStr = e.getClass().getSimpleName();
-            if (e instanceof java.lang.reflect.InvocationTargetException) {
-                Throwable cause = ((java.lang.reflect.InvocationTargetException) e).getCause();
-                if (cause != null) {
-                    errorStr += " (Cause: " + cause.getClass().getSimpleName() + " - " + cause.getMessage() + ")";
-                }
-            } else {
-                errorStr += " - " + e.getMessage();
-            }
-            Toast.makeText(this, t("Audio error: ") + errorStr, Toast.LENGTH_LONG).show();
+        if (bluetoothController != null) {
+            bluetoothController.executeA2dpConnect(targetDevice);
         }
     }
 
-    // 🚀 [신규] 블루투스 오디오 연결 해제
     private void disconnectBluetoothAudio(final BluetoothDevice targetDevice) {
-        if (targetDevice == null)
-            return;
-        targetDeviceForAudio = null; // 의도적인 연결 해제이므로 자동 재연결 타겟 취소
-        lastManualDisconnectAddress = targetDevice.getAddress();
-        lastManualDisconnectTime = System.currentTimeMillis();
-        Toast.makeText(this, t("Disconnecting Audio..."), Toast.LENGTH_SHORT).show();
-
-        if (globalA2dp != null) {
-            executeA2dpDisconnect(targetDevice);
-        } else {
-            BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
-            if (adapter != null) {
-                adapter.getProfileProxy(this, new BluetoothProfile.ServiceListener() {
-                    @Override
-                    public void onServiceConnected(int profile, BluetoothProfile proxy) {
-                        if (profile == BluetoothProfile.A2DP) {
-                            globalA2dp = proxy;
-                            runOnUiThread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    executeA2dpDisconnect(targetDevice);
-                                }
-                            });
-                        }
-                    }
-
-                    @Override
-                    public void onServiceDisconnected(int profile) {
-                        if (profile == BluetoothProfile.A2DP)
-                            globalA2dp = null;
-                    }
-                }, BluetoothProfile.A2DP);
-            }
+        if (bluetoothController != null) {
+            bluetoothController.disconnectBluetoothAudio(targetDevice);
         }
     }
 
     private void executeA2dpDisconnect(final BluetoothDevice targetDevice) {
-        if (globalA2dp == null || targetDevice == null)
-            return;
-        try {
-            // Set priority to PRIORITY_OFF (0) so incoming reconnect from earphones is rejected by Android Bluetooth stack
-            try {
-                Method setPriorityMethod = globalA2dp.getClass().getMethod("setPriority", BluetoothDevice.class, int.class);
-                if (setPriorityMethod != null) {
-                    setPriorityMethod.invoke(globalA2dp, targetDevice, 0); // BluetoothProfile.PRIORITY_OFF
-                }
-            } catch (Exception ignored) {
-            }
-
-            Method disconnectMethod = null;
-            try {
-                disconnectMethod = globalA2dp.getClass().getDeclaredMethod("disconnect", BluetoothDevice.class);
-            } catch (NoSuchMethodException e) {
-                for (Method m : globalA2dp.getClass().getMethods()) {
-                    if (m.getName().equals("disconnect") && m.getParameterTypes().length == 1) {
-                        disconnectMethod = m;
-                        break;
-                    }
-                }
-            }
-
-            if (disconnectMethod != null) {
-                disconnectMethod.setAccessible(true);
-                disconnectMethod.invoke(globalA2dp, targetDevice);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
+        if (bluetoothController != null) {
+            bluetoothController.executeA2dpDisconnect(targetDevice);
         }
-
-        new Handler().postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                if (currentScreenState == STATE_BLUETOOTH) {
-                    if (bluetoothController != null) {
-                        bluetoothController.startBluetoothScan();
-                    }
-                }
-            }
-        }, 500);
     }
 
-    // 초기화 함수 내부 (앱 실행 시 1회 호출)
     public void initRemoteControlClient(Context context) {
         if (remoteControlClient == null) {
             AudioManager audioManager = (AudioManager) context
