@@ -110,6 +110,7 @@ public class MainActivity extends Activity {
     private com.themoon.y1.controllers.videos.VideoBrowserController videoBrowserController;
     private com.themoon.y1.controllers.videos.VideoPlayerController videoPlayerController;
     private com.themoon.y1.controllers.sync.JellyfinUiController jellyfinUiController;
+    private com.themoon.y1.controllers.player.NowPlayingContextMenu nowPlayingContextMenu;
 
     private static final String TAG = "MainActivity";
     // OTA Update URL pointing to GitHub Releases
@@ -3255,6 +3256,8 @@ public class MainActivity extends Activity {
                     return kotlin.Unit.INSTANCE;
                 }
         );
+
+        nowPlayingContextMenu = com.themoon.y1.controllers.player.NowPlayingContextMenu.INSTANCE;
 
         // 🚀 [신규 추가] Videos 목록 + 전체화면 재생 화면 뷰 연결
         layoutVideosMode = findViewById(R.id.layout_videos_mode);
@@ -13792,137 +13795,55 @@ public class MainActivity extends Activity {
         Toast.makeText(MainActivity.instance, t("Added to On-The-Go."), Toast.LENGTH_SHORT).show();
     }
 
-    // 🚀 [iPod 스타일] Now Playing 화면 길게 누르면 뜨는 곡 컨텍스트 메뉴 (실제 iPod Classic 메뉴 순서/구성과 동일)
     public void showNowPlayingContextMenu(final File songFile) {
+        if (nowPlayingContextMenu == null || songFile == null) return;
         SongItem match = null;
         List<SongItem> lib = isAudiobookLibraryMode ? audiobookLibrary : customLibrary;
-        for (SongItem song : lib) {
-            if (song.file.getAbsolutePath().equals(songFile.getAbsolutePath())) {
-                match = song;
-                break;
-            }
-        }
-        final SongItem songItem = match;
-
-        ScrollView scrollView = new ScrollView(this);
-        scrollView.setBackgroundColor(0xFFFFFFFF);
-
-        final LinearLayout layout = new LinearLayout(this);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        scrollView.addView(layout);
-
-        View.OnKeyListener dialogWheelListener = new View.OnKeyListener() {
-            @Override
-            public boolean onKey(View v, int keyCode, KeyEvent event) {
-                if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                    if (keyCode == 21) {
-                        int idx = layout.indexOfChild(v);
-                        for (int i = idx - 1; i >= 0; i--) {
-                            if (layout.getChildAt(i).isFocusable()) {
-                                layout.getChildAt(i).requestFocus();
-                                clickFeedback();
-                                return true;
-                            }
-                        }
-                        return true;
-                    }
-                    if (keyCode == 22) {
-                        int idx = layout.indexOfChild(v);
-                        for (int i = idx + 1; i < layout.getChildCount(); i++) {
-                            if (layout.getChildAt(i).isFocusable()) {
-                                layout.getChildAt(i).requestFocus();
-                                clickFeedback();
-                                return true;
-                            }
-                        }
-                        return true;
-                    }
+        if (lib != null) {
+            for (SongItem song : lib) {
+                if (song != null && song.file != null && song.file.getAbsolutePath().equals(songFile.getAbsolutePath())) {
+                    match = song;
+                    break;
                 }
-                return false;
             }
-        };
-
-        final AlertDialog dialog = new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                .setView(scrollView)
-                .create();
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-
-        // 🚀 [버그 수리] Center 롱프레스가 이제 화면 잠금 전용이 되면서, 예전에 즐겨찾기를 켜고 끄던
-        // "Center 더블클릭" 경로가 죽은 코드가 되어 즐겨찾기를 켤 방법이 아예 사라졌습니다 - 이 메뉴로 복구합니다.
-        boolean isFav = favoritePaths.contains(songFile.getAbsolutePath());
-        View btnFavorite = createListButtonWithIcon("", isFav ? t("Remove from Favorites") : t("Add to Favorites"));
-        btnFavorite.setOnKeyListener(dialogWheelListener);
-        btnFavorite.setOnClickListener(v -> {
-            clickFeedback();
-            dialog.dismiss();
-            toggleFavorite();
-        });
-        layout.addView(btnFavorite);
-
-        View btnOnTheGo = createListButtonWithIcon("", t("Add to On-The-Go"));
-        btnOnTheGo.setOnKeyListener(dialogWheelListener);
-        btnOnTheGo.setOnClickListener(v -> {
-            clickFeedback();
-            dialog.dismiss();
-            addSongToOnTheGo(songFile);
-        });
-        layout.addView(btnOnTheGo);
-
-        if (songItem != null) {
-            View btnAlbum = createListButtonWithIcon("", t("Browse Album"));
-            btnAlbum.setOnKeyListener(dialogWheelListener);
-            btnAlbum.setOnClickListener(v -> {
-                clickFeedback();
-                dialog.dismiss();
-                virtualQueryType = "ALBUM";
-                virtualQueryValue = songItem.album;
-                currentBrowserMode = BROWSER_VIRTUAL_SONGS;
-                changeScreen(STATE_BROWSER);
-                buildVirtualSongs();
-            });
-            layout.addView(btnAlbum);
-
-            View btnArtist = createListButtonWithIcon("", t("Browse Artist"));
-            btnArtist.setOnKeyListener(dialogWheelListener);
-            btnArtist.setOnClickListener(v -> {
-                clickFeedback();
-                dialog.dismiss();
-                categoryArtistFilter = songItem.albumArtist;
-                categoryArtistFilterIsTrackArtist = false;
-                virtualQueryValue = "";
-                currentBrowserMode = BROWSER_ALBUMS;
-                changeScreen(STATE_BROWSER);
-                buildVirtualCategories("ALBUM");
-            });
-            layout.addView(btnArtist);
         }
-
-        View btnVisualizer = createListButtonWithIcon("", t("Toggle Visualizer"));
-        btnVisualizer.setOnKeyListener(dialogWheelListener);
-        btnVisualizer.setOnClickListener(v -> {
-            clickFeedback();
-            dialog.dismiss();
-            toggleVisualizer();
-        });
-        layout.addView(btnVisualizer);
-
-        View btnCancel = createListButtonWithIcon("", t("Cancel"));
-        btnCancel.setOnKeyListener(dialogWheelListener);
-        btnCancel.setOnClickListener(v -> {
-            clickFeedback();
-            dialog.dismiss();
-        });
-        layout.addView(btnCancel);
-
-        dialog.show();
-
-        layout.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                if (layout.getChildCount() > 0)
-                    layout.getChildAt(0).requestFocus();
-            }
-        }, 50);
+        boolean isFav = favoritePaths != null && favoritePaths.contains(songFile.getAbsolutePath());
+        nowPlayingContextMenu.show(
+                this,
+                songFile,
+                match,
+                isFav,
+                () -> {
+                    toggleFavorite();
+                    return kotlin.Unit.INSTANCE;
+                },
+                (file) -> {
+                    addSongToOnTheGo(file);
+                    return kotlin.Unit.INSTANCE;
+                },
+                (albumName) -> {
+                    virtualQueryType = "ALBUM";
+                    virtualQueryValue = albumName;
+                    currentBrowserMode = BROWSER_VIRTUAL_SONGS;
+                    changeScreen(STATE_BROWSER);
+                    buildVirtualSongs();
+                    return kotlin.Unit.INSTANCE;
+                },
+                (artistName) -> {
+                    categoryArtistFilter = artistName;
+                    categoryArtistFilterIsTrackArtist = false;
+                    virtualQueryValue = "";
+                    currentBrowserMode = BROWSER_ALBUMS;
+                    changeScreen(STATE_BROWSER);
+                    buildVirtualCategories("ALBUM");
+                    return kotlin.Unit.INSTANCE;
+                },
+                () -> {
+                    toggleVisualizer();
+                    return kotlin.Unit.INSTANCE;
+                },
+                (key) -> t(key)
+        );
     }
 
     // 🚀 [자체 플레이리스트 엔진 4단계] 실시간 하드디스크 물리 레코딩 스트림
