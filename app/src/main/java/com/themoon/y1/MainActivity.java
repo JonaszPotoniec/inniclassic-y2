@@ -113,15 +113,11 @@ public class MainActivity extends Activity {
     private com.themoon.y1.controllers.menu.MainMenuController mainMenuController;
     private com.themoon.y1.controllers.home.HomeWidgetsController homeWidgetsController;
     private com.themoon.y1.controllers.player.NowPlayingContextMenu nowPlayingContextMenu;
+    private com.themoon.y1.controllers.coverflow.CoverFlowController coverFlowController;
 
     private static final String TAG = "MainActivity";
     // OTA Update URL pointing to GitHub Releases
     private static final String UPDATE_JSON_URL = "https://github.com/JonaszPotoniec/inniclassic-y2/releases/latest/download/update.json";
-    // 🚀 [최적화 9슬롯 버퍼 엔진] 좌우 외곽 버퍼 슬롯(-4, +4)으로 팝인/사라짐 결함 완전 제거
-    private int visibleCoversCount = 9;
-
-    private com.themoon.y1.views.CoverFlowLayout coverFlowContainer;
-    private View[] cfViews; // 💡 크기는 아래 UI 생성기에서 동적으로 결정됩니다.
 
     private boolean isNavigatingToSubMenu = false; // 🚀 [여기에 한 줄 추가!] 다이렉트 접속 시 포커스 꼬임을 막는 방어막
     // 🚀 [추가] 오디오 채널을 항시 대기시키는 전역 변수
@@ -189,7 +185,6 @@ public class MainActivity extends Activity {
 
     private static final int BROWSER_COVER_FLOW = 9;
     public List<SongItem> uniqueAlbumList = new ArrayList<>();
-    private int currentCoverFlowIndex = 0;
 
     /**
      * Pre-indexes and sorts unique albums from customLibrary and audiobookLibrary.
@@ -3261,6 +3256,36 @@ public class MainActivity extends Activity {
 
         nowPlayingContextMenu = com.themoon.y1.controllers.player.NowPlayingContextMenu.INSTANCE;
 
+        coverFlowController = new com.themoon.y1.controllers.coverflow.CoverFlowController(
+                this,
+                (ViewGroup) findViewById(android.R.id.content),
+                listVirtualSongs,
+                uniqueAlbumList,
+                () -> { clickFeedback(); return kotlin.Unit.INSTANCE; },
+                (chosen) -> {
+                    if (chosen != null && chosen.file != null && chosen.file.getAbsolutePath().contains("/Audiobooks")) {
+                        isAudiobookLibraryMode = true;
+                    } else {
+                        isAudiobookLibraryMode = false;
+                    }
+                    currentBrowserMode = BROWSER_VIRTUAL_SONGS;
+                    virtualQueryType = "COVER_FLOW_ALBUM";
+                    virtualQueryValue = (chosen != null && chosen.album != null) ? chosen.album : "";
+                    buildVirtualSongs();
+                    return kotlin.Unit.INSTANCE;
+                },
+                () -> {
+                    if (lastBrowserFocusText == null || lastBrowserFocusText.trim().isEmpty()) {
+                        changeScreen(STATE_MENU);
+                    } else {
+                        currentBrowserMode = BROWSER_ROOT;
+                        buildFileBrowserUI();
+                    }
+                    return kotlin.Unit.INSTANCE;
+                },
+                (key) -> t(key)
+        );
+
         mainMenuController = new com.themoon.y1.controllers.menu.MainMenuController(
                 this,
                 (ViewGroup) findViewById(android.R.id.content),
@@ -5521,16 +5546,10 @@ public class MainActivity extends Activity {
     // 🚀 [직결 성공] 포커스 시스템을 우회하여 정중앙 앨범의 노래 리스트로 다이렉트 진입합니다!
     private void handleCenterShortClick() {
         if (currentScreenState == STATE_BROWSER && currentBrowserMode == BROWSER_COVER_FLOW) {
-            if (uniqueAlbumList != null && !uniqueAlbumList.isEmpty() && currentCoverFlowIndex >= 0
-                    && currentCoverFlowIndex < uniqueAlbumList.size()) {
-                clickFeedback();
-                SongItem chosen = uniqueAlbumList.get(currentCoverFlowIndex);
-                currentBrowserMode = BROWSER_VIRTUAL_SONGS;
-                virtualQueryType = "COVER_FLOW_ALBUM";
-                virtualQueryValue = chosen.album;
-                buildVirtualSongs();
+            if (coverFlowController != null) {
+                coverFlowController.onKeyDown(KeyEvent.KEYCODE_DPAD_CENTER, new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_CENTER));
             }
-            return; // 💡 링크를 태웠으므로 아래의 낡은 포커스 클릭 루틴으로 내려가지 못하게 차단!
+            return;
         }
 
         if (currentScreenState == STATE_PLAYER) {
@@ -7995,540 +8014,28 @@ public class MainActivity extends Activity {
     private void buildCoverFlowUI() {
         hideBrowserCoverPane();
         currentBrowserMode = BROWSER_COVER_FLOW;
-        View statusBar = findViewById(R.id.layout_status_bar);
-        if (statusBar != null)
-            statusBar.setBackgroundColor(0x00000000);
-        // 1. 기존 잔상 및 스크롤뷰 초기화
-        if (scrollViewBrowser != null) {
-            scrollViewBrowser.setVisibility(View.VISIBLE);
-            if (scrollViewBrowser instanceof ScrollView) {
-                ((ScrollView) scrollViewBrowser).scrollTo(0, 0);
-            }
-        }
-        if (listVirtualSongs != null)
-            listVirtualSongs.setVisibility(View.GONE);
-        containerBrowserItems.removeAllViews();
-
-        // 🚀 [O(1) 광속 장전] 미리 색인/정렬된 uniqueAlbumList 재사용 (없을 때만 빌드)
         if (uniqueAlbumList.isEmpty()) {
             rebuildUniqueAlbumList();
         }
-        com.themoon.y1.managers.AlbumCoverManager.getInstance().pregenerateThumbnails(uniqueAlbumList, false);
-
-        // 5. 해당 라이브러리에 앨범이 하나도 없다면 빈 화면 안내 메시지를 출력하고 탈출
-        if (uniqueAlbumList.isEmpty()) {
-            TextView tvEmpty = new TextView(this);
-            tvEmpty.setText(t("No Albums Found"));
-            tvEmpty.setTextSize(18f);
-            tvEmpty.setTextColor(ThemeManager.getTextColorSecondary());
-            tvEmpty.setGravity(Gravity.CENTER);
-            tvEmpty.setPadding(0, 50, 0, 0);
-            containerBrowserItems.addView(tvEmpty);
-            return;
-        }
-
-        // 🚀 [커버 플로우 포커스 록온]
-        // 앨범 안쪽 곡 목록(COVER_FLOW_ALBUM)에서 뒤로 가기를 눌러 복귀한 경우인지 지능적으로 판별합니다.
-        if ("COVER_FLOW_ALBUM".equals(virtualQueryType) && virtualQueryValue != null && !virtualQueryValue.isEmpty()) {
-            int foundIdx = -1;
-            // 정렬이 완료된 전체 명단에서 방금 보고 나왔던 앨범 이름과 똑같은 위치를 추적합니다!
-            for (int i = 0; i < uniqueAlbumList.size(); i++) {
-                if (uniqueAlbumList.get(i).album.equals(virtualQueryValue)) {
-                    foundIdx = i;
-                    break;
-                }
-            }
-            // 일치하는 위치를 찾았다면 커버 플로우 바늘을 해당 인덱스로 즉시 동기화 고정합니다!
-            if (foundIdx != -1) {
-                currentCoverFlowIndex = foundIdx;
-            } else {
-                currentCoverFlowIndex = 0;
-            }
-
-            // 💡 다음번 일반 메뉴나 숏컷을 통해 커버 플로우에 완전 '처음' 진입할 때는
-            // 0번부터 깔끔하게 열리도록 1회성 기억 변수를 사용 후 깨끗하게 비워줍니다.
-            virtualQueryType = "";
-            virtualQueryValue = "";
-        } else if (currentCoverFlowIndex >= uniqueAlbumList.size()) {
-            currentCoverFlowIndex = 0;
-        }
-
-        // 6. CoverFlowLayout 컨테이너 장전 (자식 뷰 Z-인덱스 자동 관리, requestLayout 제거)
-        coverFlowContainer = new com.themoon.y1.views.CoverFlowLayout(this);
-        coverFlowContainer.setClipChildren(false);
-        coverFlowContainer.setClipToPadding(false);
-        if (containerBrowserItems != null) {
-            containerBrowserItems.setClipChildren(false);
-            containerBrowserItems.setClipToPadding(false);
-        }
-        if (scrollViewBrowser instanceof ViewGroup) {
-            ((ViewGroup) scrollViewBrowser).setClipChildren(false);
-            ((ViewGroup) scrollViewBrowser).setClipToPadding(false);
-        }
-        int containerHeight = (int) (380 * getResources().getDisplayMetrics().density);
-        containerBrowserItems.addView(coverFlowContainer, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, containerHeight));
-
-        cfViews = new View[visibleCoversCount];
-        for (int i = 0; i < visibleCoversCount; i++) {
-            cfViews[i] = createSingleCoverView(); // 💡 아래 개조된 카드 생성기 호출
-            coverFlowContainer.addView(cfViews[i]);
-        }
-
-        // 7. 모든 카드가 배치되면, 기존에 있던 순정 알고리즘 엔진을 깨워 좌표와 각도를 잡아줍니다.
-        initCoverFlowPositions();
-    }
-
-    // 🚀 [순정 3D 엔진 4] 초기 포지션 세팅 (알고리즘화 완료)
-    private void initCoverFlowPositions() {
-        int total = uniqueAlbumList.size();
-        if (total == 0)
-            return;
-
-        int centerIdx = visibleCoversCount / 2;
-
-        // 정중앙을 기준으로 앞뒤 인덱스를 계산하여 데이터 바인딩
-        for (int i = 0; i < visibleCoversCount; i++) {
-            int offsetFromCenter = i - centerIdx;
-            int targetIdx = (currentCoverFlowIndex + offsetFromCenter + total * 10) % total;
-            bindCoverData(cfViews[i], targetIdx);
-        }
-
-        float d = getResources().getDisplayMetrics().density;
-
-        // 🚀 수학적 알고리즘 루프: 뷰의 개수에 상관없이 스케일/좌표 공식 자동 매핑
-        for (int i = 0; i < visibleCoversCount; i++) {
-            int dist = Math.abs(i - centerIdx);
-            float sign = (i < centerIdx) ? -1f : 1f; // 왼쪽은 음수(-), 오른쪽은 양수(+)
-
-            float transX = sign * getTransXForDist(dist, d);
-            float rotY = -sign * getRotYForDist(dist);
-            float scale = getScaleForDist(dist);
-            float alpha = getAlphaForDist(dist);
-
-            applyTransform(cfViews[i], transX, rotY, scale, alpha);
-        }
-
-        arrangeZIndex();
-
-        for (int i = 0; i < visibleCoversCount; i++) {
-            setCardTitleAlpha(cfViews[i], i == centerIdx, 0);
-        }
-
-        tvBrowserPath.setText(t("Cover Flow") + " (" + (currentCoverFlowIndex + 1) + "/" + total + ")");
-    }
-
-    private float getTransXForDist(int dist, float d) {
-        if (dist == 0)
-            return 0f;
-        if (dist == 1)
-            return 130 * d;
-        if (dist == 2)
-            return 170 * d;
-        if (dist == 3)
-            return 215 * d;
-        return 270 * d; // dist >= 4: 화면 밖 오프스크린 버퍼 슬롯
-    }
-
-    // 🚀 숫자를 높일수록 책장에 책을 비스듬히 꽂아둔 것처럼 각도가 팍 꺾입니다!
-    private float getRotYForDist(int dist) {
-        if (dist == 0)
-            return 0f;
-        return 65f;
-    }
-
-    // 🚀 [알고리즘 엔진] 중앙에서부터의 거리에 따른 크기 축소 비율 계산
-    private float getScaleForDist(int dist) {
-        if (dist == 0)
-            return 1.0f;
-        if (dist == 1)
-            return 0.8f;
-        if (dist == 2)
-            return 0.8f;
-        if (dist == 3)
-            return 0.8f;
-        return 0.75f; // dist >= 4
-    }
-
-    // 🚀 [알고리즘 엔진] 외곽으로 갈수록 부드러운 페이드아웃 (4번 버퍼 슬롯은 alpha=0)
-    private float getAlphaForDist(int dist) {
-        if (dist <= 3) return 1.0f;
-        return 0.0f; // dist >= 4: 오프스크린 버퍼 (완전 투명)
-    }
-
-    // 🚀 [AlbumCoverManager 통합] 비동기 LIFO 스레드풀 + 디스크 썸네일 캐시 연동
-    private void bindCoverData(final View card, int dataIndex) {
-        if (uniqueAlbumList.isEmpty() || dataIndex < 0 || dataIndex >= uniqueAlbumList.size())
-            return;
-        final SongItem item = uniqueAlbumList.get(dataIndex);
-
-        final ImageView ivCover = card.findViewById(dynamicViewId(1001));
-        final ImageView ivReflection = card.findViewById(dynamicViewId(1004)); // 🚀 반사판 레이어 획득
-        TextView tvTitle = card.findViewById(dynamicViewId(1002));
-        TextView tvArtist = card.findViewById(dynamicViewId(1003));
-
-        if (tvTitle != null) tvTitle.setText(item.album);
-        if (tvArtist != null) tvArtist.setText(item.artist);
-
-        final String albumKey = com.themoon.y1.managers.AlbumCoverManager.getAlbumKey(item.file, item.album);
-        ivCover.setTag(albumKey); // 비동기 꼬임 완벽 차단
-
-        com.themoon.y1.managers.AlbumCoverManager manager = com.themoon.y1.managers.AlbumCoverManager.getInstance();
-        Bitmap cachedBmp = manager.getMemoryCover(albumKey);
-        Bitmap cachedRef = manager.getMemoryReflection(albumKey);
-
-        if (cachedBmp != null) {
-            ivCover.animate().cancel();
-            ivCover.setAlpha(1.0f);
-            ivCover.setImageBitmap(cachedBmp);
-            if (ivReflection != null) {
-                ivReflection.animate().cancel();
-                ivReflection.setAlpha(1.0f);
-                ivReflection.setImageBitmap(cachedRef);
-                ivReflection.setVisibility(cachedRef != null ? View.VISIBLE : View.INVISIBLE);
-            }
-            return;
-        }
-
-        // 2. RAM 캐시에 없으면 기본 빈 도화지를 바인딩하고 LIFO 작업 큐로 발사
-        ivCover.animate().cancel();
-        ivCover.setAlpha(1.0f);
-        ivCover.setImageBitmap(
-                ThemeManager.getCustomIcon("icon_default_album.png", MainActivity.this, R.drawable.default_album));
-        if (ivReflection != null) {
-            ivReflection.animate().cancel();
-            ivReflection.setAlpha(1.0f);
-            ivReflection.setImageBitmap(null);
-            ivReflection.setVisibility(View.INVISIBLE);
-        }
-
-        manager.loadCoverAsync(item, new com.themoon.y1.managers.AlbumCoverManager.CoverCallback() {
-            @Override
-            public void onCoverLoaded(String loadedKey, Bitmap cover, Bitmap reflection) {
-                if (albumKey.equals(ivCover.getTag())) {
-                    if (cover != null) {
-                        ivCover.setImageBitmap(cover);
-                    }
-                    if (ivReflection != null) {
-                        if (reflection != null) {
-                            ivReflection.setImageBitmap(reflection);
-                            ivReflection.setVisibility(View.VISIBLE);
-                        } else {
-                            ivReflection.setVisibility(View.INVISIBLE);
-                        }
+        if (coverFlowController != null) {
+            if ("COVER_FLOW_ALBUM".equals(virtualQueryType) && virtualQueryValue != null && !virtualQueryValue.isEmpty()) {
+                int foundIdx = -1;
+                for (int i = 0; i < uniqueAlbumList.size(); i++) {
+                    if (uniqueAlbumList.get(i).album != null && uniqueAlbumList.get(i).album.equals(virtualQueryValue)) {
+                        foundIdx = i;
+                        break;
                     }
                 }
-            }
-        });
-    }
-
-    // 🚀 [버그 완전 처치 & 비율 최적화] 커버 이미지 잘림을 막으면서도 전체를 위로 올리고, 텍스트 가독성을 극대화합니다!
-    private View createSingleCoverView() {
-        float d = getResources().getDisplayMetrics().density;
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setGravity(Gravity.CENTER_HORIZONTAL);
-
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
-                (int) (350 * d), (int) (320 * d));
-        lp.gravity = Gravity.CENTER;
-
-        // 🚀 [디테일 1] 카드 전체를 위로 살짝(-20dp) 끌어올려 화면 중앙보다 약간 높은 황금 비율에 안착시킵니다.
-        lp.topMargin = (int) (-20 * d);
-
-        card.setLayoutParams(lp);
-        card.setLayerType(View.LAYER_TYPE_NONE, null); // 🚀 KitKat 음수 translationX GPU 컬링 방지를 위해 NONE 설정
-
-        ImageView ivCover = new ImageView(this);
-        ivCover.setId(dynamicViewId(1001));
-        LinearLayout.LayoutParams imgLp = new LinearLayout.LayoutParams((int) (200 * d),
-                (int) (200 * d));
-        imgLp.gravity = Gravity.CENTER_HORIZONTAL;
-        ivCover.setLayoutParams(imgLp);
-        ivCover.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        ivCover.setBackground(createButtonBackground(0x00000000));
-
-        ImageView ivReflection = new ImageView(this);
-        ivReflection.setId(dynamicViewId(1004));
-        LinearLayout.LayoutParams refLp = new LinearLayout.LayoutParams((int) (200 * d),
-                (int) (50 * d));
-        refLp.gravity = Gravity.CENTER_HORIZONTAL;
-        refLp.topMargin = (int) (2 * d);
-        ivReflection.setLayoutParams(refLp);
-        ivReflection.setScaleType(ImageView.ScaleType.CENTER_CROP);
-
-        TextView tvTitle = new TextView(this);
-        tvTitle.setId(dynamicViewId(1002));
-        tvTitle.setTextColor(ThemeManager.getTextColorPrimary());
-        // 🚀 [Main Menu/Artist 메뉴와 폰트 크기 통일] SP 대신 PX 단위로 강제 고정
-        tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, 18f * d);
-        tvTitle.setTypeface(ThemeManager.getCustomFontBold());
-        tvTitle.setGravity(Gravity.CENTER);
-        tvTitle.setSingleLine(true);
-        tvTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        tvTitle.setAlpha(0f);
-
-        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-
-        // 🚀 [디테일 2] 앨범 제목을 위쪽(반사판 쪽)으로 훨씬 더 가깝게(-55dp) 바짝 끌어올립니다.
-        titleLp.topMargin = (int) (-40 * d);
-        titleLp.bottomMargin = (int) (0 * d);
-        tvTitle.setLayoutParams(titleLp);
-
-        TextView tvArtist = new TextView(this);
-        tvArtist.setId(dynamicViewId(1003));
-        tvArtist.setTextColor(ThemeManager.getTextColorSecondary());
-
-        // 🚀 [디테일 3] 너무 작았던 가수 이름 글씨를 14f에서 16.5f로 시원하게 키웁니다!
-        tvArtist.setTextSize(16.5f);
-        tvArtist.setGravity(Gravity.CENTER);
-        tvArtist.setSingleLine(true);
-        tvArtist.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        tvArtist.setAlpha(0f);
-
-        LinearLayout.LayoutParams artistLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        artistLp.topMargin = (int) (2 * d);
-        tvArtist.setLayoutParams(artistLp);
-
-        card.addView(ivCover);
-        card.addView(ivReflection);
-        card.addView(tvTitle);
-        card.addView(tvArtist);
-
-        card.setOnClickListener(v -> {
-            int centerIdx = visibleCoversCount / 2;
-            if (v == cfViews[centerIdx] && currentCoverFlowIndex >= 0
-                    && currentCoverFlowIndex < uniqueAlbumList.size()) {
-                clickFeedback();
-                SongItem chosen = uniqueAlbumList.get(currentCoverFlowIndex);
-
-                // 🚀 [지능형 라이브러리 모드 전환 스위치]
-                // 통합 커버플로우에서 앨범을 눌러 진입하는 순간, 선택한 곡의 파일 절대 경로를 실시간으로 분석합니다.
-                // 오디오북 폴더(/Audiobooks) 소속이면 오디오북 모드를 키고, 음악 폴더 소속이면 음악 모드로 알아서 스위칭해줍니다!
-                if (chosen.file.getAbsolutePath().contains("/Audiobooks")) {
-                    isAudiobookLibraryMode = true;
+                if (foundIdx != -1) {
+                    coverFlowController.setCurrentCoverFlowIndex(foundIdx);
                 } else {
-                    isAudiobookLibraryMode = false;
+                    coverFlowController.setCurrentCoverFlowIndex(0);
                 }
-                currentBrowserMode = BROWSER_VIRTUAL_SONGS;
-                virtualQueryType = "COVER_FLOW_ALBUM";
-                virtualQueryValue = chosen.album;
-                buildVirtualSongs();
+                virtualQueryType = "";
+                virtualQueryValue = "";
             }
-        });
-
-        return card;
-    }
-
-    // 🚀 [반사판 그래픽 파서] 원본을 상하 반전 후 그라데이션 마스크를 씌워 젤리빈 순정으로 렌더링합니다.
-    private Bitmap getReflectionBitmap(Bitmap src) {
-        if (src == null)
-            return null;
-        try {
-            int w = src.getWidth();
-            int h = src.getHeight();
-            int reqH = h / 4; // 원본의 하단 25% 구역만 반사 영역으로 사용
-            if (reqH <= 0)
-                return null;
-
-            android.graphics.Matrix matrix = new android.graphics.Matrix();
-            matrix.preScale(1, -1); // 상하 반전 행렬 주입
-
-            // 하단 부분만 싹둑 잘라 뒤집은 비트맵 생성
-            Bitmap flipped = Bitmap.createBitmap(src, 0, h - reqH, w, reqH, matrix,
-                    false);
-            Bitmap reflection = Bitmap.createBitmap(w, reqH,
-                    Bitmap.Config.ARGB_8888);
-
-            android.graphics.Canvas canvas = new android.graphics.Canvas(reflection);
-            canvas.drawBitmap(flipped, 0, 0, null);
-            flipped.recycle();
-
-            // 밑으로 갈수록 스르륵 사라지는 그라데이션 마스크 도색
-            android.graphics.Paint paint = new android.graphics.Paint();
-            android.graphics.LinearGradient shader = new android.graphics.LinearGradient(
-                    0, 0, 0, reqH,
-                    0x44FFFFFF, 0x00FFFFFF, // 약 25%의 은은한 반사 시작 투명도 -> 0% 완전 투명
-                    android.graphics.Shader.TileMode.CLAMP);
-            paint.setShader(shader);
-            paint.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.DST_IN));
-            canvas.drawRect(0, 0, w, reqH, paint);
-
-            return reflection;
-        } catch (Exception e) {
-            return null;
+            coverFlowController.buildCoverFlowUI();
         }
-    }
-
-    // 🚀 [도우미 함수 4] 중앙에 온 카드만 제목을 보여주고, 옆으로 밀려난 카드는 제목을 숨깁니다!
-    private void setCardTitleAlpha(View card, boolean isCenter, int duration) {
-        View tvTitle = card.findViewById(dynamicViewId(1002));
-        View tvArtist = card.findViewById(dynamicViewId(1003));
-        if (tvTitle != null && tvArtist != null) {
-            float targetAlpha = isCenter ? 1.0f : 0.0f; // 중앙이면 100% 켜고, 아니면 0% 끄기
-            if (duration > 0) {
-                tvTitle.animate().alpha(targetAlpha).setDuration(duration).start();
-                tvArtist.animate().alpha(targetAlpha).setDuration(duration).start();
-            } else {
-                tvTitle.setAlpha(targetAlpha);
-                tvArtist.setAlpha(targetAlpha);
-            }
-        }
-    }
-
-    // 🚀 [도우미 함수 1] 뷰를 순간 이동 및 변형시키는 함수
-    private void applyTransform(View v, float transX, float rotY, float scale, float alpha) {
-        if (v == null) return;
-        v.animate().cancel();
-        v.setTranslationX(transX);
-        v.setRotationY(rotY);
-        v.setScaleX(scale);
-        v.setScaleY(scale);
-        v.setAlpha(alpha);
-    }
-
-    private void animateTransform(View v, float transX, float rotY, float scale, float alpha, int duration) {
-        if (v == null) return;
-        if (duration <= 0) {
-            applyTransform(v, transX, rotY, scale, alpha);
-        } else {
-            v.animate().translationX(transX).rotationY(rotY).scaleX(scale).scaleY(scale).alpha(alpha).setDuration(duration)
-                    .start();
-        }
-    }
-
-    // 🚀 [Z-인덱스 갱신] CoverFlowLayout이 자체 오더링을 수행하므로 requestLayout 없이 컨테이너만 invalidate!
-    private void arrangeZIndex() {
-        if (coverFlowContainer != null) {
-            coverFlowContainer.invalidate();
-        }
-    }
-
-    private int coverFlowActiveDirection = 0; // +1 for Right (22), -1 for Left (21)
-    private long coverFlowDirectionChangeTime = 0;
-    private long lastCoverFlowWheelTime = 0;
-
-    private void cancelAllCoverFlowAnimations() {
-        if (cfViews != null) {
-            for (int i = 0; i < cfViews.length; i++) {
-                if (cfViews[i] != null) {
-                    cfViews[i].animate().cancel();
-                }
-            }
-        }
-    }
-
-    private void handleCoverFlowWheelInput(int keyCode, KeyEvent event) {
-        final int dir = (keyCode == 22) ? 1 : -1;
-        final long eventTime = event.getEventTime();
-        final long now = android.os.SystemClock.uptimeMillis();
-
-        // 1. 방향 역전 감지 (Direction Reversal) 및 유휴 상태 리셋
-        if (now - lastCoverFlowWheelTime > 250) {
-            coverFlowActiveDirection = dir;
-            coverFlowDirectionChangeTime = eventTime;
-        } else if (coverFlowActiveDirection != 0 && dir != coverFlowActiveDirection) {
-            // 사용자가 휠 방향을 반대로 꺾음! 즉시 이전 방향 애니메이션 올스톱 및 기준 시각 갱신
-            coverFlowActiveDirection = dir;
-            coverFlowDirectionChangeTime = eventTime;
-            cancelAllCoverFlowAnimations();
-        } else if (coverFlowActiveDirection == 0) {
-            coverFlowActiveDirection = dir;
-            coverFlowDirectionChangeTime = eventTime;
-        }
-
-        // 2. 큐에 남아있던 이전 방향 유령 이벤트(Stale phantom events) 즉시 파쇄
-        if (dir != coverFlowActiveDirection || eventTime < coverFlowDirectionChangeTime) {
-            return;
-        }
-
-        // 3. 지연 시간(Lag) 감지: 이벤트 생성 시각과 처리 시각의 차이
-        long lag = now - eventTime;
-        long diff = now - lastCoverFlowWheelTime;
-        lastCoverFlowWheelTime = now;
-
-        // 4. 회전 속도에 따른 가변 듀레이션
-        // 큐가 밀려 lag가 40ms 이상이거나, 휠을 빠르게 돌리는 중(diff < 40ms)이라면:
-        // duration = 0 (즉시 스냅)으로 처리하여 큐 누적과 지연을 완벽 분쇄!
-        int duration;
-        if (lag > 40 || diff < 40) {
-            duration = 0;
-        } else if (diff < 90) {
-            duration = 45;
-        } else {
-            duration = 160;
-        }
-
-        scrollCoverFlow(dir > 0, duration);
-
-        // 5. 큐가 밀려있을 때는 클릭 피드백(진동/오디오) 큐 누적 방지를 위해 생략
-        if (lag <= 40) {
-            clickFeedback();
-        }
-    }
-
-    private void scrollCoverFlow(boolean isNext) {
-        scrollCoverFlow(isNext, 160);
-    }
-
-    // 🚀 [순정 3D 엔진 5] 9슬롯 버퍼 고속 슬라이딩 엔진 (팝인/사라짐 완벽 차단)
-    private void scrollCoverFlow(boolean isNext, int duration) {
-        int total = uniqueAlbumList.size();
-        if (total == 0)
-            return;
-
-        float d = getResources().getDisplayMetrics().density;
-        int centerIdx = visibleCoversCount / 2; // 4 (visibleCoversCount = 9)
-
-        float offScreenX = getTransXForDist(centerIdx, d);
-        float offScreenRot = getRotYForDist(centerIdx);
-        float offScreenScale = getScaleForDist(centerIdx);
-
-        if (isNext) {
-            currentCoverFlowIndex = (currentCoverFlowIndex + 1) % total;
-            View oldLeft = cfViews[0];
-
-            // 🚀 동적 인덱스 셔플링
-            for (int i = 0; i < visibleCoversCount - 1; i++)
-                cfViews[i] = cfViews[i + 1];
-            cfViews[visibleCoversCount - 1] = oldLeft;
-
-            // 재활용된 카드는 화면 오른쪽 완전 투명(alpha=0) 오프스크린 버퍼 슬롯에 즉시 장전
-            bindCoverData(cfViews[visibleCoversCount - 1], (currentCoverFlowIndex + centerIdx + total * 10) % total);
-            applyTransform(cfViews[visibleCoversCount - 1], offScreenX, -offScreenRot, offScreenScale, 0f);
-        } else {
-            currentCoverFlowIndex = (currentCoverFlowIndex - 1 + total) % total;
-            View oldRight = cfViews[visibleCoversCount - 1];
-
-            for (int i = visibleCoversCount - 1; i > 0; i--)
-                cfViews[i] = cfViews[i - 1];
-            cfViews[0] = oldRight;
-
-            // 재활용된 카드는 화면 왼쪽 완전 투명(alpha=0) 오프스크린 버퍼 슬롯에 즉시 장전
-            bindCoverData(cfViews[0], (currentCoverFlowIndex - centerIdx + total * 10) % total);
-            applyTransform(cfViews[0], -offScreenX, offScreenRot, offScreenScale, 0f);
-        }
-
-        arrangeZIndex();
-
-        // 🚀 전체 동적 슬롯 애니메이션: 3번 카드는 4번 버퍼로 페이드아웃(0), 4번 버퍼 카드는 3번으로 페이드인(0.45)!
-        for (int i = 0; i < visibleCoversCount; i++) {
-            setCardTitleAlpha(cfViews[i], i == centerIdx, duration);
-
-            int dist = Math.abs(i - centerIdx);
-            float sign = (i < centerIdx) ? -1f : 1f;
-
-            float transX = sign * getTransXForDist(dist, d);
-            float rotY = -sign * getRotYForDist(dist);
-            float scale = getScaleForDist(dist);
-            float alpha = getAlphaForDist(dist);
-
-            animateTransform(cfViews[i], transX, rotY, scale, alpha, duration);
-        }
-
-        tvBrowserPath.setText(t("Cover Flow") + " (" + (currentCoverFlowIndex + 1) + "/" + total + ")");
     }
 
     // 💡 4. 자체 DB에서 노래를 뽑아 '재활용 엔진'에 밀어넣는 함수 (뮤직/오디오북 완벽 격리 버전!)
@@ -10355,7 +9862,9 @@ public class MainActivity extends Activity {
             // 🚀 [순정 커버 플로우 휠 조작 대개조 완료]
             if (currentScreenState == STATE_BROWSER && currentBrowserMode == BROWSER_COVER_FLOW) {
                 if (keyCode == 21 || keyCode == 22) {
-                    handleCoverFlowWheelInput(keyCode, event);
+                    if (coverFlowController != null && coverFlowController.onKeyDown(keyCode, event)) {
+                        return true;
+                    }
                     return true;
                 }
             }
@@ -11040,7 +10549,9 @@ public class MainActivity extends Activity {
             if (keyCode == 21 || keyCode == 22) {
                 if (isScreenOnForLock && !isFakeScreenOff) {
                     if (action == KeyEvent.ACTION_DOWN) {
-                        handleCoverFlowWheelInput(keyCode, event);
+                        if (coverFlowController != null) {
+                            coverFlowController.onKeyDown(keyCode, event);
+                        }
                     }
                 }
                 return true;
