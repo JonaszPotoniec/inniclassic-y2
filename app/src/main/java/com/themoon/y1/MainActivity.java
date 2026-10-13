@@ -683,11 +683,12 @@ public class MainActivity extends Activity {
     // java.util.ArrayList<>();
     // private int currentCoverFlowIndex = 0;
     private File currentM3uFile = null; // 현재 사용자가 들여다보고 있는 M3U 파일 주소창
-    // 🚀 [추가] 즐겨찾기 전용 변수들
-    private Set<String> favoritePaths = new HashSet<>();
+    // 즐겨찾기 전용 변수들
+    public Set<String> favoritePaths = new HashSet<>();
     private TextView tvPlayerFavoriteStatus;
 
     public int consecutiveErrorCount = 0;
+    public boolean isCustomScanning = false;
     // 🚀 [추가] 스캔 진행률 표시용 변수들
     private ProgressBar pbLoadingProgress;
     private TextView tvLoadingProgress;
@@ -768,7 +769,6 @@ public class MainActivity extends Activity {
 
     private int lastRadioFocusIndex = 1;
     // (볼륨 전용 변수와 복잡한 포커스 인덱스는 이제 필요 없으므로 과감히 삭제!)
-    private boolean isCustomScanning = false;
     public static java.util.HashMap<String, Integer> trackNumberMap = new java.util.HashMap<>();
     private int currentScreenState = STATE_MENU;
     // 💡 자체 날짜/시간 설정용 임시 변수
@@ -4042,14 +4042,21 @@ public class MainActivity extends Activity {
                 public void run() {
                     // 🚀 [버그 수리 완료!] 음악 스캔이나 라디오 스캔 중 어느 하나라도 돌고 있으면 창을 닫지 않습니다!
                     if (!isCustomScanning && !isRadioScanning) {
-                        layoutLoadingOverlay.setVisibility(View.GONE);
-                        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                        dismissLoadingOverlay();
                     } else {
                         checker.postDelayed(this, 200); // 0.2초마다 검사
                     }
                 }
             });
         }
+    }
+
+    public void dismissLoadingOverlay() {
+        if (layoutLoadingOverlay != null) {
+            layoutLoadingOverlay.setVisibility(View.GONE);
+            layoutLoadingOverlay.setBackgroundColor(0xDD000000);
+        }
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     }
 
     // 🚀 [신규 추가] iPod 스타일 커버 위젯을 아주 천천히, 유기적으로 이리저리 드리프트시킵니다.
