@@ -114,6 +114,7 @@ public class MainActivity extends Activity {
     private com.themoon.y1.controllers.home.HomeWidgetsController homeWidgetsController;
     private com.themoon.y1.controllers.player.NowPlayingContextMenu nowPlayingContextMenu;
     private com.themoon.y1.controllers.coverflow.CoverFlowController coverFlowController;
+    private com.themoon.y1.controllers.playlists.PlaylistController playlistController;
 
     private static final String TAG = "MainActivity";
     // OTA Update URL pointing to GitHub Releases
@@ -3304,6 +3305,47 @@ public class MainActivity extends Activity {
         );
 
         homeWidgetsController = createHomeWidgetsController();
+
+        playlistController = new com.themoon.y1.controllers.playlists.PlaylistController(
+                this,
+                (ViewGroup) findViewById(android.R.id.content),
+                listVirtualSongs,
+                hzIndexScroll,
+                layoutIndexContainer,
+                rootFolder,
+                file -> isAudioFile(file),
+                (icon, text, color) -> createListButtonWithIcon(icon, text, color != null ? color : 0),
+                () -> {
+                    clickFeedback();
+                    return kotlin.Unit.INSTANCE;
+                },
+                m3uFile -> {
+                    currentBrowserMode = BROWSER_M3U_SONGS;
+                    buildM3uSongsUI(m3uFile);
+                    return kotlin.Unit.INSTANCE;
+                },
+                () -> {
+                    if (currentBrowserMode == BROWSER_M3U_SONGS) {
+                        currentBrowserMode = BROWSER_PLAYLISTS;
+                        if (currentM3uFile != null) {
+                            lastBrowserFocusText = currentM3uFile.getName().substring(0,
+                                    currentM3uFile.getName().lastIndexOf("."));
+                        }
+                        buildM3uPlaylistUI();
+                    } else if (currentBrowserMode == BROWSER_PLAYLISTS) {
+                        if (!isPlaylistOpenedFromLibrary) {
+                            applyThemeToMainMenu();
+                            changeScreen(STATE_MENU);
+                        } else {
+                            currentBrowserMode = BROWSER_ROOT;
+                            lastBrowserFocusText = t("Playlists");
+                            buildFileBrowserUI();
+                        }
+                    }
+                    return kotlin.Unit.INSTANCE;
+                },
+                key -> t(key)
+        );
 
         // 🚀 [신규 추가] Videos 목록 + 전체화면 재생 화면 뷰 연결
         layoutVideosMode = findViewById(R.id.layout_videos_mode);
@@ -9979,24 +10021,10 @@ public class MainActivity extends Activity {
                             // 🚀 오디오북에서 뮤직으로 돌아갈 때의 방어막
                             lastBrowserFocusText = t("Switch to Audiobooks");
                             buildFileBrowserUI();
-                        } else if (currentBrowserMode == BROWSER_PLAYLISTS) {
-                            // 🚀 [플레이리스트 탈출 버그 완벽 수리]
-                            // 꼬리표 텍스트에 의존하지 않고, 절대 지워지지 않는 '스위치 플래그'를 통해 정확한 경로로 퇴근시킵니다!
-                            if (!isPlaylistOpenedFromLibrary) {
-                                applyThemeToMainMenu();
-                                changeScreen(STATE_MENU);
-                            } else {
-                                currentBrowserMode = BROWSER_ROOT;
-                                lastBrowserFocusText = t("Playlists");
-                                buildFileBrowserUI();
+                        } else if (currentBrowserMode == BROWSER_PLAYLISTS || currentBrowserMode == BROWSER_M3U_SONGS) {
+                            if (playlistController != null) {
+                                playlistController.onBackPressed();
                             }
-                        } else if (currentBrowserMode == BROWSER_M3U_SONGS) {
-                            currentBrowserMode = BROWSER_PLAYLISTS;
-                            if (currentM3uFile != null) {
-                                lastBrowserFocusText = currentM3uFile.getName().substring(0,
-                                        currentM3uFile.getName().lastIndexOf("."));
-                            }
-                            buildM3uPlaylistUI();
                         } else if (currentBrowserMode == BROWSER_ALBUMS) {
                             // 🚀 [추가] 아티스트를 통해 들어온 앨범 목록이면, 루트가 아니라 그 아티스트로 되돌아갑니다!
                             // (Artists에서 들어왔으면 Artists로, Album Artists에서 들어왔으면 Album Artists로)
@@ -11675,120 +11703,10 @@ public class MainActivity extends Activity {
     // 🚀 [네이티브 엔진 1] M3U 리스트 화면 구축
     private void buildM3uPlaylistUI() {
         hideBrowserCoverPane();
-        if (scrollViewBrowser != null)
-            scrollViewBrowser.setVisibility(View.VISIBLE);
-        if (listVirtualSongs != null)
-            listVirtualSongs.setVisibility(View.GONE);
-        containerBrowserItems.removeAllViews();
-        tvBrowserPath.setText(t("Playlists"));
-
-        // 전용 재생목록 보관함 개설
-        File playlistDir = StoragePaths.getPlaylistsDir();
-        if (!playlistDir.exists())
-            playlistDir.mkdirs();
-
-        File[] files = playlistDir.listFiles();
-        List<File> m3uFiles = new ArrayList<>();
-        if (files != null) {
-            for (File f : files) {
-                // 🚀 [해결] 파일 이름이 .m3u 이거나(OR) .m3u8 로 끝나는 파일들을 모두 수집합니다!
-                String name = f.getName().toLowerCase();
-                if (f.isFile() && (name.endsWith(".m3u") || name.endsWith(".m3u8"))) {
-                    m3uFiles.add(f);
-                }
-            }
+        currentBrowserMode = BROWSER_PLAYLISTS;
+        if (playlistController != null) {
+            playlistController.buildPlaylistsUI();
         }
-
-        // 알파벳 대소문자 구분 없이 깔끔하게 정렬
-        java.util.Collections.sort(m3uFiles, (f1, f2) -> f1.getName().compareToIgnoreCase(f2.getName()));
-
-        if (m3uFiles.isEmpty()) {
-            View btnEmpty = createListButtonWithIcon("\uE05F", t("No .m3u files found in Y1_Playlists"),
-                    ThemeManager.getTextColorSecondary());
-            containerBrowserItems.addView(btnEmpty);
-        } else {
-            for (final File m3u : m3uFiles) {
-                // 확장자를 떼고 순수 재생목록 이름만 추출하여 리스트업
-                String cleanName = m3u.getName().substring(0, m3u.getName().lastIndexOf("."));
-                // Button b = createListButton("📝 " + cleanName);
-                View b = createListButtonWithIcon("\uE05F", cleanName);
-
-                // 1. 기존 동작: 짧게 누르면 플레이리스트 내부로 진입
-                b.setOnClickListener(v -> {
-                    clickFeedback();
-                    currentBrowserMode = BROWSER_M3U_SONGS;
-                    currentM3uFile = m3u;
-                    buildM3uSongsUI(m3u);
-                });
-
-                // 🚀 2. 신규 동작: 길게 누르면 플레이리스트 파일 자체를 물리적으로 삭제!
-                b.setLongClickable(true); // 길게 누르기 허용
-                b.setOnLongClickListener(new View.OnLongClickListener() {
-                    @Override
-                    public boolean onLongClick(View v) {
-                        clickFeedback();
-                        isLongPressConsumed = true; // 🚀 [방어막 장착] 창 닫힐 때 튕기는 휠 클릭 오작동 완벽 방어!
-
-                        // 🚀 [새로운 머티리얼 팝업 호출]
-                        // 방금 우리가 만든 예쁘고 둥근 팝업 함수로 파일(m3u)을 던져줍니다!
-                        showDeletePlaylistDialog(m3u);
-
-                        return true; // 🚀 true를 반환해야 짧은 클릭(진입) 이벤트가 중복으로 실행되지 않습니다.
-                    }
-                });
-
-                containerBrowserItems.addView(b);
-            }
-        }
-        // 🚀 [플레이리스트 전용 스크롤 추적기 장착]
-        final ScrollView sv = (ScrollView) containerBrowserItems.getParent();
-        sv.getViewTreeObserver().addOnGlobalLayoutListener(new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
-            @Override
-            public void onGlobalLayout() {
-                if (Build.VERSION.SDK_INT >= 16) {
-                    sv.getViewTreeObserver().removeOnGlobalLayoutListener(this);
-                } else {
-                    sv.getViewTreeObserver().removeGlobalOnLayoutListener(this);
-                }
-
-                boolean found = false;
-                if (!lastBrowserFocusText.isEmpty()) {
-                    for (int i = 0; i < containerBrowserItems.getChildCount(); i++) {
-                        View v = containerBrowserItems.getChildAt(i);
-                        String itemText = "";
-
-                        if (v instanceof Button) {
-                            itemText = ((Button) v).getText().toString();
-                        } else if (v instanceof LinearLayout) {
-                            LinearLayout layout = (LinearLayout) v;
-                            if (layout.getChildCount() > 1 && layout.getChildAt(1) instanceof TextView) {
-                                itemText = ((TextView) layout.getChildAt(1)).getText().toString();
-                            }
-                        }
-
-                        if (itemText.equals(lastBrowserFocusText)) {
-                            // 🚀 [원본 위치 100% 복원]
-                            int offset = (sv.getHeight() / 2) - (v.getHeight() / 2);
-                            if (exactOffsetMemory.containsKey(itemText))
-                                offset = exactOffsetMemory.get(itemText);
-
-                            int targetY = v.getTop() - offset;
-                            if (targetY < 0)
-                                targetY = 0;
-
-                            sv.scrollTo(0, targetY);
-                            v.requestFocus();
-                            found = true;
-                            break;
-                        }
-                    }
-                }
-                if (!found && containerBrowserItems.getChildCount() > 0) {
-                    containerBrowserItems.getChildAt(0).requestFocus();
-                }
-                lastBrowserFocusText = "";
-            }
-        });
     }
     // =======================================================
     // USB storage dialog & overlay — shown when USB cable is connected
@@ -12076,110 +11994,10 @@ public class MainActivity extends Activity {
     }
 
     // =======================================================
-    // 🚀 [팝업 2] 플레이리스트 목록에서 '플레이리스트 파일 자체'를 지울 때 뜨는 커스텀 팝업
-    // =======================================================
     public void showDeletePlaylistDialog(final File m3uFile) {
-        final android.app.Dialog dialog = new android.app.Dialog(this);
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        dialog.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
-
-        float d = getResources().getDisplayMetrics().density;
-
-        final LinearLayout rootLayout = new LinearLayout(this);
-        rootLayout.setOrientation(LinearLayout.VERTICAL);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(ThemeManager.getOverlayBackgroundColor() | 0x88000000);
-        bg.setCornerRadius(15 * d);
-        bg.setStroke((int)(1 * d), 0x33FFFFFF);
-        rootLayout.setBackground(bg);
-        rootLayout.setPadding((int)(15*d), (int)(20*d), (int)(15*d), (int)(15*d));
-
-        TextView tvTitle = new TextView(this);
-        tvTitle.setText(t("Delete Playlist"));
-        tvTitle.setTextColor(ThemeManager.getTextColorPrimary());
-        tvTitle.setTextSize(17f);
-        tvTitle.setTypeface(ThemeManager.getCustomFontBold());
-        tvTitle.setGravity(Gravity.CENTER);
-        tvTitle.setPadding(0, 0, 0, (int)(10*d));
-        rootLayout.addView(tvTitle);
-
-        TextView tvMsg = new TextView(this);
-        tvMsg.setText(t("Do you want to permanently delete this playlist?"));
-        tvMsg.setTextColor(ThemeManager.getTextColorSecondary());
-        tvMsg.setTextSize(14f);
-        tvMsg.setTypeface(ThemeManager.getCustomFont(), Typeface.NORMAL);
-        tvMsg.setGravity(Gravity.CENTER);
-        tvMsg.setPadding(0, 0, 0, (int)(20*d));
-        tvMsg.setLineSpacing(10f, 1.2f);
-        rootLayout.addView(tvMsg);
-
-        View.OnKeyListener dialogWheelListener = new View.OnKeyListener() {
-            @Override
-            public boolean onKey(View v, int keyCode, KeyEvent event) {
-                if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                    if (keyCode == 19 || keyCode == 21) {
-                        int idx = rootLayout.indexOfChild(v);
-                        for (int i = idx - 1; i >= 0; i--) {
-                            if (rootLayout.getChildAt(i).isFocusable()) {
-                                rootLayout.getChildAt(i).requestFocus();
-                                clickFeedback();
-                                return true;
-                            }
-                        }
-                        return true;
-                    }
-                    if (keyCode == 20 || keyCode == 22) {
-                        int idx = rootLayout.indexOfChild(v);
-                        for (int i = idx + 1; i < rootLayout.getChildCount(); i++) {
-                            if (rootLayout.getChildAt(i).isFocusable()) {
-                                rootLayout.getChildAt(i).requestFocus();
-                                clickFeedback();
-                                return true;
-                            }
-                        }
-                        return true;
-                    }
-                }
-                return false;
-            }
-        };
-
-        View btnDelete = createListButtonWithIcon("\uE872", t("Delete"), 0xFFFF5555);
-        btnDelete.setOnKeyListener(dialogWheelListener);
-        btnDelete.setOnClickListener(v -> {
-            clickFeedback();
-            dialog.dismiss();
-            if (m3uFile.exists() && m3uFile.delete()) {
-                Toast.makeText(MainActivity.this, t("Playlist deleted."), Toast.LENGTH_SHORT).show();
-                // 🚀 삭제 후 리스트 갱신 함수 (자기 환경에 맞춰 호출!)
-                buildM3uPlaylistUI();
-            } else {
-                Toast.makeText(MainActivity.this, t("Failed to delete playlist."), Toast.LENGTH_SHORT).show();
-            }
-        });
-        rootLayout.addView(btnDelete);
-
-        View btnCancel = createListButtonWithIcon("\uE5CD", t("Cancel"));
-        btnCancel.setOnKeyListener(dialogWheelListener);
-        btnCancel.setOnClickListener(v -> {
-            clickFeedback();
-            dialog.dismiss();
-        });
-        rootLayout.addView(btnCancel);
-
-        dialog.setContentView(rootLayout);
-        Window window = dialog.getWindow();
-        if (window != null) {
-            window.setLayout((int)(300 * d), ViewGroup.LayoutParams.WRAP_CONTENT);
+        if (playlistController != null) {
+            playlistController.showDeletePlaylistDialog(m3uFile);
         }
-        dialog.show();
-
-        // 팝업이 뜨면 '취소' 버튼(인덱스 3)에 휠 포커스 고정!
-        rootLayout.postDelayed(() -> {
-            if (rootLayout.getChildCount() > 3) {
-                rootLayout.getChildAt(3).requestFocus();
-            }
-        }, 50);
     }
     // 🚀 [네이티브 엔진 2] M3U 실시간 텍스트 경로 파서 (핵심 디테일 공정)
     private List<SongItem> parseM3uFile(File m3uFile) {
@@ -12287,179 +12105,16 @@ public class MainActivity extends Activity {
 
     // 🚀 [디자인 개조 및 휠 버그 완벽 해결]
     public void showAddToPlaylistDialog(final File songFile) {
-        final File playlistDir = StoragePaths.getPlaylistsDir();
-        if (!playlistDir.exists())
-            playlistDir.mkdirs();
-
-        // 🚀 [iPod 스타일] On-The-Go는 항상 존재하는 고정 플레이리스트입니다 (없으면 빈 파일로 미리 만들어둠)
-        final File onTheGoFile = new File(playlistDir, "On-The-Go.m3u8");
-        if (!onTheGoFile.exists()) {
-            try {
-                java.io.BufferedWriter bw = new java.io.BufferedWriter(
-                        new java.io.OutputStreamWriter(new FileOutputStream(onTheGoFile), "UTF-8"));
-                bw.write("#EXTM3U\n");
-                bw.close();
-            } catch (Exception e) {}
+        if (playlistController != null) {
+            playlistController.showAddToPlaylistDialog(songFile);
         }
-
-        File[] files = playlistDir.listFiles();
-        final List<File> playlistFiles = new ArrayList<>();
-
-        if (files != null) {
-            for (File f : files) {
-                String name = f.getName().toLowerCase();
-                // On-The-Go는 아래에서 맨 위 전용 버튼으로 따로 그리므로 일반 목록에서는 제외!
-                if (f.isFile() && (name.endsWith(".m3u") || name.endsWith(".m3u8"))
-                        && !f.getName().equals("On-The-Go.m3u8")) {
-                    playlistFiles.add(f);
-                }
-            }
-        }
-
-        ScrollView scrollView = new ScrollView(this);
-        scrollView.setBackgroundColor(0xFF222222);
-
-        final LinearLayout layout = new LinearLayout(this);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(30, 30, 30, 30);
-        scrollView.addView(layout);
-
-        // 🚀 1. 촌스러운 시스템 타이틀 대신, 메인 화면과 똑같은 '커스텀 타이틀'을 우리가 직접 그립니다!
-        TextView tvTitle = new TextView(this);
-        tvTitle.setText("━ " + t("ADD TO PLAYLIST") + " ━");
-        tvTitle.setTextColor(0xFFFFFFFF); // 하늘색으로 예쁘게!
-        tvTitle.setTypeface(ThemeManager.getCustomFontBold());
-        tvTitle.setGravity(Gravity.CENTER);
-        tvTitle.setPadding(0, 10, 0, 30);
-        tvTitle.setTextSize(16);
-        layout.addView(tvTitle);
-
-        // 🚀 2. 팝업창 안쪽에서도 휠(21, 22)을 인식하게 만드는 '팝업 전용 조향 장치(Listener)'
-        View.OnKeyListener dialogWheelListener = new View.OnKeyListener() {
-            @Override
-            public boolean onKey(View v, int keyCode, KeyEvent event) {
-                if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                    if (keyCode == 21) { // 휠 위로 (UP)
-                        int idx = layout.indexOfChild(v);
-                        for (int i = idx - 1; i >= 0; i--) {
-                            if (layout.getChildAt(i).isFocusable()) {
-                                layout.getChildAt(i).requestFocus();
-                                clickFeedback();
-                                return true;
-                            }
-                        }
-                        return true; // 위가 막히면 정지
-                    }
-                    if (keyCode == 22) { // 휠 아래로 (DOWN)
-                        int idx = layout.indexOfChild(v);
-                        for (int i = idx + 1; i < layout.getChildCount(); i++) {
-                            if (layout.getChildAt(i).isFocusable()) {
-                                layout.getChildAt(i).requestFocus();
-                                clickFeedback();
-                                return true;
-                            }
-                        }
-                        return true; // 아래가 막히면 정지
-                    }
-                }
-                return false;
-            }
-        };
-
-        // 🚀 3. 시스템 팝업을 만들 때, 순정 타이틀(.setTitle)을 빼버려서 보이지 않게 만듭니다!
-        final AlertDialog dialog = new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                .setView(scrollView)
-                .create();
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-
-        // 🚀 [iPod 스타일] 맨 위 고정 버튼: On-The-Go (즉석 재생목록)
-        View btnOnTheGo = createListButtonWithIcon("", t("On-The-Go"));
-        btnOnTheGo.setOnKeyListener(dialogWheelListener);
-        btnOnTheGo.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                clickFeedback();
-                addSongToOnTheGo(songFile);
-                dialog.dismiss();
-            }
-        });
-        layout.addView(btnOnTheGo);
-
-        // 4. [첫 번째 버튼] 새 플레이리스트 만들기
-        View btnNew = createListButtonWithIcon("\uE145", t("Create New Playlist"));
-        btnNew.setOnKeyListener(dialogWheelListener); // 🚀 버튼에 팝업 전용 조향 장치 연결!
-        btnNew.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                clickFeedback();
-                int count = 1;
-                File newPlaylistFile;
-                do {
-                    newPlaylistFile = new File(playlistDir, t("Playlist ") + count + ".m3u8");
-                    count++;
-                } while (newPlaylistFile.exists());
-
-                writeSongToM3uFile(newPlaylistFile, songFile, false);
-                Toast.makeText(MainActivity.instance, t("Created Playlist ") + (count - 1) + " " + t("successfully!"),
-                        Toast.LENGTH_SHORT).show();
-                dialog.dismiss();
-            }
-        });
-        layout.addView(btnNew);
-
-        // 5. [나머지 버튼들] 기존 플레이리스트 파일들 목록
-        for (final File targetM3u : playlistFiles) {
-            String cleanName = targetM3u.getName().substring(0, targetM3u.getName().lastIndexOf("."));
-
-            View btnExisting = createListButtonWithIcon("\uE05F", cleanName);
-
-            btnExisting.setOnKeyListener(dialogWheelListener); // 🚀 버튼에 팝업 전용 조향 장치 연결!
-            btnExisting.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    clickFeedback();
-                    writeSongToM3uFile(targetM3u, songFile, true);
-                    Toast.makeText(MainActivity.instance, t("Added to playlist successfully!"), Toast.LENGTH_SHORT)
-                            .show();
-                    dialog.dismiss();
-                }
-            });
-            layout.addView(btnExisting);
-        }
-
-        dialog.show();
-
-        // 6. 팝업창이 열리면 자동으로 '첫 번째 버튼'에 포커스 꽂아주기
-        layout.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                // 레이아웃의 0번 인덱스는 '커스텀 타이틀 텍스트'이므로, 포커스는 1번(btnNew)에 줍니다!
-                if (layout.getChildCount() > 1)
-                    layout.getChildAt(1).requestFocus();
-            }
-        }, 50);
     }
 
-    // =======================================================
-    // 🚀 [iPod 스타일] Now Playing 화면에서 길게 누르면 뜨는 곡 컨텍스트 메뉴
-    // =======================================================
     // 🚀 [공용화] On-The-Go에 즉석 추가 - 곡 목록 다이얼로그와 Now Playing 홀드 메뉴가 함께 사용합니다.
     private void addSongToOnTheGo(File songFile) {
-        File playlistDir = StoragePaths.getPlaylistsDir();
-        if (!playlistDir.exists())
-            playlistDir.mkdirs();
-        File onTheGoFile = new File(playlistDir, "On-The-Go.m3u8");
-        if (!onTheGoFile.exists()) {
-            try {
-                java.io.BufferedWriter bw = new java.io.BufferedWriter(
-                        new java.io.OutputStreamWriter(new FileOutputStream(onTheGoFile), "UTF-8"));
-                bw.write("#EXTM3U\n");
-                bw.close();
-            } catch (Exception e) {
-            }
+        if (playlistController != null) {
+            playlistController.addSongToOnTheGo(songFile);
         }
-        writeSongToM3uFile(onTheGoFile, songFile, true);
-        Toast.makeText(MainActivity.instance, t("Added to On-The-Go."), Toast.LENGTH_SHORT).show();
     }
 
     public void showNowPlayingContextMenu(final File songFile) {
@@ -12536,151 +12191,15 @@ public class MainActivity extends Activity {
     // 🚀 [팝업 1] 플레이리스트 안에서 '특정 노래'를 지울 때 뜨는 커스텀 팝업
     // =======================================================
     public void showRemoveFromPlaylistDialog(final File audioFile) {
-        final android.app.Dialog dialog = new android.app.Dialog(this);
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        dialog.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
-
-        float d = getResources().getDisplayMetrics().density;
-
-        final LinearLayout rootLayout = new LinearLayout(this);
-        rootLayout.setOrientation(LinearLayout.VERTICAL);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(ThemeManager.getOverlayBackgroundColor() | 0x88000000);
-        bg.setCornerRadius(15 * d);
-        bg.setStroke((int)(1 * d), 0x33FFFFFF);
-        rootLayout.setBackground(bg);
-        rootLayout.setPadding((int)(15*d), (int)(20*d), (int)(15*d), (int)(15*d));
-
-        // 제목
-        TextView tvTitle = new TextView(this);
-        tvTitle.setText(t("Remove from Playlist"));
-        tvTitle.setTextColor(ThemeManager.getTextColorPrimary());
-        tvTitle.setTextSize(17f);
-        tvTitle.setTypeface(ThemeManager.getCustomFontBold());
-        tvTitle.setGravity(Gravity.CENTER);
-        tvTitle.setPadding(0, 0, 0, (int)(10*d));
-        rootLayout.addView(tvTitle);
-
-        // 설명 메시지
-        TextView tvMsg = new TextView(this);
-        tvMsg.setText(t("Do you want to remove this track from the playlist?"));
-        tvMsg.setTextColor(ThemeManager.getTextColorSecondary());
-        tvMsg.setTextSize(14f);
-        tvMsg.setTypeface(ThemeManager.getCustomFont(), Typeface.NORMAL);
-        tvMsg.setGravity(Gravity.CENTER);
-        tvMsg.setPadding(0, 0, 0, (int)(20*d));
-        tvMsg.setLineSpacing(10f, 1.2f);
-        rootLayout.addView(tvMsg);
-
-        // 🚀 팝업 내 휠 조작 리스너
-        View.OnKeyListener dialogWheelListener = new View.OnKeyListener() {
-            @Override
-            public boolean onKey(View v, int keyCode, KeyEvent event) {
-                if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                    if (keyCode == 19 || keyCode == 21) { // 휠 위로(UP)
-                        int idx = rootLayout.indexOfChild(v);
-                        for (int i = idx - 1; i >= 0; i--) {
-                            if (rootLayout.getChildAt(i).isFocusable()) {
-                                rootLayout.getChildAt(i).requestFocus();
-                                clickFeedback();
-                                return true;
-                            }
-                        }
-                        return true;
-                    }
-                    if (keyCode == 20 || keyCode == 22) { // 휠 아래로(DOWN)
-                        int idx = rootLayout.indexOfChild(v);
-                        for (int i = idx + 1; i < rootLayout.getChildCount(); i++) {
-                            if (rootLayout.getChildAt(i).isFocusable()) {
-                                rootLayout.getChildAt(i).requestFocus();
-                                clickFeedback();
-                                return true;
-                            }
-                        }
-                        return true;
-                    }
-                }
-                return false;
-            }
-        };
-
-        // 삭제 버튼 (빨간색)
-        View btnRemove = createTablerListButton(com.themoon.y1.views.TablerIcons.TRASH, t("Remove"), 0xFFFF5555, 0xFFFF5555);
-        btnRemove.setOnKeyListener(dialogWheelListener);
-        btnRemove.setOnClickListener(v -> {
-            clickFeedback();
-            dialog.dismiss();
-            removeSongFromM3uFile(currentM3uFile, audioFile);
-            buildM3uSongsUI(currentM3uFile);
-            Toast.makeText(MainActivity.this, t("Track removed."), Toast.LENGTH_SHORT).show();
-        });
-        rootLayout.addView(btnRemove);
-
-        // 취소 버튼
-        View btnCancel = createListButtonWithIcon("\uE5CD", t("Cancel"));
-        btnCancel.setOnKeyListener(dialogWheelListener);
-        btnCancel.setOnClickListener(v -> {
-            clickFeedback();
-            dialog.dismiss();
-        });
-        rootLayout.addView(btnCancel);
-
-        dialog.setContentView(rootLayout);
-        Window window = dialog.getWindow();
-        if (window != null) {
-            window.setLayout((int)(300 * d), ViewGroup.LayoutParams.WRAP_CONTENT);
+        if (playlistController != null) {
+            playlistController.showRemoveFromPlaylistDialog(audioFile);
         }
-        dialog.show();
-
-        // 팝업이 뜨면 '취소' 버튼(인덱스 3)에 휠 포커스 강제 고정!
-        rootLayout.postDelayed(() -> {
-            if (rootLayout.getChildCount() > 3) {
-                rootLayout.getChildAt(3).requestFocus();
-            }
-        }, 50);
     }
 
     // 🚀 [자체 플레이리스트 엔진 6단계] M3U 파일에서 해당 곡의 텍스트 줄만 찾아 지우는 기능
     public void removeSongFromM3uFile(File m3uFile, File songFile) {
-        if (m3uFile == null || !m3uFile.exists())
-            return;
-        try {
-            List<String> lines = new ArrayList<>();
-            java.io.BufferedReader br = new java.io.BufferedReader(
-                    new java.io.InputStreamReader(new java.io.FileInputStream(m3uFile), "UTF-8"));
-            String line;
-            boolean isRemoved = false; // 💡 동일한 곡이 여러 개 담겼을 경우, 한 번에 하나씩만 지우도록 방어
-
-            while ((line = br.readLine()) != null) {
-                String cleanLine = line.replace("\\", "/").trim();
-
-                // 주석이나 빈 줄은 삭제하지 않고 그대로 통과시켜 M3U 본연의 형식을 보존합니다.
-                if (cleanLine.isEmpty() || cleanLine.startsWith("#")) {
-                    lines.add(line);
-                    continue;
-                }
-
-                // 지울 노래와 파일명이 일치하고, 아직 이번 타임에 지운 적이 없다면 (리스트에 넣지 않고 스킵 = 삭제)
-                if (!isRemoved && cleanLine.endsWith(songFile.getName())) {
-                    isRemoved = true;
-                    continue;
-                }
-
-                lines.add(line); // 삭제 대상이 아닌 곡들은 그대로 유지
-            }
-            br.close();
-
-            // 갱신된(한 곡이 빠진) 리스트를 원본 M3U 파일에 덮어쓰기 (Append = false)
-            java.io.BufferedWriter bw = new java.io.BufferedWriter(
-                    new java.io.OutputStreamWriter(new FileOutputStream(m3uFile, false), "UTF-8"));
-            for (String l : lines) {
-                bw.write(l + "\n");
-            }
-            bw.close();
-
-            Toast.makeText(this, t("Removed successfully."), Toast.LENGTH_SHORT).show();
-        } catch (Exception e) {
-            e.printStackTrace();
+        if (playlistController != null) {
+            playlistController.removeSongFromM3uFile(m3uFile, songFile);
         }
     }
 
