@@ -49,7 +49,10 @@ class EqualizerController(
 
     var isSoftwareEqEnabled: Boolean
         get() = prefs.getBoolean("software_eq_enabled", false)
-        set(value) = prefs.edit().putBoolean("software_eq_enabled", value).apply()
+        set(value) {
+            prefs.edit().putBoolean("software_eq_enabled", value).apply()
+            (activity as? com.themoon.y1.MainActivity)?.isSoftwareEqEnabled = value
+        }
 
     var currentEqProfile: String
         get() = prefs.getString("eq_profile_id", "preset_0") ?: "preset_0"
@@ -69,6 +72,7 @@ class EqualizerController(
 
     private var currentAdjustingBand: Short = -1
     private var isGraphicEqOpen = false
+    private var isProfileSelectorOpen = false
 
     override fun onEnter(state: ScreenState) {
         buildEqualizerSettingsUI()
@@ -76,11 +80,13 @@ class EqualizerController(
 
     override fun onExit() {
         isGraphicEqOpen = false
+        isProfileSelectorOpen = false
         currentAdjustingBand = -1
     }
 
     fun buildEqualizerSettingsUI() {
         isGraphicEqOpen = false
+        isProfileSelectorOpen = false
         currentAdjustingBand = -1
         AudioEffectManager.getInstance().loadAndSyncExternalEqProfiles()
         AudioEffectManager.getInstance().ensureAudioEffectsReady()
@@ -99,7 +105,7 @@ class EqualizerController(
                 Toast.makeText(activity, localize("Switched to Hardware 5-Band EQ"), Toast.LENGTH_SHORT).show()
                 buildEqualizerSettingsUI()
             } else {
-                showSoftwareEqDialog(btnSoftwareEq)
+                showSoftwareEqDialog()
             }
         }
         containerSettingsItems.addView(btnSoftwareEq)
@@ -145,7 +151,7 @@ class EqualizerController(
             clickFeedback()
             currentCrossfeedStep = (currentCrossfeedStep + 1) % 4
             (rowCrossfeed.getChildAt(1) as? TextView)?.text = localize(steps[currentCrossfeedStep])
-            AudioPlayerManager.getInstance().crossfeedProcessor?.setIntensity(currentCrossfeedStep)
+            AudioPlayerManager.getInstance().crossfeedProcessor.setIntensity(currentCrossfeedStep)
         }
         containerSettingsItems.addView(rowCrossfeed)
 
@@ -325,6 +331,7 @@ class EqualizerController(
     }
 
     private fun buildProfileSelectorUI() {
+        isProfileSelectorOpen = true
         containerSettingsItems.removeAllViews()
         createCategoryHeader("━ " + localize("SELECT PRESET / PROFILE") + " ━")
 
@@ -367,7 +374,7 @@ class EqualizerController(
         containerSettingsItems.addView(btnBack)
     }
 
-    private fun showSoftwareEqDialog(btnSoftwareEq: View) {
+    private fun showSoftwareEqDialog() {
         val d = activity.resources.displayMetrics.density
         val dialog = Dialog(activity).apply {
             requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -456,7 +463,7 @@ class EqualizerController(
         }
 
         if (keyCode == KeyEvent.KEYCODE_BACK) {
-            if (isGraphicEqOpen) {
+            if (isGraphicEqOpen || isProfileSelectorOpen) {
                 buildEqualizerSettingsUI()
                 return true
             }
@@ -468,7 +475,7 @@ class EqualizerController(
     }
 
     override fun onBackPressed(): Boolean {
-        if (isGraphicEqOpen) {
+        if (isGraphicEqOpen || isProfileSelectorOpen) {
             buildEqualizerSettingsUI()
             return true
         }
