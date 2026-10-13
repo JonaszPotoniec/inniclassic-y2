@@ -117,6 +117,7 @@ public class MainActivity extends Activity {
     private com.themoon.y1.controllers.playlists.PlaylistController playlistController;
     private com.themoon.y1.controllers.player.PlayerController playerController;
     private com.themoon.y1.controllers.player.LyricsOverlayController lyricsOverlayController;
+    private com.themoon.y1.controllers.browser.BrowserController browserController;
 
     private static final String TAG = "MainActivity";
     // OTA Update URL pointing to GitHub Releases
@@ -3903,6 +3904,66 @@ public class MainActivity extends Activity {
         );
         lyricsOverlayController = playerController.getLyricsOverlayController();
 
+        browserController = new com.themoon.y1.controllers.browser.BrowserController(
+                this,
+                (ViewGroup) findViewById(android.R.id.content),
+                listVirtualSongs,
+                hzIndexScroll,
+                layoutIndexContainer,
+                () -> { clickFeedback(); return kotlin.Unit.INSTANCE; },
+                (icon, text, color) -> createListButtonWithIcon(icon, text, color != null ? color : 0),
+                screenState -> {
+                    if (screenState instanceof com.themoon.y1.navigation.ScreenState.Player) {
+                        changeScreen(STATE_PLAYER);
+                    } else if (screenState instanceof com.themoon.y1.navigation.ScreenState.MainMenu) {
+                        changeScreen(STATE_MENU);
+                    } else if (screenState instanceof com.themoon.y1.navigation.ScreenState.Browser) {
+                        changeScreen(STATE_BROWSER);
+                    }
+                    return kotlin.Unit.INSTANCE;
+                },
+                () -> {
+                    changeScreen(STATE_MENU);
+                    return kotlin.Unit.INSTANCE;
+                },
+                () -> {
+                    currentBrowserMode = BROWSER_COVER_FLOW;
+                    changeScreen(STATE_BROWSER);
+                    buildCoverFlowUI();
+                    return kotlin.Unit.INSTANCE;
+                },
+                () -> {
+                    currentBrowserMode = BROWSER_PLAYLISTS;
+                    changeScreen(STATE_BROWSER);
+                    buildM3uPlaylistUI();
+                    return kotlin.Unit.INSTANCE;
+                },
+                () -> {
+                    currentKeyboardMode = 4;
+                    changeScreen(STATE_WIFI_KEYBOARD);
+                    return kotlin.Unit.INSTANCE;
+                },
+                () -> {
+                    startMediaLibraryScan();
+                    return kotlin.Unit.INSTANCE;
+                },
+                () -> {
+                    showLoadingPopup();
+                    return kotlin.Unit.INSTANCE;
+                },
+                file -> {
+                    showAddToPlaylistDialog(file);
+                    return kotlin.Unit.INSTANCE;
+                },
+                (audioFile, parentFolder) -> {
+                    com.themoon.y1.managers.AudiobookManager.getInstance(MainActivity.this)
+                            .setupBookPlaylist(MainActivity.this, audioFile, parentFolder);
+                    changeScreen(STATE_PLAYER);
+                    return kotlin.Unit.INSTANCE;
+                },
+                key -> t(key)
+        );
+
         updatePlayerStatusIndicators();
 
         // 🚀 [수정] 아이콘 파일명(.png)을 매개변수로 던져줍니다.
@@ -4889,98 +4950,17 @@ public class MainActivity extends Activity {
             hzIndexScroll.setVisibility(View.GONE);
             return;
         }
-
-        layoutIndexContainer.removeAllViews();
-        java.util.LinkedHashMap<String, Integer> indexMap = new java.util.LinkedHashMap<>();
-
-        // 1. 리스트를 훑어서 첫 글자가 나타나는 최초의 위치(인덱스)를 기록합니다.
-        for (int i = 0; i < currentScrollIndexList.size(); i++) {
-            String title = currentScrollIndexList.get(i);
-            String firstChar = String.valueOf(getInitialChar(title)); // 💡 아까 만든 도우미 함수 활용
-            if (!indexMap.containsKey(firstChar)) {
-                indexMap.put(firstChar, i);
-            }
-        }
-
-        float density = getResources().getDisplayMetrics().density;
-        int themeColor = ThemeManager.getListButtonFocusedBg() | 0xFF000000;
-
-        // 2. 추출된 알파벳 버튼들을 상단 가로 스크롤에 렌더링합니다.
-        for (final java.util.Map.Entry<String, Integer> entry : indexMap.entrySet()) {
-            final TextView tvAlpha = new TextView(this);
-            tvAlpha.setText(entry.getKey());
-            tvAlpha.setTextSize(18f);
-            tvAlpha.setTextColor(ThemeManager.getTextColorPrimary());
-            tvAlpha.setGravity(Gravity.CENTER);
-            tvAlpha.setTypeface(ThemeManager.getCustomFontBold());
-            tvAlpha.setFocusable(true);
-            tvAlpha.setClickable(true);
-            tvAlpha.setPadding((int) (15 * density), 0, (int) (15 * density), 0);
-
-            // 🚀 1. 포커스 애니메이션 + 자동 점프 기능 통합!
-            tvAlpha.setOnFocusChangeListener((v, hasFocus) -> {
-                if (hasFocus) {
-                    tvAlpha.setTextColor(ThemeManager.getListButtonFocusedTextColor());
-                    tvAlpha.setBackgroundColor(themeColor);
-                    hzIndexScroll.requestChildFocus(layoutIndexContainer, tvAlpha);
-
-                    // 🎯 [핵심 변경] 휠을 돌려서 포커스가 닿는 즉시! 클릭 없이 리스트 위치를 동기화하여 이동시킵니다.
-                    if (listVirtualSongs != null) {
-                        listVirtualSongs.setSelectionFromTop(entry.getValue(), 0);
-                    }
-                } else {
-                    tvAlpha.setTextColor(ThemeManager.getTextColorPrimary());
-                    tvAlpha.setBackgroundColor(0x00000000); // 투명
+        com.themoon.y1.views.AlphabetIndexBar indexBar = new com.themoon.y1.views.AlphabetIndexBar(
+                this,
+                hzIndexScroll,
+                layoutIndexContainer,
+                listVirtualSongs,
+                () -> {
+                    clickFeedback();
+                    return kotlin.Unit.INSTANCE;
                 }
-            });
-
-            // 🚀 [수정] 휠(UP/DOWN)을 돌렸을 때 무한 루프(끝에서 처음으로) 돌아가도록 조향 장치 업그레이드!
-            tvAlpha.setOnKeyListener((v, keyCode, event) -> {
-                if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                    int childCount = layoutIndexContainer.getChildCount();
-                    int currentIndex = layoutIndexContainer.indexOfChild(v);
-
-                    // 휠을 위로 돌림 (왼쪽으로 이동, 첫 칸이면 맨 끝으로 점프!)
-                    if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == 19 || keyCode == 21) {
-                        int prevIndex = (currentIndex - 1 + childCount) % childCount;
-                        layoutIndexContainer.getChildAt(prevIndex).requestFocus();
-                        clickFeedback(); // 💡 이동할 때마다 가벼운 진동/소리 추가
-                        return true;
-                    }
-                    // 휠을 아래로 돌림 (오른쪽으로 이동, 끝 칸이면 맨 처음으로 점프!)
-                    else if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN || keyCode == 20 || keyCode == 22) {
-                        int nextIndex = (currentIndex + 1) % childCount;
-                        layoutIndexContainer.getChildAt(nextIndex).requestFocus();
-                        clickFeedback(); // 💡 이동할 때마다 가벼운 진동/소리 추가
-                        return true;
-                    }
-                }
-                return false;
-            });
-
-            // 🚀 가운데 버튼 클릭 시: 퀵 바만 조용히 닫고 현재 위치의 곡으로 포커스 넘기기!
-            tvAlpha.setOnClickListener(v -> {
-                clickFeedback();
-
-                // 1. 휠을 돌릴 때 이미 리스트가 움직였으므로, 여기선 퀵 바만 깔끔하게 숨깁니다!
-                hzIndexScroll.setVisibility(View.GONE);
-
-                // 2. 퀵 바가 사라지면서 휠 포커스가 허공에 뜨지 않게,
-                // 지금 화면에 맞춰진 그 알파벳의 첫 번째 곡에 자석처럼 포커스를 딱! 꽂아줍니다.
-                listVirtualSongs.postDelayed(() -> {
-                    int visiblePos = entry.getValue() - listVirtualSongs.getFirstVisiblePosition();
-                    if (visiblePos >= 0 && visiblePos < listVirtualSongs.getChildCount()) {
-                        listVirtualSongs.getChildAt(visiblePos).requestFocus();
-                    } else if (listVirtualSongs.getChildCount() > 0) {
-                        listVirtualSongs.getChildAt(0).requestFocus(); // 튕김 방지용 안전장치
-                    }
-                }, 50);
-            });
-
-            layoutIndexContainer.addView(tvAlpha, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        }
-        // 상단 바 표시
+        );
+        indexBar.build(currentScrollIndexList);
         hzIndexScroll.setVisibility(View.GONE);
     }
 
@@ -5499,6 +5479,9 @@ public class MainActivity extends Activity {
         updateStatusBarTitle();
         if (state != STATE_PLAYER && playerController != null) {
             playerController.onExit();
+        }
+        if (state != STATE_BROWSER && browserController != null) {
+            browserController.onExit();
         }
         layoutMainMenu.setVisibility(state == STATE_MENU ? View.VISIBLE : View.GONE);
         layoutBrowserMode.setVisibility(state == STATE_BROWSER ? View.VISIBLE : View.GONE);
@@ -10017,6 +10000,11 @@ public class MainActivity extends Activity {
             if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == 19) {
                 clickFeedback();
                 if (currentScreenState == STATE_BROWSER) {
+                    if (browserController != null && !isPickingBackground && currentBrowserMode != BROWSER_PLAYLISTS && currentBrowserMode != BROWSER_M3U_SONGS && currentBrowserMode != BROWSER_PODCAST_CHANNELS && currentBrowserMode != BROWSER_PODCAST_EPISODES && currentBrowserMode != BROWSER_PODCAST_MANAGE) {
+                        if (browserController.onBackPressed()) {
+                            return true;
+                        }
+                    }
                     if (isPickingBackground) {
                         // 🚀 [최상단 방어막] 배경 화면 선택 시, 음악 폴더뿐만 아니라 SD카드 최상단에서도 더 이상 못
                         // 올라가게 막습니다!
