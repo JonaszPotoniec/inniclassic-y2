@@ -15,3 +15,5 @@
 .claude/
 local.properties
 *.zip
+!app/src/main/assets/themes/*.zip
+

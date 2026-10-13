@@ -4,6 +4,29 @@ import com.themoon.y1.managers.MediaLibraryManager
 import java.io.File
 import java.util.HashSet
 
+internal fun MainActivity.loadLibraryCacheInternal(): Boolean {
+    val mlm = MediaLibraryManager.getInstance()
+    if (mlm.loadLibraryCache()) {
+        synchronized(MainActivity.customLibrary) {
+            MainActivity.customLibrary.clear()
+            MainActivity.customLibrary.addAll(mlm.musicLibrary)
+        }
+        synchronized(MainActivity.audiobookLibrary) {
+            MainActivity.audiobookLibrary.clear()
+            MainActivity.audiobookLibrary.addAll(mlm.audiobookLibrary)
+        }
+        synchronized(MainActivity.trackNumberMap) {
+            MainActivity.trackNumberMap.clear()
+            MainActivity.trackNumberMap.putAll(mlm.trackNumberMap)
+        }
+        rebuildUniqueAlbumListInternal()
+        scanVideosInternal()
+        refreshNowPlayingPreview()
+        return true
+    }
+    return false
+}
+
 internal fun MainActivity.startMediaLibraryScanInternal() {
     if (isCustomScanning) return
     isCustomScanning = true

@@ -220,6 +220,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     lateinit var layoutBrightnessMode: View
     lateinit var layoutStorageMode: View
     lateinit var layoutWebServerMode: View
+    lateinit var layoutMusicQuizMode: View
     lateinit var layoutVideosMode: View
     lateinit var layoutVideoPlayerMode: View
     lateinit var layoutVolumeOverlay: View
@@ -314,7 +315,8 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
         val themeDir = File(filesDir, "themes")
         ThemeManager.loadThemesFromStorage(themeDir)
-        val savedThemeName = prefs.getString("current_theme_name", "iPod Classic")
+        val savedThemeName = prefs.getString("app_theme_name", null)
+            ?: prefs.getString("current_theme_name", "Classic Light")
         val themeIdx = ThemeManager.findThemeIndexByName(savedThemeName)
         if (themeIdx != -1) ThemeManager.setThemeIndex(themeIdx)
 
@@ -331,10 +333,19 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         AudioPlayerManager.getInstance().initPlayer(applicationContext)
         BluetoothAvrcpManager.getInstance(this).init()
 
+        if (ExternalSdMountMonitor.hasSecondarySlot() && !ExternalSdMountMonitor.isSecondaryReady()) {
+            android.util.Log.i("InniClassic", "Secondary storage not ready yet at onCreate, will load library once mounted")
+        } else {
+            loadLibraryCache()
+        }
+
         externalSdMountMonitor = ExternalSdMountMonitor(this).apply {
             setListener(object : ExternalSdMountMonitor.Listener {
                 override fun onSecondaryStorageReady() {
                     runOnUiThread {
+                        if (customLibrary.isEmpty()) {
+                            loadLibraryCache()
+                        }
                         if (customLibrary.isEmpty() && !isCustomScanning) {
                             startMediaLibraryScan()
                         }
@@ -352,6 +363,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         }, "y1-ums-init-check").start()
 
         registerReceivers()
+        updateMainMenuBackground()
         changeScreen(STATE_MENU)
         Handler(Looper.getMainLooper()).postDelayed({ usbStateReceiverReady = true }, 2000)
     }
@@ -546,6 +558,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     fun setupVisualizer() = setupVisualizerInternal()
     fun toggleVisualizer() = toggleVisualizerInternal()
     fun rebootAudioEngine() = rebootAudioEngineInternal()
+    fun loadLibraryCache() = loadLibraryCacheInternal()
     fun startMediaLibraryScan() = startMediaLibraryScanInternal()
     fun rebuildUniqueAlbumList() = rebuildUniqueAlbumListInternal()
     fun scanVideos() = scanVideosInternal()
@@ -759,6 +772,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         audioVisualizer?.release()
         audioVisualizer = null
         AudioPlayerManager.getInstance().releasePlayer()
+        NavigationManager.getInstance().reset()
         instance = null
     }
 

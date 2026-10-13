@@ -20,6 +20,7 @@ internal fun MainActivity.initViewBindings() {
     layoutBrightnessMode = findViewById(R.id.layout_brightness_mode)
     layoutStorageMode = findViewById(R.id.layout_storage_mode)
     layoutWebServerMode = findViewById(R.id.layout_webserver_mode)
+    layoutMusicQuizMode = findViewById(R.id.layout_music_quiz_mode)
     layoutVideosMode = findViewById(R.id.layout_videos_mode)
     layoutVideoPlayerMode = findViewById(R.id.layout_video_player_mode)
     layoutVolumeOverlay = findViewById(R.id.layout_volume_overlay)

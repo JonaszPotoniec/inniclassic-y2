@@ -418,5 +418,7 @@
   "Fetch Libraries": "라이브러리 가져오기",
   "Fetching libraries...": "라이브러리 가져오는 중...",
   "Failed to fetch libraries": "라이브러리를 가져오지 못했습니다",
-  "Libraries updated": "라이브러리가 업데이트되었습니다"
+  "Libraries updated": "라이브러리가 업데이트되었습니다",
+  "Classic Light": "클래식 라이트",
+  "Classic Dark": "클래식 다크"
 }

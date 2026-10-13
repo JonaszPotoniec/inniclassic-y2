@@ -68,11 +68,38 @@ object ThemeManager {
 
     private var currentThemeIndex: Int = 0
 
-    private val DEFAULT_FALLBACK_THEME = ThemeData(
-        "", "iPod Classic", "", Typeface.DEFAULT,
-        Color.WHITE, 0xFF888888.toInt(), 0xDD000000.toInt(), 0xFF000000.toInt(),
-        0x33444444, 0xFF0275D8.toInt(), Color.WHITE, 6
+    private val OBSOLETE_THEMES = setOf(
+        "Clean Light",
+        "Cyberpunk Neon",
+        "cyberpunk_neon_list",
+        "Forest Green",
+        "forest_green_list",
+        "macOS26",
+        "Royal Gold",
+        "royal_gold_list",
+        "Windows 8 Metro",
+        "Dark (Default)",
+        "default"
     )
+
+    private val DEFAULT_FALLBACK_THEME = ThemeData(
+        "", "Classic Light", "", Typeface.DEFAULT,
+        0xFF1C1C1E.toInt(), 0xFF666666.toInt(), 0xFFFFFFFF.toInt(), 0xFFC8C9C8.toInt(),
+        0x00FFFFFF, 0xFF2588DC.toInt(), Color.WHITE, 0
+    ).apply {
+        menuElements.add(MenuElement("main_scroll_list", "list_box", "", "", 0, 0, 242, 325, "", "", "", "", "", "", "", "", "NONE", "top|left", -1, -1, 16, -1, "bottom", "left", "", 0, 0, 0, 1.0f))
+        menuElements.add(MenuElement("btn_now", "button", "main_scroll_list", "", 0, 0, -1, 33, "Now Playing", "Now Playing", "›", "#FF8E8E93", "#FFFFFFFF", "", "", "", "OPEN_PLAYER", "top|left", -1, 0, 21, -1, "bottom", "left", "", 0, 0, 0, 1.0f))
+        menuElements.add(MenuElement("btn_music", "button", "main_scroll_list", "", 0, 0, -1, 33, "Music", "Music", "›", "#FF8E8E93", "#FFFFFFFF", "", "", "", "OPEN_BROWSER", "top|left", -1, 1, 21, -1, "bottom", "left", "", 0, 0, 0, 1.0f))
+        menuElements.add(MenuElement("btn_videos", "button", "main_scroll_list", "", 0, 0, -1, 33, "Videos", "Videos", "›", "#FF8E8E93", "#FFFFFFFF", "", "", "", "OPEN_VIDEOS", "top|left", -1, 2, 21, -1, "bottom", "left", "", 0, 0, 0, 1.0f))
+        menuElements.add(MenuElement("btn_musicquiz", "button", "main_scroll_list", "", 0, 0, -1, 33, "Music Quiz", "Music Quiz", "›", "#FF8E8E93", "#FFFFFFFF", "", "", "", "OPEN_MUSIC_QUIZ", "top|left", -1, 3, 21, -1, "bottom", "left", "", 0, 0, 0, 1.0f))
+        menuElements.add(MenuElement("btn_podcasts", "button", "main_scroll_list", "", 0, 0, -1, 33, "Podcasts", "Podcasts", "›", "#FF8E8E93", "#FFFFFFFF", "", "", "", "OPEN_PODCASTS", "top|left", -1, 4, 21, -1, "bottom", "left", "", 0, 0, 0, 1.0f))
+        menuElements.add(MenuElement("btn_radio", "button", "main_scroll_list", "", 0, 0, -1, 33, "FM Radio", "FM Radio", "›", "#FF8E8E93", "#FFFFFFFF", "", "", "", "OPEN_RADIO", "top|left", -1, 5, 21, -1, "bottom", "left", "", 0, 0, 0, 1.0f))
+        menuElements.add(MenuElement("btn_bt", "button", "main_scroll_list", "", 0, 0, -1, 33, "Bluetooth", "Bluetooth", "›", "#FF8E8E93", "#FFFFFFFF", "", "", "", "OPEN_BLUETOOTH", "top|left", -1, 6, 21, -1, "bottom", "left", "", 0, 0, 0, 1.0f))
+        menuElements.add(MenuElement("btn_wifi", "button", "main_scroll_list", "", 0, 0, -1, 33, "Wi-Fi", "Wi-Fi", "›", "#FF8E8E93", "#FFFFFFFF", "", "", "", "OPEN_WIFI", "top|left", -1, 7, 21, -1, "bottom", "left", "", 0, 0, 0, 1.0f))
+        menuElements.add(MenuElement("btn_set", "button", "main_scroll_list", "", 0, 0, -1, 33, "Settings", "Settings", "›", "#FF8E8E93", "#FFFFFFFF", "", "", "", "OPEN_SETTINGS", "top|left", -1, 8, 21, -1, "bottom", "left", "", 0, 0, 0, 1.0f))
+        menuElements.add(MenuElement("btn_web", "button", "main_scroll_list", "", 0, 0, -1, 33, "Web Server", "Web Server", "›", "#FF8E8E93", "#FFFFFFFF", "", "", "", "OPEN_WEBSERVER", "top|left", -1, 9, 21, -1, "bottom", "left", "", 0, 0, 0, 1.0f))
+        menuElements.add(MenuElement("widget_cover", "widget_animated_cover", "", "", 242, 0, 238, 325, "", "", "", "", "", "", "", "", "NONE", "top|left", -1, -1, 16, -1, "bottom", "left", "", 0, 0, 0, 1.0f))
+    }
 
     private var cachedBoldFont: Typeface? = null
     private var cachedBoldFontSource: Typeface? = null
@@ -91,7 +118,7 @@ object ThemeManager {
         if (availableThemes.isNotEmpty() && !iconFileName.isNullOrEmpty()) {
             val folder = getCurrentTheme().folderPath
 
-            if (folder != "default") {
+            if (folder.isNotEmpty() && folder != "default") {
                 val iconFile = File(folder, iconFileName)
                 if (iconFile.exists()) {
                     try {
@@ -129,32 +156,6 @@ object ThemeManager {
 
     fun loadThemesFromStorage(themeFolder: File) {
         availableThemes.clear()
-
-        val defaultTheme = ThemeData(
-            "default", "Dark (Default)", "", Typeface.DEFAULT,
-            0xFFFFFFFF.toInt(), 0xFF888888.toInt(), 0x00000000, 0x88000000.toInt(),
-            0x15FFFFFF, 0xDDFFFFFF.toInt(), 0xFF000000.toInt(), 15
-        )
-
-        defaultTheme.menuElements.add(MenuElement("box", "box", "", "", 0, 0, 240, 325, "", "", "", "", "", "", "", "", "NONE", "top|left", 0, -1, 16, -1, "bottom", "left", "#A0000000", 0, 0, 0, 1.0f))
-        defaultTheme.menuElements.add(MenuElement("main_scroll_list", "list_box", "", "", 10, 15, 220, 290, "", "", "", "", "", "", "", "", "NONE", "top|left", -1, -1, 16, -1, "bottom", "left", "", 0, 0, 0, 1.0f))
-        defaultTheme.menuElements.add(MenuElement("btn_now", "button", "main_scroll_list", "", 0, 0, -1, 48, "Now Playing", "Now Playing", ">", "", "", "", "", "music_circle.png", "OPEN_PLAYER", "top|left", -1, 0, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f))
-        defaultTheme.menuElements.add(MenuElement("btn_coverflow", "button", "main_scroll_list", "", 0, 8, -1, 48, "Cover Flow", "Cover Flow", ">", "", "", "", "", "cover.png", "OPEN_COVER_FLOW", "top|left", -1, 1, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f))
-        defaultTheme.menuElements.add(MenuElement("btn_music", "button", "main_scroll_list", "", 0, 8, -1, 48, "Music", "Music", ">", "", "", "", "", "music_list.png", "OPEN_BROWSER", "top|left", -1, 2, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f))
-        defaultTheme.menuElements.add(MenuElement("btn_videos", "button", "main_scroll_list", "", 0, 8, -1, 48, "Videos", "Videos", ">", "", "", "", "", "cover.png", "OPEN_VIDEOS", "top|left", -1, 3, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f))
-        defaultTheme.menuElements.add(MenuElement("btn_playlist", "button", "main_scroll_list", "", 0, 8, -1, 48, "Playlists", "Playlists", ">", "", "", "", "", "playlist.png", "OPEN_PLAYLISTS", "top|left", -1, 4, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f))
-        defaultTheme.menuElements.add(MenuElement("btn_radio", "button", "main_scroll_list", "", 0, 8, -1, 48, "Radio", "Radio", ">", "", "", "", "", "radio_circle.png", "OPEN_RADIO", "top|left", -1, 5, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f))
-        defaultTheme.menuElements.add(MenuElement("btn_audiobook", "button", "main_scroll_list", "", 0, 8, -1, 48, "Audiobooks", "Audiobooks", ">", "", "", "", "", "book.png", "OPEN_AUDIOBOOKS", "top|left", -1, 6, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f))
-        defaultTheme.menuElements.add(MenuElement("btn_podcast", "button", "main_scroll_list", "", 0, 8, -1, 48, "Podcasts", "Podcasts", ">", "", "", "", "", "icon_podcast.png", "OPEN_PODCASTS", "top|left", -1, 7, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f))
-        defaultTheme.menuElements.add(MenuElement("btn_bt", "button", "main_scroll_list", "", 0, 8, -1, 48, "Bluetooth", "Bluetooth", ">", "", "", "", "", "bluetooth_circle.png", "OPEN_BLUETOOTH", "top|left", -1, 8, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f))
-        defaultTheme.menuElements.add(MenuElement("btn_wifi", "button", "main_scroll_list", "", 0, 8, -1, 48, "Wi-Fi", "Wi-Fi", ">", "", "", "", "", "wifi_circle.png", "OPEN_WIFI", "top|left", -1, 9, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f))
-        defaultTheme.menuElements.add(MenuElement("btn_set", "button", "main_scroll_list", "", 0, 8, -1, 48, "Settings", "Settings", ">", "", "", "", "", "setting_circle.png", "OPEN_SETTINGS", "top|left", -1, 10, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f))
-        defaultTheme.menuElements.add(MenuElement("btn_web", "button", "main_scroll_list", "", 0, 8, -1, 48, "PC Upload", "PC Upload", ">", "", "", "", "", "file_sync.png", "OPEN_WEBSERVER", "top|left", -1, 11, 22, -1, "bottom", "left", "#00000000", 0, 0, 0, 1.0f))
-        defaultTheme.menuElements.add(MenuElement("widget_clock", "widget_clock", "", "btn_now", 284, 18, 150, 81, "", "", "", "", "", "", "", "", "NONE", "top|left", 0, -1, 16, -1, "bottom", "left", "", 8, 0, 0, 1.0f))
-        defaultTheme.menuElements.add(MenuElement("widget_album", "widget_album", "", "btn_now", 254, 13, 211, 212, "", "", "", "", "", "", "", "", "NONE", "bottom|left", -1, -1, 16, 12, "bottom", "center", "", 0, 0, 0, 1.0f))
-        defaultTheme.menuElements.add(MenuElement("preview", "widget_focus_image", "", "", 290, 90, 140, 140, "", "", "", "", "", "", "", "", "NONE", "top|left", -1, -1, 16, -1, "bottom", "center", "", 0, 0, 0, 1.0f))
-
-        availableThemes.add(defaultTheme)
 
         if (!themeFolder.exists()) {
             themeFolder.mkdirs()
@@ -216,6 +217,17 @@ object ThemeManager {
                             val jsonStr = String(data, Charsets.UTF_8).replace("\uFEFF", "")
                             val json = JSONObject(jsonStr)
 
+                            val rawName = json.optString("name", subFolder.name)
+                            val normalizedName = when (rawName) {
+                                "iPod Classic" -> "Classic Light"
+                                "iPod Classic Dark", "iPod Classic (Dark)" -> "Classic Dark"
+                                else -> rawName
+                            }
+
+                            if (OBSOLETE_THEMES.contains(rawName) || OBSOLETE_THEMES.contains(subFolder.name)) {
+                                continue
+                            }
+
                             val parsedOverlayBg = safeParseColor(json.optString("bgOverlay"), 0x88000000.toInt())
                             val parsedStatusBarBg = safeParseColor(json.optString("statusBarBg"), parsedOverlayBg)
                             val parsedTextPrimary = safeParseColor(json.optString("textPrimary"), 0xFFFFFFFF.toInt())
@@ -251,7 +263,7 @@ object ThemeManager {
 
                             val theme = ThemeData(
                                 subFolder.absolutePath,
-                                json.optString("name", subFolder.name),
+                                normalizedName,
                                 parsedBgImage,
                                 parsedFont,
                                 parsedTextPrimary, parsedTextSecondary,
@@ -300,7 +312,9 @@ object ThemeManager {
                                     )
                                 }
                             }
-                            availableThemes.add(theme)
+                            if (availableThemes.none { it.name == theme.name }) {
+                                availableThemes.add(theme)
+                            }
                         } catch (e: Exception) {
                             e.printStackTrace()
                         }
@@ -308,6 +322,16 @@ object ThemeManager {
                 }
             }
         }
+
+        if (availableThemes.isEmpty()) {
+            availableThemes.add(DEFAULT_FALLBACK_THEME)
+        }
+
+        availableThemes.sortWith(Comparator { a, b ->
+            if (a.name == "Classic Light") -1
+            else if (b.name == "Classic Light") 1
+            else a.name.compareTo(b.name)
+        })
     }
 
     fun setThemeIndex(index: Int) {
@@ -316,8 +340,13 @@ object ThemeManager {
 
     fun findThemeIndexByName(name: String?): Int {
         if (name == null) return -1
+        val targetName = when (name) {
+            "iPod Classic" -> "Classic Light"
+            "iPod Classic Dark", "iPod Classic (Dark)" -> "Classic Dark"
+            else -> name
+        }
         for (i in availableThemes.indices) {
-            if (availableThemes[i].name == name) return i
+            if (availableThemes[i].name == targetName || availableThemes[i].name == name) return i
         }
         return -1
     }
@@ -352,10 +381,13 @@ object ThemeManager {
 
     fun isClassicTheme(): Boolean {
         val name = getCurrentTheme().name
-        return "iPod Classic" == name || "iPod Classic Dark" == name
+        return "Classic Light" == name || "Classic Dark" == name || "iPod Classic" == name || "iPod Classic Dark" == name || "iPod Classic (Dark)" == name
     }
 
-    fun isClassicLightTheme(): Boolean = "iPod Classic" == getCurrentTheme().name
+    fun isClassicLightTheme(): Boolean {
+        val name = getCurrentTheme().name
+        return "Classic Light" == name || "iPod Classic" == name
+    }
 
     fun getListTextSize(): Float = if (isClassicTheme()) 21f else 23f
 

@@ -418,5 +418,7 @@
   "Fetch Libraries": "获取媒体库",
   "Fetching libraries...": "正在获取媒体库...",
   "Failed to fetch libraries": "获取媒体库失败",
-  "Libraries updated": "媒体库已更新"
+  "Libraries updated": "媒体库已更新",
+  "Classic Light": "经典浅色",
+  "Classic Dark": "经典深色"
 }

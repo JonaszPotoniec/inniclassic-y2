@@ -46,7 +46,7 @@ class MusicQuizController(
     private val engine = MusicQuizEngine(activity)
     private val handler = Handler(Looper.getMainLooper())
 
-    private val layoutQuiz: LinearLayout = rootView.findViewById(R.id.layout_music_quiz_mode)
+    private val layoutQuiz: LinearLayout = if (rootView.id == R.id.layout_music_quiz_mode) rootView as LinearLayout else rootView.findViewById(R.id.layout_music_quiz_mode)
     private val containerQuizItems: LinearLayout = rootView.findViewById(R.id.container_quiz_items)
     private val tvQuizScore: TextView? = rootView.findViewById(R.id.tv_quiz_score)
     private val tvQuizLives: TextView? = rootView.findViewById(R.id.tv_quiz_lives)

@@ -332,6 +332,9 @@ object ListItemViewFactory {
             isClickable = true
         }
 
+        val actualNormalColor = if (normalColor != 0) normalColor else ThemeManager.getTextColorPrimary()
+        val actualFocusedColor = if (focusedColor != 0) focusedColor else ThemeManager.getListButtonFocusedTextColor()
+
         val iconSize = (20f * d).toInt()
         var ivLeft: ImageView? = null
         if (iconPaths != null) {
@@ -339,14 +342,14 @@ object ListItemViewFactory {
                 layoutParams = LinearLayout.LayoutParams(iconSize, iconSize).apply {
                     rightMargin = (12f * d).toInt()
                 }
-                setImageBitmap(TablerIcons.render(iconPaths, iconSize, normalColor))
+                setImageBitmap(TablerIcons.render(iconPaths, iconSize, actualNormalColor))
             }
             row.addView(ivLeft)
         }
 
         val tv = TextView(context).apply {
             this.text = text
-            setTextColor(normalColor)
+            setTextColor(actualNormalColor)
             textSize = 16f
             typeface = ThemeManager.getCustomFont()
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f)
@@ -359,7 +362,7 @@ object ListItemViewFactory {
                 layoutParams = LinearLayout.LayoutParams(iconSize, iconSize).apply {
                     leftMargin = (8f * d).toInt()
                 }
-                setImageBitmap(TablerIcons.render(rightIconPaths, iconSize, normalColor))
+                setImageBitmap(TablerIcons.render(rightIconPaths, iconSize, actualNormalColor))
             }
             row.addView(ivRight)
         }
@@ -369,14 +372,14 @@ object ListItemViewFactory {
                 cornerRadius = 8f * d
                 if (focused) {
                     setColor(ThemeManager.getListButtonFocusedBg())
-                    tv.setTextColor(focusedColor)
-                    if (iconPaths != null) ivLeft?.setImageBitmap(TablerIcons.render(iconPaths, iconSize, focusedColor))
-                    if (rightIconPaths != null) ivRight?.setImageBitmap(TablerIcons.render(rightIconPaths, iconSize, focusedColor))
+                    tv.setTextColor(actualFocusedColor)
+                    if (iconPaths != null) ivLeft?.setImageBitmap(TablerIcons.render(iconPaths, iconSize, actualFocusedColor))
+                    if (rightIconPaths != null) ivRight?.setImageBitmap(TablerIcons.render(rightIconPaths, iconSize, actualFocusedColor))
                 } else {
                     setColor(ThemeManager.getListButtonNormalBg())
-                    tv.setTextColor(normalColor)
-                    if (iconPaths != null) ivLeft?.setImageBitmap(TablerIcons.render(iconPaths, iconSize, normalColor))
-                    if (rightIconPaths != null) ivRight?.setImageBitmap(TablerIcons.render(rightIconPaths, iconSize, normalColor))
+                    tv.setTextColor(actualNormalColor)
+                    if (iconPaths != null) ivLeft?.setImageBitmap(TablerIcons.render(iconPaths, iconSize, actualNormalColor))
+                    if (rightIconPaths != null) ivRight?.setImageBitmap(TablerIcons.render(rightIconPaths, iconSize, actualNormalColor))
                 }
             }
             row.background = bg

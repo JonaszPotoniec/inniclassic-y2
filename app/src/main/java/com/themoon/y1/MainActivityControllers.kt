@@ -284,7 +284,7 @@ internal fun MainActivity.initControllers() {
 
     musicQuizController = MusicQuizController(
         activity = this,
-        rootView = rootContent,
+        rootView = layoutMusicQuizMode as ViewGroup,
         libraryProvider = { MainActivity.customLibrary },
         onExitRequested = { changeScreen(backTargetForUtility) },
         clickFeedback = { clickFeedback() },
@@ -593,39 +593,51 @@ internal fun MainActivity.initControllers() {
 
 internal fun MainActivity.handleMainMenuAction(action: String) {
     when (action) {
-        "MUSIC" -> {
+        "OPEN_BROWSER", "MUSIC" -> {
             changeScreen(MainActivity.STATE_BROWSER)
             browserController.buildFileBrowserUI()
         }
-        "VIDEOS" -> {
+        "OPEN_VIDEOS", "VIDEOS" -> {
             changeScreen(MainActivity.STATE_VIDEOS)
             videoBrowserController.buildVideoListUI()
         }
-        "PHOTOS" -> {
+        "OPEN_COVER_FLOW", "PHOTOS" -> {
             changeScreen(MainActivity.STATE_COVERFLOW)
             coverFlowController.buildCoverFlowUI()
         }
-        "PODCASTS" -> {
+        "OPEN_PODCASTS", "PODCASTS" -> {
             changeScreen(MainActivity.STATE_BROWSER)
             podcastController.buildChannelsUI()
         }
-        "EXTRAS" -> {
+        "OPEN_MUSIC_QUIZ", "EXTRAS" -> {
             changeScreen(MainActivity.STATE_QUIZ)
             musicQuizController.startSession()
         }
-        "SETTINGS" -> {
+        "OPEN_SETTINGS", "SETTINGS" -> {
             changeScreen(MainActivity.STATE_SETTINGS)
             settingsController.buildSettingsUI()
         }
-        "RADIO" -> {
+        "OPEN_RADIO", "RADIO" -> {
             changeScreen(MainActivity.STATE_FM_RADIO)
             fmRadioController.buildRadioUI()
         }
-        "WEBSERVER" -> {
+        "OPEN_WEBSERVER", "WEBSERVER" -> {
             changeScreen(MainActivity.STATE_WEBSERVER)
         }
-        "BLUETOOTH" -> {
+        "OPEN_BLUETOOTH", "BLUETOOTH" -> {
             changeScreen(MainActivity.STATE_BLUETOOTH)
+        }
+        "OPEN_WIFI", "WIFI" -> {
+            changeScreen(MainActivity.STATE_WIFI)
+        }
+        "OPEN_AUDIOBOOKS" -> {
+            browserController.isAudiobookLibraryMode = true
+            changeScreen(MainActivity.STATE_BROWSER)
+            browserController.buildFileBrowserUI()
+        }
+        "OPEN_THEME_SETTINGS" -> {
+            changeScreen(MainActivity.STATE_SETTINGS)
+            settingsController.buildThemeSelectorUI()
         }
         "OPEN_PLAYER" -> {
             changeScreen(MainActivity.STATE_PLAYER)

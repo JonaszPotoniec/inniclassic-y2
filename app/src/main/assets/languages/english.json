@@ -604,5 +604,7 @@
   "Fetch Libraries": "Fetch Libraries",
   "Fetching libraries...": "Fetching libraries...",
   "Failed to fetch libraries": "Failed to fetch libraries",
-  "Libraries updated": "Libraries updated"
+  "Libraries updated": "Libraries updated",
+  "Classic Light": "Classic Light",
+  "Classic Dark": "Classic Dark"
 }

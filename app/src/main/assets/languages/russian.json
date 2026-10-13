@@ -418,5 +418,7 @@
   "Fetch Libraries": "Получить библиотеки",
   "Fetching libraries...": "Получение библиотек...",
   "Failed to fetch libraries": "Не удалось получить библиотеки",
-  "Libraries updated": "Библиотеки обновлены"
+  "Libraries updated": "Библиотеки обновлены",
+  "Classic Light": "Классическая светлая",
+  "Classic Dark": "Классическая тёмная"
 }

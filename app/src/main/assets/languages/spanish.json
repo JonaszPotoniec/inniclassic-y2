@@ -418,5 +418,7 @@
   "Fetch Libraries": "Obtener bibliotecas",
   "Fetching libraries...": "Obteniendo bibliotecas...",
   "Failed to fetch libraries": "Error al obtener las bibliotecas",
-  "Libraries updated": "Bibliotecas actualizadas"
+  "Libraries updated": "Bibliotecas actualizadas",
+  "Classic Light": "Clásico claro",
+  "Classic Dark": "Clásico oscuro"
 }

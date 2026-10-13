@@ -14,7 +14,7 @@ class NavigationManager private constructor() {
     private val backStack = ArrayDeque<ScreenState>()
     private val controllerMap = HashMap<Class<out ScreenState>, ScreenController>()
 
-    var currentState: ScreenState = ScreenState.MainMenu
+    var currentState: ScreenState? = null
         private set
 
     var activeController: ScreenController? = null
@@ -34,13 +34,13 @@ class NavigationManager private constructor() {
     }
 
     fun navigateTo(newState: ScreenState, addToBackStack: Boolean = true) {
-        if (newState == currentState) {
+        if (newState == currentState && activeController != null) {
             activeController?.onRefreshUI()
             return
         }
 
         val previous = currentState
-        if (addToBackStack) {
+        if (previous != null && addToBackStack) {
             backStack.push(previous)
         }
 
@@ -59,7 +59,9 @@ class NavigationManager private constructor() {
         }
 
         controller?.onEnter(newState)
-        transitionListener?.onScreenTransition(previous, newState)
+        if (previous != null) {
+            transitionListener?.onScreenTransition(previous, newState)
+        }
     }
 
     fun navigateBack(): Boolean {
@@ -82,6 +84,14 @@ class NavigationManager private constructor() {
 
     fun clearBackStack() {
         backStack.clear()
+    }
+
+    fun reset() {
+        backStack.clear()
+        currentState = null
+        activeController = null
+        controllerMap.clear()
+        transitionListener = null
     }
 
     private fun findControllerForState(state: ScreenState): ScreenController? {

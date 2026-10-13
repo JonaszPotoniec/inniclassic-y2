@@ -705,8 +705,8 @@ class SettingsController(
         val btnEng = createTablerListButton(
             if (isEngSelected) TablerIcons.CHECK else null,
             "English (Default)",
-            if (isEngSelected) 0xFF00FF00.toInt() else 0,
-            if (isEngSelected) 0xFF00FF00.toInt() else 0
+            if (isEngSelected) 0xFF00FF00.toInt() else ThemeManager.getTextColorPrimary(),
+            if (isEngSelected) 0xFF00FF00.toInt() else ThemeManager.getListButtonFocusedTextColor()
         )
         btnEng.setOnClickListener {
             clickFeedback()
@@ -721,8 +721,8 @@ class SettingsController(
             val btnLang = createTablerListButton(
                 if (isSelected) TablerIcons.CHECK else null,
                 f.name.replace(".json", ""),
-                if (isSelected) 0xFF00FF00.toInt() else 0,
-                if (isSelected) 0xFF00FF00.toInt() else 0
+                if (isSelected) 0xFF00FF00.toInt() else ThemeManager.getTextColorPrimary(),
+                if (isSelected) 0xFF00FF00.toInt() else ThemeManager.getListButtonFocusedTextColor()
             )
             btnLang.setOnClickListener {
                 clickFeedback()
@@ -740,7 +740,7 @@ class SettingsController(
 
     fun buildThemeSelectorUI() {
         currentSettingsDepth = 1
-        val themeFolder = StoragePaths.getThemesDir()
+        val themeFolder = File(activity.filesDir, "themes")
         ThemeManager.loadThemesFromStorage(themeFolder)
         containerSettingsItems.removeAllViews()
 
@@ -751,9 +751,9 @@ class SettingsController(
             val icon = if (isSelected) TablerIcons.CHECK else null
             val btn = createTablerListButton(
                 icon,
-                theme.name,
-                if (isSelected) 0xFF00FF00.toInt() else 0,
-                if (isSelected) 0xFF00FF00.toInt() else 0
+                localize(theme.name),
+                if (isSelected) 0xFF00FF00.toInt() else ThemeManager.getTextColorPrimary(),
+                if (isSelected) 0xFF00FF00.toInt() else ThemeManager.getListButtonFocusedTextColor()
             )
             btn.setOnClickListener {
                 clickFeedback()
@@ -762,6 +762,7 @@ class SettingsController(
                     val editor = prefs.edit()
                     editor.putInt("app_theme_index", index)
                     editor.putString("app_theme_name", ThemeManager.availableThemes[index].name)
+                    editor.putString("current_theme_name", ThemeManager.availableThemes[index].name)
                     editor.putBoolean("reboot_to_theme", true)
 
                     val selectedTheme = ThemeManager.availableThemes[index]

@@ -11,7 +11,7 @@ class AppPreferences(val prefs: SharedPreferences) {
     var isHideListBoxEnabled: Boolean by booleanPref("HIDE_LIST_BOX", false)
     var isSoftware10BandEq: Boolean by booleanPref("SW_10BAND_EQ_ENABLED", false)
     var backlightTimeoutSec: Int by intPref("BACKLIGHT_TIMER_SEC", 30)
-    var currentThemeName: String by stringPref("CURRENT_THEME_NAME", "iPod Classic")
+    var currentThemeName: String by stringPref("CURRENT_THEME_NAME", "Classic Light")
 }
 
 fun booleanPref(key: String, defaultValue: Boolean = false): ReadWriteProperty<AppPreferences, Boolean> =
