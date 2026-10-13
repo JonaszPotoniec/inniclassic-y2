@@ -127,6 +127,65 @@ class BluetoothAvrcpManager private constructor(private val context: Context) {
         }
     }
 
+    private var remoteControlClient: android.media.RemoteControlClient? = null
+    private var mediaButtonReceiver: android.content.ComponentName? = null
+
+    fun initRemoteControlClient() {
+        if (remoteControlClient == null) {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager ?: return
+
+            mediaButtonReceiver = android.content.ComponentName(
+                context.packageName,
+                "${context.packageName}.MainActivity\$MediaBtnReceiver"
+            )
+            audioManager.registerMediaButtonEventReceiver(mediaButtonReceiver)
+
+            val mediaButtonIntent = android.content.Intent(android.content.Intent.ACTION_MEDIA_BUTTON)
+            mediaButtonIntent.component = mediaButtonReceiver
+
+            var pendingIntentFlags = 0
+            if (android.os.Build.VERSION.SDK_INT >= 23) {
+                pendingIntentFlags = android.app.PendingIntent.FLAG_IMMUTABLE
+            }
+            val mediaPendingIntent = android.app.PendingIntent.getBroadcast(
+                context, 0, mediaButtonIntent, pendingIntentFlags
+            )
+
+            val rcc = android.media.RemoteControlClient(mediaPendingIntent)
+            val flags = android.media.RemoteControlClient.FLAG_KEY_MEDIA_PLAY or
+                    android.media.RemoteControlClient.FLAG_KEY_MEDIA_PAUSE or
+                    android.media.RemoteControlClient.FLAG_KEY_MEDIA_PLAY_PAUSE or
+                    android.media.RemoteControlClient.FLAG_KEY_MEDIA_NEXT or
+                    android.media.RemoteControlClient.FLAG_KEY_MEDIA_PREVIOUS
+            rcc.setTransportControlFlags(flags)
+
+            audioManager.registerRemoteControlClient(rcc)
+            remoteControlClient = rcc
+        }
+    }
+
+    fun updateMetadata(title: String?, artist: String?, album: String?, albumArtBmp: android.graphics.Bitmap?) {
+        val rcc = remoteControlClient ?: return
+        val editor = rcc.editMetadata(true)
+        editor.putString(android.media.MediaMetadataRetriever.METADATA_KEY_TITLE, title ?: "Unknown Title")
+        editor.putString(android.media.MediaMetadataRetriever.METADATA_KEY_ARTIST, artist ?: "Unknown Artist")
+        editor.putString(android.media.MediaMetadataRetriever.METADATA_KEY_ALBUM, album ?: "Unknown Album")
+        if (albumArtBmp != null) {
+            editor.putBitmap(android.media.RemoteControlClient.MetadataEditor.BITMAP_KEY_ARTWORK, albumArtBmp)
+        }
+        editor.apply()
+    }
+
+    fun updatePlaybackState(isPlaying: Boolean) {
+        val rcc = remoteControlClient ?: return
+        val state = if (isPlaying) {
+            android.media.RemoteControlClient.PLAYSTATE_PLAYING
+        } else {
+            android.media.RemoteControlClient.PLAYSTATE_PAUSED
+        }
+        rcc.setPlaybackState(state)
+    }
+
     companion object {
         @Volatile
         private var instance: BluetoothAvrcpManager? = null

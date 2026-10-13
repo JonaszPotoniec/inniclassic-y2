@@ -1680,79 +1680,16 @@ public class MainActivity extends Activity {
     }
 
     public void initRemoteControlClient(Context context) {
-        if (remoteControlClient == null) {
-            AudioManager audioManager = (AudioManager) context
-                    .getSystemService(Context.AUDIO_SERVICE);
-
-            // 우리가 이전에 만들어둔 미디어 버튼 수신기(MediaBtnReceiver)를 연결합니다.
-            mediaButtonReceiver = new ComponentName(context.getPackageName(),
-                    MediaBtnReceiver.class.getName());
-            audioManager.registerMediaButtonEventReceiver(mediaButtonReceiver);
-
-            // 리모컨 클라이언트를 위한 인텐트 생성
-            Intent mediaButtonIntent = new Intent(
-                    Intent.ACTION_MEDIA_BUTTON);
-            mediaButtonIntent.setComponent(mediaButtonReceiver);
-
-            // 🚀 [보안 에러 완벽 해결] 안드로이드 12 이상을 위한 불변(IMMUTABLE) 플래그를 장착합니다!
-            // 젤리빈 등 구형 기기(API 23 미만)에서는 에러가 나지 않도록 분기 처리를 해줍니다.
-            int pendingIntentFlags = 0;
-            if (Build.VERSION.SDK_INT >= 23) { // 안드로이드 6.0(마시멜로) 이상
-                pendingIntentFlags = android.app.PendingIntent.FLAG_IMMUTABLE;
-            }
-            android.app.PendingIntent mediaPendingIntent = android.app.PendingIntent.getBroadcast(context, 0,
-                    mediaButtonIntent, pendingIntentFlags);
-
-            // 🚀 젤리빈 전용 방송국 개국!
-            remoteControlClient = new android.media.RemoteControlClient(mediaPendingIntent);
-
-            // 차량 핸들 및 블루투스 기기에서 무슨 버튼을 누를 수 있는지 권한 부여
-            int flags = android.media.RemoteControlClient.FLAG_KEY_MEDIA_PLAY
-                    | android.media.RemoteControlClient.FLAG_KEY_MEDIA_PAUSE
-                    | android.media.RemoteControlClient.FLAG_KEY_MEDIA_PLAY_PAUSE
-                    | android.media.RemoteControlClient.FLAG_KEY_MEDIA_NEXT
-                    | android.media.RemoteControlClient.FLAG_KEY_MEDIA_PREVIOUS;
-            remoteControlClient.setTransportControlFlags(flags);
-
-            audioManager.registerRemoteControlClient(remoteControlClient);
-        }
+        com.themoon.y1.managers.BluetoothAvrcpManager.getInstance(context).initRemoteControlClient();
     }
 
-    // 🚀 곡이 바뀔 때 호출!
     public void updateBluetoothMetadata(String title, String artist, String album,
             Bitmap albumArtBmp) {
-        if (remoteControlClient == null)
-            return;
-
-        android.media.RemoteControlClient.MetadataEditor editor = remoteControlClient.editMetadata(true);
-
-        // 1. 텍스트 정보 입력 (젤리빈은 MediaMetadataRetriever의 상수를 가져다 씁니다)
-        editor.putString(MediaMetadataRetriever.METADATA_KEY_TITLE,
-                title != null ? title : "Unknown Title");
-        editor.putString(MediaMetadataRetriever.METADATA_KEY_ARTIST,
-                artist != null ? artist : "Unknown Artist");
-        editor.putString(MediaMetadataRetriever.METADATA_KEY_ALBUM,
-                album != null ? album : "Unknown Album");
-
-        // 2. 🚀 [핵심] 앨범 아트 비트맵을 차량 디스플레이로 전송!
-        if (albumArtBmp != null) {
-            editor.putBitmap(android.media.RemoteControlClient.MetadataEditor.BITMAP_KEY_ARTWORK, albumArtBmp);
-        }
-
-        // 포장 완료 후 시스템에 전송
-        editor.apply();
+        com.themoon.y1.managers.BluetoothAvrcpManager.getInstance(this).updateMetadata(title, artist, album, albumArtBmp);
     }
 
-    // 🚀 음악이 재생되거나 정지될 때 호출!
     public void updateBluetoothPlaybackState(boolean isPlaying) {
-        if (remoteControlClient == null)
-            return;
-
-        int state = isPlaying ? android.media.RemoteControlClient.PLAYSTATE_PLAYING
-                : android.media.RemoteControlClient.PLAYSTATE_PAUSED;
-
-        // 젤리빈은 현재 시간(currentPosition)을 쏘지 않아도 차량에서 자체적으로 타이머를 돌려줍니다.
-        remoteControlClient.setPlaybackState(state);
+        com.themoon.y1.managers.BluetoothAvrcpManager.getInstance(this).updatePlaybackState(isPlaying);
     }
 
     // 🚀 [신규 도우미] 현재 화면의 곡 정보와 이미지를 읽어서 블루투스로 쏘는 함수
