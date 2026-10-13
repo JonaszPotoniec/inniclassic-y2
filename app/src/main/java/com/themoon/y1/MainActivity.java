@@ -115,6 +115,8 @@ public class MainActivity extends Activity {
     private com.themoon.y1.controllers.player.NowPlayingContextMenu nowPlayingContextMenu;
     private com.themoon.y1.controllers.coverflow.CoverFlowController coverFlowController;
     private com.themoon.y1.controllers.playlists.PlaylistController playlistController;
+    private com.themoon.y1.controllers.player.PlayerController playerController;
+    private com.themoon.y1.controllers.player.LyricsOverlayController lyricsOverlayController;
 
     private static final String TAG = "MainActivity";
     // OTA Update URL pointing to GitHub Releases
@@ -3829,6 +3831,78 @@ public class MainActivity extends Activity {
         }
         // 🚀🚀🚀 [추가 끝] 🚀🚀🚀
 
+        playerController = new com.themoon.y1.controllers.player.PlayerController(
+                this,
+                (ViewGroup) findViewById(android.R.id.content),
+                () -> { clickFeedback(); return kotlin.Unit.INSTANCE; },
+                up -> { adjustVolume(up); return kotlin.Unit.INSTANCE; },
+                () -> { com.themoon.y1.managers.AudioPlayerManager.getInstance().playOrPauseMusic(); return kotlin.Unit.INSTANCE; },
+                () -> {
+                    if (isVisualizerShowing && lyricTimestamps != null && !lyricTimestamps.isEmpty()) {
+                        int currentPos = com.themoon.y1.managers.AudioPlayerManager.getInstance().getCurrentPosition();
+                        int targetMs = -1;
+                        for (int i = 0; i < lyricTimestamps.size(); i++) {
+                            if (lyricTimestamps.get(i) > currentPos + 2000) {
+                                targetMs = lyricTimestamps.get(i);
+                                break;
+                            }
+                        }
+                        if (targetMs != -1) {
+                            com.themoon.y1.managers.AudioPlayerManager.getInstance().seekRelative(targetMs - currentPos);
+                        } else {
+                            com.themoon.y1.managers.AudioPlayerManager.getInstance().nextTrack();
+                        }
+                    } else {
+                        com.themoon.y1.managers.AudioPlayerManager.getInstance().nextTrack();
+                    }
+                    return kotlin.Unit.INSTANCE;
+                },
+                () -> {
+                    if (isVisualizerShowing && lyricTimestamps != null && !lyricTimestamps.isEmpty()) {
+                        int currentPos = com.themoon.y1.managers.AudioPlayerManager.getInstance().getCurrentPosition();
+                        int targetMs = -1;
+                        for (int i = lyricTimestamps.size() - 1; i >= 0; i--) {
+                            if (lyricTimestamps.get(i) < currentPos - 3000) {
+                                targetMs = lyricTimestamps.get(i);
+                                break;
+                            }
+                        }
+                        if (targetMs == -1 && !lyricTimestamps.isEmpty()) targetMs = lyricTimestamps.get(0);
+                        if (targetMs != -1) {
+                            com.themoon.y1.managers.AudioPlayerManager.getInstance().seekRelative(targetMs - currentPos);
+                        } else {
+                            com.themoon.y1.managers.AudioPlayerManager.getInstance().prevTrack();
+                        }
+                    } else {
+                        com.themoon.y1.managers.AudioPlayerManager.getInstance().prevTrack();
+                    }
+                    return kotlin.Unit.INSTANCE;
+                },
+                () -> { changeScreen(backTargetForPlayer != 0 ? backTargetForPlayer : STATE_MENU); return kotlin.Unit.INSTANCE; },
+                albumName -> {
+                    virtualQueryType = "ALBUM";
+                    virtualQueryValue = albumName;
+                    currentBrowserMode = BROWSER_VIRTUAL_SONGS;
+                    changeScreen(STATE_BROWSER);
+                    buildVirtualSongs();
+                    return kotlin.Unit.INSTANCE;
+                },
+                artistName -> {
+                    categoryArtistFilter = artistName;
+                    categoryArtistFilterIsTrackArtist = false;
+                    virtualQueryValue = "";
+                    currentBrowserMode = BROWSER_ALBUMS;
+                    changeScreen(STATE_BROWSER);
+                    buildVirtualCategories("ALBUM");
+                    return kotlin.Unit.INSTANCE;
+                },
+                () -> { toggleFavorite(); return kotlin.Unit.INSTANCE; },
+                file -> { addSongToOnTheGo(file); return kotlin.Unit.INSTANCE; },
+                () -> { toggleVisualizer(); return kotlin.Unit.INSTANCE; },
+                key -> t(key)
+        );
+        lyricsOverlayController = playerController.getLyricsOverlayController();
+
         updatePlayerStatusIndicators();
 
         // 🚀 [수정] 아이콘 파일명(.png)을 매개변수로 던져줍니다.
@@ -5423,6 +5497,9 @@ public class MainActivity extends Activity {
 
         currentScreenState = state;
         updateStatusBarTitle();
+        if (state != STATE_PLAYER && playerController != null) {
+            playerController.onExit();
+        }
         layoutMainMenu.setVisibility(state == STATE_MENU ? View.VISIBLE : View.GONE);
         layoutBrowserMode.setVisibility(state == STATE_BROWSER ? View.VISIBLE : View.GONE);
         layoutPlayerMode.setVisibility(state == STATE_PLAYER ? View.VISIBLE : View.GONE);
@@ -5564,6 +5641,10 @@ public class MainActivity extends Activity {
             btnServerToggle.requestFocus();
         } else if (state == STATE_MUSIC_QUIZ) {
             startMusicQuizSession();
+        } else if (state == STATE_PLAYER) {
+            if (playerController != null) {
+                playerController.onEnter(com.themoon.y1.navigation.ScreenState.Player.INSTANCE);
+            }
         }
     }
 
@@ -5595,25 +5676,28 @@ public class MainActivity extends Activity {
         }
 
         if (currentScreenState == STATE_PLAYER) {
-            // 🚀 [iPod 스타일] Center 클릭 시 하단 바가 Progress→Seek→Shuffle&Repeat→Rating→Progress 순으로 순환!
-            com.themoon.y1.managers.AudioPlayerManager am = com.themoon.y1.managers.AudioPlayerManager.getInstance();
-            if (nowPlayingBottomState == 1 && pendingSeekChanged) {
-                am.seekRelative(pendingSeekPosition - am.getCurrentPosition());
-                pendingSeekChanged = false;
-                nowPlayingBottomState = 0;
-                int duration = am.getDuration();
-                tvPlayerTimeCurrent.setText(formatTime(pendingSeekPosition));
-                tvPlayerTimeTotal.setText("-" + formatTime(Math.max(0, duration - pendingSeekPosition)));
-                playerProgress.setProgress(duration > 0 ? (int) (100L * pendingSeekPosition / duration) : 0);
+            if (playerController != null) {
+                playerController.cycleBottomState();
             } else {
-                nowPlayingBottomState = (nowPlayingBottomState + 1) % 4;
-                if (nowPlayingBottomState == 1) {
-                    pendingSeekPosition = am.getCurrentPosition();
+                com.themoon.y1.managers.AudioPlayerManager am = com.themoon.y1.managers.AudioPlayerManager.getInstance();
+                if (nowPlayingBottomState == 1 && pendingSeekChanged) {
+                    am.seekRelative(pendingSeekPosition - am.getCurrentPosition());
                     pendingSeekChanged = false;
+                    nowPlayingBottomState = 0;
+                    int duration = am.getDuration();
+                    tvPlayerTimeCurrent.setText(formatTime(pendingSeekPosition));
+                    tvPlayerTimeTotal.setText("-" + formatTime(Math.max(0, duration - pendingSeekPosition)));
+                    playerProgress.setProgress(duration > 0 ? (int) (100L * pendingSeekPosition / duration) : 0);
+                } else {
+                    nowPlayingBottomState = (nowPlayingBottomState + 1) % 4;
+                    if (nowPlayingBottomState == 1) {
+                        pendingSeekPosition = am.getCurrentPosition();
+                        pendingSeekChanged = false;
+                    }
                 }
+                updateNowPlayingBottomBarState();
+                clickFeedback();
             }
-            updateNowPlayingBottomBarState();
-            clickFeedback();
         } else if (currentScreenState != STATE_BRIGHTNESS && currentScreenState != STATE_PLAYER) {
             if (isRadioUIShowing && !isRadioSettingsMode) {
                 View c = getCurrentFocus();
@@ -9282,6 +9366,10 @@ public class MainActivity extends Activity {
     // 🚀 [iPod 스타일] Now Playing 하단 바 4단계 순환 (Progress→Seek→Shuffle&Repeat→Rating→Progress)
     // 🚀 [Now Playing 커버 기울기 설정] 켜져있으면 18도 입체 기울기, 꺼져있으면 정면 평평하게!
     private void applyAlbumTiltSetting() {
+        if (playerController != null) {
+            playerController.applyAlbumTiltSetting();
+            return;
+        }
         float tilt = isAlbumTiltEnabled ? 18f : 0f;
         if (frameAlbumArt != null)
             frameAlbumArt.setRotationY(tilt);
@@ -9290,6 +9378,10 @@ public class MainActivity extends Activity {
     }
 
     private void updateNowPlayingBottomBarState() {
+        if (playerController != null) {
+            playerController.updateNowPlayingBottomBarState();
+            return;
+        }
         if (rowPlayerProgress == null) return;
         volumeHandler.removeCallbacks(hideVolumeTask);
         volumeHandler.removeCallbacks(hideNowPlayingVolumeTask);
@@ -9316,6 +9408,10 @@ public class MainActivity extends Activity {
 
     // 🚀 [공용화] Now Playing 화면에서 휠을 돌렸을 때의 동작 - 순환 상태에 따라 볼륨/탐색/셔플&리핏/별점 중 하나로 분기
     private void handleNowPlayingWheelInput(boolean up) {
+        if (playerController != null) {
+            playerController.handleNowPlayingWheelInput(up);
+            return;
+        }
         if (nowPlayingBottomState == 1) {
             com.themoon.y1.managers.AudioPlayerManager am = com.themoon.y1.managers.AudioPlayerManager.getInstance();
             if (!pendingSeekChanged) pendingSeekPosition = am.getCurrentPosition();
@@ -9417,6 +9513,9 @@ public class MainActivity extends Activity {
                     nowPlayingBottomState = 0;
                     updateNowPlayingBottomBarState();
                 }
+            }
+            if (playerController != null) {
+                playerController.updatePlayerUI();
             }
             com.themoon.y1.managers.AudioPlayerManager am = com.themoon.y1.managers.AudioPlayerManager.getInstance();
 
@@ -9857,6 +9956,9 @@ public class MainActivity extends Activity {
         }
 
         if (currentScreenState == STATE_PLAYER) {
+            if (playerController != null && playerController.onKeyDown(keyCode, event)) {
+                return true;
+            }
             if (keyCode == 21 || keyCode == 22) {
                 handleNowPlayingWheelInput(keyCode == 22);
                 return true;
