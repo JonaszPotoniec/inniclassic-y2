@@ -718,7 +718,7 @@ class SettingsController(
         }
     }
 
-    private fun buildThemeSelectorUI() {
+    fun buildThemeSelectorUI() {
         currentSettingsDepth = 1
         val themeFolder = StoragePaths.getThemesDir()
         ThemeManager.loadThemesFromStorage(themeFolder)
@@ -838,7 +838,7 @@ class SettingsController(
         }
     }
 
-    private fun buildBackgroundSettingsUI() {
+    fun buildBackgroundSettingsUI() {
         currentSettingsDepth = 1
         containerSettingsItems.removeAllViews()
 
@@ -868,7 +868,7 @@ class SettingsController(
         }
     }
 
-    private fun buildDateTimeUI() {
+    fun buildDateTimeUI() {
         currentSettingsDepth = 1
         containerSettingsItems.removeAllViews()
 
@@ -1261,7 +1261,7 @@ class SettingsController(
         }
     }
 
-    private fun toggleMenuReorderMode() {
+    fun toggleMenuReorderMode() {
         if (!isMenuReorderMode) {
             val focused = activity.currentFocus
             if (focused != null && focused.parent == containerSettingsItems) {
