@@ -707,7 +707,7 @@ class BrowserController(
         }
     }
 
-    private fun buildFolderBrowserUI() {
+    fun buildFolderBrowserUI() {
         hideBrowserCoverPane()
         containerBrowserItems.removeAllViews()
         tvBrowserPath.text = "${localize("Path")}: ${StoragePaths.toDisplayPath(currentFolder.absolutePath)}"
