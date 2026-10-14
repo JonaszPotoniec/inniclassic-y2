@@ -517,6 +517,7 @@ class SettingsController(
             prefs.edit().putInt("backlight_timer_index", backlightTimerIndex).commit()
             val tvStatus = btnBacklightTimer.getChildAt(1) as? TextView
             tvStatus?.text = localize(BACKLIGHT_TIMER_LABELS[backlightTimerIndex])
+            com.themoon.y1.managers.PowerBacklightManager.getInstance(activity).backlightTimerIndex = backlightTimerIndex
             resetBacklightTimer()
         }
         containerSettingsItems.addView(btnBacklightTimer)
@@ -1466,6 +1467,7 @@ class SettingsController(
         AudioEffectManager.getInstance().applySoundCheck()
         AudioEffectManager.getInstance().applyEqProfile()
         applyAlbumTiltSetting()
+        com.themoon.y1.managers.PowerBacklightManager.getInstance(activity).backlightTimerIndex = 3
         resetBacklightTimer()
 
         mainActivity?.isShowBatteryPercentage = false

@@ -22,9 +22,11 @@ import android.media.audiofx.Visualizer
 import android.net.ConnectivityManager
 import android.net.wifi.WifiManager
 import android.os.BatteryManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.os.SystemClock
 import android.os.Vibrator
 import android.view.KeyEvent
@@ -358,8 +360,9 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             }
         })
 
+        val savedBacklightIdx = prefs.getInt("backlight_timer_index", 3)
         powerBacklightManager = PowerBacklightManager.getInstance(this).apply {
-            backlightTimerIndex = currentTimeoutIndex
+            backlightTimerIndex = savedBacklightIdx
             setTimeoutAction { turnOffScreen() }
         }
 
@@ -447,6 +450,8 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
     override fun onResume() {
         super.onResume()
+        isScreenSleeping = false
+        powerBacklightManager?.resetTimer()
         applyTheme()
     }
 
@@ -822,6 +827,18 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             powerBacklightManager?.enterFakeScreenOff(window, layoutLoadingOverlay) { sleep ->
                 autoManageWifiPower(sleep)
             }
+        } else {
+            val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            val isScreenOn = if (Build.VERSION.SDK_INT >= 20) {
+                pm?.isInteractive ?: true
+            } else {
+                pm?.isScreenOn ?: true
+            }
+            if (isScreenOn) {
+                try {
+                    Runtime.getRuntime().exec(arrayOf("su", "-c", "input keyevent 26"))
+                } catch (_: Exception) {}
+            }
         }
     }
 
@@ -1066,6 +1083,14 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                 "com.themoon.y1.RESCAN_LIBRARY" -> {
                     startMediaLibraryScan()
                 }
+                Intent.ACTION_SCREEN_ON -> {
+                    isScreenSleeping = false
+                    powerBacklightManager?.resetTimer()
+                }
+                Intent.ACTION_SCREEN_OFF -> {
+                    isScreenSleeping = true
+                    powerBacklightManager?.cancelTimer()
+                }
                 Intent.ACTION_TIME_TICK, Intent.ACTION_TIME_CHANGED -> {
                     homeWidgetsController?.refreshWidgets()
                 }
@@ -1095,6 +1120,8 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
     private fun registerReceivers() {
         val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_SCREEN_OFF)
             addAction(Intent.ACTION_BATTERY_CHANGED)
             addAction(Intent.ACTION_POWER_CONNECTED)
             addAction(Intent.ACTION_POWER_DISCONNECTED)

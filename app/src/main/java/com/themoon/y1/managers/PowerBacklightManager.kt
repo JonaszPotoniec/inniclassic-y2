@@ -65,7 +65,18 @@ class PowerBacklightManager private constructor(private val context: Context) {
 
     fun resetTimer() {
         handler.removeCallbacks(timeoutRunnable)
-        val ms = BACKLIGHT_TIMER_OPTIONS_MS[backlightTimerIndex]
+        try {
+            val prefs = context.getSharedPreferences("Y1_SETTINGS", Context.MODE_PRIVATE)
+            if (prefs.contains("backlight_timer_index")) {
+                backlightTimerIndex = prefs.getInt("backlight_timer_index", backlightTimerIndex)
+            }
+        } catch (_: Exception) {}
+        val idx = if (backlightTimerIndex in BACKLIGHT_TIMER_OPTIONS_MS.indices) {
+            backlightTimerIndex
+        } else {
+            3
+        }
+        val ms = BACKLIGHT_TIMER_OPTIONS_MS[idx]
         if (ms > 0) {
             handler.postDelayed(timeoutRunnable, ms)
         }
