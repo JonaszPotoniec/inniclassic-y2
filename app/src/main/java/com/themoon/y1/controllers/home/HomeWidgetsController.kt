@@ -17,6 +17,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
+import com.themoon.y1.controllers.menu.MainMenuController
 import com.themoon.y1.views.CircularBatteryView
 import com.themoon.y1.views.CustomAnalogClockView
 import com.themoon.y1.views.WidgetBatteryBarView
@@ -34,20 +35,23 @@ import java.util.Locale
  */
 class HomeWidgetsController(
     private val context: Context,
-    private val widgetViewRegistry: Map<View, ThemeManager.MenuElement>,
-    private val tvWidgetClock: TextView?,
-    private val widgetBatteryView: WidgetBatteryBarView?,
-    private val ivWidgetAlbum: ImageView?,
-    private val tvWidgetAlbumTitle: TextView?,
-    private val tvWidgetAlbumArtist: TextView?,
-    private val ivAnimatedCover: ImageView?,
+    private val mainMenuProvider: () -> MainMenuController?,
     private val ivBrowserCover: ImageView?,
     private val frameBrowserCover: View?,
-    private val customAnalogClockView: CustomAnalogClockView?,
-    private val customCircularBatteryView: CircularBatteryView?,
-    private val ivWidgetFocusImage: ImageView?,
     private val fetchRandomIdleCoverAsync: () -> Unit
 ) {
+
+    private val widgetViewRegistry: Map<View, ThemeManager.MenuElement>
+        get() = mainMenuProvider()?.widgetViewRegistry ?: emptyMap<View, ThemeManager.MenuElement>()
+    private val tvWidgetClock: TextView? get() = mainMenuProvider()?.tvWidgetClock
+    private val widgetBatteryView: WidgetBatteryBarView? get() = mainMenuProvider()?.widgetBatteryView
+    private val ivWidgetAlbum: ImageView? get() = mainMenuProvider()?.ivWidgetAlbum
+    private val tvWidgetAlbumTitle: TextView? get() = mainMenuProvider()?.tvWidgetAlbumTitle
+    private val tvWidgetAlbumArtist: TextView? get() = mainMenuProvider()?.tvWidgetAlbumArtist
+    private val ivAnimatedCover: ImageView? get() = mainMenuProvider()?.ivAnimatedCover
+    private val customAnalogClockView: CustomAnalogClockView? get() = mainMenuProvider()?.customAnalogClockView
+    private val customCircularBatteryView: CircularBatteryView? get() = mainMenuProvider()?.customCircularBatteryView
+    private val ivWidgetFocusImage: ImageView? get() = mainMenuProvider()?.ivWidgetFocusImage
 
     var isWidgetClockOn = true
     var isWidgetBatteryOn = true
@@ -60,22 +64,37 @@ class HomeWidgetsController(
     var currentClockSize = 14
 
     var lastAlbumArtBytes: ByteArray? = null
+        set(value) {
+            field = value
+            cachedAlbumArtBitmap = if (value != null && value.isNotEmpty()) {
+                try {
+                    decodeAlbumArtSmart(value)
+                } catch (_: Exception) {
+                    null
+                }
+            } else {
+                null
+            }
+        }
+    private var cachedAlbumArtBitmap: Bitmap? = null
+
     var idleRandomCoverBitmap: Bitmap? = null
     var currentTrackTitle = ""
     var currentTrackArtist = ""
 
     fun refreshWidgets() {
         // 1. Digital Clock
-        if (tvWidgetClock != null) {
-            val el = widgetViewRegistry[tvWidgetClock]
+        val clockTv = tvWidgetClock
+        if (clockTv != null) {
+            val el = widgetViewRegistry[clockTv]
             if (el?.visibleOnFocus.isNullOrBlank()) {
-                tvWidgetClock.visibility = if (isWidgetClockOn) View.VISIBLE else View.GONE
+                clockTv.visibility = if (isWidgetClockOn) View.VISIBLE else View.GONE
             }
 
-            if (tvWidgetClock.visibility == View.VISIBLE) {
+            if (clockTv.visibility == View.VISIBLE) {
                 val d = context.resources.displayMetrics.density
-                tvWidgetClock.setTextSize(TypedValue.COMPLEX_UNIT_PX, (currentClockSize * 2.1f) * d)
-                tvWidgetClock.setLineSpacing(0f, 1.1f)
+                clockTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, (currentClockSize * 2.1f) * d)
+                clockTv.setLineSpacing(0f, 1.1f)
 
                 val now = Date()
                 val widgetTimeFormat = if (is24HourFormat) "HH:mm" else "hh:mm"
@@ -99,18 +118,19 @@ class HomeWidgetsController(
                         Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
                     )
                 }
-                tvWidgetClock.text = spannable
+                clockTv.text = spannable
             }
         }
 
         // 2. Battery Bar
-        if (widgetBatteryView != null) {
-            val el = widgetViewRegistry[widgetBatteryView]
+        val batteryBar = widgetBatteryView
+        if (batteryBar != null) {
+            val el = widgetViewRegistry[batteryBar]
             if (el?.visibleOnFocus.isNullOrBlank()) {
-                widgetBatteryView.visibility = if (isWidgetBatteryOn) View.VISIBLE else View.GONE
+                batteryBar.visibility = if (isWidgetBatteryOn) View.VISIBLE else View.GONE
             }
-            if (widgetBatteryView.visibility == View.VISIBLE) {
-                widgetBatteryView.setColor(ThemeManager.getTextColorPrimary())
+            if (batteryBar.visibility == View.VISIBLE) {
+                batteryBar.setColor(ThemeManager.getTextColorPrimary())
                 val batteryIntent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
                 if (batteryIntent != null) {
                     val level = batteryIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
@@ -119,15 +139,18 @@ class HomeWidgetsController(
                     val isCharging = (status == BatteryManager.BATTERY_STATUS_CHARGING ||
                             status == BatteryManager.BATTERY_STATUS_FULL)
                     if (level != -1 && scale != -1) {
-                        widgetBatteryView.setBatteryLevel(((level / scale.toFloat()) * 100).toInt(), isCharging)
+                        batteryBar.setBatteryLevel(((level / scale.toFloat()) * 100).toInt(), isCharging)
                     }
                 }
             }
         }
 
         // 3. Album Art Preview Widget
-        if (ivWidgetAlbum != null && tvWidgetAlbumTitle != null && tvWidgetAlbumArtist != null) {
-            val parent = ivWidgetAlbum.parent as? View
+        val widgetAlbum = ivWidgetAlbum
+        val titleView = tvWidgetAlbumTitle
+        val artistView = tvWidgetAlbumArtist
+        if (widgetAlbum != null && titleView != null && artistView != null) {
+            val parent = widgetAlbum.parent as? View
             val el = widgetViewRegistry[parent]
 
             if (el?.visibleOnFocus.isNullOrBlank()) {
@@ -135,16 +158,16 @@ class HomeWidgetsController(
             }
 
             if (parent != null && parent.visibility == View.VISIBLE) {
-                tvWidgetAlbumTitle.text = currentTrackTitle
-                tvWidgetAlbumArtist.text = currentTrackArtist
+                titleView.text = currentTrackTitle
+                artistView.text = currentTrackArtist
 
-                val artBytes = lastAlbumArtBytes
-                if (artBytes != null && artBytes.isNotEmpty()) {
-                    try {
-                        ivWidgetAlbum.setImageBitmap(decodeAlbumArtSmart(artBytes))
-                    } catch (ignored: Exception) {}
+                val bmp = cachedAlbumArtBitmap ?: lastAlbumArtBytes?.takeIf { it.isNotEmpty() }?.let {
+                    try { decodeAlbumArtSmart(it) } catch (_: Exception) { null }
+                }
+                if (bmp != null) {
+                    widgetAlbum.setImageBitmap(bmp)
                 } else {
-                    ivWidgetAlbum.setImageBitmap(
+                    widgetAlbum.setImageBitmap(
                         ThemeManager.getCustomIcon("icon_default_album.png", context, R.drawable.default_album)
                     )
                 }
@@ -152,27 +175,28 @@ class HomeWidgetsController(
         }
 
         // 4. Drift animated cover
-        if (ivAnimatedCover != null) {
-            val artBytes = lastAlbumArtBytes
-            if (artBytes != null && artBytes.isNotEmpty()) {
-                try {
-                    ivAnimatedCover.setImageBitmap(decodeAlbumArtSmart(artBytes))
-                } catch (ignored: Exception) {}
+        val animCover = ivAnimatedCover
+        if (animCover != null) {
+            val bmp = cachedAlbumArtBitmap ?: lastAlbumArtBytes?.takeIf { it.isNotEmpty() }?.let {
+                try { decodeAlbumArtSmart(it) } catch (_: Exception) { null }
+            }
+            if (bmp != null) {
+                animCover.setImageBitmap(bmp)
             } else if (idleRandomCoverBitmap != null) {
-                ivAnimatedCover.setImageBitmap(idleRandomCoverBitmap)
+                animCover.setImageBitmap(idleRandomCoverBitmap)
             } else {
-                ivAnimatedCover.setImageResource(R.drawable.default_album)
+                animCover.setImageResource(R.drawable.default_album)
                 fetchRandomIdleCoverAsync()
             }
         }
 
         // 5. Music menu split cover
         if (ivBrowserCover != null && frameBrowserCover != null && frameBrowserCover.visibility == View.VISIBLE) {
-            val artBytes = lastAlbumArtBytes
-            if (artBytes != null && artBytes.isNotEmpty()) {
-                try {
-                    ivBrowserCover.setImageBitmap(decodeAlbumArtSmart(artBytes))
-                } catch (ignored: Exception) {}
+            val bmp = cachedAlbumArtBitmap ?: lastAlbumArtBytes?.takeIf { it.isNotEmpty() }?.let {
+                try { decodeAlbumArtSmart(it) } catch (_: Exception) { null }
+            }
+            if (bmp != null) {
+                ivBrowserCover.setImageBitmap(bmp)
             } else if (idleRandomCoverBitmap != null) {
                 ivBrowserCover.setImageBitmap(idleRandomCoverBitmap)
             } else {
@@ -182,31 +206,33 @@ class HomeWidgetsController(
         }
 
         // 6. Analog clock
-        if (customAnalogClockView != null) {
-            val el = widgetViewRegistry[customAnalogClockView]
+        val analogClock = customAnalogClockView
+        if (analogClock != null) {
+            val el = widgetViewRegistry[analogClock]
             if (el?.visibleOnFocus.isNullOrBlank()) {
-                val parent = customAnalogClockView.parent as? View
+                val parent = analogClock.parent as? View
                 if (parent != null && "analog_wrapper" == parent.tag) {
                     parent.visibility = if (isWidgetAnalogClockOn) View.VISIBLE else View.GONE
                 } else {
-                    customAnalogClockView.visibility = if (isWidgetAnalogClockOn) View.VISIBLE else View.GONE
+                    analogClock.visibility = if (isWidgetAnalogClockOn) View.VISIBLE else View.GONE
                 }
             }
         }
 
         // 7. Circular battery
-        if (customCircularBatteryView != null) {
-            val el = widgetViewRegistry[customCircularBatteryView]
+        val circularBattery = customCircularBatteryView
+        if (circularBattery != null) {
+            val el = widgetViewRegistry[circularBattery]
             if (el?.visibleOnFocus.isNullOrBlank()) {
-                val parent = customCircularBatteryView.parent as? View
+                val parent = circularBattery.parent as? View
                 if (parent != null && "circular_wrapper" == parent.tag) {
                     parent.visibility = if (isWidgetCircularBatteryOn) View.VISIBLE else View.GONE
                 } else {
-                    customCircularBatteryView.visibility = if (isWidgetCircularBatteryOn) View.VISIBLE else View.GONE
+                    circularBattery.visibility = if (isWidgetCircularBatteryOn) View.VISIBLE else View.GONE
                 }
             }
 
-            if (customCircularBatteryView.visibility == View.VISIBLE) {
+            if (circularBattery.visibility == View.VISIBLE) {
                 val batteryIntent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
                 if (batteryIntent != null) {
                     val level = batteryIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
@@ -215,17 +241,18 @@ class HomeWidgetsController(
                     val isCharging = (status == BatteryManager.BATTERY_STATUS_CHARGING ||
                             status == BatteryManager.BATTERY_STATUS_FULL)
                     if (level != -1 && scale != -1) {
-                        customCircularBatteryView.setBatteryLevel(((level / scale.toFloat()) * 100).toInt(), isCharging)
+                        circularBattery.setBatteryLevel(((level / scale.toFloat()) * 100).toInt(), isCharging)
                     }
                 }
             }
         }
 
         // 8. Dynamic focus image
-        if (ivWidgetFocusImage != null) {
-            val el = widgetViewRegistry[ivWidgetFocusImage]
+        val focusImg = ivWidgetFocusImage
+        if (focusImg != null) {
+            val el = widgetViewRegistry[focusImg]
             if (el?.visibleOnFocus != null && el.visibleOnFocus.isNotBlank()) {
-                ivWidgetFocusImage.visibility = if (isWidgetFocusImageOn) View.VISIBLE else View.GONE
+                focusImg.visibility = if (isWidgetFocusImageOn) View.VISIBLE else View.GONE
             }
         }
     }

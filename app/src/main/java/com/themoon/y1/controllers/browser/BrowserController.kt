@@ -69,7 +69,8 @@ class BrowserController(
     private val showLoadingPopup: () -> Unit,
     private val showAddToPlaylistDialog: (File) -> Unit,
     private val onAudiobookSelected: (audioFile: File, parentFolder: File) -> Unit,
-    private val localize: (String) -> String
+    private val localize: (String) -> String,
+    private val onRefreshCoverPane: (() -> Unit)? = null
 ) : ScreenController {
 
     private val containerBrowserItems: LinearLayout = rootView.findViewById(R.id.container_browser_items)
@@ -1060,6 +1061,7 @@ class BrowserController(
                 ivBrowserCover.layoutParams = lp
             }
         }
+        onRefreshCoverPane?.invoke()
     }
 
     private fun hideBrowserCoverPane() {

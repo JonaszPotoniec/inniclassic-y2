@@ -98,23 +98,17 @@ internal fun MainActivity.initControllers() {
             turnOffScreen()
             true
         },
-        localize = { t(it) }
+        localize = { t(it) },
+        onDynamicUiBuilt = {
+            homeWidgetsController?.refreshWidgets()
+        }
     )
 
     homeWidgetsController = HomeWidgetsController(
         context = this,
-        widgetViewRegistry = mainMenuController.widgetViewRegistry,
-        tvWidgetClock = mainMenuController.tvWidgetClock,
-        widgetBatteryView = mainMenuController.widgetBatteryView,
-        ivWidgetAlbum = mainMenuController.ivWidgetAlbum,
-        tvWidgetAlbumTitle = mainMenuController.tvWidgetAlbumTitle,
-        tvWidgetAlbumArtist = mainMenuController.tvWidgetAlbumArtist,
-        ivAnimatedCover = mainMenuController.ivAnimatedCover,
+        mainMenuProvider = { mainMenuController },
         ivBrowserCover = findViewById(R.id.iv_browser_cover),
         frameBrowserCover = findViewById(R.id.frame_browser_cover),
-        customAnalogClockView = mainMenuController.customAnalogClockView,
-        customCircularBatteryView = mainMenuController.customCircularBatteryView,
-        ivWidgetFocusImage = mainMenuController.ivWidgetFocusImage,
         fetchRandomIdleCoverAsync = { fetchRandomIdleCoverAsync() }
     )
 
@@ -157,7 +151,10 @@ internal fun MainActivity.initControllers() {
             AudioPlayerManager.getInstance().setupFolderPlaylist(file, parent)
             changeScreen(MainActivity.STATE_PLAYER)
         },
-        localize = { t(it) }
+        localize = { t(it) },
+        onRefreshCoverPane = {
+            homeWidgetsController?.refreshWidgets()
+        }
     )
 
     playlistController = PlaylistController(

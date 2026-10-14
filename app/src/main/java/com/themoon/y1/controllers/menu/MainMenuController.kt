@@ -43,7 +43,8 @@ class MainMenuController(
     private val onButtonFocusChanged: (element: ThemeManager.MenuElement) -> Unit,
     private val startCoverPanAnimation: (iv: ImageView, maxDx: Int, maxDy: Int) -> Unit,
     private val onLongPressScreenOff: View.OnLongClickListener,
-    private val localize: (String) -> String
+    private val localize: (String) -> String,
+    private val onDynamicUiBuilt: (() -> Unit)? = null
 ) : ScreenController {
 
     private val layoutMainMenu: ViewGroup = rootView.findViewById(R.id.layout_main_menu)
@@ -730,6 +731,7 @@ class MainMenuController(
                 }
             })
         }
+        onDynamicUiBuilt?.invoke()
     }
 
     private fun sortMenuElements(buttons: ArrayList<ThemeManager.MenuElement>) {
