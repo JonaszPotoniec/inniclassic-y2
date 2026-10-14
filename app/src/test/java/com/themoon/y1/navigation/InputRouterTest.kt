@@ -110,4 +110,23 @@ class InputRouterTest {
         val event19 = KeyEvent(KeyEvent.ACTION_UP, 19)
         assertTrue(inputRouter.onKeyUp(19, event19, mainMenuController))
     }
+
+    @Test
+    fun testOnKeyDown_mediaKeysConsumedWhenNotHandledByController() {
+        val playEvent = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+        assertTrue("Play/pause key should be handled globally when controller does not consume",
+            inputRouter.onKeyDown(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, playEvent, mainMenuController))
+
+        val playEvent85 = KeyEvent(KeyEvent.ACTION_DOWN, 85)
+        assertTrue("Key 85 should be handled globally when controller does not consume",
+            inputRouter.onKeyDown(85, playEvent85, mainMenuController))
+
+        val nextEvent = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_NEXT)
+        assertTrue("Next track key should be handled globally when controller does not consume",
+            inputRouter.onKeyDown(KeyEvent.KEYCODE_MEDIA_NEXT, nextEvent, mainMenuController))
+
+        val prevEvent = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+        assertTrue("Prev track key should be handled globally when controller does not consume",
+            inputRouter.onKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, prevEvent, mainMenuController))
+    }
 }

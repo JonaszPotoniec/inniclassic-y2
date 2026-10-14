@@ -65,6 +65,26 @@ class AudioPlayerManager private constructor() {
     private var pendingScrobbleAlbum: String? = null
     private var pendingScrobblePath: String? = null
 
+    internal var isRestoringPlaybackState: Boolean = false
+    private val positionSaveHandler = Handler(Looper.getMainLooper())
+    private val positionSaveRunnable = object : Runnable {
+        override fun run() {
+            if (isPlaying()) {
+                savePlaybackPositionOnly(false)
+                positionSaveHandler.postDelayed(this, 5000)
+            }
+        }
+    }
+
+    private fun startPeriodicPositionSaver() {
+        positionSaveHandler.removeCallbacks(positionSaveRunnable)
+        positionSaveHandler.postDelayed(positionSaveRunnable, 5000)
+    }
+
+    private fun stopPeriodicPositionSaver() {
+        positionSaveHandler.removeCallbacks(positionSaveRunnable)
+    }
+
     fun setMasterVolume(volume: Float) {
         currentMasterVolume = volume.coerceIn(0.0f, 1.0f)
         applyMasterVolume()
@@ -170,6 +190,11 @@ class AudioPlayerManager private constructor() {
             addListener(object : Player.EventListener {
                 override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
                     if (playbackState == Player.STATE_READY && !isUsingLegacyPlayer) {
+                        if (playWhenReady) {
+                            startPeriodicPositionSaver()
+                        } else {
+                            stopPeriodicPositionSaver()
+                        }
                         MainActivity.instance?.let { main ->
                             main.runOnUiThread {
                                 try {
@@ -182,13 +207,15 @@ class AudioPlayerManager private constructor() {
                                     val s = (remaining / 1000) % 60
                                     val m = remaining / (1000 * 60)
                                     main.tvPlayerTimeTotal.text = String.format(Locale.US, "-%02d:%02d", m, s)
-                                    LastFmScrobbler.getInstance(main).onTrackStart(
-                                        pendingScrobbleArtist,
-                                        pendingScrobbleTitle,
-                                        pendingScrobbleAlbum,
-                                        duration.toLong(),
-                                        pendingScrobblePath
-                                    )
+                                    if (playWhenReady) {
+                                        LastFmScrobbler.getInstance(main).onTrackStart(
+                                            pendingScrobbleArtist,
+                                            pendingScrobbleTitle,
+                                            pendingScrobbleAlbum,
+                                            duration.toLong(),
+                                            pendingScrobblePath
+                                        )
+                                    }
                                     if (main.currentPlaylist.isNotEmpty()) {
                                         main.updateAudioQualityInfo(main.currentPlaylist[main.currentIndex])
                                     }
@@ -196,6 +223,7 @@ class AudioPlayerManager private constructor() {
                             }
                         }
                     } else if (playbackState == Player.STATE_ENDED && !isUsingLegacyPlayer) {
+                        stopPeriodicPositionSaver()
                         handleTrackCompletion()
                     }
 
@@ -279,6 +307,7 @@ class AudioPlayerManager private constructor() {
                         prepareMusicTrack(main.currentIndex)
                         main.isPausedByHand = true
                         main.updatePlayerUI()
+                        savePlaybackState(sync = true)
                     }
                 }
             } catch (e: Exception) {
@@ -484,20 +513,28 @@ class AudioPlayerManager private constructor() {
             if (player.isPlaying) {
                 saveAudiobookBookmarkIfNeeded()
                 player.pause()
+                stopPeriodicPositionSaver()
                 MainActivity.instance?.isPausedByHand = true
+                savePlaybackState(sync = true)
             } else {
                 player.start()
+                startPeriodicPositionSaver()
                 MainActivity.instance?.isPausedByHand = false
+                savePlaybackPositionOnly(sync = false)
             }
         } else if (exoPlayer != null) {
             val player = exoPlayer ?: return
             if (player.playWhenReady) {
                 saveAudiobookBookmarkIfNeeded()
                 player.playWhenReady = false
+                stopPeriodicPositionSaver()
                 MainActivity.instance?.isPausedByHand = true
+                savePlaybackState(sync = true)
             } else {
                 player.playWhenReady = true
+                startPeriodicPositionSaver()
                 MainActivity.instance?.isPausedByHand = false
+                savePlaybackPositionOnly(sync = false)
             }
         }
         MainActivity.instance?.updatePlayerUI()
@@ -558,9 +595,10 @@ class AudioPlayerManager private constructor() {
         } else if (exoPlayer != null) {
             exoPlayer?.seekTo(targetPos)
         }
+        savePlaybackPositionOnly(sync = true)
     }
 
-    fun prepareMusicTrack(index: Int) {
+    fun prepareMusicTrack(index: Int, initialSeekMs: Long = 0L, initialDurationMs: Long = 0L) {
         val main = MainActivity.instance ?: return
         if (main.currentPlaylist.isEmpty()) return
 
@@ -594,9 +632,25 @@ class AudioPlayerManager private constructor() {
         main.tvPlayerAlbum.text = ""
         main.ivAlbumArt.setImageResource(R.drawable.default_album)
         main.ivPlayerBgBlur.setImageResource(0)
-        main.playerProgress.progress = 0
-        main.tvPlayerTimeCurrent.text = "00:00"
-        main.tvPlayerTimeTotal.text = "00:00"
+        if (initialSeekMs > 0) {
+            val curS = (initialSeekMs / 1000) % 60
+            val curM = initialSeekMs / (1000 * 60)
+            main.tvPlayerTimeCurrent.text = String.format(Locale.US, "%02d:%02d", curM, curS)
+            if (initialDurationMs > 0) {
+                val remaining = (initialDurationMs - initialSeekMs).coerceAtLeast(0)
+                val remS = (remaining / 1000) % 60
+                val remM = remaining / (1000 * 60)
+                main.tvPlayerTimeTotal.text = String.format(Locale.US, "-%02d:%02d", remM, remS)
+                main.playerProgress.progress = ((initialSeekMs * 100) / initialDurationMs).toInt()
+            } else {
+                main.tvPlayerTimeTotal.text = "00:00"
+                main.playerProgress.progress = 0
+            }
+        } else {
+            main.playerProgress.progress = 0
+            main.tvPlayerTimeCurrent.text = "00:00"
+            main.tvPlayerTimeTotal.text = "00:00"
+        }
 
         val ext = track.name.lowercase(Locale.US)
         val isOpus = ext.endsWith(".opus")
@@ -807,12 +861,21 @@ class AudioPlayerManager private constructor() {
                 player.setDataSource(currentFileInputStream!!.fd)
                 player.prepare()
 
-                val savedPos = main.prefs.getInt("book_pos_" + track.absolutePath, 0)
-                if (savedPos > 0 && (main.isAudiobookLibraryMode || track.absolutePath.contains("/Audiobooks"))) {
-                    player.seekTo(savedPos)
+                if (initialSeekMs > 0) {
+                    player.seekTo(initialSeekMs.toInt())
+                } else {
+                    val savedPos = main.prefs.getInt("book_pos_" + track.absolutePath, 0)
+                    if (savedPos > 0 && (main.isAudiobookLibraryMode || track.absolutePath.contains("/Audiobooks"))) {
+                        player.seekTo(savedPos)
+                    }
                 }
 
-                if (!main.isPausedByHand) player.start()
+                if (!main.isPausedByHand) {
+                    player.start()
+                    startPeriodicPositionSaver()
+                } else {
+                    stopPeriodicPositionSaver()
+                }
                 applyMasterVolume()
 
                 AudioEffectManager.getInstance().applyAudioEffects()
@@ -823,13 +886,15 @@ class AudioPlayerManager private constructor() {
                 val s = (remaining / 1000) % 60
                 val m = remaining / (1000 * 60)
                 main.tvPlayerTimeTotal.text = String.format(Locale.US, "-%02d:%02d", m, s)
-                LastFmScrobbler.getInstance(main).onTrackStart(
-                    pendingScrobbleArtist,
-                    pendingScrobbleTitle,
-                    pendingScrobbleAlbum,
-                    duration.toLong(),
-                    pendingScrobblePath
-                )
+                if (!main.isPausedByHand) {
+                    LastFmScrobbler.getInstance(main).onTrackStart(
+                        pendingScrobbleArtist,
+                        pendingScrobbleTitle,
+                        pendingScrobbleAlbum,
+                        duration.toLong(),
+                        pendingScrobblePath
+                    )
+                }
             } else if (isGaplessQueueActive) {
                 exoPlayer?.setPlaybackParameters(PlaybackParameters(currentSpeed, 1.0f))
             } else {
@@ -855,19 +920,32 @@ class AudioPlayerManager private constructor() {
                 val isShuffle = main.prefs.getBoolean("shuffle", false)
                 exoPlayer?.shuffleModeEnabled = isShuffle
 
-                val savedPos = main.prefs.getInt("book_pos_" + track.absolutePath, 0)
-                if (savedPos > 0 && (main.isAudiobookLibraryMode || track.absolutePath.contains("/Audiobooks"))) {
-                    exoPlayer?.seekTo(savedPos.toLong())
+                if (initialSeekMs > 0) {
+                    exoPlayer?.seekTo(initialSeekMs)
+                } else {
+                    val savedPos = main.prefs.getInt("book_pos_" + track.absolutePath, 0)
+                    if (savedPos > 0 && (main.isAudiobookLibraryMode || track.absolutePath.contains("/Audiobooks"))) {
+                        exoPlayer?.seekTo(savedPos.toLong())
+                    }
                 }
 
                 exoPlayer?.setPlaybackParameters(PlaybackParameters(currentSpeed, 1.0f))
 
-                if (!main.isPausedByHand) exoPlayer?.playWhenReady = true
+                if (!main.isPausedByHand) {
+                    exoPlayer?.playWhenReady = true
+                    startPeriodicPositionSaver()
+                } else {
+                    exoPlayer?.playWhenReady = false
+                    stopPeriodicPositionSaver()
+                }
                 applyMasterVolume()
             }
 
             main.consecutiveErrorCount = 0
             main.tvPlayerTrackCount.text = "${index + 1} of ${main.currentPlaylist.size}"
+            if (!isRestoringPlaybackState) {
+                savePlaybackState(sync = false)
+            }
         } catch (e: Throwable) {
             main.consecutiveErrorCount++
             val failReason = when (e) {
@@ -941,6 +1019,7 @@ class AudioPlayerManager private constructor() {
     }
 
     fun releasePlayer() {
+        stopPeriodicPositionSaver()
         exoPlayer?.release()
         exoPlayer = null
         legacyPlayer?.release()
@@ -1383,6 +1462,177 @@ class AudioPlayerManager private constructor() {
             raf.close()
         } catch (ignored: Exception) {}
         return tags
+    }
+
+    fun savePlaybackState(sync: Boolean = false) {
+        val main = MainActivity.instance ?: return
+        if (isRestoringPlaybackState) return
+        if (main.currentPlaylist.isEmpty() || main.currentIndex !in main.currentPlaylist.indices) return
+        val currentFile = main.currentPlaylist[main.currentIndex]
+        val pos = getCurrentPosition().toLong().coerceAtLeast(0L)
+        val dur = getDuration().toLong().coerceAtLeast(0L)
+
+        try {
+            val playlistFile = File(main.filesDir, "last_playback_playlist.txt")
+            val origPlaylistFile = File(main.filesDir, "last_playback_original.txt")
+
+            val sb = java.lang.StringBuilder()
+            for (f in main.currentPlaylist) {
+                sb.append(f.absolutePath).append('\n')
+            }
+            val temp = File(main.filesDir, "last_playback_playlist.tmp")
+            temp.writeText(sb.toString())
+            temp.renameTo(playlistFile)
+
+            val sbOrig = java.lang.StringBuilder()
+            for (f in main.originalPlaylist) {
+                sbOrig.append(f.absolutePath).append('\n')
+            }
+            val tempOrig = File(main.filesDir, "last_playback_original.tmp")
+            tempOrig.writeText(sbOrig.toString())
+            tempOrig.renameTo(origPlaylistFile)
+
+            val editor = main.prefs.edit()
+                .putString("last_played_song_path", currentFile.absolutePath)
+                .putInt("last_played_song_index", main.currentIndex)
+                .putLong("last_played_position", pos)
+                .putLong("last_played_duration", dur)
+                .putBoolean("last_played_is_audiobook", main.isAudiobookLibraryMode)
+                .putBoolean("has_saved_playback_state", true)
+
+            if (sync) editor.commit() else editor.apply()
+        } catch (e: Exception) {
+            android.util.Log.e("AudioPlayerManager", "Failed to save playback state: ${e.message}")
+        }
+    }
+
+    fun savePlaybackPositionOnly(sync: Boolean = false) {
+        val main = MainActivity.instance ?: return
+        if (isRestoringPlaybackState) return
+        if (main.currentPlaylist.isEmpty() || main.currentIndex !in main.currentPlaylist.indices) return
+        val pos = getCurrentPosition().toLong().coerceAtLeast(0L)
+        if (pos <= 0L) return
+        val editor = main.prefs.edit().putLong("last_played_position", pos)
+        val dur = getDuration().toLong().coerceAtLeast(0L)
+        if (dur > 0L) editor.putLong("last_played_duration", dur)
+        if (sync) editor.commit() else editor.apply()
+    }
+
+    fun restoreLastPlaybackState(main: MainActivity): Boolean {
+        if (!main.prefs.getBoolean("has_saved_playback_state", false)) return false
+        val savedPath = main.prefs.getString("last_played_song_path", null) ?: return false
+        val targetFile = File(savedPath)
+
+        if (!targetFile.exists()) {
+            if (ExternalSdMountMonitor.hasSecondarySlot() && !ExternalSdMountMonitor.isSecondaryReady() &&
+                (savedPath.contains("sdcard1") || savedPath.contains("external_sd") || savedPath.contains("MicroSD"))
+            ) {
+                android.util.Log.i("AudioPlayerManager", "Postponing playback restore until secondary storage is ready: $savedPath")
+                main.isPendingRestorePlayback = true
+                return false
+            }
+            android.util.Log.w("AudioPlayerManager", "Saved song does not exist: $savedPath")
+            return false
+        }
+
+        initPlayer(main.applicationContext)
+
+        isRestoringPlaybackState = true
+        try {
+            val playlistFile = File(main.filesDir, "last_playback_playlist.txt")
+            val origPlaylistFile = File(main.filesDir, "last_playback_original.txt")
+            val restoredPlaylist = ArrayList<File>()
+            val restoredOriginal = ArrayList<File>()
+
+            if (playlistFile.exists()) {
+                try {
+                    playlistFile.forEachLine { line ->
+                        val trimmed = line.trim()
+                        if (trimmed.isNotEmpty()) {
+                            val f = File(trimmed)
+                            if (f.exists()) {
+                                restoredPlaylist.add(f)
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("AudioPlayerManager", "Failed to read saved playlist: ${e.message}")
+                }
+            }
+
+            if (restoredPlaylist.isEmpty() || !restoredPlaylist.any { it.absolutePath == targetFile.absolutePath }) {
+                restoredPlaylist.clear()
+                restoredPlaylist.add(targetFile)
+            }
+
+            if (origPlaylistFile.exists()) {
+                try {
+                    origPlaylistFile.forEachLine { line ->
+                        val trimmed = line.trim()
+                        if (trimmed.isNotEmpty()) {
+                            val f = File(trimmed)
+                            if (f.exists()) {
+                                restoredOriginal.add(f)
+                            }
+                        }
+                    }
+                } catch (ignored: Exception) {}
+            }
+            if (restoredOriginal.isEmpty()) {
+                restoredOriginal.addAll(restoredPlaylist)
+            }
+
+            var savedIndex = main.prefs.getInt("last_played_song_index", 0)
+            if (savedIndex !in restoredPlaylist.indices || restoredPlaylist[savedIndex].absolutePath != targetFile.absolutePath) {
+                savedIndex = restoredPlaylist.indexOfFirst { it.absolutePath == targetFile.absolutePath }
+                if (savedIndex == -1) savedIndex = 0
+            }
+
+            val savedPos = main.prefs.getLong("last_played_position", 0L).coerceAtLeast(0L)
+            val savedDur = main.prefs.getLong("last_played_duration", 0L).coerceAtLeast(0L)
+            val isAudiobook = main.prefs.getBoolean("last_played_is_audiobook", false)
+
+            main.originalPlaylist.clear()
+            main.originalPlaylist.addAll(restoredOriginal)
+            main.currentPlaylist.clear()
+            main.currentPlaylist.addAll(restoredPlaylist)
+            main.currentIndex = savedIndex
+            main.isPausedByHand = true
+            main.isAudiobookLibraryMode = isAudiobook
+
+            val isShuffle = main.prefs.getBoolean("shuffle", false)
+            if (!isUsingLegacyPlayer && exoPlayer != null) {
+                exoPlayer?.shuffleModeEnabled = isShuffle
+            }
+
+            isGaplessQueueActive = !isShuffle && shouldUseGaplessQueue(main.currentPlaylist)
+            if (isGaplessQueueActive) {
+                val mediaItems = ArrayList<MediaItem>()
+                for (f in main.currentPlaylist) {
+                    mediaItems.add(MediaItem.fromUri(Uri.fromFile(f)))
+                }
+                legacyPlayer?.let {
+                    it.stop()
+                    it.reset()
+                }
+                exoPlayer?.let { exo ->
+                    exo.stop()
+                    exo.setMediaItems(mediaItems, main.currentIndex, savedPos)
+                    exo.shuffleModeEnabled = false
+                    exo.setPlaybackParameters(PlaybackParameters(currentSpeed, 1.0f))
+                    exo.playWhenReady = false
+                    exo.prepare()
+                }
+            }
+
+            prepareMusicTrack(main.currentIndex, initialSeekMs = savedPos, initialDurationMs = savedDur)
+            main.updatePlayerUI()
+            main.refreshNowPlayingPreview()
+            main.updateMainMenuBackground()
+            return true
+        } finally {
+            isRestoringPlaybackState = false
+        }
     }
 
     companion object {

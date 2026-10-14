@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import com.themoon.y1.MainActivity
 import com.themoon.y1.controllers.ScreenController
+import com.themoon.y1.managers.AudioPlayerManager
 
 /**
  * Handles global key intercepts (wake logic, volume overlay, UMS blocking)
@@ -127,6 +128,18 @@ class InputRouter private constructor() {
                 return true
             }
             (activeController?.rootView?.context as? MainActivity)?.clickFeedback()
+            return true
+        }
+        if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY || keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE || keyCode == 85) {
+            AudioPlayerManager.getInstance().playOrPauseMusic()
+            return true
+        }
+        if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == 87) {
+            AudioPlayerManager.getInstance().nextTrack()
+            return true
+        }
+        if (keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS || keyCode == 88) {
+            AudioPlayerManager.getInstance().prevTrack()
             return true
         }
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == 23 || keyCode == KeyEvent.KEYCODE_ENTER) {

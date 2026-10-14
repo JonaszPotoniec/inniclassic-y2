@@ -198,6 +198,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     val eqPresetNames: ArrayList<String> = ArrayList()
 
     var isCustomScanning: Boolean = false
+    var isPendingRestorePlayback: Boolean = false
     var isServerRunning: Boolean = false
     val blacklist: MutableSet<String> = HashSet()
     val favoritePaths: MutableSet<String> = HashSet()
@@ -365,10 +366,13 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         AudioPlayerManager.getInstance().initPlayer(applicationContext)
         BluetoothAvrcpManager.getInstance(this).init()
 
+        var playbackRestored = false
         if (ExternalSdMountMonitor.hasSecondarySlot() && !ExternalSdMountMonitor.isSecondaryReady()) {
             android.util.Log.i("InniClassic", "Secondary storage not ready yet at onCreate, will load library once mounted")
+            playbackRestored = AudioPlayerManager.getInstance().restoreLastPlaybackState(this)
         } else {
             loadLibraryCache()
+            playbackRestored = AudioPlayerManager.getInstance().restoreLastPlaybackState(this)
         }
 
         externalSdMountMonitor = ExternalSdMountMonitor(this).apply {
@@ -380,6 +384,10 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                         }
                         if (customLibrary.isEmpty() && !isCustomScanning) {
                             startMediaLibraryScan()
+                        }
+                        if (!playbackRestored || isPendingRestorePlayback || currentPlaylist.isEmpty()) {
+                            isPendingRestorePlayback = false
+                            playbackRestored = AudioPlayerManager.getInstance().restoreLastPlaybackState(this@MainActivity)
                         }
                     }
                 }
@@ -440,6 +448,16 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     override fun onResume() {
         super.onResume()
         applyTheme()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        AudioPlayerManager.getInstance().savePlaybackState(sync = false)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        AudioPlayerManager.getInstance().savePlaybackState(sync = true)
     }
 
     fun t(key: String): String = LanguageManager.getInstance(this).t(key)
@@ -659,7 +677,12 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     }
 
     fun refreshNowPlayingPreview() {
-        homeWidgetsController?.refreshWidgets()
+        homeWidgetsController?.let { hwc ->
+            hwc.currentTrackTitle = tvPlayerTitle?.text?.toString() ?: ""
+            hwc.currentTrackArtist = tvPlayerArtist?.text?.toString() ?: ""
+            hwc.lastAlbumArtBytes = lastAlbumArtBytes
+            hwc.refreshWidgets()
+        }
     }
 
     fun findFolderCover(folder: File?): File? = MediaLibraryManager.getInstance().findFolderCover(folder)
@@ -1046,6 +1069,9 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                 Intent.ACTION_TIME_TICK, Intent.ACTION_TIME_CHANGED -> {
                     homeWidgetsController?.refreshWidgets()
                 }
+                Intent.ACTION_SHUTDOWN, "android.intent.action.QUICKBOOT_POWEROFF", "com.htc.intent.action.QUICKBOOT_POWEROFF" -> {
+                    AudioPlayerManager.getInstance().savePlaybackState(sync = true)
+                }
                 "android.hardware.usb.action.USB_STATE" -> {
                     val connected = intent.getBooleanExtra("connected", false)
                     if (connected) {
@@ -1086,6 +1112,9 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             addAction(ConnectivityManager.CONNECTIVITY_ACTION)
             addAction(Intent.ACTION_TIME_TICK)
             addAction(Intent.ACTION_TIME_CHANGED)
+            addAction(Intent.ACTION_SHUTDOWN)
+            addAction("android.intent.action.QUICKBOOT_POWEROFF")
+            addAction("com.htc.intent.action.QUICKBOOT_POWEROFF")
             addAction("android.hardware.usb.action.USB_STATE")
             addAction("com.themoon.y1.REBUILD_COVER_CACHE")
             addAction("com.themoon.y1.RESCAN_LIBRARY")
@@ -1094,6 +1123,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     }
 
     override fun onDestroy() {
+        AudioPlayerManager.getInstance().savePlaybackState(sync = true)
         super.onDestroy()
         try {
             unregisterReceiver(systemStatusReceiver)
