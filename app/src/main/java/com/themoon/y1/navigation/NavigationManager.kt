@@ -40,7 +40,9 @@ class NavigationManager private constructor() {
         }
 
         val previous = currentState
-        if (previous != null && addToBackStack) {
+        if (newState is ScreenState.MainMenu) {
+            backStack.clear()
+        } else if (previous != null && addToBackStack) {
             backStack.push(previous)
         }
 
@@ -50,11 +52,16 @@ class NavigationManager private constructor() {
         val controller = findControllerForState(newState)
         activeController = controller
 
+        val targetRoot = controller?.rootView
+        val handledRoots = HashSet<View>()
+        if (targetRoot != null) {
+            targetRoot.visibility = View.VISIBLE
+            handledRoots.add(targetRoot)
+        }
         controllerMap.values.forEach { ctrl ->
-            if (ctrl == controller) {
-                ctrl.rootView.visibility = View.VISIBLE
-            } else if (ctrl.rootView.parent != null) {
+            if (ctrl.rootView !in handledRoots && ctrl.rootView.parent != null) {
                 ctrl.rootView.visibility = View.GONE
+                handledRoots.add(ctrl.rootView)
             }
         }
 
@@ -64,11 +71,7 @@ class NavigationManager private constructor() {
         }
     }
 
-    fun navigateBack(): Boolean {
-        if (activeController?.onBackPressed() == true) {
-            return true
-        }
-
+    fun popBackStack(): Boolean {
         if (backStack.isEmpty()) {
             if (currentState != ScreenState.MainMenu) {
                 navigateTo(ScreenState.MainMenu, addToBackStack = false)
@@ -80,6 +83,14 @@ class NavigationManager private constructor() {
         val previousState = backStack.pop()
         navigateTo(previousState, addToBackStack = false)
         return true
+    }
+
+    fun navigateBack(): Boolean {
+        if (activeController?.onBackPressed() == true) {
+            return true
+        }
+
+        return popBackStack()
     }
 
     fun clearBackStack() {

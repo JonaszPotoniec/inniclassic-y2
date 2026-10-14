@@ -3,6 +3,9 @@ package com.themoon.y1.navigation
 import android.content.Context
 import android.os.PowerManager
 import android.view.KeyEvent
+import android.view.View
+import android.view.ViewGroup
+import android.widget.LinearLayout
 import com.themoon.y1.MainActivity
 import com.themoon.y1.controllers.ScreenController
 
@@ -87,6 +90,31 @@ class InputRouter private constructor() {
             if (activeController?.onWheel(delta, event) == true) {
                 return true
             }
+
+            val focused = activeController?.rootView?.findFocus()
+            val parent = focused?.parent as? ViewGroup
+            if (parent is LinearLayout) {
+                val idx = parent.indexOfChild(focused)
+                if (delta < 0) {
+                    for (i in idx - 1 downTo 0) {
+                        val child = parent.getChildAt(i)
+                        if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
+                            child.requestFocus()
+                            (activeController?.rootView?.context as? MainActivity)?.clickFeedback()
+                            return true
+                        }
+                    }
+                } else {
+                    for (i in idx + 1 until parent.childCount) {
+                        val child = parent.getChildAt(i)
+                        if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
+                            child.requestFocus()
+                            (activeController?.rootView?.context as? MainActivity)?.clickFeedback()
+                            return true
+                        }
+                    }
+                }
+            }
         }
         if (activeController?.onKeyDown(keyCode, event) == true) {
             return true
@@ -98,6 +126,13 @@ class InputRouter private constructor() {
             if (NavigationManager.getInstance().navigateBack()) {
                 return true
             }
+            (activeController?.rootView?.context as? MainActivity)?.clickFeedback()
+            return true
+        }
+        if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == 23 || keyCode == KeyEvent.KEYCODE_ENTER) {
+            if (event.repeatCount == 0) {
+                event.startTracking()
+            }
         }
         return false
     }
@@ -107,7 +142,22 @@ class InputRouter private constructor() {
         event: KeyEvent,
         activeController: ScreenController?
     ): Boolean {
-        return activeController?.onKeyUp(keyCode, event) == true
+        if (activeController?.onKeyUp(keyCode, event) == true) {
+            return true
+        }
+        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == 19) {
+            return true
+        }
+        if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == 23 || keyCode == KeyEvent.KEYCODE_ENTER) {
+            if ((event.flags and KeyEvent.FLAG_CANCELED_LONG_PRESS) == 0) {
+                val focused = activeController?.rootView?.findFocus()
+                if (focused != null && focused !is android.widget.Button && focused.isClickable) {
+                    focused.performClick()
+                    return true
+                }
+            }
+        }
+        return false
     }
 
     fun onKeyLongPress(

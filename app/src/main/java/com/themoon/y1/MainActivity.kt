@@ -7,21 +7,31 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.GradientDrawable
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothProfile
 import android.media.AudioManager
 import android.media.audiofx.BassBoost
 import android.media.audiofx.Equalizer
 import android.media.audiofx.LoudnessEnhancer
 import android.media.audiofx.Virtualizer
 import android.media.audiofx.Visualizer
+import android.net.ConnectivityManager
+import android.net.wifi.WifiManager
 import android.os.BatteryManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.os.Vibrator
 import android.view.KeyEvent
 import android.view.MotionEvent
+import com.themoon.y1.views.AlphabetIndexBar
+import com.themoon.y1.views.BatteryIconView
+import com.themoon.y1.views.TablerIcons
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -137,7 +147,13 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     var isVibrationEnabled: Boolean = true
     var vibrationStrengthLevel: Int = 1
     var isScreenOffControlEnabled: Boolean = false
-    var isUsbPromptEnabled: Boolean = true
+    var isUsbPromptEnabled: Boolean
+        get() = if (::prefs.isInitialized) prefs.getBoolean("usb_storage_prompt", true) else true
+        set(value) {
+            if (::prefs.isInitialized) {
+                prefs.edit().putBoolean("usb_storage_prompt", value).apply()
+            }
+        }
     var isAutoFetchEnabled: Boolean = true
     var is24HourFormat: Boolean = false
     var isTimeInTitleBar: Boolean = false
@@ -239,11 +255,15 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     lateinit var playerProgress: ProgressBar
 
     var tvFastScrollLetter: TextView? = null
+    var lastFastScrollLetter: String? = null
+    var classicWheelStreak: Int = 0
+    var lastClassicWheelTime: Long = 0L
     var tvStatusBarTitle: TextView? = null
     var ivStatusWifi: ImageView? = null
     var ivStatusBluetooth: ImageView? = null
     var ivStatusHeadphone: ImageView? = null
     var tvStatusBattery: TextView? = null
+    var batteryIconView: BatteryIconView? = null
     var volumeProgress: ProgressBar? = null
     var layoutLoadingOverlay: LinearLayout? = null
     var pbLoadingProgress: ProgressBar? = null
@@ -284,7 +304,11 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             getExternalSdMountMonitor = { externalSdMountMonitor },
             isFmRadioActive = { activePlayer == 1 },
             stopFmRadio = { FmRadioManager.getInstance(this).powerDown() },
-            localize = { t(it) }
+            localize = { t(it) },
+            clickFeedback = { clickFeedback() },
+            createListButtonWithIcon = { icon, text ->
+                ListItemViewFactory.createListButtonWithIcon(this, icon, text)
+            }
         )
     }
 
@@ -296,6 +320,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     private val fastScrollHandler = Handler(Looper.getMainLooper())
     private val hideFastScrollTask = Runnable {
         tvFastScrollLetter?.visibility = View.GONE
+        lastFastScrollLetter = null
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -324,6 +349,13 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         initViewBindings()
         applyRootSystemSettings()
         initControllers()
+        NavigationManager.getInstance().setTransitionListener(object : NavigationManager.StateChangeListener {
+            override fun onScreenTransition(from: ScreenState, to: ScreenState) {
+                syncCurrentScreenState(to)
+                updateStatusBarTitle()
+                applyTheme()
+            }
+        })
 
         powerBacklightManager = PowerBacklightManager.getInstance(this).apply {
             backlightTimerIndex = currentTimeoutIndex
@@ -363,9 +395,51 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         }, "y1-ums-init-check").start()
 
         registerReceivers()
+
+        try {
+            val initBattery = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            if (initBattery != null) {
+                val initL = initBattery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                val initS = initBattery.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+                val initStatus = initBattery.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+                val initPlugged = initBattery.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
+                val initCharging = (initStatus == BatteryManager.BATTERY_STATUS_CHARGING
+                        || initStatus == BatteryManager.BATTERY_STATUS_FULL
+                        || initPlugged > 0)
+                if (initL >= 0 && initS > 0) {
+                    val pct = ((initL / initS.toFloat()) * 100).toInt()
+                    tvStatusBattery?.text = "$pct%"
+                    batteryIconView?.setBatteryLevel(pct, initCharging)
+                }
+            }
+        } catch (_: Exception) {}
+
+        try {
+            if (audioManager.isWiredHeadsetOn) {
+                ivStatusHeadphone?.visibility = View.VISIBLE
+            }
+            val ba = BluetoothAdapter.getDefaultAdapter()
+            if (ba != null && ba.isEnabled) {
+                ivStatusBluetooth?.visibility = View.VISIBLE
+            }
+            val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            if (wm != null && wm.isWifiEnabled) {
+                ivStatusWifi?.visibility = View.VISIBLE
+                val info = wm.connectionInfo
+                val isConnected = (info != null && info.networkId != -1)
+                updateStatusBarWifi(isConnected)
+            }
+        } catch (_: Exception) {}
+
         updateMainMenuBackground()
         changeScreen(STATE_MENU)
+        applyTheme()
         Handler(Looper.getMainLooper()).postDelayed({ usbStateReceiverReady = true }, 2000)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        applyTheme()
     }
 
     fun t(key: String): String = LanguageManager.getInstance(this).t(key)
@@ -393,24 +467,29 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             STATE_WEBSERVER -> ScreenState.WebServer
             STATE_QUIZ -> ScreenState.MusicQuiz
             STATE_VIDEOS -> ScreenState.Videos
-            STATE_COVERFLOW -> ScreenState.Browser(BrowserMode.CoverFlow)
-            STATE_EQUALIZER -> ScreenState.Settings(SettingsSubMode.Equalizer5Band)
-            STATE_FM_RADIO -> ScreenState.Settings(SettingsSubMode.Radio)
+            STATE_COVERFLOW -> ScreenState.CoverFlow
+            STATE_EQUALIZER -> ScreenState.Equalizer
+            STATE_FM_RADIO -> ScreenState.FmRadio
             STATE_JELLYFIN -> ScreenState.Settings(SettingsSubMode.Jellyfin())
             else -> ScreenState.MainMenu
         }
         changeScreen(screenState)
     }
 
-    fun changeScreen(state: ScreenState) {
+    fun syncCurrentScreenState(state: ScreenState) {
         currentScreenState = when (state) {
             is ScreenState.MainMenu -> STATE_MENU
+            is ScreenState.CoverFlow -> STATE_COVERFLOW
             is ScreenState.Browser -> {
                 when (state.mode) {
                     is BrowserMode.CoverFlow -> STATE_COVERFLOW
                     else -> STATE_BROWSER
                 }
             }
+            is ScreenState.Playlists, is ScreenState.M3uPlaylistSongs -> STATE_BROWSER
+            is ScreenState.Podcasts, is ScreenState.PodcastEpisodes, is ScreenState.PodcastManage -> STATE_BROWSER
+            is ScreenState.Equalizer -> STATE_EQUALIZER
+            is ScreenState.FmRadio -> STATE_FM_RADIO
             is ScreenState.Player -> STATE_PLAYER
             is ScreenState.Settings -> {
                 when (state.subMode) {
@@ -430,13 +509,32 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             is ScreenState.Videos -> STATE_VIDEOS
             is ScreenState.VideoPlayer -> STATE_VIDEO_PLAYER
         }
-        NavigationManager.getInstance().navigateTo(state)
+    }
+
+    fun changeScreen(state: ScreenState) {
+        val targetState = if (state is ScreenState.Browser && state.mode is BrowserMode.CoverFlow) {
+            ScreenState.CoverFlow
+        } else {
+            state
+        }
+        classicWheelStreak = 0
+        lastFastScrollLetter = null
+        tvFastScrollLetter?.visibility = View.GONE
+        syncCurrentScreenState(targetState)
+        NavigationManager.getInstance().navigateTo(targetState)
         updateStatusBarTitle()
+        applyTheme()
     }
 
     fun getActiveScreenController(): ScreenController? = NavigationManager.getInstance().activeController
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val keyCode = event.keyCode
+        if (event.action == KeyEvent.ACTION_DOWN && (keyCode == 21 || keyCode == 22)) {
+            val now = SystemClock.uptimeMillis()
+            classicWheelStreak = if (now - lastClassicWheelTime < 200) classicWheelStreak + 1 else 1
+            lastClassicWheelTime = now
+        }
         return InputRouter.getInstance().dispatchKeyEvent(
             event = event,
             context = this,
@@ -444,7 +542,10 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             onWakeFromFakeScreenOff = Runnable { wakeFromFakeScreenOff() },
             onResetBacklightTimer = Runnable { powerBacklightManager?.resetTimer() },
             isUsbStorageActive = usbStorageManager.isStorageOverlayActive,
-            onStopUsbStorage = Runnable { stopUsbStorage() },
+            onStopUsbStorage = Runnable {
+                clickFeedback()
+                stopUsbStorage()
+            },
             onAdjustVolume = this,
             activeController = getActiveScreenController()
         ) || super.dispatchKeyEvent(event)
@@ -472,6 +573,19 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             event = event,
             activeController = getActiveScreenController()
         ) || super.onKeyLongPress(keyCode, event)
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onBackPressed() {
+        val active = getActiveScreenController()
+        if (active?.onBackPressed() == true) {
+            return
+        }
+        if (NavigationManager.getInstance().navigateBack()) {
+            return
+        }
+        clickFeedback()
+        // Never call super.onBackPressed() because MainActivity is the HOME launcher.
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
@@ -553,6 +667,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     fun applyGaussianBlur(original: Bitmap?): Bitmap? = ImageEffects.applyGaussianBlur(this, original)
 
     fun updateMainMenuBackground() = updateMainMenuBackgroundInternal()
+    fun applyTheme() = applyThemeInternal()
     fun applyCachedCoverArt(imagePath: String) = applyCachedCoverArtInternal(imagePath)
     fun fetchRandomIdleCoverAsync() = fetchRandomIdleCoverAsyncInternal()
     fun setupVisualizer() = setupVisualizerInternal()
@@ -563,13 +678,48 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     fun rebuildUniqueAlbumList() = rebuildUniqueAlbumListInternal()
     fun scanVideos() = scanVideosInternal()
 
-    fun showFastScrollLetter(letter: String) {
+    fun showFastScrollLetter(rawText: String) {
+        val navState = NavigationManager.getInstance().currentState
+        val bcMode = if (::browserController.isInitialized) browserController.currentBrowserMode else BrowserMode.Root
+        val isBrowserList = currentScreenState == STATE_BROWSER && (bcMode !is BrowserMode.Root || (navState is ScreenState.Browser && navState.mode !is BrowserMode.Root))
+        if (!isBrowserList) return
+
         val tv = tvFastScrollLetter ?: return
-        tv.text = letter
-        tv.setTextColor(ThemeManager.getTextColorPrimary())
+        val clean = rawText.replace("📁 ", "").replace("👤 ", "")
+            .replace("💿 ", "").replace("🎵 ", "")
+            .replace("📦 [INSTALL] ", "").trim()
+        if (clean.isEmpty()) return
+
+        val firstChar = AlphabetIndexBar.getInitialChar(clean).toString()
+        val isLetterChange = (lastFastScrollLetter != null && lastFastScrollLetter != firstChar)
+        val shouldShow = isLetterChange || classicWheelStreak >= 3 || tv.visibility == View.VISIBLE
+        lastFastScrollLetter = firstChar
+
+        if (!shouldShow) return
+
+        if (tv.visibility == View.VISIBLE && tv.text.toString() == firstChar) {
+            fastScrollHandler.removeCallbacks(hideFastScrollTask)
+            fastScrollHandler.postDelayed(hideFastScrollTask, 800)
+            return
+        }
+
+        tv.text = firstChar
+
+        val bgColor = ThemeManager.getListButtonFocusedBg()
+        val textColor = ThemeManager.getListButtonFocusedTextColor()
+
+        tv.setTextColor(textColor)
+        tv.typeface = ThemeManager.getCustomFontBold()
+
+        val letterBg = GradientDrawable().apply {
+            setColor(bgColor or 0xDD000000.toInt())
+            cornerRadius = 15f * resources.displayMetrics.density
+        }
+        tv.background = letterBg
         tv.visibility = View.VISIBLE
+
         fastScrollHandler.removeCallbacks(hideFastScrollTask)
-        fastScrollHandler.postDelayed(hideFastScrollTask, 700)
+        fastScrollHandler.postDelayed(hideFastScrollTask, 800)
     }
 
     fun updateAudioQualityInfo(audioFile: File) {}
@@ -672,7 +822,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     private fun updateStatusBarTitle() {
         tvStatusBarTitle?.text = when (currentScreenState) {
             STATE_MENU -> t("iPod")
-            STATE_BROWSER -> t("Music")
+            STATE_BROWSER -> if (::browserController.isInitialized) browserController.getCurrentBrowserTitle() else t("Music")
             STATE_PLAYER -> t("Now Playing")
             STATE_SETTINGS -> t("Settings")
             STATE_BLUETOOTH -> t("Bluetooth")
@@ -683,7 +833,14 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             STATE_WEBSERVER -> t("Upload")
             STATE_QUIZ -> t("Music Quiz")
             STATE_VIDEOS -> t("Videos")
-            STATE_COVERFLOW -> t("Cover Flow")
+            STATE_COVERFLOW -> {
+                val total = uniqueAlbumList.size
+                if (total > 0 && ::coverFlowController.isInitialized) {
+                    "${t("Cover Flow")} (${coverFlowController.currentCoverFlowIndex + 1}/$total)"
+                } else {
+                    t("Cover Flow")
+                }
+            }
             STATE_EQUALIZER -> t("Equalizer")
             STATE_FM_RADIO -> t("Radio")
             STATE_JELLYFIN -> t("Jellyfin")
@@ -725,26 +882,184 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         override fun onReceive(context: Context?, intent: Intent?) {
             val action = intent?.action ?: return
             when (action) {
-                Intent.ACTION_BATTERY_CHANGED -> {
-                    val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-                    val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
-                    if (level != -1 && scale != -1) {
+                Intent.ACTION_BATTERY_CHANGED, Intent.ACTION_POWER_CONNECTED, Intent.ACTION_POWER_DISCONNECTED -> {
+                    var batteryIntent = intent
+                    if (Intent.ACTION_POWER_CONNECTED == action || Intent.ACTION_POWER_DISCONNECTED == action) {
+                        val bi = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+                        if (bi != null) batteryIntent = bi
+                    }
+                    val level = batteryIntent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+                    val scale = batteryIntent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+                    val status = batteryIntent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+                    val plugged = batteryIntent?.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1) ?: -1
+                    var isCharging = (status == BatteryManager.BATTERY_STATUS_CHARGING
+                            || status == BatteryManager.BATTERY_STATUS_FULL
+                            || plugged > 0)
+                    if (Intent.ACTION_POWER_DISCONNECTED == action) {
+                        isCharging = false
+                    }
+                    if (level != -1 && scale > 0) {
                         val pct = ((level / scale.toFloat()) * 100).toInt()
                         tvStatusBattery?.text = "$pct%"
+                        batteryIconView?.setBatteryLevel(pct, isCharging)
                     }
                 }
                 Intent.ACTION_HEADSET_PLUG -> {
                     val state = intent.getIntExtra("state", 0)
                     ivStatusHeadphone?.visibility = if (state == 1) View.VISIBLE else View.GONE
+                    if (state == 1) {
+                        updateStatusBarHeadphone()
+                    }
+                }
+                BluetoothAdapter.ACTION_STATE_CHANGED -> {
+                    val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
+                    if (state == BluetoothAdapter.STATE_ON) {
+                        ivStatusBluetooth?.visibility = View.VISIBLE
+                        updateStatusBarBluetooth()
+                        BluetoothAdapter.getDefaultAdapter()?.getProfileProxy(
+                            applicationContext,
+                            object : BluetoothProfile.ServiceListener {
+                                override fun onServiceConnected(profile: Int, proxy: BluetoothProfile) {
+                                    if (profile == BluetoothProfile.A2DP) {
+                                        bluetoothController.setGlobalA2dpProxy(proxy)
+                                    }
+                                }
+                                override fun onServiceDisconnected(profile: Int) {
+                                    if (profile == BluetoothProfile.A2DP) {
+                                        bluetoothController.setGlobalA2dpProxy(null)
+                                    }
+                                }
+                            },
+                            BluetoothProfile.A2DP
+                        )
+                    } else {
+                        ivStatusBluetooth?.visibility = View.GONE
+                        bluetoothController.setGlobalA2dpProxy(null)
+                        if (state == BluetoothAdapter.STATE_OFF) {
+                            bluetoothController.clearTargetDeviceForAudio()
+                        }
+                    }
+                    if (NavigationManager.getInstance().currentState is ScreenState.Bluetooth || currentScreenState == STATE_BLUETOOTH) {
+                        if (state == BluetoothAdapter.STATE_ON || state == BluetoothAdapter.STATE_OFF) {
+                            bluetoothController.startBluetoothScan()
+                        }
+                    }
+                }
+                BluetoothDevice.ACTION_FOUND -> {
+                    val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+                    if (device != null) {
+                        bluetoothController.onDeviceDiscovered(device)
+                    }
+                }
+                BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> {
+                    bluetoothController.onDiscoveryFinished()
+                }
+                BluetoothDevice.ACTION_BOND_STATE_CHANGED -> {
+                    val bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.ERROR)
+                    if (bondState == BluetoothDevice.BOND_BONDED) {
+                        val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+                        if (device != null) {
+                            bluetoothController.connectBluetoothAudio(device)
+                        }
+                    }
+                    if (NavigationManager.getInstance().currentState is ScreenState.Bluetooth || currentScreenState == STATE_BLUETOOTH) {
+                        bluetoothController.startBluetoothScan()
+                    }
+                }
+                "android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED" -> {
+                    val profileState = intent.getIntExtra("android.bluetooth.profile.extra.STATE", -1)
+                    val currentDevice = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+                    if (profileState == BluetoothProfile.STATE_DISCONNECTED) {
+                        bluetoothController.clearTargetDeviceForAudio()
+                        Toast.makeText(this@MainActivity, t("Audio Disconnected"), Toast.LENGTH_SHORT).show()
+                    } else if (profileState == BluetoothProfile.STATE_CONNECTED) {
+                        bluetoothController.clearTargetDeviceForAudio()
+                        val name = currentDevice?.name ?: "Unknown"
+                        Toast.makeText(this@MainActivity, t("Audio Connected to ") + name, Toast.LENGTH_SHORT).show()
+                    }
+                    if (profileState == BluetoothProfile.STATE_CONNECTED || profileState == BluetoothProfile.STATE_DISCONNECTED) {
+                        bluetoothController.isBtConnectingState = false
+                        if (NavigationManager.getInstance().currentState is ScreenState.Bluetooth || currentScreenState == STATE_BLUETOOTH) {
+                            window.decorView.postDelayed({
+                                bluetoothController.startBluetoothScan()
+                            }, 300)
+                        }
+                    }
+                }
+                BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
+                    bluetoothController.clearTargetDeviceForAudio()
+                }
+                "android.bluetooth.device.action.PAIRING_REQUEST" -> {
+                    val pairingDevice = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+                    if (pairingDevice != null) {
+                        try {
+                            val confirmMethod = pairingDevice.javaClass.getMethod("setPairingConfirmation", Boolean::class.javaPrimitiveType)
+                            confirmMethod.invoke(pairingDevice, true)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                }
+                WifiManager.WIFI_STATE_CHANGED_ACTION -> {
+                    val state = intent.getIntExtra(WifiManager.EXTRA_WIFI_STATE, WifiManager.WIFI_STATE_UNKNOWN)
+                    if (state == WifiManager.WIFI_STATE_ENABLED) {
+                        ivStatusWifi?.visibility = View.VISIBLE
+                        updateStatusBarWifi(false)
+                    } else if (state == WifiManager.WIFI_STATE_DISABLED) {
+                        ivStatusWifi?.visibility = View.GONE
+                    }
+                    if (NavigationManager.getInstance().currentState is ScreenState.Wifi || currentScreenState == STATE_WIFI) {
+                        if (state == WifiManager.WIFI_STATE_ENABLED || state == WifiManager.WIFI_STATE_DISABLED) {
+                            wifiController.startWifiScan()
+                        }
+                    }
+                }
+                WifiManager.SCAN_RESULTS_AVAILABLE_ACTION -> {
+                    val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+                    if (wm != null) {
+                        try {
+                            val results = wm.scanResults
+                            if (NavigationManager.getInstance().currentState is ScreenState.Wifi || currentScreenState == STATE_WIFI) {
+                                wifiController.updateWifiUI(results)
+                            }
+                        } catch (_: Exception) {}
+                    }
+                }
+                WifiManager.NETWORK_STATE_CHANGED_ACTION -> {
+                    val networkInfo = intent.getParcelableExtra<android.net.NetworkInfo>(WifiManager.EXTRA_NETWORK_INFO)
+                    val isConnected = networkInfo != null && networkInfo.isConnected
+                    if (ivStatusWifi?.visibility == View.VISIBLE) {
+                        updateStatusBarWifi(isConnected)
+                    }
+                    if (isConnected && (NavigationManager.getInstance().currentState is ScreenState.Wifi || currentScreenState == STATE_WIFI)) {
+                        wifiController.startWifiScan()
+                    }
+                }
+                "com.themoon.y1.REBUILD_COVER_CACHE" -> {
+                    rebuildUniqueAlbumList()
+                    com.themoon.y1.managers.AlbumCoverManager.getInstance().pregenerateThumbnails(uniqueAlbumList, true)
+                    Toast.makeText(this@MainActivity, t("Rebuilding album cover cache..."), Toast.LENGTH_SHORT).show()
+                }
+                "com.themoon.y1.RESCAN_LIBRARY" -> {
+                    startMediaLibraryScan()
                 }
                 Intent.ACTION_TIME_TICK, Intent.ACTION_TIME_CHANGED -> {
                     homeWidgetsController?.refreshWidgets()
                 }
                 "android.hardware.usb.action.USB_STATE" -> {
-                    if (usbStateReceiverReady && isUsbPromptEnabled) {
-                        val connected = intent.getBooleanExtra("connected", false)
-                        if (connected && !UsbMassStorageController.isEnabled()) {
+                    val connected = intent.getBooleanExtra("connected", false)
+                    if (connected) {
+                        if (!usbStateReceiverReady) return
+                        if (!isUsbPromptEnabled || usbStorageManager.isStorageOverlayActive || usbStorageManager.isDialogShowing || usbStorageManager.usbStorageBusy) return
+                        val now = System.currentTimeMillis()
+                        if (now - usbStorageManager.lastUsbDialogShownMs > 8000) {
+                            usbStorageManager.lastUsbDialogShownMs = now
                             showUsbStorageDialog()
+                        }
+                    } else {
+                        usbStorageManager.dismissUsbStorageDialog()
+                        if (usbStorageManager.isStorageOverlayActive) {
+                            usbStorageManager.onUsbCableRemovedWhileShared()
                         }
                     }
                 }
@@ -755,10 +1070,25 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     private fun registerReceivers() {
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_BATTERY_CHANGED)
+            addAction(Intent.ACTION_POWER_CONNECTED)
+            addAction(Intent.ACTION_POWER_DISCONNECTED)
             addAction(Intent.ACTION_HEADSET_PLUG)
+            addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
+            addAction(BluetoothDevice.ACTION_FOUND)
+            addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
+            addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+            addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
+            addAction("android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED")
+            addAction("android.bluetooth.device.action.PAIRING_REQUEST")
+            addAction(WifiManager.WIFI_STATE_CHANGED_ACTION)
+            addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
+            addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION)
+            addAction(ConnectivityManager.CONNECTIVITY_ACTION)
             addAction(Intent.ACTION_TIME_TICK)
             addAction(Intent.ACTION_TIME_CHANGED)
             addAction("android.hardware.usb.action.USB_STATE")
+            addAction("com.themoon.y1.REBUILD_COVER_CACHE")
+            addAction("com.themoon.y1.RESCAN_LIBRARY")
         }
         registerReceiver(systemStatusReceiver, filter)
     }

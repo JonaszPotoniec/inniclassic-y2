@@ -28,6 +28,7 @@ import com.themoon.y1.controllers.settings.AppDrawerController
 import com.themoon.y1.controllers.settings.BrightnessController
 import com.themoon.y1.controllers.settings.EqualizerController
 import com.themoon.y1.controllers.settings.ScreenRecorderController
+import com.themoon.y1.views.ClassicMenuStyle
 import com.themoon.y1.controllers.settings.SettingsController
 import com.themoon.y1.controllers.storage.StorageController
 import com.themoon.y1.controllers.sync.JellyfinUiController
@@ -70,7 +71,7 @@ internal fun MainActivity.initControllers() {
         }
     }.apply {
         divider = ColorDrawable(0)
-        dividerHeight = (4 * resources.displayMetrics.density).toInt()
+        dividerHeight = if (ThemeManager.isClassicTheme()) 0 else (4 * resources.displayMetrics.density).toInt()
         selector = ColorDrawable(0)
         itemsCanFocus = true
         isSoundEffectsEnabled = false
@@ -80,6 +81,8 @@ internal fun MainActivity.initControllers() {
 
     val scrollViewBrowser = containerBrowserItems.parent as View
     val browserParent = scrollViewBrowser.parent as ViewGroup
+    val density = resources.displayMetrics.density
+    browserParent.setPadding(0, (ClassicMenuStyle.STATUS_HEIGHT_DP * density).toInt(), 0, 0)
     browserParent.addView(listContainer, scrollViewBrowser.layoutParams)
 
     mainMenuController = MainMenuController(
@@ -129,14 +132,13 @@ internal fun MainActivity.initControllers() {
             changeScreen(state)
         },
         onNavigateBackToMenu = {
-            changeScreen(MainActivity.STATE_MENU)
+            NavigationManager.getInstance().popBackStack()
         },
         onCoverFlowRequested = {
-            changeScreen(MainActivity.STATE_COVERFLOW)
+            changeScreen(ScreenState.CoverFlow)
         },
         onPlaylistsRequested = {
-            changeScreen(MainActivity.STATE_BROWSER)
-            playlistController.buildPlaylistsUI()
+            changeScreen(ScreenState.Playlists)
         },
         onSearchRequested = {
             wifiKeyboardController.currentKeyboardMode = 3
@@ -171,9 +173,9 @@ internal fun MainActivity.initControllers() {
         },
         clickFeedback = { clickFeedback() },
         onPlaylistSelected = { file ->
-            playlistController.buildM3uSongsUI(file)
+            changeScreen(ScreenState.M3uPlaylistSongs(file))
         },
-        onNavigateBack = { changeScreen(MainActivity.STATE_MENU) },
+        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         localize = { t(it) }
     )
 
@@ -184,12 +186,12 @@ internal fun MainActivity.initControllers() {
         uniqueAlbumList = uniqueAlbumList,
         clickFeedback = { clickFeedback() },
         onAlbumSelected = { album ->
-            changeScreen(MainActivity.STATE_BROWSER)
-            browserController.virtualQueryType = "ALBUM"
+            browserController.virtualQueryType = "COVER_FLOW_ALBUM"
             browserController.virtualQueryValue = album.album
-            browserController.buildVirtualSongs()
+            changeScreen(ScreenState.Browser(BrowserMode.VirtualSongs))
         },
-        onNavigateBack = { changeScreen(MainActivity.STATE_MENU) },
+        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
+        onRebuildUniqueAlbumList = { rebuildUniqueAlbumListInternal() },
         localize = { t(it) }
     )
 
@@ -201,7 +203,7 @@ internal fun MainActivity.initControllers() {
         onTogglePlayback = { AudioPlayerManager.getInstance().playOrPauseMusic() },
         onNextTrack = { AudioPlayerManager.getInstance().nextTrack() },
         onPreviousTrack = { AudioPlayerManager.getInstance().prevTrack() },
-        onNavigateBack = { changeScreen(backTargetForPlayer) },
+        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         onBrowseAlbum = { album ->
             changeScreen(MainActivity.STATE_BROWSER)
             browserController.virtualQueryType = "ALBUM"
@@ -235,7 +237,7 @@ internal fun MainActivity.initControllers() {
         createListButtonWithColor = { icon, text, color -> createListButton(text, icon, color) },
         clickFeedback = { clickFeedback() },
         rebootAudioEngine = { rebootAudioEngine() },
-        onNavigateBack = { changeScreen(MainActivity.STATE_SETTINGS) },
+        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         localize = { t(it) }
     )
 
@@ -251,7 +253,7 @@ internal fun MainActivity.initControllers() {
         createListButtonWithIcon = { icon, text -> createListButton(text, icon) },
         clickFeedback = { clickFeedback() },
         updateGlobalStatusPlayIcon = { updatePlayerUI() },
-        onExitRadio = { changeScreen(MainActivity.STATE_SETTINGS) },
+        onExitRadio = { NavigationManager.getInstance().popBackStack() },
         showLoadingPopup = { showLoadingPopup() },
         dismissLoadingOverlay = { dismissLoadingOverlay() },
         updateLoadingProgress = { _, _ -> },
@@ -273,20 +275,27 @@ internal fun MainActivity.initControllers() {
         onNavigateToPlayer = { changeScreen(MainActivity.STATE_PLAYER) },
         createListButton = { icon, text, color -> createListButton(text, icon, color) },
         createTablerButton = { icon, text, textColor, iconColor ->
-            ListItemViewFactory.createTablerListButton(this, icon, text, textColor, iconColor)
+            ListItemViewFactory.createTablerListButtonWithRightIcon(
+                context = this,
+                iconPaths = icon,
+                text = text,
+                rightIconPaths = null,
+                iconColor = iconColor,
+                textColor = textColor
+            )
         },
         clickFeedback = { clickFeedback() },
         localize = { t(it) },
         showLoadingPopup = { showLoadingPopup() },
         onHideLoadingPopup = { dismissLoadingOverlay() },
-        onExitPodcasts = { changeScreen(MainActivity.STATE_MENU) }
+        onExitPodcasts = { NavigationManager.getInstance().popBackStack() }
     )
 
     musicQuizController = MusicQuizController(
         activity = this,
         rootView = layoutMusicQuizMode as ViewGroup,
         libraryProvider = { MainActivity.customLibrary },
-        onExitRequested = { changeScreen(backTargetForUtility) },
+        onExitRequested = { NavigationManager.getInstance().popBackStack() },
         clickFeedback = { clickFeedback() },
         localize = { t(it) }
     )
@@ -299,7 +308,7 @@ internal fun MainActivity.initControllers() {
             changeScreen(ScreenState.VideoPlayer(file))
         },
         clickFeedback = { clickFeedback() },
-        onNavigateBack = { changeScreen(MainActivity.STATE_MENU) },
+        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         localize = { t(it) }
     )
 
@@ -317,10 +326,17 @@ internal fun MainActivity.initControllers() {
         rootView = layoutBluetoothMode as ViewGroup,
         createSettingRow = { title, value -> ListItemViewFactory.createSettingRow(this, title, value) },
         createTablerListButton = { iconPaths, text, rightIconPaths, iconColor, textColor ->
-            ListItemViewFactory.createTablerListButtonWithRightIcon(this, iconPaths, text, rightIconPaths, textColor, iconColor)
+            ListItemViewFactory.createTablerListButtonWithRightIcon(
+                context = this,
+                iconPaths = iconPaths,
+                text = text,
+                rightIconPaths = rightIconPaths,
+                iconColor = iconColor,
+                textColor = textColor
+            )
         },
         clickFeedback = { clickFeedback() },
-        onNavigateBack = { changeScreen(MainActivity.STATE_SETTINGS) },
+        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         localize = { t(it) }
     )
 
@@ -329,7 +345,14 @@ internal fun MainActivity.initControllers() {
         rootView = layoutWifiMode as ViewGroup,
         createSettingRow = { title, value -> ListItemViewFactory.createSettingRow(this, title, value) },
         createTablerListButton = { iconPaths, text, rightIconPaths, iconColor, textColor ->
-            ListItemViewFactory.createTablerListButtonWithRightIcon(this, iconPaths, text, rightIconPaths, textColor, iconColor)
+            ListItemViewFactory.createTablerListButtonWithRightIcon(
+                context = this,
+                iconPaths = iconPaths,
+                text = text,
+                rightIconPaths = rightIconPaths,
+                iconColor = iconColor,
+                textColor = textColor
+            )
         },
         clickFeedback = { clickFeedback() },
         onConnectToSavedNetwork = { _, _ -> },
@@ -337,9 +360,9 @@ internal fun MainActivity.initControllers() {
             wifiKeyboardController.targetWifiSsid = ssid
             wifiKeyboardController.isTargetWifiOpen = isOpen
             wifiKeyboardController.currentKeyboardMode = 0
-            changeScreen(MainActivity.STATE_WIFI_KEYBOARD)
+            changeScreen(ScreenState.WifiKeyboard(ssid))
         },
-        onNavigateBack = { changeScreen(MainActivity.STATE_SETTINGS) },
+        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         localize = { t(it) }
     )
 
@@ -424,7 +447,7 @@ internal fun MainActivity.initControllers() {
         },
         onScanMediaRequested = { startMediaLibraryScan() },
         clickFeedback = { clickFeedback() },
-        onNavigateBack = { changeScreen(MainActivity.STATE_SETTINGS) },
+        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         localize = { t(it) }
     )
 
@@ -435,7 +458,7 @@ internal fun MainActivity.initControllers() {
         videosProvider = { videoFiles },
         createSettingRow = { title, value -> ListItemViewFactory.createSettingRow(this, title, value) },
         clickFeedback = { clickFeedback() },
-        onNavigateBack = { changeScreen(backTargetForUtility) },
+        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         localize = { t(it) }
     )
 
@@ -443,7 +466,7 @@ internal fun MainActivity.initControllers() {
         activity = this,
         rootView = layoutBrightnessMode as ViewGroup,
         clickFeedback = { clickFeedback() },
-        onNavigateBack = { changeScreen(backTargetForUtility) }
+        onNavigateBack = { NavigationManager.getInstance().popBackStack() }
     )
 
     jellyfinUiController = JellyfinUiController(
@@ -505,9 +528,12 @@ internal fun MainActivity.initControllers() {
             ListItemViewFactory.createTablerListButton(this, icon, text, normalColor, focusedColor)
         },
         clickFeedback = { clickFeedback() },
-        onNavigateBack = { changeScreen(MainActivity.STATE_MENU) },
-        onNavigateToScreen = { screenId -> changeScreen(screenId) },
-        onOpenEqualizer = { changeScreen(MainActivity.STATE_EQUALIZER) },
+        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
+        onNavigateToScreen = { screenId ->
+            backTargetForUtility = MainActivity.STATE_SETTINGS
+            changeScreen(screenId)
+        },
+        onOpenEqualizer = { changeScreen(ScreenState.Equalizer) },
         onOpenJellyfin = { changeScreen(MainActivity.STATE_JELLYFIN) },
         onOpenUpdateCheck = { otaUpdateManager?.checkForUpdates() },
         onClearCacheConfirmed = {
@@ -561,7 +587,7 @@ internal fun MainActivity.initControllers() {
         rootView = layoutSettingsMode as ViewGroup,
         createListButton = { text -> ListItemViewFactory.createListButtonSimple(this, text) },
         clickFeedback = { clickFeedback() },
-        onNavigateBack = { changeScreen(MainActivity.STATE_SETTINGS) },
+        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         localize = { t(it) }
     )
 
@@ -570,15 +596,23 @@ internal fun MainActivity.initControllers() {
         rootView = layoutSettingsMode as ViewGroup,
         createSettingRow = { title, value -> ListItemViewFactory.createSettingRow(this, title, value) },
         clickFeedback = { clickFeedback() },
-        onNavigateBack = { changeScreen(MainActivity.STATE_SETTINGS) },
+        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         localize = { t(it) }
     )
 
     NavigationManager.getInstance().apply {
         registerController(ScreenState.MainMenu::class.java, mainMenuController)
         registerController(ScreenState.Browser::class.java, browserController)
+        registerController(ScreenState.CoverFlow::class.java, coverFlowController)
+        registerController(ScreenState.Playlists::class.java, playlistController)
+        registerController(ScreenState.M3uPlaylistSongs::class.java, playlistController)
+        registerController(ScreenState.Podcasts::class.java, podcastController)
+        registerController(ScreenState.PodcastEpisodes::class.java, podcastController)
+        registerController(ScreenState.PodcastManage::class.java, podcastController)
         registerController(ScreenState.Player::class.java, playerController)
         registerController(ScreenState.Settings::class.java, settingsController)
+        registerController(ScreenState.Equalizer::class.java, equalizerController)
+        registerController(ScreenState.FmRadio::class.java, fmRadioController)
         registerController(ScreenState.Bluetooth::class.java, bluetoothController)
         registerController(ScreenState.Wifi::class.java, wifiController)
         registerController(ScreenState.WifiKeyboard::class.java, wifiKeyboardController)
@@ -592,6 +626,7 @@ internal fun MainActivity.initControllers() {
 }
 
 internal fun MainActivity.handleMainMenuAction(action: String) {
+    backTargetForUtility = MainActivity.STATE_MENU
     when (action) {
         "OPEN_BROWSER", "MUSIC" -> {
             changeScreen(MainActivity.STATE_BROWSER)
@@ -603,11 +638,9 @@ internal fun MainActivity.handleMainMenuAction(action: String) {
         }
         "OPEN_COVER_FLOW", "PHOTOS" -> {
             changeScreen(MainActivity.STATE_COVERFLOW)
-            coverFlowController.buildCoverFlowUI()
         }
         "OPEN_PODCASTS", "PODCASTS" -> {
-            changeScreen(MainActivity.STATE_BROWSER)
-            podcastController.buildChannelsUI()
+            changeScreen(ScreenState.Podcasts)
         }
         "OPEN_MUSIC_QUIZ", "EXTRAS" -> {
             changeScreen(MainActivity.STATE_QUIZ)
@@ -618,8 +651,7 @@ internal fun MainActivity.handleMainMenuAction(action: String) {
             settingsController.buildSettingsUI()
         }
         "OPEN_RADIO", "RADIO" -> {
-            changeScreen(MainActivity.STATE_FM_RADIO)
-            fmRadioController.buildRadioUI()
+            changeScreen(ScreenState.FmRadio)
         }
         "OPEN_WEBSERVER", "WEBSERVER" -> {
             changeScreen(MainActivity.STATE_WEBSERVER)
@@ -640,7 +672,11 @@ internal fun MainActivity.handleMainMenuAction(action: String) {
             settingsController.buildThemeSelectorUI()
         }
         "OPEN_PLAYER" -> {
-            changeScreen(MainActivity.STATE_PLAYER)
+            if (currentPlaylist.isEmpty()) {
+                android.widget.Toast.makeText(this@handleMainMenuAction, t("No music is currently playing."), android.widget.Toast.LENGTH_SHORT).show()
+            } else {
+                changeScreen(MainActivity.STATE_PLAYER)
+            }
         }
     }
 }

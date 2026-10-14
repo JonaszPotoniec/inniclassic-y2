@@ -19,6 +19,14 @@ sealed interface ScreenState {
     data object MusicQuiz : ScreenState
     data object Videos : ScreenState
     data class VideoPlayer(val videoFile: File) : ScreenState
+    data object CoverFlow : ScreenState
+    data object Playlists : ScreenState
+    data class M3uPlaylistSongs(val m3uFile: File) : ScreenState
+    data object Podcasts : ScreenState
+    data class PodcastEpisodes(val channelTitle: String, val rssUrl: String) : ScreenState
+    data object PodcastManage : ScreenState
+    data object Equalizer : ScreenState
+    data object FmRadio : ScreenState
 }
 
 /**

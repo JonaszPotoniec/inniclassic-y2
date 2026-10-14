@@ -34,6 +34,7 @@ class CoverFlowController(
     private val clickFeedback: () -> Unit,
     private val onAlbumSelected: (albumItem: SongItem) -> Unit,
     private val onNavigateBack: () -> Unit,
+    private val onRebuildUniqueAlbumList: (() -> Unit)? = null,
     private val localize: (String) -> String
 ) : ScreenController {
 
@@ -55,6 +56,10 @@ class CoverFlowController(
         buildCoverFlowUI()
     }
 
+    override fun onRefreshUI() {
+        buildCoverFlowUI()
+    }
+
     override fun onExit() {
         cancelAllAnimations()
         coverFlowContainer?.removeAllViews()
@@ -62,8 +67,11 @@ class CoverFlowController(
     }
 
     fun buildCoverFlowUI() {
-        val statusBar = rootView.findViewById<View>(R.id.layout_status_bar)
+        val statusBar = activity.findViewById<View>(R.id.layout_status_bar)
         statusBar?.setBackgroundColor(0x00000000)
+
+        // Ensure split-screen right cover pane from browser mode is hidden in Cover Flow
+        rootView.findViewById<View>(R.id.frame_browser_cover)?.visibility = View.GONE
 
         scrollViewBrowser?.visibility = View.VISIBLE
         if (scrollViewBrowser is ScrollView) {
@@ -71,6 +79,10 @@ class CoverFlowController(
         }
         listVirtualSongs?.visibility = View.GONE
         containerBrowserItems.removeAllViews()
+
+        if (uniqueAlbumList.isEmpty()) {
+            onRebuildUniqueAlbumList?.invoke()
+        }
 
         AlbumCoverManager.getInstance().pregenerateThumbnails(uniqueAlbumList, false)
 
@@ -152,7 +164,9 @@ class CoverFlowController(
             views[i]?.let { setCardTitleAlpha(it, i == centerIdx, 0) }
         }
 
-        tvBrowserPath.text = localize("Cover Flow") + " (" + (currentCoverFlowIndex + 1) + "/" + total + ")"
+        val statusTitle = localize("Cover Flow") + " (" + (currentCoverFlowIndex + 1) + "/" + total + ")"
+        tvBrowserPath.text = statusTitle
+        activity.findViewById<TextView>(R.id.tv_status_clock)?.text = statusTitle
     }
 
     private fun getTransXForDist(dist: Int, d: Float): Float {
@@ -471,7 +485,9 @@ class CoverFlowController(
             animateTransform(views[i], transX, rotY, scale, alpha, duration)
         }
 
-        tvBrowserPath.text = localize("Cover Flow") + " (" + (currentCoverFlowIndex + 1) + "/" + total + ")"
+        val statusTitle = localize("Cover Flow") + " (" + (currentCoverFlowIndex + 1) + "/" + total + ")"
+        tvBrowserPath.text = statusTitle
+        activity.findViewById<TextView>(R.id.tv_status_clock)?.text = statusTitle
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {

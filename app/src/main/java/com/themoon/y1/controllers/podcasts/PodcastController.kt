@@ -84,16 +84,20 @@ class PodcastController(
     }
 
     override fun onEnter(state: ScreenState) {
-        if (state is ScreenState.Browser) {
-            currentMode = state.mode
-            when (val mode = state.mode) {
-                is BrowserMode.PodcastChannels -> buildChannelsUI()
-                is BrowserMode.PodcastEpisodes -> buildEpisodesUI(mode.channelTitle, mode.rssUrl)
-                is BrowserMode.PodcastManage -> buildManageUI()
-                else -> buildChannelsUI()
+        when (state) {
+            is ScreenState.Podcasts -> buildChannelsUI()
+            is ScreenState.PodcastEpisodes -> buildEpisodesUI(state.channelTitle, state.rssUrl)
+            is ScreenState.PodcastManage -> buildManageUI()
+            is ScreenState.Browser -> {
+                currentMode = state.mode
+                when (val mode = state.mode) {
+                    is BrowserMode.PodcastChannels -> buildChannelsUI()
+                    is BrowserMode.PodcastEpisodes -> buildEpisodesUI(mode.channelTitle, mode.rssUrl)
+                    is BrowserMode.PodcastManage -> buildManageUI()
+                    else -> buildChannelsUI()
+                }
             }
-        } else {
-            buildChannelsUI()
+            else -> buildChannelsUI()
         }
     }
 
@@ -524,7 +528,7 @@ class PodcastController(
 
         val listView = ListView(activity).apply {
             divider = ColorDrawable(0x00000000)
-            dividerHeight = (4 * d).toInt()
+            dividerHeight = if (ThemeManager.isClassicTheme()) 0 else (4 * d).toInt()
             selector = ColorDrawable(Color.TRANSPARENT)
             isScrollbarFadingEnabled = false
             itemsCanFocus = true

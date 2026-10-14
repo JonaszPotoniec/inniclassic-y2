@@ -70,19 +70,26 @@ class PlaylistController(
     } else null
 
     var currentM3uFile: File? = null
+    var lastPlaylistFocusName: String = ""
 
     override fun onEnter(state: ScreenState) {
-        if (state is ScreenState.Browser) {
-            when (state.mode) {
-                is BrowserMode.Playlists -> buildPlaylistsUI()
-                is BrowserMode.M3uSongs -> {
-                    currentM3uFile = state.mode.m3uFile
-                    buildM3uSongsUI(state.mode.m3uFile)
-                }
-                else -> buildPlaylistsUI()
+        when (state) {
+            is ScreenState.Playlists -> buildPlaylistsUI()
+            is ScreenState.M3uPlaylistSongs -> {
+                currentM3uFile = state.m3uFile
+                buildM3uSongsUI(state.m3uFile)
             }
-        } else {
-            buildPlaylistsUI()
+            is ScreenState.Browser -> {
+                when (state.mode) {
+                    is BrowserMode.Playlists -> buildPlaylistsUI()
+                    is BrowserMode.M3uSongs -> {
+                        currentM3uFile = state.mode.m3uFile
+                        buildM3uSongsUI(state.mode.m3uFile)
+                    }
+                    else -> buildPlaylistsUI()
+                }
+            }
+            else -> buildPlaylistsUI()
         }
     }
 
@@ -132,6 +139,7 @@ class PlaylistController(
                 btn.setOnClickListener {
                     clickFeedback()
                     currentM3uFile = m3u
+                    lastPlaylistFocusName = cleanName
                     onPlaylistSelected(m3u)
                 }
 
@@ -155,7 +163,29 @@ class PlaylistController(
                     sv.viewTreeObserver.removeGlobalOnLayoutListener(this)
                 }
                 if (containerBrowserItems.childCount > 0) {
-                    containerBrowserItems.getChildAt(0).requestFocus()
+                    var targetIndex = 0
+                    if (lastPlaylistFocusName.isNotEmpty()) {
+                        for (i in 0 until containerBrowserItems.childCount) {
+                            val child = containerBrowserItems.getChildAt(i)
+                            var itemText = ""
+                            if (child is Button) {
+                                itemText = child.text.toString()
+                            } else if (child is LinearLayout && child.childCount > 1 && child.getChildAt(1) is TextView) {
+                                itemText = (child.getChildAt(1) as TextView).text.toString()
+                            }
+                            if (itemText == lastPlaylistFocusName) {
+                                targetIndex = i
+                                break
+                            }
+                        }
+                    }
+                    val target = containerBrowserItems.getChildAt(targetIndex)
+                    target?.requestFocus()
+                    if (sv != null && target != null) {
+                        val offset = (sv.height / 2) - (target.height / 2)
+                        val targetY = (target.top - offset).coerceAtLeast(0)
+                        sv.scrollTo(0, targetY)
+                    }
                 }
             }
         })
@@ -170,6 +200,11 @@ class PlaylistController(
         tvBrowserPath.text = localize("Playlist") + ": " + playlistName
 
         val songs = parseM3uFile(m3uFile)
+        val main = activity as? com.themoon.y1.MainActivity
+        main?.virtualSongList?.clear()
+        for (song in songs) {
+            main?.virtualSongList?.add(song.file)
+        }
         val titles = ArrayList<String>()
         for (song in songs) {
             titles.add(song.title)
@@ -381,5 +416,26 @@ class PlaylistController(
     override fun onBackPressed(): Boolean {
         onNavigateBack()
         return true
+    }
+
+    override fun onWheel(delta: Int, event: KeyEvent): Boolean {
+        val list = listVirtualSongs
+        if (list != null && list.visibility == View.VISIBLE) {
+            val totalCount = list.count
+            if (totalCount <= 0) return true
+            val curFocused = list.findFocus()
+            val currentIdx = if (curFocused != null) list.getPositionForView(curFocused) else 0
+            val targetPos = currentIdx + (if (delta < 0) -1 else 1)
+            if (targetPos in 0 until totalCount) {
+                list.setSelection(targetPos)
+                val visiblePos = targetPos - list.firstVisiblePosition
+                if (visiblePos in 0 until list.childCount) {
+                    list.getChildAt(visiblePos)?.requestFocus()
+                }
+                clickFeedback()
+            }
+            return true
+        }
+        return false
     }
 }

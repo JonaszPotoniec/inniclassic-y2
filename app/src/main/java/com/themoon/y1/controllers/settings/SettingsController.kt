@@ -17,6 +17,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import com.themoon.y1.MainActivity
 import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
@@ -69,10 +70,12 @@ class SettingsController(
     private val containerSettingsItems: LinearLayout = rootView.findViewById(R.id.container_settings_items)
     private val prefs = activity.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
     private val audioManager = activity.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private val mainActivity: MainActivity? get() = activity as? MainActivity
 
     var currentSettingsDepth: Int = 0
     var lastSettingsFocusIndex: Int = 0
     var settingsSubMode: Int = 0
+    private var isUiActive = false
 
     // Temporary variables for Date/Time picker
     var dtYear: Int = 2026
@@ -112,8 +115,36 @@ class SettingsController(
         )
     }
 
+    init {
+        containerSettingsItems.viewTreeObserver?.addOnGlobalFocusChangeListener { _, newFocus ->
+            if (isUiActive && currentSettingsDepth == 0 && newFocus != null) {
+                var v: View? = newFocus
+                while (v != null && v.parent != containerSettingsItems) {
+                    v = v.parent as? View
+                }
+                if (v != null) {
+                    val idx = containerSettingsItems.indexOfChild(v)
+                    if (idx >= 0) {
+                        lastSettingsFocusIndex = idx
+                    }
+                }
+            }
+        }
+    }
+
     override fun onEnter(state: ScreenState) {
         buildSettingsUI()
+    }
+
+    override fun onExit() {
+        if (currentSettingsDepth == 0) {
+            val curFocus = containerSettingsItems.findFocus()
+            val idx = if (curFocus != null) containerSettingsItems.indexOfChild(curFocus) else -1
+            if (idx >= 0) {
+                lastSettingsFocusIndex = idx
+            }
+        }
+        isUiActive = false
     }
 
     override fun onRefreshUI() {
@@ -144,10 +175,10 @@ class SettingsController(
         return true
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+    override fun onWheel(delta: Int, event: KeyEvent): Boolean {
         if (settingsSubMode == 4 && isMenuReorderMode && currentReorderRow != null) {
-            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == 21) {
-                val idx = containerSettingsItems.indexOfChild(currentReorderRow)
+            val idx = containerSettingsItems.indexOfChild(currentReorderRow)
+            if (delta < 0) {
                 if (idx > 0) {
                     containerSettingsItems.removeViewAt(idx)
                     containerSettingsItems.addView(currentReorderRow, idx - 1)
@@ -158,10 +189,7 @@ class SettingsController(
                         p.requestChildFocus(containerSettingsItems, currentReorderRow)
                     }
                 }
-                return true
-            }
-            if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == 22) {
-                val idx = containerSettingsItems.indexOfChild(currentReorderRow)
+            } else {
                 if (idx < containerSettingsItems.childCount - 1) {
                     containerSettingsItems.removeViewAt(idx)
                     containerSettingsItems.addView(currentReorderRow, idx + 1)
@@ -172,8 +200,90 @@ class SettingsController(
                         p.requestChildFocus(containerSettingsItems, currentReorderRow)
                     }
                 }
-                return true
             }
+            return true
+        }
+
+        if (containerSettingsItems.childCount == 0) return false
+        val isLoopScrollOn = prefs.getBoolean("loop_scroll_on", true)
+        val curFocus = containerSettingsItems.findFocus()
+        val currentIndex = if (curFocus != null) containerSettingsItems.indexOfChild(curFocus) else -1
+
+        if (delta < 0) {
+            if (currentIndex > 0) {
+                for (i in currentIndex - 1 downTo 0) {
+                    val child = containerSettingsItems.getChildAt(i)
+                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
+                        child.requestFocus()
+                        if (currentSettingsDepth == 0) lastSettingsFocusIndex = i
+                        clickFeedback()
+                        return true
+                    }
+                }
+            }
+            if (isLoopScrollOn && currentIndex >= 0) {
+                for (i in containerSettingsItems.childCount - 1 downTo currentIndex + 1) {
+                    val child = containerSettingsItems.getChildAt(i)
+                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
+                        child.requestFocus()
+                        if (currentSettingsDepth == 0) lastSettingsFocusIndex = i
+                        clickFeedback()
+                        return true
+                    }
+                }
+            }
+            if (currentIndex == -1) {
+                for (i in 0 until containerSettingsItems.childCount) {
+                    val child = containerSettingsItems.getChildAt(i)
+                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
+                        child.requestFocus()
+                        if (currentSettingsDepth == 0) lastSettingsFocusIndex = i
+                        clickFeedback()
+                        return true
+                    }
+                }
+            }
+        } else {
+            if (currentIndex in 0 until containerSettingsItems.childCount - 1) {
+                for (i in currentIndex + 1 until containerSettingsItems.childCount) {
+                    val child = containerSettingsItems.getChildAt(i)
+                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
+                        child.requestFocus()
+                        if (currentSettingsDepth == 0) lastSettingsFocusIndex = i
+                        clickFeedback()
+                        return true
+                    }
+                }
+            }
+            if (isLoopScrollOn && currentIndex >= 0) {
+                for (i in 0 until currentIndex) {
+                    val child = containerSettingsItems.getChildAt(i)
+                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
+                        child.requestFocus()
+                        if (currentSettingsDepth == 0) lastSettingsFocusIndex = i
+                        clickFeedback()
+                        return true
+                    }
+                }
+            }
+            if (currentIndex == -1) {
+                for (i in 0 until containerSettingsItems.childCount) {
+                    val child = containerSettingsItems.getChildAt(i)
+                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
+                        child.requestFocus()
+                        if (currentSettingsDepth == 0) lastSettingsFocusIndex = i
+                        clickFeedback()
+                        return true
+                    }
+                }
+            }
+        }
+        return false
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == 21 || keyCode == 22) {
+            return onWheel(if (keyCode == 22) 1 else -1, event)
         }
         return false
     }
@@ -600,17 +710,19 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnBrightMenu)
 
-        var isShowBatteryPercentage = prefs.getBoolean("show_battery_percentage", false)
+        val isShowPct = mainActivity?.isShowBatteryPercentage ?: prefs.getBoolean("show_battery_percentage", false)
         val btnBatteryPct = createSettingRow(
             localize("Battery Percentage"),
-            if (isShowBatteryPercentage) localize("ON") else localize("OFF")
+            if (isShowPct) localize("ON") else localize("OFF")
         )
         btnBatteryPct.setOnClickListener {
             clickFeedback()
-            isShowBatteryPercentage = !isShowBatteryPercentage
-            prefs.edit().putBoolean("show_battery_percentage", isShowBatteryPercentage).commit()
+            val newPct = !(mainActivity?.isShowBatteryPercentage ?: prefs.getBoolean("show_battery_percentage", false))
+            mainActivity?.isShowBatteryPercentage = newPct
+            prefs.edit().putBoolean("show_battery_percentage", newPct).commit()
             val tvStatus = btnBatteryPct.getChildAt(1) as? TextView
-            tvStatus?.text = if (isShowBatteryPercentage) localize("ON") else localize("OFF")
+            tvStatus?.text = if (newPct) localize("ON") else localize("OFF")
+            mainActivity?.batteryIconView?.setShowPercentage(newPct)
         }
         containerSettingsItems.addView(btnBatteryPct)
 
@@ -686,11 +798,20 @@ class SettingsController(
         sv?.post {
             if (targetFocusIndex in 0 until containerSettingsItems.childCount) {
                 val target = containerSettingsItems.getChildAt(targetFocusIndex)
+                if (sv != null && target != null) {
+                    val offset = (sv.height / 2) - (target.height / 2)
+                    val targetY = (target.top - offset).coerceAtLeast(0)
+                    sv.scrollTo(0, targetY)
+                }
                 target?.requestFocus()
                 lastSettingsFocusIndex = targetFocusIndex
             } else if (containerSettingsItems.childCount > 0) {
-                containerSettingsItems.getChildAt(0)?.requestFocus()
+                val first = containerSettingsItems.getChildAt(0)
+                first?.requestFocus()
+                sv?.scrollTo(0, 0)
+                lastSettingsFocusIndex = 0
             }
+            isUiActive = true
         }
     }
 
@@ -899,6 +1020,7 @@ class SettingsController(
         rowFormat.setOnClickListener {
             clickFeedback()
             is24HourFormat = !is24HourFormat
+            mainActivity?.is24HourFormat = is24HourFormat
             prefs.edit().putBoolean("is_24h_format", is24HourFormat).commit()
             buildDateTimeUI()
         }
@@ -912,6 +1034,7 @@ class SettingsController(
         rowTitleClock.setOnClickListener {
             clickFeedback()
             isTimeInTitleBar = !isTimeInTitleBar
+            mainActivity?.isTimeInTitleBar = isTimeInTitleBar
             prefs.edit().putBoolean("time_in_title_bar", isTimeInTitleBar).commit()
             val tvStatus = rowTitleClock.getChildAt(1) as? TextView
             tvStatus?.text = if (isTimeInTitleBar) localize("ON") else localize("OFF")
@@ -1344,6 +1467,11 @@ class SettingsController(
         AudioEffectManager.getInstance().applyEqProfile()
         applyAlbumTiltSetting()
         resetBacklightTimer()
+
+        mainActivity?.isShowBatteryPercentage = false
+        mainActivity?.isTimeInTitleBar = false
+        mainActivity?.is24HourFormat = false
+        mainActivity?.batteryIconView?.setShowPercentage(false)
 
         Toast.makeText(activity, localize("All settings have been reset."), Toast.LENGTH_SHORT).show()
         buildSettingsUI()

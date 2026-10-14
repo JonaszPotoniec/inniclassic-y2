@@ -17,6 +17,7 @@ import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.navigation.ScreenState
+import com.themoon.y1.views.ListItemViewFactory
 import com.themoon.y1.views.TablerIcons
 
 /**
@@ -40,7 +41,23 @@ class WifiController(
 
     private val foundWifiNetworks = mutableSetOf<String>()
 
+    private fun updateScanButtonFocus(hasFocus: Boolean) {
+        if (hasFocus) {
+            btnScanWifi.background = ListItemViewFactory.createFocusedButtonBackground(activity)
+            btnScanWifi.setTextColor(ThemeManager.getListButtonFocusedTextColor())
+        } else {
+            btnScanWifi.background = ListItemViewFactory.createButtonBackground(activity, ThemeManager.getListButtonNormalBg())
+            btnScanWifi.setTextColor(ThemeManager.getTextColorPrimary())
+        }
+        btnScanWifi.typeface = ThemeManager.getCustomFontBold()
+    }
+
     init {
+        btnScanWifi.isSoundEffectsEnabled = false
+        updateScanButtonFocus(btnScanWifi.hasFocus())
+        btnScanWifi.setOnFocusChangeListener { _, hasFocus ->
+            updateScanButtonFocus(hasFocus)
+        }
         btnScanWifi.setOnClickListener {
             clickFeedback()
             startWifiScan()
@@ -49,6 +66,7 @@ class WifiController(
 
     override fun onEnter(state: ScreenState) {
         layoutWifiMode.visibility = View.VISIBLE
+        updateScanButtonFocus(btnScanWifi.hasFocus())
         startWifiScan()
     }
 
@@ -57,6 +75,7 @@ class WifiController(
     }
 
     override fun onRefreshUI() {
+        updateScanButtonFocus(btnScanWifi.hasFocus())
         startWifiScan()
     }
 
@@ -145,6 +164,7 @@ class WifiController(
         if (!isOn) return
 
         if (results != null) {
+            btnScanWifi.text = localize("Scan Complete (Retry)")
             foundWifiNetworks.clear()
             val wifiInfo = wm?.connectionInfo
             var connectedSSID = ""
@@ -217,6 +237,59 @@ class WifiController(
         }
 
         containerWifiItems.addView(btnWifi)
+    }
+
+    override fun onWheel(delta: Int, event: KeyEvent): Boolean {
+        if (containerWifiItems.childCount == 0) return false
+        var currentIndex = -1
+        for (i in 0 until containerWifiItems.childCount) {
+            if (containerWifiItems.getChildAt(i).hasFocus()) {
+                currentIndex = i
+                break
+            }
+        }
+        if (delta < 0) {
+            if (currentIndex > 0) {
+                for (i in currentIndex - 1 downTo 0) {
+                    val child = containerWifiItems.getChildAt(i)
+                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
+                        child.requestFocus()
+                        clickFeedback()
+                        return true
+                    }
+                }
+            }
+        } else {
+            if (currentIndex in 0 until containerWifiItems.childCount - 1) {
+                for (i in currentIndex + 1 until containerWifiItems.childCount) {
+                    val child = containerWifiItems.getChildAt(i)
+                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
+                        child.requestFocus()
+                        clickFeedback()
+                        return true
+                    }
+                }
+            }
+        }
+        if (currentIndex == -1 && containerWifiItems.childCount > 0) {
+            for (i in 0 until containerWifiItems.childCount) {
+                val child = containerWifiItems.getChildAt(i)
+                if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
+                    child.requestFocus()
+                    clickFeedback()
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == 21 || keyCode == 22 || keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+            val delta = if (keyCode == 22 || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) 1 else -1
+            return onWheel(delta, event)
+        }
+        return false
     }
 
     override fun onBackPressed(): Boolean {

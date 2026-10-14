@@ -26,12 +26,14 @@ internal fun MainActivity.initViewBindings() {
     layoutVolumeOverlay = findViewById(R.id.layout_volume_overlay)
 
     val rootContent = findViewById<ViewGroup>(android.R.id.content)
+    val d = resources.displayMetrics.density
     tvFastScrollLetter = TextView(this).apply {
-        textSize = 64f
+        textSize = 50f
         gravity = Gravity.CENTER
         visibility = View.GONE
-        val lp = FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-            gravity = Gravity.CENTER
+        val lp = FrameLayout.LayoutParams((80 * d).toInt(), (80 * d).toInt()).apply {
+            gravity = Gravity.CENTER_VERTICAL or Gravity.RIGHT
+            rightMargin = (30 * d).toInt()
         }
         rootContent.addView(this, lp)
     }
@@ -82,10 +84,30 @@ internal fun MainActivity.initViewBindings() {
     rootContent.addView(layoutLoadingOverlay, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
 
     tvStatusBarTitle = findViewById(R.id.tv_status_clock)
+    tvStatusBarTitle?.setShadowLayer(0f, 0f, 0f, 0)
+    tvStatusBarTitle?.typeface = ThemeManager.getCustomFontBold()
     ivStatusWifi = findViewById(R.id.iv_status_wifi)
     ivStatusBluetooth = findViewById(R.id.iv_status_bluetooth)
     ivStatusHeadphone = findViewById(R.id.iv_status_headphone)
     tvStatusBattery = findViewById(R.id.tv_status_battery)
+    tvStatusBattery?.setShadowLayer(0f, 0f, 0f, 0)
+
+    val statusParent = tvStatusBattery?.parent as? ViewGroup
+    if (statusParent != null && tvStatusBattery != null) {
+        tvStatusBattery?.visibility = View.GONE
+        val bIdx = statusParent.indexOfChild(tvStatusBattery)
+        val biv = com.themoon.y1.views.BatteryIconView(this).apply {
+            setShowPercentage(isShowBatteryPercentage)
+            setColor(ThemeManager.getTextColorPrimary())
+        }
+        batteryIconView = biv
+        val d = resources.displayMetrics.density
+        val blp = LinearLayout.LayoutParams((30 * d).toInt(), (16 * d).toInt()).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setMargins((8 * d).toInt(), 0, (4 * d).toInt(), 0)
+        }
+        statusParent.addView(biv, bIdx, blp)
+    }
 }
 
 internal fun MainActivity.applyRootSystemSettings() {
@@ -109,7 +131,7 @@ internal fun MainActivity.loadPreferences() {
     isVibrationEnabled = prefs.getBoolean("vibration", true)
     vibrationStrengthLevel = prefs.getInt("vibration_level", 1)
     isScreenOffControlEnabled = prefs.getBoolean("screen_off_control", false)
-    isUsbPromptEnabled = prefs.getBoolean("usb_prompt", true)
+    isUsbPromptEnabled = prefs.getBoolean("usb_storage_prompt", true)
     isAutoFetchEnabled = prefs.getBoolean("auto_fetch", true)
     is24HourFormat = prefs.getBoolean("is_24_hour_format", false)
     isTimeInTitleBar = prefs.getBoolean("time_in_title_bar", false)

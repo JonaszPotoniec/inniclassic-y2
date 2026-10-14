@@ -16,7 +16,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="horizontal"
-        android:paddingTop="36dp"
+        android:paddingTop="0dp"
         android:visibility="visible"
         android:background="#00000000">
 
@@ -120,16 +120,16 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:orientation="vertical"
-            android:paddingTop="36dp"
-            android:paddingLeft="10dp"
-            android:paddingRight="10dp"
-            android:paddingBottom="10dp">
+            android:paddingTop="26dp"
+            android:paddingLeft="0dp"
+            android:paddingRight="0dp"
+            android:paddingBottom="0dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginBottom="6dp">
+                android:visibility="gone">
 
                 <TextView
                     android:id="@+id/tv_browser_path"
@@ -189,13 +189,13 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:paddingTop="36dp"
-        android:paddingBottom="10dp"
-        android:paddingLeft="10dp"
-        android:paddingRight="10dp"
+        android:paddingTop="26dp"
+        android:paddingBottom="0dp"
+        android:paddingLeft="0dp"
+        android:paddingRight="0dp"
         android:background="#66000000"
         android:visibility="gone">
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="SETTINGS" android:textColor="#BBFFFFFF" android:textSize="16sp" android:textStyle="bold" android:singleLine="true" android:layout_marginBottom="6dp"/>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="SETTINGS" android:textColor="#BBFFFFFF" android:textSize="16sp" android:textStyle="bold" android:singleLine="true" android:visibility="gone"/>
         <ScrollView android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
             <LinearLayout android:id="@+id/container_settings_items" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" />
         </ScrollView>
@@ -206,13 +206,13 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:paddingTop="36dp"
-        android:paddingBottom="10dp"
-        android:paddingLeft="10dp"
-        android:paddingRight="10dp"
+        android:paddingTop="26dp"
+        android:paddingBottom="0dp"
+        android:paddingLeft="0dp"
+        android:paddingRight="0dp"
         android:background="#66000000"
         android:visibility="gone">
-        <TextView android:id="@+id/tv_storage_header" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="ABOUT" android:textColor="#BBFFFFFF" android:textSize="16sp" android:textStyle="bold" android:singleLine="true" android:layout_marginBottom="6dp"/>
+        <TextView android:id="@+id/tv_storage_header" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="ABOUT" android:textColor="#BBFFFFFF" android:textSize="16sp" android:textStyle="bold" android:singleLine="true" android:visibility="gone"/>
         <ScrollView android:id="@+id/scroll_storage" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
             <LinearLayout android:id="@+id/container_storage_items" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" />
         </ScrollView>
@@ -223,14 +223,14 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:paddingTop="36dp"
-        android:paddingBottom="10dp"
-        android:paddingLeft="10dp"
-        android:paddingRight="10dp"
+        android:paddingTop="26dp"
+        android:paddingBottom="0dp"
+        android:paddingLeft="0dp"
+        android:paddingRight="0dp"
         android:background="#66000000"
         android:visibility="gone">
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="BLUETOOTH SCAN" android:textColor="#BBFFFFFF" android:textSize="16sp" android:textStyle="bold" android:layout_marginBottom="6dp"/>
-        <Button android:id="@+id/btn_scan_bt" android:layout_width="match_parent" android:layout_height="40dp" android:text="🔍 Scan Devices" android:textColor="#FFFFFF" android:textSize="16sp" android:background="#15FFFFFF" android:focusable="true"/>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="BLUETOOTH SCAN" android:textColor="#BBFFFFFF" android:textSize="16sp" android:textStyle="bold" android:visibility="gone"/>
+        <Button android:id="@+id/btn_scan_bt" android:layout_width="match_parent" android:layout_height="33dp" android:text="🔍 Scan Devices" android:textColor="#FFFFFF" android:textSize="16sp" android:background="#15FFFFFF" android:focusable="true"/>
         <ScrollView android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true" android:layout_marginTop="5dp">
             <LinearLayout android:id="@+id/container_bt_items" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" />
         </ScrollView>
@@ -241,14 +241,14 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:paddingTop="36dp"
-        android:paddingBottom="10dp"
-        android:paddingLeft="10dp"
-        android:paddingRight="10dp"
+        android:paddingTop="26dp"
+        android:paddingBottom="0dp"
+        android:paddingLeft="0dp"
+        android:paddingRight="0dp"
         android:background="#66000000"
         android:visibility="gone">
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="WI-FI NETWORKS" android:textColor="#BBFFFFFF" android:textSize="16sp" android:textStyle="bold" android:layout_marginBottom="6dp"/>
-        <Button android:id="@+id/btn_scan_wifi" android:layout_width="match_parent" android:layout_height="40dp" android:text="🔍 Scan Networks" android:textColor="#FFFFFF" android:textSize="16sp" android:background="#15FFFFFF" android:focusable="true"/>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="WI-FI NETWORKS" android:textColor="#BBFFFFFF" android:textSize="16sp" android:textStyle="bold" android:visibility="gone"/>
+        <Button android:id="@+id/btn_scan_wifi" android:layout_width="match_parent" android:layout_height="33dp" android:text="🔍 Scan Networks" android:textColor="#FFFFFF" android:textSize="16sp" android:background="#15FFFFFF" android:focusable="true"/>
         <ScrollView android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true" android:layout_marginTop="5dp">
             <LinearLayout android:id="@+id/container_wifi_items" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" />
         </ScrollView>
@@ -442,11 +442,7 @@
             android:text="12:00 AM"
             android:textColor="#FFFFFF"
             android:textSize="13sp"
-            android:textStyle="bold"
-            android:shadowColor="#FF000000"
-            android:shadowDx="1"
-            android:shadowDy="1"
-            android:shadowRadius="2" />
+            android:textStyle="bold" />
 
         <LinearLayout
             android:id="@+id/layout_status_right_group"
@@ -459,7 +455,7 @@
             <ImageView android:id="@+id/iv_status_headphone" android:layout_width="16dp" android:layout_height="16dp" android:src="@drawable/ic_headphone" android:visibility="gone" android:layout_marginRight="6dp"/>
             <ImageView android:id="@+id/iv_status_wifi" android:layout_width="16dp" android:layout_height="16dp" android:visibility="gone" android:layout_marginRight="6dp"/>
             <ImageView android:id="@+id/iv_status_bluetooth" android:layout_width="16dp" android:layout_height="16dp" android:src="@drawable/ic_bluetooth" android:visibility="gone" android:layout_marginRight="8dp"/>
-            <TextView android:id="@+id/tv_status_battery" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="100%" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold" android:shadowColor="#FF000000" android:shadowDx="1" android:shadowDy="1" android:shadowRadius="2"/>
+            <TextView android:id="@+id/tv_status_battery" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="100%" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold" />
         </LinearLayout>
     </RelativeLayout>
 
@@ -538,13 +534,13 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:paddingTop="36dp"
-        android:paddingBottom="10dp"
-        android:paddingLeft="10dp"
-        android:paddingRight="10dp"
+        android:paddingTop="26dp"
+        android:paddingBottom="0dp"
+        android:paddingLeft="0dp"
+        android:paddingRight="0dp"
         android:background="#66000000"
         android:visibility="gone">
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="VIDEOS" android:textColor="#BBFFFFFF" android:textSize="16sp" android:textStyle="bold" android:singleLine="true" android:layout_marginBottom="6dp"/>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="VIDEOS" android:textColor="#BBFFFFFF" android:textSize="16sp" android:textStyle="bold" android:singleLine="true" android:visibility="gone"/>
         <ScrollView android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
             <LinearLayout android:id="@+id/container_video_items" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" />
         </ScrollView>

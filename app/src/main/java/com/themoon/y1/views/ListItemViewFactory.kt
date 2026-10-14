@@ -214,30 +214,29 @@ object ListItemViewFactory {
 
     fun createListButtonSimple(context: Context, text: String): Button {
         val d = context.resources.displayMetrics.density
+        val rowHeight = if (ThemeManager.isClassicTheme()) (ClassicMenuStyle.ROW_HEIGHT_DP * d).toInt() else (48f * d).toInt()
+        val padX = ((if (ThemeManager.isClassicTheme()) 8 else 12) * d).toInt()
         val btn = Button(context).apply {
             this.text = text
             setTextColor(ThemeManager.getTextColorPrimary())
-            textSize = 16f
-            typeface = ThemeManager.getCustomFont()
+            setTextSize(TypedValue.COMPLEX_UNIT_PX, (if (ThemeManager.isClassicTheme()) 21f else 16f) * d)
+            typeface = if (ThemeManager.isClassicTheme()) ThemeManager.getCustomFontBold() else ThemeManager.getCustomFont()
+            includeFontPadding = false
             gravity = Gravity.LEFT or Gravity.CENTER_VERTICAL
-            setPadding((16f * d).toInt(), 0, (16f * d).toInt(), 0)
+            setPadding(padX, 0, padX, 0)
             isFocusable = true
             isClickable = true
-            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (48f * d).toInt())
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, rowHeight)
         }
 
         fun updateBg(focused: Boolean) {
-            val bg = GradientDrawable().apply {
-                cornerRadius = 8f * d
-                if (focused) {
-                    setColor(ThemeManager.getListButtonFocusedBg())
-                    btn.setTextColor(ThemeManager.getListButtonFocusedTextColor())
-                } else {
-                    setColor(ThemeManager.getListButtonNormalBg())
-                    btn.setTextColor(ThemeManager.getTextColorPrimary())
-                }
+            btn.background = if (focused) {
+                btn.setTextColor(ThemeManager.getListButtonFocusedTextColor())
+                createFocusedButtonBackground(context)
+            } else {
+                btn.setTextColor(ThemeManager.getTextColorPrimary())
+                createButtonBackground(context, ThemeManager.getListButtonNormalBg())
             }
-            btn.background = bg
         }
 
         updateBg(false)
@@ -247,11 +246,13 @@ object ListItemViewFactory {
 
     fun createSettingRow(context: Context, title: String, value: String): LinearLayout {
         val d = context.resources.displayMetrics.density
+        val rowHeight = if (ThemeManager.isClassicTheme()) (ClassicMenuStyle.ROW_HEIGHT_DP * d).toInt() else (48f * d).toInt()
+        val padX = ((if (ThemeManager.isClassicTheme()) 8 else 12) * d).toInt()
         val row = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (48f * d).toInt())
-            setPadding((16f * d).toInt(), 0, (16f * d).toInt(), 0)
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, rowHeight)
+            setPadding(padX, 0, padX, 0)
             isFocusable = true
             isClickable = true
         }
@@ -259,34 +260,33 @@ object ListItemViewFactory {
         val tvTitle = TextView(context).apply {
             text = title
             setTextColor(ThemeManager.getTextColorPrimary())
-            textSize = 16f
-            typeface = ThemeManager.getCustomFont()
+            setTextSize(TypedValue.COMPLEX_UNIT_PX, (if (ThemeManager.isClassicTheme()) 21f else 16f) * d)
+            typeface = if (ThemeManager.isClassicTheme()) ThemeManager.getCustomFontBold() else ThemeManager.getCustomFont()
+            includeFontPadding = false
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f)
         }
         row.addView(tvTitle)
 
+        val displayVal = if (ThemeManager.isClassicTheme()) value.replace("〉", "›") else value
         val tvVal = TextView(context).apply {
-            text = value
+            text = displayVal
             setTextColor(ThemeManager.getTextColorSecondary())
-            textSize = 14f
+            setTextSize(TypedValue.COMPLEX_UNIT_PX, (if (ThemeManager.isClassicTheme()) 21f else 14f) * d)
             typeface = ThemeManager.getCustomFont()
+            includeFontPadding = false
         }
         row.addView(tvVal)
 
         fun updateBg(focused: Boolean) {
-            val bg = GradientDrawable().apply {
-                cornerRadius = 8f * d
-                if (focused) {
-                    setColor(ThemeManager.getListButtonFocusedBg())
-                    tvTitle.setTextColor(ThemeManager.getListButtonFocusedTextColor())
-                    tvVal.setTextColor(ThemeManager.getListButtonFocusedTextColor())
-                } else {
-                    setColor(ThemeManager.getListButtonNormalBg())
-                    tvTitle.setTextColor(ThemeManager.getTextColorPrimary())
-                    tvVal.setTextColor(ThemeManager.getTextColorSecondary())
-                }
+            row.background = if (focused) {
+                tvTitle.setTextColor(ThemeManager.getListButtonFocusedTextColor())
+                tvVal.setTextColor(ThemeManager.getListButtonFocusedTextColor())
+                createFocusedButtonBackground(context)
+            } else {
+                tvTitle.setTextColor(ThemeManager.getTextColorPrimary())
+                tvVal.setTextColor(ThemeManager.getTextColorSecondary())
+                createButtonBackground(context, ThemeManager.getListButtonNormalBg())
             }
-            row.background = bg
         }
 
         updateBg(false)
@@ -310,79 +310,98 @@ object ListItemViewFactory {
         context: Context,
         icon: Array<String>?,
         text: String,
-        normalColor: Int,
-        focusedColor: Int
-    ): View = createTablerListButtonWithRightIcon(context, icon, text, null, normalColor, focusedColor)
+        normalColor: Int = 0,
+        focusedColor: Int = 0
+    ): View = createTablerListButtonWithRightIcon(
+        context = context,
+        iconPaths = icon,
+        text = text,
+        rightIconPaths = null,
+        iconColor = normalColor,
+        textColor = normalColor,
+        focusedTextColor = focusedColor,
+        focusedIconColor = focusedColor
+    )
 
     fun createTablerListButtonWithRightIcon(
         context: Context,
         iconPaths: Array<String>?,
         text: String,
-        rightIconPaths: Array<String>?,
-        normalColor: Int,
-        focusedColor: Int
+        rightIconPaths: Array<String>? = null,
+        iconColor: Int = 0,
+        textColor: Int = 0,
+        focusedTextColor: Int = 0,
+        focusedIconColor: Int = 0
     ): View {
         val d = context.resources.displayMetrics.density
+        val rowHeight = if (ThemeManager.isClassicTheme()) (ClassicMenuStyle.ROW_HEIGHT_DP * d).toInt() else (48f * d).toInt()
+        val padX = ((if (ThemeManager.isClassicTheme()) 8 else 12) * d).toInt()
         val row = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (48f * d).toInt())
-            setPadding((16f * d).toInt(), 0, (16f * d).toInt(), 0)
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, rowHeight)
+            setPadding(padX, 0, padX, 0)
             isFocusable = true
             isClickable = true
         }
 
-        val actualNormalColor = if (normalColor != 0) normalColor else ThemeManager.getTextColorPrimary()
-        val actualFocusedColor = if (focusedColor != 0) focusedColor else ThemeManager.getListButtonFocusedTextColor()
+        val actualIconColor = if (iconColor != 0) iconColor else ThemeManager.getTextColorPrimary()
+        val actualTextColor = if (textColor != 0) textColor else ThemeManager.getTextColorPrimary()
+        val actualFocusedTextColor = if (focusedTextColor != 0) focusedTextColor else ThemeManager.getListButtonFocusedTextColor()
+        val actualFocusedIconColor = if (focusedIconColor != 0) focusedIconColor else ThemeManager.getListButtonFocusedTextColor()
 
-        val iconSize = (20f * d).toInt()
+        val iconSize = (18f * d).toInt()
         var ivLeft: ImageView? = null
         if (iconPaths != null) {
             ivLeft = ImageView(context).apply {
                 layoutParams = LinearLayout.LayoutParams(iconSize, iconSize).apply {
-                    rightMargin = (12f * d).toInt()
+                    rightMargin = (10f * d).toInt()
                 }
-                setImageBitmap(TablerIcons.render(iconPaths, iconSize, actualNormalColor))
+                setImageBitmap(TablerIcons.render(iconPaths, iconSize, actualIconColor))
             }
             row.addView(ivLeft)
         }
 
         val tv = TextView(context).apply {
             this.text = text
-            setTextColor(actualNormalColor)
-            textSize = 16f
-            typeface = ThemeManager.getCustomFont()
+            setTextColor(actualTextColor)
+            setTextSize(TypedValue.COMPLEX_UNIT_PX, ThemeManager.getListTextSize() * d)
+            typeface = if (ThemeManager.isClassicTheme()) ThemeManager.getCustomFontBold() else ThemeManager.getCustomFont()
+            includeFontPadding = false
+            isSingleLine = true
+            ellipsize = TextUtils.TruncateAt.MARQUEE
+            marqueeRepeatLimit = -1
+            isHorizontalFadingEdgeEnabled = true
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f)
         }
         row.addView(tv)
 
+        val rightIconSize = (16f * d).toInt()
         var ivRight: ImageView? = null
         if (rightIconPaths != null) {
             ivRight = ImageView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(iconSize, iconSize).apply {
+                layoutParams = LinearLayout.LayoutParams(rightIconSize, rightIconSize).apply {
                     leftMargin = (8f * d).toInt()
                 }
-                setImageBitmap(TablerIcons.render(rightIconPaths, iconSize, actualNormalColor))
+                setImageBitmap(TablerIcons.render(rightIconPaths, rightIconSize, ThemeManager.getTextColorSecondary()))
             }
             row.addView(ivRight)
         }
 
         fun updateBg(focused: Boolean) {
-            val bg = GradientDrawable().apply {
-                cornerRadius = 8f * d
-                if (focused) {
-                    setColor(ThemeManager.getListButtonFocusedBg())
-                    tv.setTextColor(actualFocusedColor)
-                    if (iconPaths != null) ivLeft?.setImageBitmap(TablerIcons.render(iconPaths, iconSize, actualFocusedColor))
-                    if (rightIconPaths != null) ivRight?.setImageBitmap(TablerIcons.render(rightIconPaths, iconSize, actualFocusedColor))
-                } else {
-                    setColor(ThemeManager.getListButtonNormalBg())
-                    tv.setTextColor(actualNormalColor)
-                    if (iconPaths != null) ivLeft?.setImageBitmap(TablerIcons.render(iconPaths, iconSize, actualNormalColor))
-                    if (rightIconPaths != null) ivRight?.setImageBitmap(TablerIcons.render(rightIconPaths, iconSize, actualNormalColor))
-                }
+            row.background = if (focused) {
+                tv.setTextColor(actualFocusedTextColor)
+                tv.isSelected = true
+                if (iconPaths != null) ivLeft?.setImageBitmap(TablerIcons.render(iconPaths, iconSize, actualFocusedIconColor))
+                if (rightIconPaths != null) ivRight?.setImageBitmap(TablerIcons.render(rightIconPaths, rightIconSize, actualFocusedIconColor))
+                createFocusedButtonBackground(context)
+            } else {
+                tv.setTextColor(actualTextColor)
+                tv.isSelected = false
+                if (iconPaths != null) ivLeft?.setImageBitmap(TablerIcons.render(iconPaths, iconSize, actualIconColor))
+                if (rightIconPaths != null) ivRight?.setImageBitmap(TablerIcons.render(rightIconPaths, rightIconSize, ThemeManager.getTextColorSecondary()))
+                createButtonBackground(context, ThemeManager.getListButtonNormalBg())
             }
-            row.background = bg
         }
 
         updateBg(false)

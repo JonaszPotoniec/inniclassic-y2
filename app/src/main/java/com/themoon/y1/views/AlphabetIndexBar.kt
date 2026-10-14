@@ -111,8 +111,11 @@ class AlphabetIndexBar(
         fun getInitialChar(text: String?): Char {
             if (text.isNullOrEmpty()) return '#'
 
-            val clean = text.replace("📁 ", "").replace("👤 ", "")
-                .replace("💿 ", "").replace("🎵 ", "").trim().uppercase()
+            var clean = text.replace("📁 ", "").replace("👤 ", "")
+                .replace("💿 ", "").replace("🎵 ", "").replace("📦 [INSTALL] ", "").trim().uppercase()
+            while (clean.isNotEmpty() && !clean[0].isLetterOrDigit() && clean[0] !in '\uAC00'..'\uD7A3') {
+                clean = clean.substring(1).trim()
+            }
             if (clean.isEmpty()) return '#'
 
             val c = clean[0]

@@ -22,7 +22,7 @@ class BatteryIconView @JvmOverloads constructor(
 
     private var level = 100
     private var isCharging = false
-    private var color = Color.WHITE
+    private var color = 0xFF1C1C1E.toInt()
     private var showPercentage = false
 
     private val paintFill: Paint
@@ -80,8 +80,10 @@ class BatteryIconView @JvmOverloads constructor(
     }
 
     fun setColor(color: Int) {
-        this.color = color
-        invalidate()
+        if (this.color != color) {
+            this.color = color
+            invalidate()
+        }
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -102,8 +104,9 @@ class BatteryIconView @JvmOverloads constructor(
             currentColor = Color.parseColor("#F44336")
         }
 
-        paintStroke.color = 0xFF3C3C43.toInt()
-        paintTerminal.color = 0xFF3C3C43.toInt()
+        val strokeColor = if (ThemeManager.isClassicLightTheme()) 0xFF3C3C43.toInt() else 0xFF8E8E93.toInt()
+        paintStroke.color = strokeColor
+        paintTerminal.color = strokeColor
         paintFill.color = currentColor
 
         if (level <= 20 && !isCharging) {
@@ -174,12 +177,8 @@ class BatteryIconView @JvmOverloads constructor(
                 val textX = startX + boltW + gap - textBounds.left
                 val textY = rectShell.centerY() - textBounds.exactCenterY()
 
-                var emptyColor = color
-                if (color == Color.WHITE || Color.red(color) > 200) {
-                    emptyColor = 0xFF1C1C1E.toInt()
-                }
-                paintText.color = emptyColor
-                paintBolt.color = emptyColor
+                paintText.color = color
+                paintBolt.color = color
                 canvas.drawPath(boltPath, paintBolt)
                 canvas.drawText(text, textX, textY, paintText)
 
@@ -203,11 +202,7 @@ class BatteryIconView @JvmOverloads constructor(
                 val textX = rectShell.centerX() - textBounds.exactCenterX()
                 val textY = rectShell.centerY() - textBounds.exactCenterY()
 
-                var emptyTextColor = color
-                if (color == Color.WHITE || Color.red(color) > 200) {
-                    emptyTextColor = 0xFF1C1C1E.toInt()
-                }
-                paintText.color = emptyTextColor
+                paintText.color = color
                 canvas.drawText(text, textX, textY, paintText)
 
                 if (currentFillWidth > 0) {

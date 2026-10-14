@@ -50,6 +50,8 @@ class MainMenuController(
     private val prefs = activity.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
 
     var lastMainMenuFocusIndex: Int = 0
+    private val currentButtons = ArrayList<LinearLayout>()
+    private var isUiActive = false
 
     // Registry of created widget views mapped to their theme definitions
     val widgetViewRegistry = HashMap<View, ThemeManager.MenuElement>()
@@ -89,6 +91,15 @@ class MainMenuController(
 
     override fun onEnter(state: ScreenState) {
         buildDynamicMainMenuUI()
+    }
+
+    override fun onExit() {
+        val curFocus = activity.currentFocus
+        val idx = if (curFocus != null) currentButtons.indexOf(curFocus) else -1
+        if (idx >= 0) {
+            lastMainMenuFocusIndex = idx
+        }
+        isUiActive = false
     }
 
     override fun onRefreshUI() {
@@ -621,7 +632,9 @@ class MainMenuController(
                     }
 
                     onButtonFocusChanged(el)
-                    lastMainMenuFocusIndex = dynamicViewKey(btn) - 10000
+                    if (isUiActive) {
+                        lastMainMenuFocusIndex = i
+                    }
 
                     tvMain.animate()
                         .translationX(el.focusOffsetX * density)
@@ -643,6 +656,7 @@ class MainMenuController(
             }
 
             btn.setOnClickListener {
+                lastMainMenuFocusIndex = i
                 clickFeedback()
                 onActionTriggered(el.action ?: "")
             }
@@ -664,6 +678,9 @@ class MainMenuController(
             createdButtons.add(btn)
         }
 
+        currentButtons.clear()
+        currentButtons.addAll(createdButtons)
+
         // 3. Chain Focus Navigation Loop
         val totalBtns = createdButtons.size
         val isLoopScrollOn = prefs.getBoolean("loop_scroll_on", true)
@@ -680,6 +697,7 @@ class MainMenuController(
 
         // 4. Restore Focus & Scroll Position
         if (createdButtons.isNotEmpty()) {
+            val targetIndex = safeMenuIndex.coerceIn(0, createdButtons.size - 1)
             val firstBtn = createdButtons[0]
             canvas.viewTreeObserver.addOnGlobalLayoutListener(object : android.view.ViewTreeObserver.OnGlobalLayoutListener {
                 override fun onGlobalLayout() {
@@ -689,29 +707,26 @@ class MainMenuController(
                         canvas.viewTreeObserver.removeGlobalOnLayoutListener(this)
                     }
 
-                    val targetId = dynamicViewId(10000 + safeMenuIndex)
-                    val targetBtn = activity.findViewById<View>(targetId)
-                    if (targetBtn != null && targetBtn.visibility == View.VISIBLE) {
+                    val targetBtn = createdButtons.getOrNull(targetIndex) ?: firstBtn
+                    if (targetBtn.visibility == View.VISIBLE) {
                         val parent = targetBtn.parent
                         if (parent != null && parent.parent is ScrollView) {
                             val sv = parent.parent as ScrollView
-                            var offset = (sv.height / 2) - (targetBtn.height / 2)
-                            if (exactOffsetMemory.containsKey("MAIN_$safeMenuIndex")) {
-                                offset = exactOffsetMemory["MAIN_$safeMenuIndex"] ?: offset
-                            }
-                            var targetY = targetBtn.top - offset
-                            if (targetY < 0) targetY = 0
+                            val offset = (sv.height / 2) - (targetBtn.height / 2)
+                            val targetY = (targetBtn.top - offset).coerceAtLeast(0)
                             sv.scrollTo(0, targetY)
                         }
                         targetBtn.requestFocus()
-                        lastMainMenuFocusIndex = safeMenuIndex
+                        lastMainMenuFocusIndex = targetIndex
                     } else {
                         firstBtn.requestFocus()
                         val parent = firstBtn.parent
                         if (parent != null && parent.parent is ScrollView) {
                             (parent.parent as ScrollView).scrollTo(0, 0)
                         }
+                        lastMainMenuFocusIndex = 0
                     }
+                    isUiActive = true
                 }
             })
         }
@@ -815,14 +830,20 @@ class MainMenuController(
                 val target = activity.findViewById<View>(targetId)
                 if (target != null) {
                     target.requestFocus()
+                    val idx = currentButtons.indexOf(target)
+                    if (idx >= 0) {
+                        lastMainMenuFocusIndex = idx
+                        isUiActive = true
+                    }
                     clickFeedback()
                     return true
                 }
             }
         } else {
-            val firstBtn = activity.findViewById<View>(dynamicViewId(10000))
-            if (firstBtn != null) {
-                firstBtn.requestFocus()
+            val targetIndex = lastMainMenuFocusIndex.coerceIn(0, (currentButtons.size - 1).coerceAtLeast(0))
+            val targetBtn = currentButtons.getOrNull(targetIndex) ?: currentButtons.firstOrNull()
+            if (targetBtn != null) {
+                targetBtn.requestFocus()
                 clickFeedback()
                 return true
             }
@@ -856,5 +877,10 @@ class MainMenuController(
             return true
         }
         return false
+    }
+
+    override fun onBackPressed(): Boolean {
+        clickFeedback()
+        return true
     }
 }

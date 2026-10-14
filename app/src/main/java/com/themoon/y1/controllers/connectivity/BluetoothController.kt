@@ -21,6 +21,7 @@ import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.navigation.ScreenState
+import com.themoon.y1.views.ListItemViewFactory
 import com.themoon.y1.views.TablerIcons
 import java.lang.reflect.Method
 
@@ -56,7 +57,23 @@ class BluetoothController(
     // Bluetooth proxy reference
     private var globalA2dp: BluetoothProfile? = null
 
+    private fun updateScanButtonFocus(hasFocus: Boolean) {
+        if (hasFocus) {
+            btnScanBt.background = ListItemViewFactory.createFocusedButtonBackground(activity)
+            btnScanBt.setTextColor(ThemeManager.getListButtonFocusedTextColor())
+        } else {
+            btnScanBt.background = ListItemViewFactory.createButtonBackground(activity, ThemeManager.getListButtonNormalBg())
+            btnScanBt.setTextColor(ThemeManager.getTextColorPrimary())
+        }
+        btnScanBt.typeface = ThemeManager.getCustomFontBold()
+    }
+
     init {
+        btnScanBt.isSoundEffectsEnabled = false
+        updateScanButtonFocus(btnScanBt.hasFocus())
+        btnScanBt.setOnFocusChangeListener { _, hasFocus ->
+            updateScanButtonFocus(hasFocus)
+        }
         btnScanBt.setOnClickListener {
             clickFeedback()
             startBluetoothScan()
@@ -65,6 +82,7 @@ class BluetoothController(
 
     override fun onEnter(state: ScreenState) {
         layoutBluetoothMode.visibility = View.VISIBLE
+        updateScanButtonFocus(btnScanBt.hasFocus())
         startBluetoothScan()
     }
 
@@ -74,6 +92,7 @@ class BluetoothController(
     }
 
     override fun onRefreshUI() {
+        updateScanButtonFocus(btnScanBt.hasFocus())
         startBluetoothScan()
     }
 
@@ -544,6 +563,69 @@ class BluetoothController(
                 }
             }
         }, 50)
+    }
+
+    override fun onWheel(delta: Int, event: KeyEvent): Boolean {
+        val curFocus = activity.currentFocus
+        if (curFocus == btnScanBt) {
+            if (delta > 0 && containerBtItems.childCount > 0) {
+                for (i in 0 until containerBtItems.childCount) {
+                    val child = containerBtItems.getChildAt(i)
+                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
+                        child.requestFocus()
+                        clickFeedback()
+                        return true
+                    }
+                }
+            }
+            return false
+        }
+        val currentIndex = if (curFocus != null) containerBtItems.indexOfChild(curFocus) else -1
+        if (delta < 0) {
+            if (currentIndex > 0) {
+                for (i in currentIndex - 1 downTo 0) {
+                    val child = containerBtItems.getChildAt(i)
+                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
+                        child.requestFocus()
+                        clickFeedback()
+                        return true
+                    }
+                }
+            } else if (currentIndex == 0 && btnScanBt.visibility == View.VISIBLE) {
+                btnScanBt.requestFocus()
+                clickFeedback()
+                return true
+            }
+        } else {
+            if (currentIndex in 0 until containerBtItems.childCount - 1) {
+                for (i in currentIndex + 1 until containerBtItems.childCount) {
+                    val child = containerBtItems.getChildAt(i)
+                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
+                        child.requestFocus()
+                        clickFeedback()
+                        return true
+                    }
+                }
+            }
+        }
+        if (currentIndex == -1 && containerBtItems.childCount > 0) {
+            for (i in 0 until containerBtItems.childCount) {
+                val child = containerBtItems.getChildAt(i)
+                if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
+                    child.requestFocus()
+                    clickFeedback()
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == 21 || keyCode == 22) {
+            return onWheel(if (keyCode == 22) 1 else -1, event)
+        }
+        return false
     }
 
     override fun onBackPressed(): Boolean {
