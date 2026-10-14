@@ -30,14 +30,24 @@ class JellyfinClient(rawUrl: String?, deviceId: String?) {
     private val httpClient: OkHttpClient = buildOkHttpClient()
 
     private fun buildOkHttpClient(): OkHttpClient {
-        return try {
-            val trustAll = object : X509TrustManager {
-                override fun checkClientTrusted(certs: Array<X509Certificate>, authType: String) {}
-                override fun checkServerTrusted(certs: Array<X509Certificate>, authType: String) {}
-                override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-            }
+        com.themoon.y1.InniClassicApplication.installConscrypt()
+        val trustAll = object : X509TrustManager {
+            override fun checkClientTrusted(certs: Array<X509Certificate>, authType: String) {}
+            override fun checkServerTrusted(certs: Array<X509Certificate>, authType: String) {}
+            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+        }
 
-            val sslContext = SSLContext.getInstance("TLS", "Conscrypt")
+        return try {
+            val sslContext = try {
+                SSLContext.getInstance("TLS", "Conscrypt")
+            } catch (t: Throwable) {
+                val p = try { org.conscrypt.Conscrypt.newProvider() } catch (_: Throwable) { null }
+                if (p != null) {
+                    SSLContext.getInstance("TLS", p)
+                } else {
+                    SSLContext.getInstance("TLS")
+                }
+            }
             sslContext.init(null, arrayOf<TrustManager>(trustAll), SecureRandom())
 
             OkHttpClient.Builder()
@@ -47,12 +57,19 @@ class JellyfinClient(rawUrl: String?, deviceId: String?) {
                 .readTimeout(60, TimeUnit.SECONDS)
                 .writeTimeout(60, TimeUnit.SECONDS)
                 .build()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.w(TAG, "Conscrypt SSL init failed, fallback to default OkHttp: " + e.message)
-            OkHttpClient.Builder()
+            val fallbackBuilder = OkHttpClient.Builder()
                 .connectTimeout(15, TimeUnit.SECONDS)
                 .readTimeout(60, TimeUnit.SECONDS)
-                .build()
+                .writeTimeout(60, TimeUnit.SECONDS)
+            try {
+                val fallbackContext = SSLContext.getInstance("TLS")
+                fallbackContext.init(null, arrayOf<TrustManager>(trustAll), SecureRandom())
+                fallbackBuilder.sslSocketFactory(fallbackContext.socketFactory, trustAll)
+                fallbackBuilder.hostnameVerifier(HostnameVerifier { _, _ -> true })
+            } catch (ignored: Throwable) {}
+            fallbackBuilder.build()
         }
     }
 
@@ -465,14 +482,14 @@ class JellyfinClient(rawUrl: String?, deviceId: String?) {
         val item = JellyfinMediaItem()
         item.id = o.optString("Id", "")
         item.name = o.optString("Name", "Unknown")
-        item.album = o.optString("Album", null)
+        item.album = if (!o.isNull("Album")) o.optString("Album") else null
         item.libraryId = libraryId
         item.collectionType = collectionType
         item.serverDateModified = o.optString("DateCreated", "")
 
         val artistsArr = o.optJSONArray("Artists")
         if (artistsArr != null && artistsArr.length() > 0) {
-            item.artist = artistsArr.optString(0, null)
+            item.artist = if (!artistsArr.isNull(0)) artistsArr.optString(0) else ""
         }
         if (item.artist.isNullOrBlank()) {
             item.artist = o.optString("AlbumArtist", "Unknown Artist")
@@ -503,10 +520,10 @@ class JellyfinClient(rawUrl: String?, deviceId: String?) {
 
         item.indexNumber = o.optInt("IndexNumber", 0)
         item.parentIndexNumber = o.optInt("ParentIndexNumber", 0)
-        item.seriesName = o.optString("SeriesName", null)
-        item.seriesId = o.optString("SeriesId", null)
-        item.seasonId = o.optString("SeasonId", null)
-        item.seasonName = o.optString("SeasonName", null)
+        item.seriesName = if (!o.isNull("SeriesName")) o.optString("SeriesName") else null
+        item.seriesId = o.optString("SeriesId", "")
+        item.seasonId = o.optString("SeasonId", "")
+        item.seasonName = if (!o.isNull("SeasonName")) o.optString("SeasonName") else null
         if (item.seasonName.isNullOrBlank()) {
             if (item.parentIndexNumber > 0) {
                 item.seasonName = "Season " + item.parentIndexNumber
@@ -522,8 +539,8 @@ class JellyfinClient(rawUrl: String?, deviceId: String?) {
             item.seasonId = item.seriesId + "_S" + item.parentIndexNumber
         }
 
-        item.albumId = o.optString("AlbumId", null)
-        item.albumPrimaryImageTag = o.optString("AlbumPrimaryImageTag", null)
+        item.albumId = if (!o.isNull("AlbumId")) o.optString("AlbumId") else null
+        item.albumPrimaryImageTag = if (!o.isNull("AlbumPrimaryImageTag")) o.optString("AlbumPrimaryImageTag") else null
 
         item.container = o.optString("Container", "")
         item.runTimeTicks = o.optLong("RunTimeTicks", 0L)

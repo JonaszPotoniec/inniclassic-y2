@@ -109,7 +109,6 @@ class SettingsController(
             arrayOf("years", "Years"),
             arrayOf("recently_added", "Recently Added"),
             arrayOf("favorites", "My Favorites"),
-            arrayOf("audiobooks", "Audiobooks"),
             arrayOf("folders", "Folders"),
             arrayOf("search", "Search")
         )

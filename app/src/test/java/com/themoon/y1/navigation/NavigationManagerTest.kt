@@ -160,4 +160,89 @@ class NavigationManagerTest {
         assertEquals(ScreenState.MainMenu, transitionedFrom)
         assertEquals(ScreenState.CoverFlow, transitionedTo)
     }
+
+    @Test
+    fun testJellyfinNavigationAndBackStack() {
+        val fakeSettings = FakeController()
+        val fakeJellyfin = FakeController()
+        navManager.registerController(ScreenState.Settings::class.java, fakeSettings)
+        navManager.registerController(ScreenState.Jellyfin::class.java, fakeJellyfin)
+
+        navManager.navigateTo(ScreenState.MainMenu)
+        navManager.navigateTo(ScreenState.Settings())
+        assertEquals(fakeSettings, navManager.activeController)
+        assertEquals(ScreenState.Settings(), navManager.currentState)
+
+        navManager.navigateTo(ScreenState.Jellyfin)
+        assertEquals(fakeJellyfin, navManager.activeController)
+        assertEquals(ScreenState.Jellyfin, navManager.currentState)
+        assertEquals(1, fakeJellyfin.enterCount)
+        assertEquals(1, fakeSettings.exitCount)
+
+        assertTrue(navManager.popBackStack())
+        assertEquals(fakeSettings, navManager.activeController)
+        assertEquals(ScreenState.Settings(), navManager.currentState)
+    }
+
+    @Test
+    fun testJellyfinToKeyboardCancelAndBackStack() {
+        val fakeSettings = FakeController()
+        val fakeJellyfin = FakeController()
+        val fakeKeyboard = FakeController()
+        navManager.registerController(ScreenState.Settings::class.java, fakeSettings)
+        navManager.registerController(ScreenState.Jellyfin::class.java, fakeJellyfin)
+        navManager.registerController(ScreenState.WifiKeyboard::class.java, fakeKeyboard)
+
+        navManager.navigateTo(ScreenState.MainMenu)
+        navManager.navigateTo(ScreenState.Settings())
+        navManager.navigateTo(ScreenState.Jellyfin)
+        assertEquals(fakeJellyfin, navManager.activeController)
+
+        // Open keyboard
+        navManager.navigateTo(ScreenState.WifiKeyboard(""))
+        assertEquals(fakeKeyboard, navManager.activeController)
+        assertEquals(ScreenState.WifiKeyboard(""), navManager.currentState)
+
+        // Cancel / exit keyboard pops back to Jellyfin
+        assertTrue(navManager.popBackStack())
+        assertEquals(fakeJellyfin, navManager.activeController)
+        assertEquals(ScreenState.Jellyfin, navManager.currentState)
+
+        // Back from Jellyfin pops back to Settings
+        assertTrue(navManager.popBackStack())
+        assertEquals(fakeSettings, navManager.activeController)
+        assertEquals(ScreenState.Settings(), navManager.currentState)
+
+        // Back from Settings pops to MainMenu
+        assertTrue(navManager.popBackStack())
+        assertEquals(ScreenState.MainMenu, navManager.currentState)
+    }
+
+    @Test
+    fun testAudiobooksNavigationAndBackStack() {
+        // Start at Main Menu
+        navManager.navigateTo(ScreenState.MainMenu)
+        assertEquals(fakeMainMenu, navManager.activeController)
+        assertEquals(ScreenState.MainMenu, navManager.currentState)
+
+        // Navigate to Audiobooks (Browser Audiobooks mode)
+        navManager.navigateTo(ScreenState.Browser(BrowserMode.Audiobooks))
+        assertEquals(fakeBrowser, navManager.activeController)
+        assertEquals(ScreenState.Browser(BrowserMode.Audiobooks), navManager.currentState)
+
+        // Pop backstack should return to Main Menu
+        assertTrue(navManager.popBackStack())
+        assertEquals(fakeMainMenu, navManager.activeController)
+        assertEquals(ScreenState.MainMenu, navManager.currentState)
+
+        // Now navigate to Music (Browser Root mode)
+        navManager.navigateTo(ScreenState.Browser(BrowserMode.Root))
+        assertEquals(fakeBrowser, navManager.activeController)
+        assertEquals(ScreenState.Browser(BrowserMode.Root), navManager.currentState)
+
+        // Pop backstack returns to Main Menu
+        assertTrue(navManager.popBackStack())
+        assertEquals(fakeMainMenu, navManager.activeController)
+        assertEquals(ScreenState.MainMenu, navManager.currentState)
+    }
 }

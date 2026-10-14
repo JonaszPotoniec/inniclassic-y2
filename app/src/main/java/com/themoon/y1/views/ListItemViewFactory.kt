@@ -244,6 +244,47 @@ object ListItemViewFactory {
         return btn
     }
 
+    fun createDialogButton(context: Context, text: String): View {
+        val d = context.resources.displayMetrics.density
+        val btnHeight = (36f * d).toInt()
+        val cornerRad = (if (ThemeManager.isClassicTheme()) 6f else ThemeManager.getButtonRadius().toFloat()) * d
+
+        val btn = TextView(context).apply {
+            this.text = text
+            setTextSize(TypedValue.COMPLEX_UNIT_PX, (if (ThemeManager.isClassicTheme()) 16f else 15f) * d)
+            typeface = ThemeManager.getCustomFontBold()
+            gravity = Gravity.CENTER
+            isFocusable = true
+            isClickable = true
+            includeFontPadding = false
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                btnHeight
+            ).apply {
+                topMargin = (6f * d).toInt()
+            }
+        }
+
+        fun updateBg(focused: Boolean) {
+            val bg = if (focused) {
+                btn.setTextColor(ThemeManager.getListButtonFocusedTextColor())
+                val grad = createFocusedButtonBackground(context)
+                grad.cornerRadius = cornerRad
+                grad
+            } else {
+                btn.setTextColor(ThemeManager.getTextColorPrimary())
+                val shape = createButtonBackground(context, ThemeManager.getListButtonNormalBg())
+                shape.cornerRadius = cornerRad
+                shape
+            }
+            btn.background = bg
+        }
+
+        updateBg(false)
+        btn.setOnFocusChangeListener { _, hasFocus -> updateBg(hasFocus) }
+        return btn
+    }
+
     fun createSettingRow(context: Context, title: String, value: String): LinearLayout {
         val d = context.resources.displayMetrics.density
         val rowHeight = if (ThemeManager.isClassicTheme()) (ClassicMenuStyle.ROW_HEIGHT_DP * d).toInt() else (48f * d).toInt()

@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.Context
 import android.net.wifi.WifiConfiguration
 import android.net.wifi.WifiManager
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.view.KeyEvent
 import android.view.View
@@ -13,6 +15,7 @@ import android.widget.TextView
 import android.widget.Toast
 import com.themoon.y1.R
 import com.themoon.y1.controllers.ScreenController
+import com.themoon.y1.navigation.InputRouter
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.QwertyKeyboardView
 
@@ -63,6 +66,13 @@ class WifiKeyboardController(
     private var keyboardIndex = 0
     private var isBackLongPressConsumed = false
     private var isLongPressConsumed = false
+    private val handler = Handler(Looper.getMainLooper())
+    private val longPressBackRunnable = Runnable {
+        isBackLongPressConsumed = true
+        InputRouter.getInstance().suppressBackUntilRelease(350L)
+        clickFeedback()
+        exitKeyboard()
+    }
 
     private val KEYBOARD_CHARS = arrayOf(
         "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u",
@@ -115,6 +125,8 @@ class WifiKeyboardController(
     }
 
     override fun onEnter(state: ScreenState) {
+        handler.removeCallbacks(longPressBackRunnable)
+        isBackLongPressConsumed = false
         layoutWifiKeyboard.visibility = View.VISIBLE
         if (state is ScreenState.WifiKeyboard) {
             targetWifiSsid = state.ssid
@@ -123,6 +135,8 @@ class WifiKeyboardController(
     }
 
     override fun onExit() {
+        handler.removeCallbacks(longPressBackRunnable)
+        isBackLongPressConsumed = false
         layoutWifiKeyboard.visibility = View.GONE
     }
 
@@ -287,6 +301,7 @@ class WifiKeyboardController(
                 }
                 pendingJellyfinUsername = typedText.trim()
                 currentKeyboardMode = 7
+                openKeyboard()
                 onSubmitJellyfinUsername(pendingJellyfinUsername)
             }
             7 -> {
@@ -315,6 +330,7 @@ class WifiKeyboardController(
     }
 
     fun exitKeyboard() {
+        handler.removeCallbacks(longPressBackRunnable)
         val mode = currentKeyboardMode
         currentKeyboardMode = 0
         onExitKeyboard(mode)
@@ -347,6 +363,39 @@ class WifiKeyboardController(
         val keyCode = event.keyCode
         val action = event.action
         if (isQwertyKeyboard()) {
+            if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == 4) {
+                if (action == KeyEvent.ACTION_DOWN) {
+                    if (event.repeatCount == 0) {
+                        isBackLongPressConsumed = false
+                        handler.removeCallbacks(longPressBackRunnable)
+                        handler.postDelayed(longPressBackRunnable, 450L)
+                    } else if (!isBackLongPressConsumed && (event.eventTime - event.downTime) >= 450L) {
+                        handler.removeCallbacks(longPressBackRunnable)
+                        isBackLongPressConsumed = true
+                        InputRouter.getInstance().suppressBackUntilRelease(350L)
+                        clickFeedback()
+                        exitKeyboard()
+                    }
+                    return true
+                } else if (action == KeyEvent.ACTION_UP) {
+                    handler.removeCallbacks(longPressBackRunnable)
+                    if (isBackLongPressConsumed) {
+                        isBackLongPressConsumed = false
+                        return true
+                    }
+                    keyboardQwertyView?.moveFocus(0, -1, false)
+                    clickFeedback()
+                    return true
+                }
+                return true
+            }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == 19) {
+                if (action == KeyEvent.ACTION_DOWN) {
+                    keyboardQwertyView?.moveFocus(0, -1, false)
+                    clickFeedback()
+                }
+                return true
+            }
             if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == 85
                 || keyCode == KeyEvent.KEYCODE_MEDIA_STOP || keyCode == 86
                 || keyCode == 126 || keyCode == 127
@@ -372,6 +421,14 @@ class WifiKeyboardController(
                 return true
             }
         } else {
+            if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == 4) {
+                if (action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                    InputRouter.getInstance().suppressBackUntilRelease(300L)
+                    clickFeedback()
+                    exitKeyboard()
+                }
+                return true
+            }
             if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == 85
                 || keyCode == KeyEvent.KEYCODE_MEDIA_STOP || keyCode == 86
                 || keyCode == 126 || keyCode == 127
@@ -384,13 +441,31 @@ class WifiKeyboardController(
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (isQwertyKeyboard()) {
-            if (keyCode == KeyEvent.KEYCODE_BACK) {
+        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == 4) {
+            if (isQwertyKeyboard()) {
                 if (event.repeatCount == 0) {
-                    event.startTracking()
+                    isBackLongPressConsumed = false
+                    handler.removeCallbacks(longPressBackRunnable)
+                    handler.postDelayed(longPressBackRunnable, 450L)
+                } else if (!isBackLongPressConsumed && (event.eventTime - event.downTime) >= 450L) {
+                    handler.removeCallbacks(longPressBackRunnable)
+                    isBackLongPressConsumed = true
+                    InputRouter.getInstance().suppressBackUntilRelease(350L)
+                    clickFeedback()
+                    exitKeyboard()
+                }
+                return true
+            } else {
+                if (event.repeatCount == 0) {
+                    InputRouter.getInstance().suppressBackUntilRelease(300L)
+                    clickFeedback()
+                    exitKeyboard()
                 }
                 return true
             }
+        }
+
+        if (isQwertyKeyboard()) {
             if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == 19) {
                 keyboardQwertyView?.moveFocus(0, -1, false)
                 clickFeedback()
@@ -446,10 +521,6 @@ class WifiKeyboardController(
             clickFeedback()
             return true
         }
-        if (keyCode == KeyEvent.KEYCODE_BACK) {
-            exitKeyboard()
-            return true
-        }
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
             if (event.repeatCount == 0) {
                 event.startTracking()
@@ -460,17 +531,19 @@ class WifiKeyboardController(
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
-        if (isQwertyKeyboard() && keyCode == KeyEvent.KEYCODE_BACK) {
-            if (isBackLongPressConsumed) {
-                isBackLongPressConsumed = false
-                return true
-            }
-            if ((event.flags and KeyEvent.FLAG_CANCELED_LONG_PRESS) == 0) {
+        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == 4) {
+            handler.removeCallbacks(longPressBackRunnable)
+            if (isQwertyKeyboard()) {
+                if (isBackLongPressConsumed) {
+                    isBackLongPressConsumed = false
+                    return true
+                }
                 keyboardQwertyView?.moveFocus(0, -1, false)
                 clickFeedback()
                 return true
+            } else {
+                return true
             }
-            return true
         }
 
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
@@ -492,13 +565,19 @@ class WifiKeyboardController(
     }
 
     override fun onKeyLongPress(keyCode: Int, event: KeyEvent): Boolean {
-        if (isQwertyKeyboard()) {
-            if (keyCode == KeyEvent.KEYCODE_BACK) {
+        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == 4) {
+            if (isQwertyKeyboard()) {
+                handler.removeCallbacks(longPressBackRunnable)
                 isBackLongPressConsumed = true
+                InputRouter.getInstance().suppressBackUntilRelease(350L)
                 clickFeedback()
                 exitKeyboard()
                 return true
             }
+            return true
+        }
+
+        if (isQwertyKeyboard()) {
             if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
                 isLongPressConsumed = true
                 keyboardQwertyView?.performCenterLongPress(typedText)
@@ -509,6 +588,10 @@ class WifiKeyboardController(
     }
 
     override fun onBackPressed(): Boolean {
+        handler.removeCallbacks(longPressBackRunnable)
+        isBackLongPressConsumed = false
+        InputRouter.getInstance().suppressBackUntilRelease(300L)
+        clickFeedback()
         exitKeyboard()
         return true
     }

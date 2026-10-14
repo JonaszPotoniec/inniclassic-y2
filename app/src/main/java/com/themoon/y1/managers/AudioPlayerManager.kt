@@ -65,6 +65,9 @@ class AudioPlayerManager private constructor() {
     private var pendingScrobbleAlbum: String? = null
     private var pendingScrobblePath: String? = null
 
+    @Volatile var isPlayingActive: Boolean = false
+    @Volatile var currentlyPlayingFilePath: String? = null
+
     internal var isRestoringPlaybackState: Boolean = false
     private val positionSaveHandler = Handler(Looper.getMainLooper())
     private val positionSaveRunnable = object : Runnable {
@@ -189,6 +192,7 @@ class AudioPlayerManager private constructor() {
         exoPlayer = SimpleExoPlayer.Builder(context.applicationContext, renderersFactory).build().apply {
             addListener(object : Player.EventListener {
                 override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
+                    isPlayingActive = playWhenReady && (playbackState == Player.STATE_READY || playbackState == Player.STATE_BUFFERING)
                     if (playbackState == Player.STATE_READY && !isUsingLegacyPlayer) {
                         if (playWhenReady) {
                             startPeriodicPositionSaver()
@@ -223,6 +227,7 @@ class AudioPlayerManager private constructor() {
                             }
                         }
                     } else if (playbackState == Player.STATE_ENDED && !isUsingLegacyPlayer) {
+                        isPlayingActive = false
                         stopPeriodicPositionSaver()
                         handleTrackCompletion()
                     }
@@ -235,6 +240,7 @@ class AudioPlayerManager private constructor() {
                 }
 
                 override fun onPlayerError(error: ExoPlaybackException) {
+                    isPlayingActive = false
                     val currentPath = MainActivity.instance?.let { it.currentPlaylist.getOrNull(it.currentIndex)?.absolutePath }
                     android.util.Log.e("AudioPlayerManager", "ExoPlayer playback error on $currentPath: ${error.message}", error)
                     if (!isUsingLegacyPlayer) {
@@ -513,12 +519,14 @@ class AudioPlayerManager private constructor() {
         if (isUsingLegacyPlayer && legacyPlayer != null) {
             val player = legacyPlayer ?: return
             if (player.isPlaying) {
+                isPlayingActive = false
                 saveAudiobookBookmarkIfNeeded()
                 player.pause()
                 stopPeriodicPositionSaver()
                 MainActivity.instance?.isPausedByHand = true
                 savePlaybackState(sync = true)
             } else {
+                isPlayingActive = true
                 player.start()
                 startPeriodicPositionSaver()
                 MainActivity.instance?.isPausedByHand = false
@@ -527,12 +535,14 @@ class AudioPlayerManager private constructor() {
         } else if (exoPlayer != null) {
             val player = exoPlayer ?: return
             if (player.playWhenReady) {
+                isPlayingActive = false
                 saveAudiobookBookmarkIfNeeded()
                 player.playWhenReady = false
                 stopPeriodicPositionSaver()
                 MainActivity.instance?.isPausedByHand = true
                 savePlaybackState(sync = true)
             } else {
+                isPlayingActive = true
                 player.playWhenReady = true
                 startPeriodicPositionSaver()
                 MainActivity.instance?.isPausedByHand = false
@@ -607,6 +617,7 @@ class AudioPlayerManager private constructor() {
         LastFmScrobbler.getInstance(main).evaluateAndMaybeSubmit(getCurrentPosition().toLong())
 
         val track = main.currentPlaylist[index]
+        currentlyPlayingFilePath = track.absolutePath
         main.lastAlbumArtBytes = null
         main.currentAlbumColor = ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt()
 
@@ -1011,9 +1022,34 @@ class AudioPlayerManager private constructor() {
     }
 
     fun isPlaying(): Boolean {
-        if (isUsingLegacyPlayer && legacyPlayer != null) return legacyPlayer?.isPlaying == true
-        if (!isUsingLegacyPlayer && exoPlayer != null) return exoPlayer?.playWhenReady == true
-        return false
+        val mainLooper = Looper.getMainLooper()
+        if (mainLooper != null && Looper.myLooper() == mainLooper) {
+            val playing = if (isUsingLegacyPlayer && legacyPlayer != null) {
+                legacyPlayer?.isPlaying == true
+            } else if (!isUsingLegacyPlayer && exoPlayer != null) {
+                exoPlayer?.playWhenReady == true
+            } else {
+                false
+            }
+            isPlayingActive = playing
+            return playing
+        }
+        return isPlayingActive
+    }
+
+    fun isFileCurrentlyPlaying(file: File?): Boolean {
+        if (file == null) return false
+        if (!isPlaying()) return false
+        val currentPath = currentlyPlayingFilePath ?: MainActivity.instance?.let { main ->
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                main.currentPlaylist.getOrNull(main.currentIndex)?.absolutePath
+            } else {
+                synchronized(main.currentPlaylist) {
+                    main.currentPlaylist.getOrNull(main.currentIndex)?.absolutePath
+                }
+            }
+        }
+        return currentPath != null && currentPath == file.absolutePath
     }
 
     fun getAudioSessionId(): Int {
@@ -1023,6 +1059,8 @@ class AudioPlayerManager private constructor() {
     }
 
     fun releasePlayer() {
+        isPlayingActive = false
+        currentlyPlayingFilePath = null
         stopPeriodicPositionSaver()
         exoPlayer?.release()
         exoPlayer = null

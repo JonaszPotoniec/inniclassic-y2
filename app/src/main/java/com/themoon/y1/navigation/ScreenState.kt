@@ -27,6 +27,7 @@ sealed interface ScreenState {
     data object PodcastManage : ScreenState
     data object Equalizer : ScreenState
     data object FmRadio : ScreenState
+    data object Jellyfin : ScreenState
 }
 
 /**

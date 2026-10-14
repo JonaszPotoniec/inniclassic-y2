@@ -43,6 +43,7 @@ class InputRouterTest {
     @Before
     fun setUp() {
         navManager.reset()
+        inputRouter.resetBackSuppression()
         navManager.registerController(ScreenState.MainMenu::class.java, mainMenuController)
         navManager.registerController(ScreenState.CoverFlow::class.java, subController)
     }
@@ -50,6 +51,7 @@ class InputRouterTest {
     @After
     fun tearDown() {
         navManager.reset()
+        inputRouter.resetBackSuppression()
     }
 
     @Test
@@ -128,5 +130,27 @@ class InputRouterTest {
         val prevEvent = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PREVIOUS)
         assertTrue("Prev track key should be handled globally when controller does not consume",
             inputRouter.onKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, prevEvent, mainMenuController))
+    }
+
+    @Test
+    fun testSuppressBackUntilRelease_blocksBackEventsUntilUp() {
+        navManager.navigateTo(ScreenState.MainMenu)
+        navManager.navigateTo(ScreenState.CoverFlow)
+        subController.handleBackResult = false
+
+        inputRouter.suppressBackUntilRelease(500L)
+        assertTrue(inputRouter.isBackSuppressed)
+
+        // Down event while suppressed
+        val downEvent = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK)
+        val handledDown = inputRouter.onKeyDown(KeyEvent.KEYCODE_BACK, downEvent, subController)
+        assertTrue(handledDown)
+        assertEquals(ScreenState.CoverFlow, navManager.currentState)
+        assertFalse(subController.backPressed)
+
+        // Up event clears suppression
+        val upEvent = KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_BACK)
+        inputRouter.onKeyUp(KeyEvent.KEYCODE_BACK, upEvent, subController)
+        assertFalse(inputRouter.isBackSuppressed)
     }
 }

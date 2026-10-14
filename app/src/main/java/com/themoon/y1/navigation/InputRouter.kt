@@ -16,6 +16,24 @@ import com.themoon.y1.managers.AudioPlayerManager
  */
 class InputRouter private constructor() {
 
+    @Volatile
+    var isBackSuppressed: Boolean = false
+        private set
+
+    @Volatile
+    var backDebounceUntil: Long = 0L
+        private set
+
+    fun suppressBackUntilRelease(debounceMs: Long = 350L) {
+        isBackSuppressed = true
+        backDebounceUntil = System.currentTimeMillis() + debounceMs
+    }
+
+    fun resetBackSuppression() {
+        isBackSuppressed = false
+        backDebounceUntil = 0L
+    }
+
     fun interface VolumeAdjuster {
         fun adjustVolume(isUp: Boolean)
     }
@@ -106,6 +124,16 @@ class InputRouter private constructor() {
             return true
         }
 
+        // Suppress back key repeat / debounce after modal or long-press dismissal
+        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == 19 || keyCode == 4) {
+            if (isBackSuppressed || System.currentTimeMillis() < backDebounceUntil) {
+                if (action == KeyEvent.ACTION_UP) {
+                    isBackSuppressed = false
+                }
+                return true
+            }
+        }
+
         return false
     }
 
@@ -148,7 +176,11 @@ class InputRouter private constructor() {
         if (activeController?.onKeyDown(keyCode, event) == true) {
             return true
         }
-        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == 19) {
+        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == 19 || keyCode == 4) {
+            val now = System.currentTimeMillis()
+            if (isBackSuppressed || now < backDebounceUntil || event.repeatCount > 0) {
+                return true
+            }
             if (activeController?.onBackPressed() == true) {
                 return true
             }
@@ -186,7 +218,8 @@ class InputRouter private constructor() {
         if (activeController?.onKeyUp(keyCode, event) == true) {
             return true
         }
-        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == 19) {
+        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == 19 || keyCode == 4) {
+            isBackSuppressed = false
             return true
         }
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == 23 || keyCode == KeyEvent.KEYCODE_ENTER) {

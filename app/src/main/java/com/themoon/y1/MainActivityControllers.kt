@@ -367,52 +367,44 @@ internal fun MainActivity.initControllers() {
         activity = this,
         rootView = layoutWifiKeyboard as ViewGroup,
         clickFeedback = { clickFeedback() },
-        onExitKeyboard = { mode ->
-            when (mode) {
-                0 -> changeScreen(MainActivity.STATE_WIFI)
-                1 -> changeScreen(MainActivity.STATE_BROWSER)
-                2 -> changeScreen(MainActivity.STATE_SETTINGS)
-                3 -> changeScreen(MainActivity.STATE_BROWSER)
-                else -> changeScreen(MainActivity.STATE_SETTINGS)
-            }
+        onExitKeyboard = { _ ->
+            NavigationManager.getInstance().popBackStack()
         },
         onSubmitSearchPodcast = { keyword ->
-            changeScreen(MainActivity.STATE_BROWSER)
+            NavigationManager.getInstance().popBackStack()
             podcastController.searchApplePodcasts(keyword)
         },
         onSubmitSearchLibrary = { keyword ->
-            changeScreen(MainActivity.STATE_BROWSER)
+            NavigationManager.getInstance().popBackStack()
             browserController.virtualQueryType = "SEARCH"
             browserController.virtualQueryValue = keyword
             browserController.buildVirtualSongs()
         },
         onSubmitLastFmUsername = { username ->
             prefs.edit().putString("lastfm_username", username).apply()
-            changeScreen(MainActivity.STATE_SETTINGS)
         },
         onSubmitLastFmPassword = { password ->
             prefs.edit().putString("lastfm_password", password).apply()
-            changeScreen(MainActivity.STATE_SETTINGS)
+            NavigationManager.getInstance().popBackStack()
         },
         onSubmitJellyfinServerUrl = { url ->
-            prefs.edit().putString("jellyfin_server_url", url).apply()
-            changeScreen(MainActivity.STATE_SETTINGS)
-            jellyfinUiController.buildSettingsUI()
+            val provider = com.themoon.y1.sync.jellyfin.JellyfinSyncProvider.getInstance(this)
+            provider.serverUrl = url
+            NavigationManager.getInstance().popBackStack()
         },
         onSubmitJellyfinUsername = { username ->
-            prefs.edit().putString("jellyfin_username", username).apply()
-            changeScreen(MainActivity.STATE_SETTINGS)
-            jellyfinUiController.buildSettingsUI()
+            val provider = com.themoon.y1.sync.jellyfin.JellyfinSyncProvider.getInstance(this)
+            provider.username = username
         },
         onSubmitJellyfinPassword = { password ->
-            prefs.edit().putString("jellyfin_password", password).apply()
-            changeScreen(MainActivity.STATE_SETTINGS)
-            jellyfinUiController.buildSettingsUI()
+            val provider = com.themoon.y1.sync.jellyfin.JellyfinSyncProvider.getInstance(this)
+            provider.password = password
+            NavigationManager.getInstance().popBackStack()
         },
         onSubmitJellyfinToken = { token ->
-            prefs.edit().putString("jellyfin_token", token).apply()
-            changeScreen(MainActivity.STATE_SETTINGS)
-            jellyfinUiController.buildSettingsUI()
+            val provider = com.themoon.y1.sync.jellyfin.JellyfinSyncProvider.getInstance(this)
+            provider.accessToken = token
+            NavigationManager.getInstance().popBackStack()
         },
         onConnectWifi = { ssid, password, isOpen ->
             val wm = getSystemService(Context.WIFI_SERVICE) as? WifiManager
@@ -431,7 +423,7 @@ internal fun MainActivity.initControllers() {
                     wm.saveConfiguration()
                 }
             }
-            changeScreen(MainActivity.STATE_WIFI)
+            NavigationManager.getInstance().popBackStack()
         },
         localize = { t(it) }
     )
@@ -477,10 +469,11 @@ internal fun MainActivity.initControllers() {
         createTablerButton = { icon, text ->
             ListItemViewFactory.createTablerListButton(this, icon, text, ThemeManager.getTextColorPrimary(), ThemeManager.getListButtonFocusedTextColor())
         },
-        createDialogButton = { text -> ListItemViewFactory.createListButtonSimple(this, text) },
+        createDialogButton = { text -> ListItemViewFactory.createDialogButton(this, text) },
         clickFeedback = { clickFeedback() },
-        onOpenKeyboard = { mode, _ ->
+        onOpenKeyboard = { mode, currentVal ->
             wifiKeyboardController.currentKeyboardMode = mode
+            wifiKeyboardController.typedText = currentVal
             changeScreen(MainActivity.STATE_WIFI_KEYBOARD)
         },
         onRequestWifi = { _ -> changeScreen(MainActivity.STATE_WIFI) },
@@ -492,8 +485,7 @@ internal fun MainActivity.initControllers() {
         onSyncFinished = { startMediaLibraryScan() },
         onScanVideos = { scanVideos() },
         isFilePlaying = { file ->
-            val am = AudioPlayerManager.getInstance()
-            am.isPlaying() && currentPlaylist.isNotEmpty() && currentIndex in currentPlaylist.indices && currentPlaylist[currentIndex].absolutePath == file?.absolutePath
+            AudioPlayerManager.getInstance().isFileCurrentlyPlaying(file)
         },
         customLibrary = MainActivity.customLibrary,
         trackNumberMap = MainActivity.trackNumberMap,
@@ -531,7 +523,7 @@ internal fun MainActivity.initControllers() {
             changeScreen(screenId)
         },
         onOpenEqualizer = { changeScreen(ScreenState.Equalizer) },
-        onOpenJellyfin = { changeScreen(MainActivity.STATE_JELLYFIN) },
+        onOpenJellyfin = { changeScreen(ScreenState.Jellyfin) },
         onOpenUpdateCheck = { otaUpdateManager?.checkForUpdates() },
         onClearCacheConfirmed = {
             MediaLibraryManager.getInstance().musicLibrary.clear()
@@ -610,6 +602,7 @@ internal fun MainActivity.initControllers() {
         registerController(ScreenState.Settings::class.java, settingsController)
         registerController(ScreenState.Equalizer::class.java, equalizerController)
         registerController(ScreenState.FmRadio::class.java, fmRadioController)
+        registerController(ScreenState.Jellyfin::class.java, jellyfinUiController)
         registerController(ScreenState.Bluetooth::class.java, bluetoothController)
         registerController(ScreenState.Wifi::class.java, wifiController)
         registerController(ScreenState.WifiKeyboard::class.java, wifiKeyboardController)
@@ -626,6 +619,8 @@ internal fun MainActivity.handleMainMenuAction(action: String) {
     backTargetForUtility = MainActivity.STATE_MENU
     when (action) {
         "OPEN_BROWSER", "MUSIC" -> {
+            browserController.isAudiobookLibraryMode = false
+            browserController.currentBrowserMode = BrowserMode.Root
             changeScreen(MainActivity.STATE_BROWSER)
             browserController.buildFileBrowserUI()
         }
@@ -661,8 +656,16 @@ internal fun MainActivity.handleMainMenuAction(action: String) {
         }
         "OPEN_AUDIOBOOKS" -> {
             browserController.isAudiobookLibraryMode = true
-            changeScreen(MainActivity.STATE_BROWSER)
+            browserController.currentBrowserMode = BrowserMode.Audiobooks
+            val isScanning = MainActivity.instance?.isCustomScanning == true
+            if (MainActivity.audiobookLibrary.isEmpty() && !isScanning) {
+                startMediaLibraryScan()
+            }
+            changeScreen(ScreenState.Browser(BrowserMode.Audiobooks))
             browserController.buildFileBrowserUI()
+            if (isScanning) {
+                showLoadingPopup()
+            }
         }
         "OPEN_THEME_SETTINGS" -> {
             changeScreen(MainActivity.STATE_SETTINGS)

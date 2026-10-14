@@ -328,6 +328,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        InniClassicApplication.installConscrypt()
         super.onCreate(savedInstanceState)
         instance = this
 
@@ -504,7 +505,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             STATE_COVERFLOW -> ScreenState.CoverFlow
             STATE_EQUALIZER -> ScreenState.Equalizer
             STATE_FM_RADIO -> ScreenState.FmRadio
-            STATE_JELLYFIN -> ScreenState.Settings(SettingsSubMode.Jellyfin())
+            STATE_JELLYFIN -> ScreenState.Jellyfin
             else -> ScreenState.MainMenu
         }
         changeScreen(screenState)
@@ -524,6 +525,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             is ScreenState.Podcasts, is ScreenState.PodcastEpisodes, is ScreenState.PodcastManage -> STATE_BROWSER
             is ScreenState.Equalizer -> STATE_EQUALIZER
             is ScreenState.FmRadio -> STATE_FM_RADIO
+            is ScreenState.Jellyfin -> STATE_JELLYFIN
             is ScreenState.Player -> STATE_PLAYER
             is ScreenState.Settings -> {
                 when (state.subMode) {
@@ -546,10 +548,10 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     }
 
     fun changeScreen(state: ScreenState) {
-        val targetState = if (state is ScreenState.Browser && state.mode is BrowserMode.CoverFlow) {
-            ScreenState.CoverFlow
-        } else {
-            state
+        val targetState = when {
+            state is ScreenState.Browser && state.mode is BrowserMode.CoverFlow -> ScreenState.CoverFlow
+            state is ScreenState.Settings && state.subMode is SettingsSubMode.Jellyfin -> ScreenState.Jellyfin
+            else -> state
         }
         classicWheelStreak = 0
         lastFastScrollLetter = null

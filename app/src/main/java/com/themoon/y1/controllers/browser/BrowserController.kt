@@ -115,7 +115,10 @@ class BrowserController(
         if (state is ScreenState.Browser) {
             currentBrowserMode = state.mode
             when (val mode = state.mode) {
-                is BrowserMode.Root -> buildFileBrowserUI()
+                is BrowserMode.Root -> {
+                    isAudiobookLibraryMode = false
+                    buildFileBrowserUI()
+                }
                 is BrowserMode.Folder -> {
                     currentFolder = mode.dir
                     buildFolderBrowserUI()
@@ -172,7 +175,7 @@ class BrowserController(
                 }
                 is BrowserMode.Audiobooks -> {
                     isAudiobookLibraryMode = true
-                    buildFolderBrowserUI()
+                    buildFileBrowserUI()
                 }
                 is BrowserMode.CoverFlow -> onCoverFlowRequested()
                 else -> buildFileBrowserUI()
@@ -185,11 +188,12 @@ class BrowserController(
     override fun onExit() {
         hideBrowserCoverPane()
         hzIndexScroll?.visibility = View.GONE
+        isAudiobookLibraryMode = false
     }
 
     override fun onRefreshUI() {
         when (currentBrowserMode) {
-            is BrowserMode.Root -> buildFileBrowserUI()
+            is BrowserMode.Root, is BrowserMode.Audiobooks -> buildFileBrowserUI()
             is BrowserMode.Folder -> buildFolderBrowserUI()
             is BrowserMode.VirtualSongs -> buildVirtualSongs()
             is BrowserMode.Favorites -> buildVirtualSongsForFavorites()
@@ -205,12 +209,12 @@ class BrowserController(
         listVirtualSongs?.visibility = View.GONE
         containerBrowserItems.removeAllViews()
 
-        if (isPickingBackground || currentBrowserMode is BrowserMode.Folder || currentBrowserMode is BrowserMode.Audiobooks) {
+        if (isPickingBackground || currentBrowserMode is BrowserMode.Folder) {
             buildFolderBrowserUI()
             return
         }
 
-        if (!isAudiobookLibraryMode) {
+        if (!isAudiobookLibraryMode && currentBrowserMode !is BrowserMode.Audiobooks) {
             updateHeaderTitle(localize("Music"))
             showBrowserCoverPane()
 
@@ -350,25 +354,6 @@ class BrowserController(
                 containerBrowserItems.addView(btnFav)
             }
 
-            if (!isMusicMenuItemHidden("audiobooks")) {
-                val btnAudiobooks = createListButtonWithIcon("\uE8B6", localize("Audiobooks"), null)
-                btnAudiobooks.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Audiobooks")
-                    isAudiobookLibraryMode = true
-                    currentBrowserMode = BrowserMode.Root
-                    val isScanning = MainActivity.instance?.isCustomScanning == true
-                    if (MainActivity.audiobookLibrary.isEmpty() && !isScanning) {
-                        onStartMediaLibraryScan()
-                    }
-                    buildFileBrowserUI()
-                    if (isScanning) {
-                        showLoadingPopup()
-                    }
-                }
-                containerBrowserItems.addView(btnAudiobooks)
-            }
-
             if (!isMusicMenuItemHidden("folders")) {
                 val btnFolders = createListButtonWithIcon("\uE8B6", localize("Folders"), null)
                 btnFolders.setOnClickListener {
@@ -435,15 +420,6 @@ class BrowserController(
                 buildVirtualSongs()
             }
             containerBrowserItems.addView(btnAll)
-
-            val btnMusic = createListButtonWithIcon("\uE03D", localize("Switch to Music"), null)
-            btnMusic.setOnClickListener {
-                clickFeedback()
-                lastBrowserFocusText = localize("Switch to Music")
-                isAudiobookLibraryMode = false
-                buildFileBrowserUI()
-            }
-            containerBrowserItems.addView(btnMusic)
         }
 
         val isScanning = MainActivity.instance?.isCustomScanning == true
@@ -1199,7 +1175,8 @@ class BrowserController(
         clickFeedback()
         val mode = currentBrowserMode
         when (mode) {
-            is BrowserMode.Root -> {
+            is BrowserMode.Root, is BrowserMode.Audiobooks -> {
+                isAudiobookLibraryMode = false
                 onNavigateBackToMenu()
                 return true
             }
@@ -1210,13 +1187,14 @@ class BrowserController(
                     currentFolder.absolutePath == StoragePaths.getPrimaryRoot().absolutePath
                 }
                 if (isAtFolderRoot || StoragePaths.isAnyStorageRoot(currentFolder.absolutePath)) {
-                    currentBrowserMode = BrowserMode.Root
+                    currentBrowserMode = if (isAudiobookLibraryMode) BrowserMode.Audiobooks else BrowserMode.Root
                     lastBrowserFocusText = localize("Folders")
                     buildFileBrowserUI()
                 } else {
                     val exitedName = currentFolder.name
                     val parent = currentFolder.parentFile
                     if (parent == null) {
+                        isAudiobookLibraryMode = false
                         onNavigateBackToMenu()
                     } else {
                         currentFolder = parent
@@ -1245,7 +1223,7 @@ class BrowserController(
                     }
                     else -> {
                         if (virtualQueryType == "ALL") {
-                            currentBrowserMode = BrowserMode.Root
+                            currentBrowserMode = if (isAudiobookLibraryMode) BrowserMode.Audiobooks else BrowserMode.Root
                             lastBrowserFocusText = if (isAudiobookLibraryMode) localize("All Audiobooks") else localize("All Songs")
                             buildFileBrowserUI()
                         } else {
@@ -1257,7 +1235,7 @@ class BrowserController(
                 return true
             }
             is BrowserMode.Artists -> {
-                currentBrowserMode = BrowserMode.Root
+                currentBrowserMode = if (isAudiobookLibraryMode) BrowserMode.Audiobooks else BrowserMode.Root
                 lastBrowserFocusText = if (isAudiobookLibraryMode) localize("Authors") else localize("Album Artists")
                 buildFileBrowserUI()
                 return true
@@ -1283,7 +1261,7 @@ class BrowserController(
                     virtualQueryValue = exitedArtist
                     buildVirtualCategories(if (wasTrack) "TRACK_ARTIST" else "ARTIST")
                 } else {
-                    currentBrowserMode = BrowserMode.Root
+                    currentBrowserMode = if (isAudiobookLibraryMode) BrowserMode.Audiobooks else BrowserMode.Root
                     lastBrowserFocusText = if (isAudiobookLibraryMode) localize("Books") else localize("Albums")
                     buildFileBrowserUI()
                 }

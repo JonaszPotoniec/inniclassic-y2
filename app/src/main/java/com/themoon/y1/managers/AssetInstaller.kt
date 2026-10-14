@@ -36,7 +36,7 @@ object AssetInstaller {
         if (!themesDir.exists()) themesDir.mkdirs()
 
         val lastThemeVersion = prefs.getInt("last_installed_theme_version", 0)
-        val currentThemeVersion = 1010
+        val currentThemeVersion = 1011
         if (lastThemeVersion >= currentThemeVersion) return
 
         try {
