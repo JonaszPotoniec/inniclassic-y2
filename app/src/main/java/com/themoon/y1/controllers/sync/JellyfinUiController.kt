@@ -1111,7 +1111,8 @@ class JellyfinUiController(
             val isSel = currentSelections.contains(movie.id)
             val st = if (isSel) JellyfinSyncHierarchy.TriState.CHECKED else JellyfinSyncHierarchy.TriState.UNCHECKED
 
-            val yearSuffix = if (!movie.year.isNullOrEmpty() && !movie.year.contains("Unknown")) " (${movie.year})" else ""
+            val movieYear = movie.year
+            val yearSuffix = if (!movieYear.isNullOrEmpty() && !movieYear.contains("Unknown")) " ($movieYear)" else ""
             val movieTitle = movie.name + yearSuffix
             val sizeStr = if (movie.fileSize > 0) formatSize(movie.fileSize) else ""
 

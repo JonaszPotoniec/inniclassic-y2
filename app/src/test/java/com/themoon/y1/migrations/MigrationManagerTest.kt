@@ -13,33 +13,7 @@ class MigrationManagerTest {
     @Before
     fun setUp() {
         mockPrefs = MockSharedPreferences()
-        migrationManager = object : MigrationManager(null, mockPrefs) {
-            override fun applyPendingMigrations(): Int {
-                var currentVer = currentVersion
-                val context = MigrationContext(null, mockPrefs, mockPrefs, currentVer)
-                var appliedCount = 0
-
-                for (migration in getRegisteredMigrations()) {
-                    val alreadyApplied = isMigrationApplied(migration.id)
-                    if (migration.version <= currentVer && alreadyApplied) continue
-
-                    try {
-                        migration.migrate(context)
-                        val newVersion = maxOf(currentVer, migration.version)
-                        mockPrefs.edit()
-                            .putInt(KEY_CURRENT_VERSION, newVersion)
-                            .putBoolean(PREFIX_APPLIED + migration.id, true)
-                            .putLong(PREFIX_APPLIED_TIME + migration.id, System.currentTimeMillis())
-                            .commit()
-                        currentVer = newVersion
-                        appliedCount++
-                    } catch (_: Throwable) {
-                        break
-                    }
-                }
-                return appliedCount
-            }
-        }
+        migrationManager = MigrationManager(null, mockPrefs)
     }
 
     @Test

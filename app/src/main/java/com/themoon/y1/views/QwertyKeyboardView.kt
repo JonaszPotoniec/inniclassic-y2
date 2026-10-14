@@ -253,23 +253,6 @@ class QwertyKeyboardView @JvmOverloads constructor(
         }
     }
 
-    private fun col10ToRow4(col10: Int): Int {
-        if (col10 <= 1) return 0
-        if (col10 == 2) return 1
-        if (col10 <= 6) return 2
-        if (col10 == 7) return 3
-        return 4
-    }
-
-    private fun row4ToCol10(col4: Int): Int {
-        return when (col4) {
-            0 -> 0
-            1 -> 2
-            2 -> 4
-            3 -> 7
-            else -> 9
-        }
-    }
 
     @JvmOverloads
     fun moveFocus(dx: Int, dy: Int, wrapAcrossRows: Boolean = false) {
@@ -624,5 +607,27 @@ class QwertyKeyboardView @JvmOverloads constructor(
             "y" to "ÿ", "Y" to "Ÿ",
             "$" to "€", "!" to "¡", "?" to "¿"
         )
+
+        fun col10ToRow4(col10: Int): Int {
+            if (col10 <= 1) return 0
+            if (col10 == 2) return 1
+            if (col10 <= 6) return 2
+            if (col10 == 7) return 3
+            return 4
+        }
+
+        fun row4ToCol10(row: Int): Int {
+            return when (row) {
+                0 -> 0
+                1 -> 2
+                2 -> 4
+                3 -> 7
+                else -> 9
+            }
+        }
     }
+
+    fun col10ToRow4(col10: Int): Int = Companion.col10ToRow4(col10)
+
+    fun row4ToCol10(row: Int): Int = Companion.row4ToCol10(row)
 }

@@ -19,7 +19,7 @@ import java.util.concurrent.Executors
  * Singleton coordinator for media synchronization with WakeLocks, thread safety,
  * progress notifications, and batch library updates.
  */
-class SyncManager private constructor(context: Context) {
+class SyncManager internal constructor(context: Context? = null) {
 
     enum class SyncState {
         IDLE,
@@ -60,18 +60,18 @@ class SyncManager private constructor(context: Context) {
         fun isFileCurrentlyPlaying(file: File): Boolean
     }
 
-    private val context: Context = context.applicationContext
+    private val context: Context? = context?.applicationContext ?: context
     private val mainHandler = Handler(Looper.getMainLooper())
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     val ledger: SyncLedger = SyncLedger()
 
     @Volatile
     var currentState: SyncState = SyncState.IDLE
-        private set
+        internal set
 
     @Volatile
     var isSyncing: Boolean = false
-        private set
+        internal set
 
     private var currentCancellationToken: MediaSyncProvider.CancellationToken? = null
     var syncListener: SyncListener? = null
@@ -79,12 +79,21 @@ class SyncManager private constructor(context: Context) {
     var playbackCheckCallback: PlaybackCheckCallback? = null
 
     init {
-        ledger.load()
+        try {
+            ledger.load()
+        } catch (_: Exception) {}
     }
 
     private fun updateState(state: SyncState, message: String?) {
         this.currentState = state
-        mainHandler.post {
+        val posted = try {
+            mainHandler.post {
+                syncListener?.onStateChanged(state, message)
+            }
+        } catch (_: Exception) {
+            false
+        }
+        if (!posted) {
             syncListener?.onStateChanged(state, message)
         }
     }
@@ -97,13 +106,21 @@ class SyncManager private constructor(context: Context) {
         bytesRead: Long,
         bytesTotal: Long
     ) {
-        mainHandler.post {
+        val posted = try {
+            mainHandler.post {
+                syncListener?.onProgress(libraryName, currentItem, totalItems, currentTitle, bytesRead, bytesTotal)
+            }
+        } catch (_: Exception) {
+            false
+        }
+        if (!posted) {
             syncListener?.onProgress(libraryName, currentItem, totalItems, currentTitle, bytesRead, bytesTotal)
         }
     }
 
     fun cancelSync() {
         currentCancellationToken?.cancel()
+        isSyncing = false
         updateState(SyncState.CANCELLED, "Cancelled by user")
     }
 
@@ -119,7 +136,7 @@ class SyncManager private constructor(context: Context) {
         currentCancellationToken = token
 
         executor.execute {
-            val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            val pm = context?.getSystemService(Context.POWER_SERVICE) as? PowerManager
             var wakeLock: PowerManager.WakeLock? = null
             var wifiLock: WifiManager.WifiLock? = null
 
@@ -127,7 +144,7 @@ class SyncManager private constructor(context: Context) {
                 wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "InniClassic:JellyfinSync")
                 wakeLock?.acquire()
 
-                val wm = context.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+                val wm = context?.getSystemService(Context.WIFI_SERVICE) as? WifiManager
                 if (wm != null) {
                     wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "InniClassic:JellyfinSync")
                     wifiLock.acquire()
@@ -159,7 +176,8 @@ class SyncManager private constructor(context: Context) {
         trackNumberMap: Map<String, Int>,
         token: MediaSyncProvider.CancellationToken
     ) {
-        val provider = JellyfinSyncProvider.getInstance(context)
+        val ctx = context ?: throw IllegalStateException("Context required to execute sync")
+        val provider = JellyfinSyncProvider.getInstance(ctx)
         if (!provider.isConfigured()) {
             throw Exception("Jellyfin is not configured")
         }
@@ -348,7 +366,8 @@ class SyncManager private constructor(context: Context) {
                         )
                         File(syncRoot, "Videos/Jellyfin/$series/$epName")
                     } else {
-                        val yearSuffix = if (!item.year.isNullOrEmpty() && !item.year.contains("Unknown")) " (" + item.year + ")" else ""
+                        val y = item.year
+                        val yearSuffix = if (!y.isNullOrEmpty() && !y.contains("Unknown")) " (" + y + ")" else ""
                         val movName = FileUtils.sanitizeFilename(item.name) + yearSuffix + "." + ext
                         File(syncRoot, "Videos/Jellyfin/$movName")
                     }

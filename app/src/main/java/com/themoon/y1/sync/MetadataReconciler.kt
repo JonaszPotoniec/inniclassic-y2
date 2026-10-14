@@ -16,9 +16,11 @@ object MetadataReconciler {
         val updatedTrackNumbers: MutableMap<String, Int> = HashMap() // absPath -> trackNum
         var isDirty: Boolean = false
     }
+    private val WHITESPACE_REGEX = Regex("\\s+")
+
     fun normalizeText(text: String?): String {
         if (text == null) return ""
-        return text.trim().lowercase(Locale.ROOT)
+        return text.trim().replace(WHITESPACE_REGEX, " ").lowercase(Locale.ROOT)
     }
     fun makeSongKey(title: String?, artist: String?, album: String?): String {
         return normalizeText(title) + "|" + normalizeText(artist) + "|" + normalizeText(album)
@@ -51,12 +53,13 @@ object MetadataReconciler {
             val ledgerItem = ledger.getItem(remoteId)
             var matchedSong: SongItem? = null
 
-            if (ledgerItem != null && ledgerItem.localPath != null) {
-                val localFile = File(ledgerItem.localPath)
+            val ledgerPath = ledgerItem?.localPath
+            if (ledgerPath != null) {
+                val localFile = File(ledgerPath)
                 if (localFile.exists()) {
                     if (localSongs != null) {
                         for (s in localSongs) {
-                            if (s.file.absolutePath == ledgerItem.localPath) {
+                            if (s.file.absolutePath == ledgerPath) {
                                 matchedSong = s
                                 break
                             }
@@ -163,8 +166,9 @@ object MetadataReconciler {
         for (remote in remoteItems) {
             val remoteId = remote.id ?: continue
             val ledgerItem = ledger.getItem(remoteId)
-            if (ledgerItem != null && ledgerItem.localPath != null) {
-                val localFile = File(ledgerItem.localPath)
+            val ledgerPath = ledgerItem?.localPath
+            if (ledgerPath != null) {
+                val localFile = File(ledgerPath)
                 if (localFile.exists() && localFile.length() > 0) {
                     ledgerItem.orphaned = false
                     continue

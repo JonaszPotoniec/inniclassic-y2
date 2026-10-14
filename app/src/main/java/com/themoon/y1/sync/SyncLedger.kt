@@ -15,7 +15,7 @@ import java.io.FileWriter
  * Keeps track of synced items, per-library sync modes ("all", "manual", "off"),
  * manual selections, and orphaned items.
  */
-class SyncLedger {
+class SyncLedger @JvmOverloads constructor(private val ledgerFile: File? = null) {
 
     class LedgerItem(
         var jellyfinId: String,
@@ -143,8 +143,8 @@ class SyncLedger {
     }
 
     @Synchronized
-    fun load() {
-        val file = StoragePaths.primaryFile(LEDGER_FILENAME)
+    @JvmOverloads
+    fun load(file: File = ledgerFile ?: StoragePaths.primaryFile(LEDGER_FILENAME)) {
         if (!file.exists()) return
 
         var reader: BufferedReader? = null
@@ -209,9 +209,10 @@ class SyncLedger {
     }
 
     @Synchronized
-    fun save() {
-        val file = StoragePaths.primaryFile(LEDGER_FILENAME)
-        val tempFile = StoragePaths.primaryFile("$LEDGER_FILENAME.tmp")
+    @JvmOverloads
+    fun save(file: File = ledgerFile ?: StoragePaths.primaryFile(LEDGER_FILENAME)) {
+        val parent = file.parentFile ?: File(".")
+        val tempFile = File(parent, "${file.name}.tmp")
         var writer: BufferedWriter? = null
         try {
             val root = JSONObject().apply {
@@ -241,8 +242,7 @@ class SyncLedger {
                 put("items", itemsObj)
             }
 
-            val parent = tempFile.parentFile
-            if (parent != null && !parent.exists()) {
+            if (!parent.exists()) {
                 parent.mkdirs()
             }
 

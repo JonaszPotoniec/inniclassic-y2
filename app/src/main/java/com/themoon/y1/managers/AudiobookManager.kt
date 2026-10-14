@@ -73,14 +73,6 @@ class AudiobookManager private constructor(context: Context) {
         AudioPlayerManager.getInstance().playTrackListWithOffset(currentBookChapters, currentChapterIndex, savedOffset)
     }
 
-    private fun isAudioFile(f: File?): Boolean {
-        if (f == null || !f.isFile) return false
-        val name = f.name.lowercase()
-        return name.endsWith(".mp3") || name.endsWith(".m4a") || name.endsWith(".flac") || name.endsWith(".wav") ||
-                name.endsWith(".ogg") || name.endsWith(".aac") || name.endsWith(".ape") || name.endsWith(".wma") ||
-                name.endsWith(".opus")
-    }
-
     companion object {
         @Volatile
         private var instance: AudiobookManager? = null
@@ -92,6 +84,15 @@ class AudiobookManager private constructor(context: Context) {
                 instance = inst
             }
             return inst
+        }
+
+        fun isAudioFile(file: File?): Boolean {
+            if (file == null || file.isDirectory) return false
+            val name = file.name.lowercase(java.util.Locale.US)
+            return name.endsWith(".mp3") || name.endsWith(".m4a") || name.endsWith(".m4b") ||
+                    name.endsWith(".aac") || name.endsWith(".flac") || name.endsWith(".ogg") ||
+                    name.endsWith(".wav") || name.endsWith(".ape") || name.endsWith(".wma") ||
+                    name.endsWith(".opus") || name.endsWith(".alac")
         }
     }
 }

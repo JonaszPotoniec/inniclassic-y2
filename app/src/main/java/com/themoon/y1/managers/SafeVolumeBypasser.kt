@@ -10,10 +10,17 @@ import android.util.Log
  * Bypasses Android's Safe Media Volume limit (~80% volume cap on headphones).
  */
 object SafeVolumeBypasser {
-    private const val TAG = "SafeVolumeBypasser"
+    const val TAG = "SafeVolumeBypasser"
+    const val KEY_AUDIO_SAFE_VOLUME_STATE = "audio_safe_volume_state"
+    const val VALUE_SAFE_VOLUME_STATE_DISABLED = 2
+    const val KEY_SAFE_MEDIA_VOLUME_ENABLED = "safe_media_volume_enabled"
+    const val VALUE_SAFE_MEDIA_VOLUME_DISABLED = 0
 
     @Volatile
     private var sRootInitialized: Boolean = false
+
+    val isRootInitialized: Boolean
+        get() = sRootInitialized
 
     /**
      * Programmatic bypass using reflection on AudioManager, IAudioService, and Settings.
@@ -59,16 +66,16 @@ object SafeVolumeBypasser {
         } catch (ignored: Throwable) {}
 
         try {
-            Settings.Global.putInt(context.contentResolver, "audio_safe_volume_state", 2)
+            Settings.Global.putInt(context.contentResolver, KEY_AUDIO_SAFE_VOLUME_STATE, VALUE_SAFE_VOLUME_STATE_DISABLED)
         } catch (ignored: Throwable) {}
         try {
-            Settings.Global.putInt(context.contentResolver, "safe_media_volume_enabled", 0)
+            Settings.Global.putInt(context.contentResolver, KEY_SAFE_MEDIA_VOLUME_ENABLED, VALUE_SAFE_MEDIA_VOLUME_DISABLED)
         } catch (ignored: Throwable) {}
         try {
-            Settings.System.putInt(context.contentResolver, "audio_safe_volume_state", 2)
+            Settings.System.putInt(context.contentResolver, KEY_AUDIO_SAFE_VOLUME_STATE, VALUE_SAFE_VOLUME_STATE_DISABLED)
         } catch (ignored: Throwable) {}
         try {
-            Settings.System.putInt(context.contentResolver, "safe_media_volume_enabled", 0)
+            Settings.System.putInt(context.contentResolver, KEY_SAFE_MEDIA_VOLUME_ENABLED, VALUE_SAFE_MEDIA_VOLUME_DISABLED)
         } catch (ignored: Throwable) {}
     }
 
@@ -81,10 +88,10 @@ object SafeVolumeBypasser {
         Thread({
             try {
                 val pkg = context?.packageName ?: "com.themoon.y1"
-                val cmd = "settings put global audio_safe_volume_state 2 && " +
-                        "settings put system audio_safe_volume_state 2 && " +
-                        "settings put global safe_media_volume_enabled 0 && " +
-                        "settings put system safe_media_volume_enabled 0 && " +
+                val cmd = "settings put global $KEY_AUDIO_SAFE_VOLUME_STATE $VALUE_SAFE_VOLUME_STATE_DISABLED && " +
+                        "settings put system $KEY_AUDIO_SAFE_VOLUME_STATE $VALUE_SAFE_VOLUME_STATE_DISABLED && " +
+                        "settings put global $KEY_SAFE_MEDIA_VOLUME_ENABLED $VALUE_SAFE_MEDIA_VOLUME_DISABLED && " +
+                        "settings put system $KEY_SAFE_MEDIA_VOLUME_ENABLED $VALUE_SAFE_MEDIA_VOLUME_DISABLED && " +
                         "pm grant $pkg android.permission.STATUS_BAR_SERVICE 2>/dev/null && " +
                         "sync"
                 runSu(cmd)

@@ -217,16 +217,6 @@ class LastFmScrobbler private constructor(context: Context) {
         } catch (ignored: Exception) {}
     }
 
-    private fun tsv(vararg fields: String?): String {
-        val sb = StringBuilder()
-        for (i in fields.indices) {
-            if (i > 0) sb.append('\t')
-            val f = fields[i]
-            sb.append(if (f == null) "" else f.replace("\t", " ").replace("\n", " "))
-        }
-        return sb.toString()
-    }
-
     @Synchronized
     private fun enqueuePendingScrobble(
         artist: String,
@@ -314,28 +304,43 @@ class LastFmScrobbler private constructor(context: Context) {
         }
     }
 
-    private fun sign(sortedParams: Map<String, String>): String {
-        val sb = StringBuilder()
-        for ((key, value) in sortedParams) {
-            sb.append(key).append(value)
-        }
-        sb.append(API_SECRET)
-        return md5(sb.toString())
-    }
-
-    private fun md5(input: String): String {
-        val md = MessageDigest.getInstance("MD5")
-        val digest = md.digest(input.toByteArray(Charsets.UTF_8))
-        val sb = StringBuilder()
-        for (b in digest) {
-            sb.append(String.format("%02x", b))
-        }
-        return sb.toString()
-    }
-
     companion object {
         private val API_KEY: String = BuildConfig.LASTFM_API_KEY
         private val API_SECRET: String = BuildConfig.LASTFM_API_SECRET
+
+        fun tsv(list: List<String?>): String {
+            val sb = StringBuilder()
+            for (i in list.indices) {
+                if (i > 0) sb.append('\t')
+                val f = list[i]
+                sb.append(if (f == null) "" else f.replace("\t", " ").replace("\n", " "))
+            }
+            return sb.toString()
+        }
+
+        fun tsv(vararg fields: String?): String {
+            return tsv(fields.toList())
+        }
+
+        fun md5(input: String): String {
+            val md = MessageDigest.getInstance("MD5")
+            val digest = md.digest(input.toByteArray(Charsets.UTF_8))
+            val sb = StringBuilder()
+            for (b in digest) {
+                sb.append(String.format("%02x", b))
+            }
+            return sb.toString()
+        }
+
+        fun sign(params: Map<String, String>, secret: String = API_SECRET): String {
+            val sorted = if (params is TreeMap) params else TreeMap(params)
+            val sb = StringBuilder()
+            for ((key, value) in sorted) {
+                sb.append(key).append(value)
+            }
+            sb.append(secret)
+            return md5(sb.toString())
+        }
 
         private const val API_ROOT = "https://ws.audioscrobbler.com/2.0/"
         private val SCROBBLE_LOG_FILE: File = StoragePaths.primaryFile(".scrobbler.log")

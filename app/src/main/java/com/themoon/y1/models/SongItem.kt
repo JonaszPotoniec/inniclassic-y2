@@ -74,7 +74,7 @@ class SongItem {
     }
 
     companion object {
-        private fun safe(value: String?, fallback: String): String {
+        internal fun safe(value: String?, fallback: String): String {
             return if (!value.isNullOrBlank()) value else fallback
         }
     }

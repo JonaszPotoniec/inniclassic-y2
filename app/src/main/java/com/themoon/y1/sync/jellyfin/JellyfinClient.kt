@@ -526,6 +526,7 @@ class JellyfinClient(rawUrl: String?, deviceId: String?) {
         item.albumPrimaryImageTag = o.optString("AlbumPrimaryImageTag", null)
 
         item.container = o.optString("Container", "")
+        item.runTimeTicks = o.optLong("RunTimeTicks", 0L)
 
         val sources = o.optJSONArray("MediaSources")
         if (sources != null && sources.length() > 0) {

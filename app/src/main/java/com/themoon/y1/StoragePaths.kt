@@ -147,6 +147,9 @@ object StoragePaths {
         return false
     }
 
+    fun isAnyStorageRoot(file: File?): Boolean =
+        file != null && isAnyStorageRoot(file.absolutePath)
+
     fun isVideosRoot(absolutePath: String?): Boolean {
         if (absolutePath == null) return false
         if (absolutePath == "$PRIMARY_PATH/Videos" || absolutePath == "$SECONDARY_PATH/Videos") return true
@@ -156,6 +159,9 @@ object StoragePaths {
         return false
     }
 
+    fun isVideosRoot(file: File?): Boolean =
+        file != null && isVideosRoot(file.absolutePath)
+
     fun isAudiobooksRoot(absolutePath: String?): Boolean {
         if (absolutePath == null) return false
         if (absolutePath == "$PRIMARY_PATH/Audiobooks" || absolutePath == "$SECONDARY_PATH/Audiobooks") return true
@@ -164,6 +170,9 @@ object StoragePaths {
         }
         return false
     }
+
+    fun isAudiobooksRoot(file: File?): Boolean =
+        file != null && isAudiobooksRoot(file.absolutePath)
 
     fun isUnderAudiobooks(absolutePath: String?): Boolean {
         if (absolutePath == null) return false
@@ -201,7 +210,7 @@ object StoragePaths {
         val path = absolutePath
         for (prefix in arrayOf(
             getPrimaryRoot().absolutePath, PRIMARY_PATH, SECONDARY_PATH,
-            "/storage/emulated/legacy"
+            "/storage/emulated/legacy", "/sdcard"
         )) {
             if (path == prefix) return "/"
             if (path.startsWith("$prefix/")) return path.substring(prefix.length)
@@ -253,7 +262,28 @@ object StoragePaths {
         }
     }
 
-    private fun containsSameRoot(roots: List<File>, candidate: File): Boolean {
+    fun containsSameRoot(file1: File?, file2: File?): Boolean {
+        if (file1 == null || file2 == null) return false
+        val p1 = file1.absolutePath
+        val p2 = file2.absolutePath
+        for (root in getAllRoots()) {
+            val r = root.absolutePath
+            val in1 = p1 == r || p1.startsWith("$r/")
+            val in2 = p2 == r || p2.startsWith("$r/")
+            if (in1 && in2) return true
+        }
+        val inPri1 = p1 == PRIMARY_PATH || p1.startsWith("$PRIMARY_PATH/")
+        val inPri2 = p2 == PRIMARY_PATH || p2.startsWith("$PRIMARY_PATH/")
+        if (inPri1 && inPri2) return true
+
+        val inSec1 = p1 == SECONDARY_PATH || p1.startsWith("$SECONDARY_PATH/")
+        val inSec2 = p2 == SECONDARY_PATH || p2.startsWith("$SECONDARY_PATH/")
+        if (inSec1 && inSec2) return true
+
+        return false
+    }
+
+    fun containsSameRoot(roots: List<File>, candidate: File): Boolean {
         val path = candidate.absolutePath
         for (existing in roots) {
             if (existing.absolutePath == path) return true

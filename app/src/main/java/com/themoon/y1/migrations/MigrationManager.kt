@@ -73,7 +73,7 @@ open class MigrationManager {
     open fun applyPendingMigrations(): Int {
         var currentVer = currentVersion
         val settingsPrefs = context?.getSharedPreferences("Y1_SETTINGS", Context.MODE_PRIVATE) ?: prefs
-        val ctx = MigrationContext(context ?: throw IllegalStateException("Context is null"), prefs, settingsPrefs, currentVer)
+        val ctx = MigrationContext(context, prefs, settingsPrefs, currentVer)
         migrationContext = ctx
 
         var appliedCount = 0
