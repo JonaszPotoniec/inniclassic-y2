@@ -235,6 +235,8 @@ class AudioPlayerManager private constructor() {
                 }
 
                 override fun onPlayerError(error: ExoPlaybackException) {
+                    val currentPath = MainActivity.instance?.let { it.currentPlaylist.getOrNull(it.currentIndex)?.absolutePath }
+                    android.util.Log.e("AudioPlayerManager", "ExoPlayer playback error on $currentPath: ${error.message}", error)
                     if (!isUsingLegacyPlayer) {
                         handleTrackError("Cannot play this file.")
                     }
@@ -609,6 +611,8 @@ class AudioPlayerManager private constructor() {
         main.currentAlbumColor = ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt()
 
         if (!track.exists() || track.length() < 1024) {
+            val size = if (track.exists()) track.length() else -1L
+            android.util.Log.e("AudioPlayerManager", "Track is missing or corrupt (<1024 bytes, size=$size): ${track.absolutePath}")
             main.tvPlayerTitle.text = "Corrupted File"
             main.tvPlayerArtist.text = "Skipping..."
             main.tvPlayerAlbum.text = ""

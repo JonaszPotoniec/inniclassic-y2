@@ -65,7 +65,9 @@ class MediaLibraryManager private constructor() {
             if (f.isDirectory) {
                 count += countAudioFiles(f)
             } else if (isAudioFile(f)) {
-                count++
+                if (f.length() >= 1024L) {
+                    count++
+                }
             }
         }
         return count
@@ -159,6 +161,10 @@ class MediaLibraryManager private constructor() {
             if (f.isDirectory) {
                 scanned = scanDirectory(f, targetList, existingPaths, blacklist, scanned, total, isAudiobook, listener)
             } else if (isAudioFile(f)) {
+                if (f.length() < 1024L) {
+                    android.util.Log.w("MediaLibraryManager", "Skipping empty/corrupted file (< 1024 bytes): ${f.absolutePath}")
+                    continue
+                }
                 if (blacklist.contains(f.absolutePath)) continue
 
                 if (existingPaths.contains(f.absolutePath)) {
@@ -413,7 +419,7 @@ class MediaLibraryManager private constructor() {
             try {
                 val o = arr.getJSONObject(i)
                 val f = File(o.getString("path"))
-                if (!f.exists()) continue
+                if (!f.exists() || f.length() < 1024L) continue
 
                 if (isAudiobook) {
                     if (!StoragePaths.isUnderAudiobooks(f)) continue
