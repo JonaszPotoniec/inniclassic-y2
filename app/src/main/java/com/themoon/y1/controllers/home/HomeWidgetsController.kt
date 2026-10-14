@@ -1,11 +1,13 @@
 package com.themoon.y1.controllers.home
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Typeface
+import android.media.MediaMetadataRetriever
 import android.os.BatteryManager
 import android.text.SpannableString
 import android.text.Spanned
@@ -15,12 +17,17 @@ import android.util.TypedValue
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
+import com.themoon.y1.MainActivity
 import com.themoon.y1.R
+import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.menu.MainMenuController
+import com.themoon.y1.managers.MediaLibraryManager
 import com.themoon.y1.views.CircularBatteryView
 import com.themoon.y1.views.CustomAnalogClockView
 import com.themoon.y1.views.WidgetBatteryBarView
+import java.io.File
+import java.io.FileInputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -38,7 +45,8 @@ class HomeWidgetsController(
     private val mainMenuProvider: () -> MainMenuController?,
     private val ivBrowserCover: ImageView?,
     private val frameBrowserCover: View?,
-    private val fetchRandomIdleCoverAsync: () -> Unit
+    private val fetchRandomIdleCoverAsync: () -> Unit,
+    private val isAudiobookMode: () -> Boolean = { false }
 ) {
 
     private val widgetViewRegistry: Map<View, ThemeManager.MenuElement>
@@ -77,6 +85,13 @@ class HomeWidgetsController(
             }
         }
     private var cachedAlbumArtBitmap: Bitmap? = null
+    var cachedBookCoverBitmap: Bitmap? = null
+
+    fun setAudiobookCoverBytes(bytes: ByteArray?) {
+        if (bytes != null && bytes.isNotEmpty()) {
+            cachedBookCoverBitmap = try { decodeAlbumArtSmart(bytes) } catch (_: Exception) { null }
+        }
+    }
 
     var idleRandomCoverBitmap: Bitmap? = null
     var currentTrackTitle = ""
@@ -190,18 +205,30 @@ class HomeWidgetsController(
             }
         }
 
-        // 5. Music menu split cover
+        // 5. Music / Audiobooks menu split cover
         if (ivBrowserCover != null && frameBrowserCover != null && frameBrowserCover.visibility == View.VISIBLE) {
-            val bmp = cachedAlbumArtBitmap ?: lastAlbumArtBytes?.takeIf { it.isNotEmpty() }?.let {
-                try { decodeAlbumArtSmart(it) } catch (_: Exception) { null }
-            }
-            if (bmp != null) {
-                ivBrowserCover.setImageBitmap(bmp)
-            } else if (idleRandomCoverBitmap != null) {
-                ivBrowserCover.setImageBitmap(idleRandomCoverBitmap)
+            if (isAudiobookMode()) {
+                val cached = cachedBookCoverBitmap
+                if (cached != null) {
+                    ivBrowserCover.setImageBitmap(cached)
+                } else {
+                    ivBrowserCover.setImageResource(R.drawable.default_album)
+                    fetchAudiobookCoverAsync { bmp ->
+                        ivBrowserCover.setImageBitmap(bmp)
+                    }
+                }
             } else {
-                ivBrowserCover.setImageResource(R.drawable.default_album)
-                fetchRandomIdleCoverAsync()
+                val bmp = cachedAlbumArtBitmap ?: lastAlbumArtBytes?.takeIf { it.isNotEmpty() }?.let {
+                    try { decodeAlbumArtSmart(it) } catch (_: Exception) { null }
+                }
+                if (bmp != null) {
+                    ivBrowserCover.setImageBitmap(bmp)
+                } else if (idleRandomCoverBitmap != null) {
+                    ivBrowserCover.setImageBitmap(idleRandomCoverBitmap)
+                } else {
+                    ivBrowserCover.setImageResource(R.drawable.default_album)
+                    fetchRandomIdleCoverAsync()
+                }
             }
         }
 
@@ -275,6 +302,126 @@ class HomeWidgetsController(
         opts.inJustDecodeBounds = false
         opts.inSampleSize = sample
         return BitmapFactory.decodeByteArray(data, 0, data.size, opts)
+    }
+
+    @Volatile
+    private var isFetchingAudiobookCover = false
+
+    private fun fetchAudiobookCoverAsync(onLoaded: (Bitmap) -> Unit) {
+        if (isFetchingAudiobookCover) return
+        isFetchingAudiobookCover = true
+        Thread({
+            try {
+                val bmp = resolveAudiobookCover()
+                if (bmp != null) {
+                    cachedBookCoverBitmap = bmp
+                    (context as? Activity)?.runOnUiThread {
+                        onLoaded(bmp)
+                    }
+                }
+            } finally {
+                isFetchingAudiobookCover = false
+            }
+        }, "y1-book-cover").start()
+    }
+
+    private fun resolveAudiobookCover(): Bitmap? {
+        val main = MainActivity.instance
+        val bookPrefs = context.getSharedPreferences("Y1_AUDIOBOOK_BOOKMARKS", Context.MODE_PRIVATE)
+        val savedPath = main?.prefs?.getString("last_played_audiobook_path", null)
+            ?: bookPrefs.getString("LAST_AUDIOBOOK_PATH", null)
+            ?: if (main?.prefs?.getBoolean("last_played_is_audiobook", false) == true) {
+                main.prefs.getString("last_played_song_path", null)
+            } else null
+
+        if (!savedPath.isNullOrEmpty()) {
+            val file = File(savedPath)
+            if (file.exists()) {
+                val bmp = extractCoverFromFileOrFolder(file)
+                if (bmp != null) return bmp
+            }
+        }
+
+        val libraryBook = MainActivity.audiobookLibrary.firstOrNull()?.file
+        if (libraryBook != null && libraryBook.exists()) {
+            val bmp = extractCoverFromFileOrFolder(libraryBook)
+            if (bmp != null) return bmp
+        }
+
+        for (dir in StoragePaths.getAudiobooksDirs()) {
+            if (dir.exists()) {
+                val folderCover = MediaLibraryManager.getInstance().findFolderCover(dir)
+                if (folderCover != null && folderCover.exists()) {
+                    val bmp = decodeFileSmart(folderCover)
+                    if (bmp != null) return bmp
+                }
+                val subdirs = dir.listFiles()
+                if (subdirs != null) {
+                    for (sub in subdirs) {
+                        if (sub.isDirectory) {
+                            val subCover = MediaLibraryManager.getInstance().findFolderCover(sub)
+                            if (subCover != null && subCover.exists()) {
+                                val bmp = decodeFileSmart(subCover)
+                                if (bmp != null) return bmp
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return null
+    }
+
+    private fun decodeFileSmart(file: File): Bitmap? {
+        return try {
+            val opts = BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
+            BitmapFactory.decodeFile(file.absolutePath, opts)
+            var sample = 1
+            var w = opts.outWidth
+            var h = opts.outHeight
+            while (w > 512 || h > 512) {
+                sample *= 2
+                w /= 2
+                h /= 2
+            }
+            opts.inJustDecodeBounds = false
+            opts.inSampleSize = sample
+            BitmapFactory.decodeFile(file.absolutePath, opts)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun extractCoverFromFileOrFolder(file: File): Bitmap? {
+        val parent = file.parentFile
+        val folderCover = MediaLibraryManager.getInstance().findFolderCover(parent)
+        if (folderCover != null && folderCover.exists()) {
+            val bmp = decodeFileSmart(folderCover)
+            if (bmp != null) return bmp
+        }
+
+        val safeName = file.name.substringBeforeLast(".")
+        val coverFile = File(StoragePaths.getCoversDir(), "$safeName.jpg")
+        if (coverFile.exists()) {
+            val bmp = decodeFileSmart(coverFile)
+            if (bmp != null) return bmp
+        }
+
+        return try {
+            val mmr = MediaMetadataRetriever()
+            val fis = FileInputStream(file)
+            mmr.setDataSource(fis.fd)
+            val pic = mmr.embeddedPicture
+            fis.close()
+            mmr.release()
+            if (pic != null) {
+                decodeAlbumArtSmart(pic)
+            } else null
+        } catch (_: Exception) {
+            null
+        }
     }
 
     fun updateFocusPreview(focusedElement: ThemeManager.MenuElement) {

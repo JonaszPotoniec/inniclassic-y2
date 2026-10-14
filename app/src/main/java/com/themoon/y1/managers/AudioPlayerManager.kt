@@ -1542,6 +1542,10 @@ class AudioPlayerManager private constructor() {
                 .putBoolean("last_played_is_audiobook", main.isAudiobookLibraryMode)
                 .putBoolean("has_saved_playback_state", true)
 
+            if (main.isAudiobookLibraryMode || currentFile.absolutePath.contains("/Audiobooks")) {
+                editor.putString("last_played_audiobook_path", currentFile.absolutePath)
+            }
+
             if (sync) editor.commit() else editor.apply()
         } catch (e: Exception) {
             android.util.Log.e("AudioPlayerManager", "Failed to save playback state: ${e.message}")

@@ -109,7 +109,10 @@ internal fun MainActivity.initControllers() {
         mainMenuProvider = { mainMenuController },
         ivBrowserCover = findViewById(R.id.iv_browser_cover),
         frameBrowserCover = findViewById(R.id.frame_browser_cover),
-        fetchRandomIdleCoverAsync = { fetchRandomIdleCoverAsync() }
+        fetchRandomIdleCoverAsync = { fetchRandomIdleCoverAsync() },
+        isAudiobookMode = {
+            isAudiobookLibraryMode || (isBrowserControllerInitialized() && (browserController.isAudiobookLibraryMode || browserController.currentBrowserMode is BrowserMode.Audiobooks))
+        }
     )
 
     browserController = BrowserController(
@@ -657,15 +660,8 @@ internal fun MainActivity.handleMainMenuAction(action: String) {
         "OPEN_AUDIOBOOKS" -> {
             browserController.isAudiobookLibraryMode = true
             browserController.currentBrowserMode = BrowserMode.Audiobooks
-            val isScanning = MainActivity.instance?.isCustomScanning == true
-            if (MainActivity.audiobookLibrary.isEmpty() && !isScanning) {
-                startMediaLibraryScan()
-            }
             changeScreen(ScreenState.Browser(BrowserMode.Audiobooks))
             browserController.buildFileBrowserUI()
-            if (isScanning) {
-                showLoadingPopup()
-            }
         }
         "OPEN_THEME_SETTINGS" -> {
             changeScreen(MainActivity.STATE_SETTINGS)

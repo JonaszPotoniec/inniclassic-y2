@@ -279,6 +279,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     lateinit var mainMenuController: MainMenuController
     var homeWidgetsController: HomeWidgetsController? = null
     lateinit var browserController: BrowserController
+    fun isBrowserControllerInitialized(): Boolean = ::browserController.isInitialized
     lateinit var playlistController: PlaylistController
     lateinit var coverFlowController: CoverFlowController
     lateinit var playerController: PlayerController
@@ -700,6 +701,9 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             hwc.currentTrackTitle = tvPlayerTitle?.text?.toString() ?: ""
             hwc.currentTrackArtist = tvPlayerArtist?.text?.toString() ?: ""
             hwc.lastAlbumArtBytes = lastAlbumArtBytes
+            if (isAudiobookLibraryMode && lastAlbumArtBytes != null) {
+                hwc.setAudiobookCoverBytes(lastAlbumArtBytes)
+            }
             hwc.refreshWidgets()
         }
     }
@@ -723,7 +727,9 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     fun showFastScrollLetter(rawText: String) {
         val navState = NavigationManager.getInstance().currentState
         val bcMode = if (::browserController.isInitialized) browserController.currentBrowserMode else BrowserMode.Root
-        val isBrowserList = currentScreenState == STATE_BROWSER && (bcMode !is BrowserMode.Root || (navState is ScreenState.Browser && navState.mode !is BrowserMode.Root))
+        val isRootMenu = bcMode is BrowserMode.Root || bcMode is BrowserMode.Audiobooks ||
+                (navState is ScreenState.Browser && (navState.mode is BrowserMode.Root || navState.mode is BrowserMode.Audiobooks))
+        val isBrowserList = currentScreenState == STATE_BROWSER && !isRootMenu
         if (!isBrowserList) return
 
         val tv = tvFastScrollLetter ?: return
@@ -788,9 +794,13 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
     fun showLoadingPopup(title: String? = null) {
         pbLoadingProgress?.visibility = View.VISIBLE
-        tvLoadingProgress?.text = title ?: ""
+        if (title != null) {
+            tvLoadingProgress?.text = title
+        } else if (tvLoadingProgress?.text.isNullOrEmpty()) {
+            tvLoadingProgress?.text = t("Preparing to scan...\nPlease wait.")
+        }
         layoutLoadingOverlay?.apply {
-            setBackgroundColor(0xBB000000.toInt())
+            setBackgroundColor(0xDD000000.toInt())
             alpha = 1.0f
             visibility = View.VISIBLE
         }

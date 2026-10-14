@@ -377,6 +377,7 @@ class BrowserController(
             }
         } else {
             updateHeaderTitle(localize("Audiobooks"))
+            showBrowserCoverPane()
 
             val btnFolder = createListButtonWithIcon("\uE2C7", localize("Folders"), null)
             btnFolder.setOnClickListener {
@@ -429,7 +430,6 @@ class BrowserController(
         btnScan.setOnClickListener {
             clickFeedback()
             onStartMediaLibraryScan()
-            showLoadingPopup()
         }
         containerBrowserItems.addView(btnScan)
 

@@ -35,6 +35,7 @@ class AudiobookManager private constructor(context: Context) {
         bookPrefs.edit()
             .putInt("POS_$filePath", positionMs)
             .putInt("CHAP_$filePath", chapterIdx)
+            .putString("LAST_AUDIOBOOK_PATH", filePath)
             .apply()
     }
 
