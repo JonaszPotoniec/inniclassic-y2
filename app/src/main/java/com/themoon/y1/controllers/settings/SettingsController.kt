@@ -471,6 +471,7 @@ class SettingsController(
             clickFeedback()
             isScreenOffControlEnabled = !isScreenOffControlEnabled
             prefs.edit().putBoolean("screen_off_control", isScreenOffControlEnabled).commit()
+            mainActivity?.isScreenOffControlEnabled = isScreenOffControlEnabled
             val tvStatus = btnScreenOffCtrl.getChildAt(1) as? TextView
             tvStatus?.text = if (isScreenOffControlEnabled) localize("ON") else localize("OFF")
         }
@@ -1470,6 +1471,7 @@ class SettingsController(
         com.themoon.y1.managers.PowerBacklightManager.getInstance(activity).backlightTimerIndex = 3
         resetBacklightTimer()
 
+        mainActivity?.isScreenOffControlEnabled = false
         mainActivity?.isShowBatteryPercentage = false
         mainActivity?.isTimeInTitleBar = false
         mainActivity?.is24HourFormat = false

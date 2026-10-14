@@ -29,6 +29,7 @@ import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
 import android.os.Vibrator
+import android.provider.Settings
 import android.view.KeyEvent
 import android.view.MotionEvent
 import com.themoon.y1.views.AlphabetIndexBar
@@ -452,6 +453,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         super.onResume()
         isScreenSleeping = false
         powerBacklightManager?.resetTimer()
+        updateScreenOffFeedback(true)
         applyTheme()
     }
 
@@ -468,6 +470,15 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     fun t(key: String): String = LanguageManager.getInstance(this).t(key)
 
     fun clickFeedback() {
+        val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
+        val isScreenOn = if (Build.VERSION.SDK_INT >= 20) {
+            pm?.isInteractive ?: true
+        } else {
+            pm?.isScreenOn ?: true
+        }
+        if (!isScreenOffControlEnabled && (!isScreenOn || isScreenSleeping)) {
+            return
+        }
         if (isVibrationEnabled) {
             vibrator.vibrate((vibrationStrengthLevel * 15).toLong())
         }
@@ -562,6 +573,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             event = event,
             context = this,
             isFakeScreenOff = isFakeScreenOff,
+            isScreenOffControlEnabled = isScreenOffControlEnabled,
             onWakeFromFakeScreenOff = Runnable { wakeFromFakeScreenOff() },
             onResetBacklightTimer = Runnable { powerBacklightManager?.resetTimer() },
             isUsbStorageActive = usbStorageManager.isStorageOverlayActive,
@@ -816,6 +828,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     fun turnOffScreen() {
         if (isScreenSleeping) return
         isScreenSleeping = true
+        updateScreenOffFeedback(false)
         powerBacklightManager?.cancelTimer()
         val am = AudioPlayerManager.getInstance()
         val fm = FmRadioManager.getInstance(this)
@@ -851,6 +864,31 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             autoManageWifiPower(sleep)
         }
         powerBacklightManager?.resetTimer()
+        updateScreenOffFeedback(true)
+    }
+
+    fun updateScreenOffFeedback(screenOn: Boolean) {
+        try {
+            if (screenOn) {
+                audioManager.setStreamMute(AudioManager.STREAM_SYSTEM, !isSoundEffectEnabled)
+                Settings.System.putInt(
+                    contentResolver,
+                    Settings.System.SOUND_EFFECTS_ENABLED,
+                    if (isSoundEffectEnabled) 1 else 0
+                )
+                Settings.System.putInt(
+                    contentResolver,
+                    Settings.System.HAPTIC_FEEDBACK_ENABLED,
+                    if (isVibrationEnabled) 1 else 0
+                )
+            } else {
+                if (!isScreenOffControlEnabled) {
+                    audioManager.setStreamMute(AudioManager.STREAM_SYSTEM, true)
+                    Settings.System.putInt(contentResolver, Settings.System.SOUND_EFFECTS_ENABLED, 0)
+                    Settings.System.putInt(contentResolver, Settings.System.HAPTIC_FEEDBACK_ENABLED, 0)
+                }
+            }
+        } catch (_: Exception) {}
     }
 
     private fun autoManageWifiPower(isGoingToSleep: Boolean) {
@@ -1086,10 +1124,12 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                 Intent.ACTION_SCREEN_ON -> {
                     isScreenSleeping = false
                     powerBacklightManager?.resetTimer()
+                    updateScreenOffFeedback(true)
                 }
                 Intent.ACTION_SCREEN_OFF -> {
                     isScreenSleeping = true
                     powerBacklightManager?.cancelTimer()
+                    updateScreenOffFeedback(false)
                 }
                 Intent.ACTION_TIME_TICK, Intent.ACTION_TIME_CHANGED -> {
                     homeWidgetsController?.refreshWidgets()
@@ -1150,6 +1190,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     }
 
     override fun onDestroy() {
+        updateScreenOffFeedback(true)
         AudioPlayerManager.getInstance().savePlaybackState(sync = true)
         super.onDestroy()
         try {
@@ -1167,6 +1208,23 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         override fun onReceive(context: Context, intent: Intent) {
             val event = intent.getParcelableExtra<KeyEvent>(Intent.EXTRA_KEY_EVENT) ?: return
             if (event.action != KeyEvent.ACTION_DOWN || event.repeatCount != 0) return
+
+            val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            val isScreenOn = if (Build.VERSION.SDK_INT >= 20) {
+                pm?.isInteractive ?: true
+            } else {
+                pm?.isScreenOn ?: true
+            }
+
+            if (!isScreenOn) {
+                val isScreenOffCtrl = instance?.isScreenOffControlEnabled
+                    ?: context.getSharedPreferences("Y1_SETTINGS", Context.MODE_PRIVATE)
+                        .getBoolean("screen_off_control", false)
+                if (!isScreenOffCtrl) {
+                    return
+                }
+            }
+
             val am = AudioPlayerManager.getInstance()
             when (event.keyCode) {
                 KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, 85 -> {

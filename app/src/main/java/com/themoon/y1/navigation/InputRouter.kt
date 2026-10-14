@@ -24,6 +24,7 @@ class InputRouter private constructor() {
         event: KeyEvent,
         context: Context,
         isFakeScreenOff: Boolean,
+        isScreenOffControlEnabled: Boolean = false,
         onWakeFromFakeScreenOff: Runnable,
         onResetBacklightTimer: Runnable,
         isUsbStorageActive: Boolean,
@@ -61,6 +62,33 @@ class InputRouter private constructor() {
                 if (event.repeatCount == 0 || (event.repeatCount % 2 == 0)) {
                     onAdjustVolume.adjustVolume(keyCode == KeyEvent.KEYCODE_VOLUME_UP)
                 }
+            }
+            return true
+        }
+
+        // Screen is off: block or allow only media controls based on isScreenOffControlEnabled
+        if (!isScreenOn) {
+            if (!isScreenOffControlEnabled) {
+                return true
+            }
+            val isMediaKey = keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE ||
+                    keyCode == KeyEvent.KEYCODE_MEDIA_PLAY ||
+                    keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE ||
+                    keyCode == 85 ||
+                    keyCode == KeyEvent.KEYCODE_MEDIA_NEXT ||
+                    keyCode == 87 ||
+                    keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS ||
+                    keyCode == 88
+
+            if (isMediaKey) {
+                if (action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                    when (keyCode) {
+                        KeyEvent.KEYCODE_MEDIA_NEXT, 87 -> com.themoon.y1.managers.AudioPlayerManager.getInstance().nextTrack()
+                        KeyEvent.KEYCODE_MEDIA_PREVIOUS, 88 -> com.themoon.y1.managers.AudioPlayerManager.getInstance().prevTrack()
+                        else -> com.themoon.y1.managers.AudioPlayerManager.getInstance().playOrPauseMusic()
+                    }
+                }
+                return true
             }
             return true
         }
