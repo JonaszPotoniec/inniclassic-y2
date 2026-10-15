@@ -203,7 +203,9 @@ class InputRouter private constructor() {
             return true
         }
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == 23 || keyCode == KeyEvent.KEYCODE_ENTER) {
+            val main = (activeController?.rootView?.context as? MainActivity) ?: MainActivity.instance
             if (event.repeatCount == 0) {
+                main?.isLongPressConsumed = false
                 event.startTracking()
             }
         }
@@ -223,6 +225,11 @@ class InputRouter private constructor() {
             return true
         }
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == 23 || keyCode == KeyEvent.KEYCODE_ENTER) {
+            val main = (activeController?.rootView?.context as? MainActivity) ?: MainActivity.instance
+            if (main?.isLongPressConsumed == true) {
+                main.isLongPressConsumed = false
+                return true
+            }
             if ((event.flags and KeyEvent.FLAG_CANCELED_LONG_PRESS) == 0) {
                 val focused = activeController?.rootView?.findFocus()
                 if (focused != null && focused !is android.widget.Button && focused.isClickable) {

@@ -500,7 +500,7 @@ class BrowserController(
         currentScrollIndexList.clear()
         currentScrollIndexList.addAll(categories)
 
-        val adapter = CategoryListAdapter(categories, type)
+        val adapter = CategoryListAdapter(categories, type, isAudiobookLibraryMode)
         listVirtualSongs?.adapter = adapter
 
         val targetIndex = categories.indexOf(virtualQueryValue)
@@ -544,9 +544,9 @@ class BrowserController(
         for (song in activeLibrary) {
             var isPathMatched = false
             if (isAudiobookLibraryMode) {
-                if (song.file.absolutePath.contains("/Audiobooks")) isPathMatched = true
+                if (StoragePaths.isUnderAudiobooks(song.file.absolutePath) || song.file.absolutePath.contains("audiobooks", ignoreCase = true)) isPathMatched = true
             } else {
-                if (song.file.absolutePath.contains("/Music")) isPathMatched = true
+                if (StoragePaths.isUnderMusic(song.file.absolutePath) || song.file.absolutePath.contains("music", ignoreCase = true)) isPathMatched = true
             }
 
             if (isPathMatched) {
@@ -1208,11 +1208,11 @@ class BrowserController(
                 when (virtualQueryType) {
                     "COVER_FLOW_ALBUM" -> onNavigateBackToMenu()
                     "GENRE_ALBUM_SONGS" -> {
-                        currentBrowserMode = BrowserMode.GenreAlbums(categoryGenreFilter)
+                        currentBrowserMode = BrowserMode.GenreAlbums(categoryGenreFilter, categoryArtistFilter)
                         buildVirtualCategories("GENRE_ALBUM")
                     }
                     "GENRE_ARTIST_SONGS" -> {
-                        currentBrowserMode = BrowserMode.GenreAlbums(categoryGenreFilter)
+                        currentBrowserMode = BrowserMode.GenreAlbums(categoryGenreFilter, categoryArtistFilter)
                         virtualQueryValue = ALL_SONGS_SENTINEL
                         buildVirtualCategories("GENRE_ALBUM")
                     }
@@ -1221,15 +1221,49 @@ class BrowserController(
                         virtualQueryValue = ALL_SONGS_SENTINEL
                         buildVirtualCategories("GENRE_ARTIST")
                     }
+                    "ALL" -> {
+                        currentBrowserMode = if (isAudiobookLibraryMode) BrowserMode.Audiobooks else BrowserMode.Root
+                        lastBrowserFocusText = if (isAudiobookLibraryMode) localize("All Audiobooks") else localize("All Songs")
+                        buildFileBrowserUI()
+                    }
+                    "RECENT" -> {
+                        currentBrowserMode = BrowserMode.Root
+                        lastBrowserFocusText = localize("Recently Added")
+                        buildFileBrowserUI()
+                    }
+                    "ARTIST_ALL_ALBUMS" -> {
+                        val exitedArtist = categoryArtistFilter
+                        currentBrowserMode = BrowserMode.Albums(exitedArtist, categoryArtistFilterIsTrackArtist)
+                        virtualQueryValue = ALL_SONGS_SENTINEL
+                        buildVirtualCategories("ALBUM")
+                    }
+                    "ALBUM" -> {
+                        val exitedAlbum = virtualQueryValue
+                        currentBrowserMode = BrowserMode.Albums(categoryArtistFilter, categoryArtistFilterIsTrackArtist)
+                        virtualQueryValue = exitedAlbum
+                        buildVirtualCategories("ALBUM")
+                    }
+                    "ARTIST" -> {
+                        val exitedArtist = virtualQueryValue
+                        currentBrowserMode = if (categoryArtistFilterIsTrackArtist) BrowserMode.TrackArtists else BrowserMode.Artists
+                        virtualQueryValue = exitedArtist
+                        buildVirtualCategories(if (categoryArtistFilterIsTrackArtist) "TRACK_ARTIST" else "ARTIST")
+                    }
+                    "YEAR" -> {
+                        val exitedYear = virtualQueryValue
+                        currentBrowserMode = BrowserMode.Years
+                        virtualQueryValue = exitedYear
+                        buildVirtualCategories("YEAR")
+                    }
+                    "COMPOSER" -> {
+                        val exitedComposer = virtualQueryValue
+                        currentBrowserMode = BrowserMode.Composers
+                        virtualQueryValue = exitedComposer
+                        buildVirtualCategories("COMPOSER")
+                    }
                     else -> {
-                        if (virtualQueryType == "ALL") {
-                            currentBrowserMode = if (isAudiobookLibraryMode) BrowserMode.Audiobooks else BrowserMode.Root
-                            lastBrowserFocusText = if (isAudiobookLibraryMode) localize("All Audiobooks") else localize("All Songs")
-                            buildFileBrowserUI()
-                        } else {
-                            val catType = if (virtualQueryType == "ARTIST") "ARTIST" else "ALBUM"
-                            buildVirtualCategories(catType)
-                        }
+                        currentBrowserMode = if (isAudiobookLibraryMode) BrowserMode.Audiobooks else BrowserMode.Root
+                        buildFileBrowserUI()
                     }
                 }
                 return true

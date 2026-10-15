@@ -90,8 +90,13 @@ class JellyfinUiController(
         private set
     var currentSelectedAlbum: JellyfinSyncHierarchy.AlbumNode? = null
         private set
+    var currentSelectedAuthor: JellyfinSyncHierarchy.AuthorNode? = null
+        private set
+    var currentSelectedBook: JellyfinSyncHierarchy.BookNode? = null
+        private set
 
     var lastLongClickTime: Long = 0L
+    private var isLongPressActive: Boolean = false
 
     var lastFocusIndex: Int = -1
     var lastLibConfigFocusIndex: Int = -1
@@ -105,19 +110,34 @@ class JellyfinUiController(
 
     override fun onExit() {
         currentDepth = 1
+        isLongPressActive = false
     }
 
     override fun onKeyLongPress(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+        if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == 23) {
             val c = activity.currentFocus
             if (c != null && currentDepth >= 3) {
                 lastLongClickTime = System.currentTimeMillis()
+                isLongPressActive = true
                 val main = activity as? com.themoon.y1.MainActivity
                 if (main != null) {
                     main.lastJellyfinLongClickTime = lastLongClickTime
                     main.isLongPressConsumed = true
                 }
                 c.performLongClick()
+                return true
+            }
+        }
+        return false
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER || keyCode == 23) {
+            val main = activity as? com.themoon.y1.MainActivity
+            if (isLongPressActive || main?.isLongPressConsumed == true || System.currentTimeMillis() - lastLongClickTime < 600) {
+                isLongPressActive = false
+                main?.isLongPressConsumed = false
+                lastLongClickTime = System.currentTimeMillis()
                 return true
             }
         }
@@ -133,6 +153,8 @@ class JellyfinUiController(
                         currentSelectedSeries?.let { buildTvSeasonsListUI(it) } ?: buildLibraryConfigUI(lib)
                     } else if ("music".equals(lib.collectionType, ignoreCase = true)) {
                         currentSelectedArtist?.let { buildMusicAlbumsListUI(it) } ?: buildLibraryConfigUI(lib)
+                    } else if ("books".equals(lib.collectionType, ignoreCase = true) || "audiobooks".equals(lib.collectionType, ignoreCase = true)) {
+                        currentSelectedAuthor?.let { buildBookTitlesListUI(it) } ?: buildLibraryConfigUI(lib)
                     } else {
                         buildLibraryConfigUI(lib)
                     }
@@ -148,6 +170,8 @@ class JellyfinUiController(
                         buildTvSeriesListUI()
                     } else if ("music".equals(lib.collectionType, ignoreCase = true)) {
                         buildMusicArtistsListUI()
+                    } else if ("books".equals(lib.collectionType, ignoreCase = true) || "audiobooks".equals(lib.collectionType, ignoreCase = true)) {
+                        buildBookAuthorsListUI()
                     } else {
                         buildLibraryConfigUI(lib)
                     }
@@ -322,7 +346,9 @@ class JellyfinUiController(
             for (lib in cachedLibs) {
                 val defaultMode = if ("music".equals(lib.collectionType, ignoreCase = true)) {
                     "all"
-                } else if ("movies".equals(lib.collectionType, ignoreCase = true) || "tvshows".equals(lib.collectionType, ignoreCase = true)) {
+                } else if ("movies".equals(lib.collectionType, ignoreCase = true) || "tvshows".equals(lib.collectionType, ignoreCase = true) ||
+                    "books".equals(lib.collectionType, ignoreCase = true) || "audiobooks".equals(lib.collectionType, ignoreCase = true)
+                ) {
                     "manual"
                 } else {
                     "off"
@@ -336,6 +362,8 @@ class JellyfinUiController(
 
                 val libIcon = if ("music".equals(lib.collectionType, ignoreCase = true)) {
                     TablerIcons.MUSIC
+                } else if ("books".equals(lib.collectionType, ignoreCase = true) || "audiobooks".equals(lib.collectionType, ignoreCase = true)) {
+                    TablerIcons.BOOK
                 } else if ("movies".equals(lib.collectionType, ignoreCase = true)) {
                     TablerIcons.MOVIE
                 } else {
@@ -438,7 +466,9 @@ class JellyfinUiController(
         val ledger = syncManager.ledger
         val defaultMode = if ("music".equals(library.collectionType, ignoreCase = true)) {
             "all"
-        } else if ("movies".equals(library.collectionType, ignoreCase = true) || "tvshows".equals(library.collectionType, ignoreCase = true)) {
+        } else if ("movies".equals(library.collectionType, ignoreCase = true) || "tvshows".equals(library.collectionType, ignoreCase = true) ||
+            "books".equals(library.collectionType, ignoreCase = true) || "audiobooks".equals(library.collectionType, ignoreCase = true)
+        ) {
             "manual"
         } else {
             "off"
@@ -505,6 +535,8 @@ class JellyfinUiController(
                 buildTvSeriesListUI()
             } else if ("music".equals(library.collectionType, ignoreCase = true)) {
                 buildMusicArtistsListUI()
+            } else if ("books".equals(library.collectionType, ignoreCase = true) || "audiobooks".equals(library.collectionType, ignoreCase = true)) {
+                buildBookAuthorsListUI()
             } else {
                 buildMoviesListUI()
             }
@@ -580,6 +612,9 @@ class JellyfinUiController(
                     } else if ("music".equals(library.collectionType, ignoreCase = true)) {
                         currentHierarchy = JellyfinSyncHierarchy.buildMusicHierarchy(items)
                         buildMusicArtistsListUI()
+                    } else if ("books".equals(library.collectionType, ignoreCase = true) || "audiobooks".equals(library.collectionType, ignoreCase = true)) {
+                        currentHierarchy = JellyfinSyncHierarchy.buildBooksHierarchy(items)
+                        buildBookAuthorsListUI()
                     } else {
                         currentHierarchy = JellyfinSyncHierarchy.buildMoviesHierarchy(items)
                         buildMoviesListUI()
@@ -1150,6 +1185,243 @@ class JellyfinUiController(
         restoreFocus(3, lastBrowseDepth3FocusIndex)
     }
 
+    fun buildBookAuthorsListUI() {
+        val hierarchy = currentHierarchy ?: return
+        val library = activeLibrary ?: return
+        currentDepth = 3
+        containerSettingsItems.removeAllViews()
+
+        createCategoryHeader("━ ${library.name} ━")
+
+        val ledger = syncManager.ledger
+        val currentSelections = ledger.getLibrarySelections(library.id)
+
+        var totalSize = 0L
+        for (aut in hierarchy.authorsList) {
+            for (bk in aut.books) {
+                for (ch in bk.chapters) {
+                    if (currentSelections.contains(ch.id)) {
+                        totalSize += ch.fileSize
+                    }
+                }
+            }
+        }
+
+        val totalSelected = JellyfinSyncHierarchy.countSelected(hierarchy.allItemIds, currentSelections)
+        addStorageHeader(totalSize, totalSelected, hierarchy.allItemIds.size)
+
+        val overallState = JellyfinSyncHierarchy.computeTriState(hierarchy.allItemIds, currentSelections)
+
+        val rowToggleAll = createToggleAllRow(
+            overallState,
+            totalSelected,
+            hierarchy.allItemIds.size
+        ) {
+            clickFeedback()
+            if (overallState == JellyfinSyncHierarchy.TriState.CHECKED) {
+                ledger.removeLibrarySelections(library.id, hierarchy.allItemIds)
+            } else {
+                ledger.addLibrarySelections(library.id, hierarchy.allItemIds)
+            }
+            ledger.save()
+            buildBookAuthorsListUI()
+        }
+        containerSettingsItems.addView(rowToggleAll)
+
+        for (author in hierarchy.authorsList) {
+            val sel = author.getSelectedCount(currentSelections)
+            val tot = author.allChapterIds.size
+            val st = author.getTriState(currentSelections)
+
+            val row = createSelectRow(
+                TablerIcons.USER,
+                author.name,
+                "$sel/$tot",
+                st,
+                true,
+                clickListener = {
+                    clickFeedback()
+                    currentSelectedAuthor = author
+                    lastBrowseDepth4FocusIndex = -1
+                    buildBookTitlesListUI(author)
+                },
+                longClickListener = {
+                    clickFeedback()
+                    val cur = author.getTriState(ledger.getLibrarySelections(library.id))
+                    if (cur == JellyfinSyncHierarchy.TriState.CHECKED) {
+                        ledger.removeLibrarySelections(library.id, author.allChapterIds)
+                    } else {
+                        ledger.addLibrarySelections(library.id, author.allChapterIds)
+                    }
+                    ledger.save()
+                    buildBookAuthorsListUI()
+                    true
+                }
+            )
+            containerSettingsItems.addView(row)
+        }
+
+        restoreFocus(3, lastBrowseDepth3FocusIndex)
+    }
+
+    fun buildBookTitlesListUI(author: JellyfinSyncHierarchy.AuthorNode) {
+        val library = activeLibrary ?: return
+        currentDepth = 4
+        currentSelectedAuthor = author
+        containerSettingsItems.removeAllViews()
+
+        createCategoryHeader("━ ${author.name} ━")
+
+        val ledger = syncManager.ledger
+        val currentSelections = ledger.getLibrarySelections(library.id)
+
+        var totalSize = 0L
+        for (bk in author.books) {
+            for (ch in bk.chapters) {
+                if (currentSelections.contains(ch.id)) {
+                    totalSize += ch.fileSize
+                }
+            }
+        }
+
+        val totalSelected = author.getSelectedCount(currentSelections)
+        addStorageHeader(totalSize, totalSelected, author.allChapterIds.size)
+
+        val overallState = author.getTriState(currentSelections)
+
+        val rowToggleAll = createToggleAllRow(
+            overallState,
+            totalSelected,
+            author.allChapterIds.size
+        ) {
+            clickFeedback()
+            if (overallState == JellyfinSyncHierarchy.TriState.CHECKED) {
+                ledger.removeLibrarySelections(library.id, author.allChapterIds)
+            } else {
+                ledger.addLibrarySelections(library.id, author.allChapterIds)
+            }
+            ledger.save()
+            buildBookTitlesListUI(author)
+        }
+        containerSettingsItems.addView(rowToggleAll)
+
+        for (book in author.books) {
+            val sel = book.getSelectedCount(currentSelections)
+            val tot = book.allChapterIds.size
+            val st = book.getTriState(currentSelections)
+
+            val row = createSelectRow(
+                TablerIcons.BOOK,
+                book.name,
+                "$sel/$tot",
+                st,
+                true,
+                clickListener = {
+                    clickFeedback()
+                    currentSelectedBook = book
+                    lastBrowseDepth5FocusIndex = -1
+                    buildBookChaptersListUI(author, book)
+                },
+                longClickListener = {
+                    clickFeedback()
+                    val cur = book.getTriState(ledger.getLibrarySelections(library.id))
+                    if (cur == JellyfinSyncHierarchy.TriState.CHECKED) {
+                        ledger.removeLibrarySelections(library.id, book.allChapterIds)
+                    } else {
+                        ledger.addLibrarySelections(library.id, book.allChapterIds)
+                    }
+                    ledger.save()
+                    buildBookTitlesListUI(author)
+                    true
+                }
+            )
+            containerSettingsItems.addView(row)
+        }
+
+        restoreFocus(4, lastBrowseDepth4FocusIndex)
+    }
+
+    fun buildBookChaptersListUI(
+        author: JellyfinSyncHierarchy.AuthorNode,
+        book: JellyfinSyncHierarchy.BookNode
+    ) {
+        val library = activeLibrary ?: return
+        currentDepth = 5
+        currentSelectedAuthor = author
+        currentSelectedBook = book
+        containerSettingsItems.removeAllViews()
+
+        createCategoryHeader("━ ${author.name} - ${book.name} ━")
+
+        val ledger = syncManager.ledger
+        val currentSelections = ledger.getLibrarySelections(library.id)
+
+        var totalSize = 0L
+        for (ch in book.chapters) {
+            if (currentSelections.contains(ch.id)) {
+                totalSize += ch.fileSize
+            }
+        }
+
+        val totalSelected = book.getSelectedCount(currentSelections)
+        addStorageHeader(totalSize, totalSelected, book.allChapterIds.size)
+
+        val overallState = book.getTriState(currentSelections)
+
+        val rowToggleAll = createToggleAllRow(
+            overallState,
+            totalSelected,
+            book.allChapterIds.size
+        ) {
+            clickFeedback()
+            if (overallState == JellyfinSyncHierarchy.TriState.CHECKED) {
+                ledger.removeLibrarySelections(library.id, book.allChapterIds)
+            } else {
+                ledger.addLibrarySelections(library.id, book.allChapterIds)
+            }
+            ledger.save()
+            buildBookChaptersListUI(author, book)
+        }
+        containerSettingsItems.addView(rowToggleAll)
+
+        for (ch in book.chapters) {
+            val isSel = currentSelections.contains(ch.id)
+            val st = if (isSel) JellyfinSyncHierarchy.TriState.CHECKED else JellyfinSyncHierarchy.TriState.UNCHECKED
+
+            val chTitle = (if (ch.indexNumber > 0) (if (ch.indexNumber < 10) "0" else "") + "${ch.indexNumber} - " else "") + ch.name
+            val sizeStr = if (ch.fileSize > 0) formatSize(ch.fileSize) else ""
+
+            val row = createSelectRow(
+                TablerIcons.BOOK,
+                chTitle,
+                sizeStr,
+                st,
+                false,
+                clickListener = {
+                    clickFeedback()
+                    ledger.toggleLibrarySelection(library.id, ch.id)
+                    ledger.save()
+                    buildBookChaptersListUI(author, book)
+                },
+                longClickListener = {
+                    clickFeedback()
+                    val cur = book.getTriState(ledger.getLibrarySelections(library.id))
+                    if (cur == JellyfinSyncHierarchy.TriState.CHECKED) {
+                        ledger.removeLibrarySelections(library.id, book.allChapterIds)
+                    } else {
+                        ledger.addLibrarySelections(library.id, book.allChapterIds)
+                    }
+                    ledger.save()
+                    buildBookChaptersListUI(author, book)
+                    true
+                }
+            )
+            containerSettingsItems.addView(row)
+        }
+
+        restoreFocus(5, lastBrowseDepth5FocusIndex)
+    }
+
     private fun addStorageHeader(selectedBytes: Long, selectedCount: Int, totalCount: Int) {
         val root = SyncManager.getSyncRoot()
         var freeBytes = 0L
@@ -1457,7 +1729,7 @@ class JellyfinUiController(
 
         if (clickListener != null) {
             rowButton.setOnClickListener { v ->
-                if (System.currentTimeMillis() - lastLongClickTime < 600) {
+                if (isLongPressActive || System.currentTimeMillis() - lastLongClickTime < 600) {
                     return@setOnClickListener
                 }
                 clickListener.onClick(v)
@@ -1467,6 +1739,10 @@ class JellyfinUiController(
         if (longClickListener != null) {
             rowButton.setOnLongClickListener { v ->
                 lastLongClickTime = System.currentTimeMillis()
+                isLongPressActive = true
+                val main = activity as? com.themoon.y1.MainActivity
+                main?.lastJellyfinLongClickTime = lastLongClickTime
+                main?.isLongPressConsumed = true
                 longClickListener.onLongClick(v)
             }
         }
@@ -1575,13 +1851,17 @@ class JellyfinUiController(
 
         if (clickListener != null) {
             rowButton.setOnClickListener { v ->
-                if (System.currentTimeMillis() - lastLongClickTime < 600) {
+                if (isLongPressActive || System.currentTimeMillis() - lastLongClickTime < 600) {
                     return@setOnClickListener
                 }
                 clickListener.onClick(v)
             }
             rowButton.setOnLongClickListener { v ->
                 lastLongClickTime = System.currentTimeMillis()
+                isLongPressActive = true
+                val main = activity as? com.themoon.y1.MainActivity
+                main?.lastJellyfinLongClickTime = lastLongClickTime
+                main?.isLongPressConsumed = true
                 clickListener.onClick(v)
                 true
             }

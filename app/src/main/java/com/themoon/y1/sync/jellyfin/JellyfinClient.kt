@@ -14,6 +14,7 @@ import java.io.InputStream
 import java.net.URLEncoder
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.SSLContext
@@ -379,11 +380,14 @@ class JellyfinClient(rawUrl: String?, deviceId: String?) {
         urlBuilder.append("&recursive=true")
         urlBuilder.append("&startIndex=").append(startIndex)
         urlBuilder.append("&limit=").append(limit)
-        urlBuilder.append("&fields=MediaSources,Genres,MediaStreams,Composers,DateCreated")
+        urlBuilder.append("&fields=MediaSources,Genres,MediaStreams,Composers,DateCreated,ParentId")
 
         if ("music".equals(collectionType, ignoreCase = true)) {
             urlBuilder.append("&includeItemTypes=Audio")
             urlBuilder.append("&sortBy=AlbumArtist,Album,SortName")
+        } else if ("books".equals(collectionType, ignoreCase = true) || "audiobooks".equals(collectionType, ignoreCase = true)) {
+            urlBuilder.append("&includeItemTypes=AudioBook,Audio")
+            urlBuilder.append("&sortBy=AlbumArtist,Album,SortName,IndexNumber")
         } else if ("movies".equals(collectionType, ignoreCase = true)) {
             urlBuilder.append("&includeItemTypes=Movie")
             urlBuilder.append("&sortBy=SortName")
@@ -540,6 +544,7 @@ class JellyfinClient(rawUrl: String?, deviceId: String?) {
         }
 
         item.albumId = if (!o.isNull("AlbumId")) o.optString("AlbumId") else null
+        item.parentId = if (!o.isNull("ParentId")) o.optString("ParentId") else null
         item.albumPrimaryImageTag = if (!o.isNull("AlbumPrimaryImageTag")) o.optString("AlbumPrimaryImageTag") else null
 
         item.container = o.optString("Container", "")
@@ -564,7 +569,7 @@ class JellyfinClient(rawUrl: String?, deviceId: String?) {
         }
 
         if (item.container.isEmpty()) {
-            item.container = if ("music".equals(collectionType, ignoreCase = true)) "mp3" else "mp4"
+            item.container = if ("movies".equals(collectionType, ignoreCase = true) || "tvshows".equals(collectionType, ignoreCase = true)) "mp4" else "mp3"
         }
 
         return item
@@ -605,7 +610,10 @@ class JellyfinClient(rawUrl: String?, deviceId: String?) {
             val code = response.code()
             response.close()
             // If download permission denied on audio, try static audio stream fallback
-            if ("music".equals(item.collectionType, ignoreCase = true) && (code == 401 || code == 403)) {
+            val isAudio = "music".equals(item.collectionType, ignoreCase = true) ||
+                    "books".equals(item.collectionType, ignoreCase = true) ||
+                    "audiobooks".equals(item.collectionType, ignoreCase = true)
+            if (isAudio && (code == 401 || code == 403)) {
                 val fallbackUrl = baseUrl + "/Audio/" + item.id + "/stream?static=true"
                 val fallbackReq = newRequestBuilder(fallbackUrl, token)
                     .addHeader("Accept-Encoding", "identity")
@@ -684,6 +692,99 @@ class JellyfinClient(rawUrl: String?, deviceId: String?) {
     }
 
     /**
+     * Download album or book cover art to destination (and creates counterpart cover.jpg/folder.jpg).
+     * Tries candidate IDs in order until one returns an image.
+     */
+    @Throws(Exception::class)
+    fun downloadCover(
+        token: String?,
+        candidateIds: List<String?>,
+        destination: File,
+        cancelToken: MediaSyncProvider.CancellationToken?
+    ) {
+        if (cancelToken != null && cancelToken.isCancelled()) return
+        val destParent = destination.parentFile
+        if (destination.exists()) return
+        if (destParent != null) {
+            val f1 = File(destParent, "cover.jpg")
+            val f2 = File(destParent, "folder.jpg")
+            val f3 = File(destParent, "cover.jpeg")
+            if (f1.exists() || f2.exists() || f3.exists()) return
+        }
+
+        val targetIds = candidateIds.filterNotNull().filter { it.isNotBlank() }.distinct()
+        if (targetIds.isEmpty()) return
+
+        for (targetId in targetIds) {
+            if (cancelToken != null && cancelToken.isCancelled()) return
+            val coverUrl = "$baseUrl/Items/$targetId/Images/Primary?maxWidth=320&maxHeight=320&quality=85"
+            val request = newRequestBuilder(coverUrl, token)
+                .get()
+                .build()
+
+            var response: okhttp3.Response? = null
+            try {
+                response = httpClient.newCall(request).execute()
+                if (!response.isSuccessful) {
+                    response.close()
+                    continue
+                }
+
+                if (destParent != null && !destParent.exists()) {
+                    destParent.mkdirs()
+                }
+
+                val tmpFile = File(destination.absolutePath + ".tmp")
+                var inStream: InputStream? = null
+                var outStream: FileOutputStream? = null
+                try {
+                    inStream = response.body()!!.byteStream()
+                    outStream = FileOutputStream(tmpFile)
+                    val buffer = ByteArray(8192)
+                    var read: Int
+                    while (inStream.read(buffer).also { read = it } != -1) {
+                        if (cancelToken != null && cancelToken.isCancelled()) break
+                        outStream.write(buffer, 0, read)
+                    }
+                    outStream.flush()
+                    outStream.close()
+                    outStream = null
+
+                    if (cancelToken == null || !cancelToken.isCancelled()) {
+                        tmpFile.renameTo(destination)
+                        if (destParent != null && destination.exists()) {
+                            val destName = destination.name.lowercase(Locale.US)
+                            val altName = if (destName.startsWith("cover.")) "folder.jpg" else "cover.jpg"
+                            val altFile = File(destParent, altName)
+                            if (!altFile.exists()) {
+                                try {
+                                    destination.copyTo(altFile, overwrite = false)
+                                } catch (ignored: Throwable) {}
+                            }
+                        }
+                        Log.i(TAG, "Successfully downloaded cover for $targetId to ${destination.absolutePath}")
+                        return
+                    }
+                } finally {
+                    if (outStream != null) {
+                        try { outStream.close() } catch (ignored: Exception) {}
+                    }
+                    if (inStream != null) {
+                        try { inStream.close() } catch (ignored: Exception) {}
+                    }
+                    if (tmpFile.exists()) {
+                        tmpFile.delete()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed downloading cover from $targetId: ${e.message}")
+            } finally {
+                response?.close()
+            }
+        }
+    }
+
+    /**
      * Download album cover art to folder.jpg.
      */
     @Throws(Exception::class)
@@ -694,59 +795,7 @@ class JellyfinClient(rawUrl: String?, deviceId: String?) {
         destination: File,
         cancelToken: MediaSyncProvider.CancellationToken?
     ) {
-        if (cancelToken != null && cancelToken.isCancelled()) return
-        if (destination.exists()) return
-
-        val targetId = if (!albumId.isNullOrEmpty()) albumId else itemId
-        if (targetId.isNullOrEmpty()) return
-
-        val coverUrl = "$baseUrl/Items/$targetId/Images/Primary?maxWidth=320&maxHeight=320&quality=85"
-        val request = newRequestBuilder(coverUrl, token)
-            .get()
-            .build()
-
-        val response = httpClient.newCall(request).execute()
-        if (!response.isSuccessful) {
-            response.close()
-            return
-        }
-
-        val parent = destination.parentFile
-        if (parent != null && !parent.exists()) {
-            parent.mkdirs()
-        }
-
-        val tmpFile = File(destination.absolutePath + ".tmp")
-        var inStream: InputStream? = null
-        var outStream: FileOutputStream? = null
-        try {
-            inStream = response.body()!!.byteStream()
-            outStream = FileOutputStream(tmpFile)
-            val buffer = ByteArray(8192)
-            var read: Int
-            while (inStream.read(buffer).also { read = it } != -1) {
-                if (cancelToken != null && cancelToken.isCancelled()) break
-                outStream.write(buffer, 0, read)
-            }
-            outStream.flush()
-            outStream.close()
-            outStream = null
-
-            if (cancelToken == null || !cancelToken.isCancelled()) {
-                tmpFile.renameTo(destination)
-            }
-        } finally {
-            if (outStream != null) {
-                try { outStream.close() } catch (ignored: Exception) {}
-            }
-            if (inStream != null) {
-                try { inStream.close() } catch (ignored: Exception) {}
-            }
-            response.close()
-            if (tmpFile.exists()) {
-                tmpFile.delete()
-            }
-        }
+        downloadCover(token, listOfNotNull(albumId, itemId), destination, cancelToken)
     }
 
     companion object {

@@ -25,7 +25,8 @@ class JellyfinMediaItem(
     var seriesId: String = "",
     var seasonId: String = "",
     var seasonName: String? = null,
-    var serverDateModified: String = ""
+    var serverDateModified: String = "",
+    var parentId: String? = null
 ) {
     var indexNumber: Int
         get() = trackNumber

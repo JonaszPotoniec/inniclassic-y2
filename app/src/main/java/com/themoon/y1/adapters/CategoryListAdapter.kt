@@ -31,7 +31,10 @@ import java.util.Collections
 
 class CategoryListAdapter(
     private val items: List<String>,
-    private val type: String
+    private val type: String,
+    private val isAudiobook: Boolean = MainActivity.instance?.let {
+        it.isAudiobookLibraryMode || (it.isBrowserControllerInitialized() && it.browserController.isAudiobookLibraryMode)
+    } ?: false
 ) : BaseAdapter() {
 
     private var albumSongCounts: MutableMap<String, Int>? = null
@@ -50,8 +53,9 @@ class CategoryListAdapter(
             val genreFilter = bc?.categoryGenreFilter ?: ""
             val artistFilter = bc?.categoryArtistFilter ?: ""
             val isTrackArtist = bc?.categoryArtistFilterIsTrackArtist == true
+            val activeLibrary = if (isAudiobook) MainActivity.audiobookLibrary else MainActivity.customLibrary
 
-            for (song in MainActivity.customLibrary) {
+            for (song in activeLibrary) {
                 if (type == "GENRE_ALBUM") {
                     if (song.genre.isEmpty() || !song.genre.equals(genreFilter, ignoreCase = true)) {
                         continue
@@ -209,21 +213,22 @@ class CategoryListAdapter(
         tvArrow.visibility = if (row.isFocused) View.VISIBLE else View.GONE
         ClassicMenuStyle.apply(row, tvTitle, tvArrow, 64)
 
-        tvTitle.text = main.t("All Songs")
-        ivCover.setImageResource(R.drawable.icon_all_songs)
+        tvTitle.text = if (isAudiobook) main.t("All Audiobooks") else main.t("All Songs")
+        ivCover.setImageResource(if (isAudiobook) R.drawable.book else R.drawable.icon_all_songs)
 
         if (cachedAllSongsCount < 0) {
             var allCount = 0
             val bc = main.browserController
+            val activeLibrary = if (isAudiobook) MainActivity.audiobookLibrary else MainActivity.customLibrary
             if (type == "GENRE_ARTIST") {
-                for (song in MainActivity.customLibrary) {
+                for (song in activeLibrary) {
                     if (song.genre.isNotEmpty() && song.genre.equals(bc.categoryGenreFilter, ignoreCase = true)) {
                         allCount++
                     }
                 }
             } else if (type == "GENRE_ALBUM") {
                 val isTrack = bc.categoryArtistFilterIsTrackArtist
-                for (song in MainActivity.customLibrary) {
+                for (song in activeLibrary) {
                     if (song.genre.isNotEmpty() && song.genre.equals(bc.categoryGenreFilter, ignoreCase = true)) {
                         val matchField = if (isTrack) song.artist else song.albumArtist
                         if (bc.categoryArtistFilter.equals(matchField, ignoreCase = true)) {
@@ -233,7 +238,7 @@ class CategoryListAdapter(
                 }
             } else {
                 val isTrackArtistMode = bc.categoryArtistFilterIsTrackArtist
-                for (song in MainActivity.customLibrary) {
+                for (song in activeLibrary) {
                     val matchField = if (isTrackArtistMode) song.artist else song.albumArtist
                     if (bc.categoryArtistFilter == matchField) {
                         allCount++
@@ -244,7 +249,11 @@ class CategoryListAdapter(
         }
 
         val allCount = cachedAllSongsCount
-        tvSubtitle.text = if (allCount == 1) t1Song() else "$allCount ${tSongs()}"
+        tvSubtitle.text = if (isAudiobook) {
+            if (allCount == 1) t1File() else "$allCount ${tFiles()}"
+        } else {
+            if (allCount == 1) t1Song() else "$allCount ${tSongs()}"
+        }
 
         val focusedNow = row.isFocused
         row.background = if (focusedNow) main.createFocusedButtonBackground() else main.createButtonBackground(ThemeManager.getListButtonNormalBg())
@@ -296,15 +305,16 @@ class CategoryListAdapter(
             main.isLongPressConsumed = true
             val bc = main.browserController
             val tracks = ArrayList<File>()
+            val activeLibrary = if (isAudiobook) MainActivity.audiobookLibrary else MainActivity.customLibrary
             if (type == "GENRE_ARTIST") {
-                for (song in MainActivity.customLibrary) {
+                for (song in activeLibrary) {
                     if (song.genre.isNotEmpty() && song.genre.equals(bc.categoryGenreFilter, ignoreCase = true)) {
                         tracks.add(song.file)
                     }
                 }
             } else if (type == "GENRE_ALBUM") {
                 val isTrack = bc.categoryArtistFilterIsTrackArtist
-                for (song in MainActivity.customLibrary) {
+                for (song in activeLibrary) {
                     if (song.genre.isNotEmpty() && song.genre.equals(bc.categoryGenreFilter, ignoreCase = true)) {
                         val matchField = if (isTrack) song.artist else song.albumArtist
                         if (bc.categoryArtistFilter.equals(matchField, ignoreCase = true)) {
@@ -314,7 +324,7 @@ class CategoryListAdapter(
                 }
             } else {
                 val isTrack = bc.categoryArtistFilterIsTrackArtist
-                for (song in MainActivity.customLibrary) {
+                for (song in activeLibrary) {
                     val matchField = if (isTrack) song.artist else song.albumArtist
                     if (bc.categoryArtistFilter == matchField) {
                         tracks.add(song.file)
@@ -438,7 +448,11 @@ class CategoryListAdapter(
         tvTitle.text = name
         tvTitle.setTextColor(if (row.isFocused) ThemeManager.getListButtonFocusedTextColor() else ThemeManager.getTextColorPrimary())
         val songCount = albumSongCounts?.get(name) ?: 0
-        tvSubtitle.text = if (songCount == 1) t1Song() else "$songCount ${tSongs()}"
+        tvSubtitle.text = if (isAudiobook) {
+            if (songCount == 1) t1File() else "$songCount ${tFiles()}"
+        } else {
+            if (songCount == 1) t1Song() else "$songCount ${tSongs()}"
+        }
         tvSubtitle.setTextColor(if (row.isFocused) ThemeManager.getListButtonFocusedTextColor() else ThemeManager.getTextColorSecondary())
 
         val cached = coverCache?.get(name)
@@ -455,7 +469,7 @@ class CategoryListAdapter(
                 coverCache?.put(name, directDrawable)
                 ivCover.setImageDrawable(directDrawable)
             } else {
-                ivCover.setImageResource(R.drawable.default_album)
+                ivCover.setImageResource(if (isAudiobook) R.drawable.book else R.drawable.default_album)
                 ivCover.tag = name
                 loadAlbumArtAsync(name, sampleFile, ivCover)
             }
@@ -640,6 +654,10 @@ class CategoryListAdapter(
     private fun t1Song(): String = "1 " + (MainActivity.instance?.t("Song") ?: "Song")
 
     private fun tSongs(): String = MainActivity.instance?.t("Songs") ?: "Songs"
+
+    private fun t1File(): String = "1 " + (MainActivity.instance?.t("File") ?: "File")
+
+    private fun tFiles(): String = MainActivity.instance?.t("Files") ?: "Files"
 
     companion object {
         private var coverCache: LruCache<String, Drawable>? = null

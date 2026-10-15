@@ -347,6 +347,14 @@ class StoragePathsParityTest {
         assertFalse(StoragePaths.containsSameRoot(emptyList(), File("/storage/sdcard0")))
     }
 
+    @Test
+    fun containsSameRoot_collectionCaseInsensitive() {
+        val roots = listOf(File("/storage/sdcard1/Audiobooks"))
+        assertTrue(StoragePaths.containsSameRoot(roots, File("/storage/sdcard1/audiobooks")))
+        assertTrue(StoragePaths.containsSameRoot(roots, File("/storage/sdcard1/AUDIOBOOKS")))
+        assertFalse(StoragePaths.containsSameRoot(roots, File("/storage/sdcard1/Music")))
+    }
+
     // -------------------------------------------------------------------------
     // 7. primaryFile(relativeName)
     // -------------------------------------------------------------------------

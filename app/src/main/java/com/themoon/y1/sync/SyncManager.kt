@@ -7,6 +7,8 @@ import android.os.Looper
 import android.os.PowerManager
 import android.util.Log
 import com.themoon.y1.StoragePaths
+import com.themoon.y1.managers.AlbumCoverManager
+import com.themoon.y1.managers.MediaLibraryManager
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.sync.jellyfin.JellyfinClient
 import com.themoon.y1.sync.jellyfin.JellyfinMediaItem
@@ -224,7 +226,9 @@ class SyncManager internal constructor(context: Context? = null) {
 
             val defaultMode = if ("music".equals(lib.collectionType, ignoreCase = true)) {
                 "all"
-            } else if ("movies".equals(lib.collectionType, ignoreCase = true) || "tvshows".equals(lib.collectionType, ignoreCase = true)) {
+            } else if ("movies".equals(lib.collectionType, ignoreCase = true) || "tvshows".equals(lib.collectionType, ignoreCase = true) ||
+                "books".equals(lib.collectionType, ignoreCase = true) || "audiobooks".equals(lib.collectionType, ignoreCase = true)
+            ) {
                 "manual"
             } else {
                 "off"
@@ -318,8 +322,8 @@ class SyncManager internal constructor(context: Context? = null) {
                     }, token)
 
                     if (downloadCovers) {
-                        val coverFile = File(targetDir, "folder.jpg")
-                        client.downloadCover(accessToken, item.albumId, item.id, coverFile, token)
+                        val coverFile = File(targetDir, "cover.jpg")
+                        client.downloadCover(accessToken, listOfNotNull(item.albumId, item.parentId, item.id), coverFile, token)
                     }
 
                     val newSong = SongItem(
@@ -343,6 +347,143 @@ class SyncManager internal constructor(context: Context? = null) {
                             false
                         )
                     )
+                }
+
+                if (downloadCovers) {
+                    val checkedDirs = HashSet<String>()
+                    for (item in remoteItems) {
+                        if (token.isCancelled()) return
+                        val effectiveArtist = if (!item.albumArtist.isNullOrBlank()) {
+                            item.albumArtist
+                        } else {
+                            item.artist
+                        }
+                        val artistDir = FileUtils.sanitizeFilename(effectiveArtist)
+                        val albumDir = FileUtils.sanitizeFilename(if (!item.album.isNullOrEmpty()) item.album else "Unknown Album")
+                        val targetDir = File(syncRoot, "Music/Jellyfin/$artistDir/$albumDir")
+                        if (checkedDirs.add(targetDir.absolutePath)) {
+                            if (targetDir.exists() && MediaLibraryManager.getInstance().findFolderCover(targetDir) == null) {
+                                val coverFile = File(targetDir, "cover.jpg")
+                                client.downloadCover(accessToken, listOfNotNull(item.albumId, item.parentId, item.id), coverFile, token)
+                                anyDirty = true
+                            }
+                        }
+                    }
+                }
+
+            } else if ("books".equals(lib.collectionType, ignoreCase = true) || "audiobooks".equals(lib.collectionType, ignoreCase = true)) {
+                val recResult = MetadataReconciler.reconcileMusic(
+                    remoteItems, localSongs, trackNumberMap, ledger
+                )
+
+                allUpdatedSongs.addAll(recResult.updatedSongs)
+                allNewTrackNumbers.putAll(recResult.updatedTrackNumbers)
+                if (recResult.isDirty) anyDirty = true
+
+                val toDownload = recResult.itemsToDownload
+                val totalToDownload = toDownload.size
+
+                for (i in 0 until totalToDownload) {
+                    if (token.isCancelled()) return
+                    val item = toDownload[i]
+                    val itemIndex = i + 1
+
+                    updateState(SyncState.DOWNLOADING, "Downloading " + item.name)
+
+                    val effectiveAuthor = if (!item.albumArtist.isNullOrBlank()) {
+                        item.albumArtist
+                    } else if (!item.artist.isNullOrBlank()) {
+                        item.artist
+                    } else {
+                        "Unknown Author"
+                    }
+                    val authorDir = FileUtils.sanitizeFilename(effectiveAuthor)
+                    val bookTitle = if (!item.album.isNullOrBlank()) {
+                        item.album
+                    } else if (!item.seriesName.isNullOrBlank()) {
+                        item.seriesName
+                    } else {
+                        item.name
+                    }
+                    val bookDir = FileUtils.sanitizeFilename(if (!bookTitle.isNullOrEmpty()) bookTitle else "Unknown Book")
+                    val trackPrefix = if (item.indexNumber > 0) String.format("%02d - ", item.indexNumber) else ""
+                    val filename = trackPrefix + FileUtils.sanitizeFilename(item.name) + "." + item.container
+
+                    val targetDir = File(syncRoot, "Audiobooks/Jellyfin/$authorDir/$bookDir")
+                    val targetFile = File(targetDir, filename)
+
+                    if (playbackCheckCallback?.isFileCurrentlyPlaying(targetFile) == true) {
+                        Log.w(TAG, "Skipping playing track: " + targetFile.name)
+                        continue
+                    }
+
+                    if (!FileUtils.hasAvailableSpace(targetDir, item.fileSize, 50 * 1024 * 1024L)) {
+                        throw Exception("Storage Full. Minimum 50 MB headroom required.")
+                    }
+
+                    client.downloadItem(accessToken, item, false, targetFile, object : MediaSyncProvider.DownloadProgressListener {
+                        override fun onProgress(bytesDownloaded: Long, totalBytes: Long) {
+                            updateProgress(lib.name, itemIndex, totalToDownload, item.name, bytesDownloaded, totalBytes)
+                        }
+                    }, token)
+
+                    if (downloadCovers) {
+                        val coverFile = File(targetDir, "cover.jpg")
+                        client.downloadCover(accessToken, listOfNotNull(item.albumId, item.parentId, item.seriesId, item.id), coverFile, token)
+                    }
+
+                    val newSong = SongItem(
+                        targetFile, item.name, effectiveAuthor, bookTitle,
+                        item.year, item.genre, item.albumArtist, item.composer
+                    )
+                    allNewSongs.add(newSong)
+                    if (item.indexNumber > 0) {
+                        allNewTrackNumbers[targetFile.absolutePath] = item.indexNumber
+                    }
+                    anyDirty = true
+
+                    ledger.putItem(
+                        SyncLedger.LedgerItem(
+                            item.id,
+                            lib.id,
+                            "books",
+                            targetFile.absolutePath,
+                            targetFile.length(),
+                            item.serverDateModified,
+                            false
+                        )
+                    )
+                }
+
+                if (downloadCovers) {
+                    val checkedDirs = HashSet<String>()
+                    for (item in remoteItems) {
+                        if (token.isCancelled()) return
+                        val effectiveAuthor = if (!item.albumArtist.isNullOrBlank()) {
+                            item.albumArtist
+                        } else if (!item.artist.isNullOrBlank()) {
+                            item.artist
+                        } else {
+                            "Unknown Author"
+                        }
+                        val authorDir = FileUtils.sanitizeFilename(effectiveAuthor)
+                        val bookTitle = if (!item.album.isNullOrBlank()) {
+                            item.album
+                        } else if (!item.seriesName.isNullOrBlank()) {
+                            item.seriesName
+                        } else {
+                            item.name
+                        }
+                        val bookDir = FileUtils.sanitizeFilename(if (!bookTitle.isNullOrEmpty()) bookTitle else "Unknown Book")
+                        val targetDir = File(syncRoot, "Audiobooks/Jellyfin/$authorDir/$bookDir")
+                        if (checkedDirs.add(targetDir.absolutePath)) {
+                            if (targetDir.exists() && MediaLibraryManager.getInstance().findFolderCover(targetDir) == null) {
+                                val coverFile = File(targetDir, "cover.jpg")
+                                client.downloadCover(accessToken, listOfNotNull(item.albumId, item.parentId, item.seriesId, item.id), coverFile, token)
+                                anyDirty = true
+                            }
+                        }
+                    }
                 }
 
             } else if ("movies".equals(lib.collectionType, ignoreCase = true) || "tvshows".equals(lib.collectionType, ignoreCase = true)) {
@@ -372,7 +513,7 @@ class SyncManager internal constructor(context: Context? = null) {
                         File(syncRoot, "Videos/Jellyfin/$movName")
                     }
 
-                    val targetDir = targetFile.parentFile
+                    val targetDir = targetFile.parentFile ?: syncRoot
                     if (!FileUtils.hasAvailableSpace(targetDir, item.fileSize, 50 * 1024 * 1024L)) {
                         throw Exception("Storage Full. Minimum 50 MB headroom required.")
                     }
@@ -406,8 +547,9 @@ class SyncManager internal constructor(context: Context? = null) {
             for ((id, item) in allLedgerItems) {
                 if (token.isCancelled()) return
                 if (!seenServerItemIds.contains(id)) {
-                    val f = File(item.localPath)
-                    if (f.exists() && (playbackCheckCallback == null || !playbackCheckCallback!!.isFileCurrentlyPlaying(f))) {
+                    val p = item.localPath
+                    val f = if (p != null) File(p) else null
+                    if (f != null && f.exists() && (playbackCheckCallback == null || !playbackCheckCallback!!.isFileCurrentlyPlaying(f))) {
                         f.delete()
                         deletedCount++
                     }
@@ -430,6 +572,9 @@ class SyncManager internal constructor(context: Context? = null) {
         val finalVideoUpdates = hasVideoUpdates
 
         mainHandler.post {
+            if (finalDirty) {
+                AlbumCoverManager.getInstance().clearCache(true)
+            }
             batchUpdateCallback?.let { cb ->
                 cb.onMusicBatchReady(allNewSongs, allUpdatedSongs, allNewTrackNumbers, finalDirty)
                 if (finalVideoUpdates) {

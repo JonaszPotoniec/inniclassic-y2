@@ -768,78 +768,92 @@ class AudioPlayerManager private constructor() {
             pendingScrobbleAlbum = album
             pendingScrobblePath = track.absolutePath
 
+            var artApplied = false
             if (main.lastAlbumArtBytes != null && (main.lastAlbumArtBytes?.size ?: 0) > 0) {
-                main.updateMainMenuBackground()
-                main.refreshNowPlayingPreview()
                 try {
                     val optsCenter = android.graphics.BitmapFactory.Options().apply { inSampleSize = 2 }
                     val bmpCenter = android.graphics.BitmapFactory.decodeByteArray(main.lastAlbumArtBytes, 0, main.lastAlbumArtBytes!!.size, optsCenter)
-                    main.ivAlbumArt.setImageBitmap(bmpCenter)
+                    if (bmpCenter != null) {
+                        main.ivAlbumArt.setImageBitmap(bmpCenter)
+                        main.updateMainMenuBackground()
+                        main.refreshNowPlayingPreview()
 
-                    val optsBg = android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 }
-                    val sourceBg = android.graphics.BitmapFactory.decodeByteArray(main.lastAlbumArtBytes, 0, main.lastAlbumArtBytes!!.size, optsBg)
-                    val blurredBg = main.applyGaussianBlur(sourceBg)
-                    main.ivPlayerBgBlur.setImageBitmap(blurredBg)
-                    if (sourceBg != blurredBg) sourceBg.recycle()
+                        val optsBg = android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 }
+                        val sourceBg = android.graphics.BitmapFactory.decodeByteArray(main.lastAlbumArtBytes, 0, main.lastAlbumArtBytes!!.size, optsBg)
+                        val blurredBg = main.applyGaussianBlur(sourceBg)
+                        main.ivPlayerBgBlur.setImageBitmap(blurredBg)
+                        if (sourceBg != blurredBg) sourceBg?.recycle()
 
-                    try {
-                        val centerX = bmpCenter.width / 2
-                        val centerY = (bmpCenter.height * 0.8).toInt()
-                        main.currentAlbumColor = (bmpCenter.getPixel(centerX, centerY) or 0xFF000000.toInt())
-                    } catch (e: Exception) {
-                        main.currentAlbumColor = ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt()
+                        try {
+                            val centerX = bmpCenter.width / 2
+                            val centerY = (bmpCenter.height * 0.8).toInt()
+                            main.currentAlbumColor = (bmpCenter.getPixel(centerX, centerY) or 0xFF000000.toInt())
+                        } catch (e: Exception) {
+                            main.currentAlbumColor = ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt()
+                        }
+                        artApplied = true
                     }
                 } catch (ignored: Throwable) {}
-            } else if (isPodcast && podcastCoverFile != null && podcastCoverFile.exists()) {
-                try {
-                    val opts = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                    android.graphics.BitmapFactory.decodeFile(podcastCoverFile.absolutePath, opts)
+            }
 
-                    var scale = 1
-                    while (opts.outWidth / scale > 500 || opts.outHeight / scale > 500) {
-                        scale *= 2
-                    }
-
-                    opts.inJustDecodeBounds = false
-                    opts.inSampleSize = scale
-                    val bmp = android.graphics.BitmapFactory.decodeFile(podcastCoverFile.absolutePath, opts)
-                    main.ivAlbumArt.setImageBitmap(bmp)
-
-                    val blurredBg = main.applyGaussianBlur(bmp)
-                    main.ivPlayerBgBlur.setImageBitmap(blurredBg)
-
+            if (!artApplied) {
+                if (isPodcast && podcastCoverFile != null && podcastCoverFile.exists()) {
                     try {
-                        val centerX = bmp.width / 2
-                        val centerY = (bmp.height * 0.8).toInt()
-                        main.currentAlbumColor = (bmp.getPixel(centerX, centerY) or 0xFF000000.toInt())
+                        val opts = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                        android.graphics.BitmapFactory.decodeFile(podcastCoverFile.absolutePath, opts)
+
+                        var scale = 1
+                        while (opts.outWidth / scale > 500 || opts.outHeight / scale > 500) {
+                            scale *= 2
+                        }
+
+                        opts.inJustDecodeBounds = false
+                        opts.inSampleSize = scale
+                        val bmp = android.graphics.BitmapFactory.decodeFile(podcastCoverFile.absolutePath, opts)
+                        if (bmp != null) {
+                            main.ivAlbumArt.setImageBitmap(bmp)
+
+                            val blurredBg = main.applyGaussianBlur(bmp)
+                            main.ivPlayerBgBlur.setImageBitmap(blurredBg)
+
+                            try {
+                                val centerX = bmp.width / 2
+                                val centerY = (bmp.height * 0.8).toInt()
+                                main.currentAlbumColor = (bmp.getPixel(centerX, centerY) or 0xFF000000.toInt())
+                            } catch (e: Exception) {
+                                main.currentAlbumColor = ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt()
+                            }
+
+                            main.updateMainMenuBackground()
+                            main.refreshNowPlayingPreview()
+                            artApplied = true
+                        }
                     } catch (e: Exception) {
-                        main.currentAlbumColor = ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt()
+                        main.applyCachedCoverArt(podcastCoverFile.absolutePath)
+                        artApplied = true
                     }
-
-                    main.updateMainMenuBackground()
-                    main.refreshNowPlayingPreview()
-                } catch (e: Exception) {
-                    main.applyCachedCoverArt(podcastCoverFile.absolutePath)
-                }
-            } else if (coverFile.exists()) {
-                main.applyCachedCoverArt(coverFile.absolutePath)
-            } else {
-                val folderCover = main.findFolderCover(track.parentFile)
-                if (folderCover != null) {
-                    main.applyCachedCoverArt(folderCover.absolutePath)
+                } else if (coverFile.exists()) {
+                    main.applyCachedCoverArt(coverFile.absolutePath)
+                    artApplied = true
                 } else {
-                    main.ivAlbumArt.setImageResource(R.drawable.default_album)
-                    main.currentAlbumColor = ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt()
-                    main.ivPlayerBgBlur.setImageResource(0)
-                    main.updateMainMenuBackground()
-                    main.refreshNowPlayingPreview()
+                    val folderCover = main.findFolderCover(track.parentFile)
+                    if (folderCover != null && folderCover.exists()) {
+                        main.applyCachedCoverArt(folderCover.absolutePath)
+                        artApplied = true
+                    } else {
+                        main.ivAlbumArt.setImageResource(R.drawable.default_album)
+                        main.currentAlbumColor = ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt()
+                        main.ivPlayerBgBlur.setImageResource(0)
+                        main.updateMainMenuBackground()
+                        main.refreshNowPlayingPreview()
 
-                    val hasValidTags = (!t.isNullOrBlank()) && (!a.isNullOrBlank() && !a.contains("Unknown"))
-                    val isAutoFetchEnabled = main.prefs.getBoolean("auto_fetch", true)
+                        val hasValidTags = (!t.isNullOrBlank()) && (!a.isNullOrBlank() && !a.contains("Unknown"))
+                        val isAutoFetchEnabled = main.prefs.getBoolean("auto_fetch", true)
 
-                    if (!isPodcast && isAutoFetchEnabled) {
-                        val searchQuery = if (hasValidTags) "$a $t" else safeFileName.replace("-", " ").replace("_", " ")
-                        main.fetchTrackInfoFromInternet(track, searchQuery, hasValidTags, t, a)
+                        if (!isPodcast && isAutoFetchEnabled) {
+                            val searchQuery = if (hasValidTags) "$a $t" else safeFileName.replace("-", " ").replace("_", " ")
+                            main.fetchTrackInfoFromInternet(track, searchQuery, hasValidTags, t, a)
+                        }
                     }
                 }
             }

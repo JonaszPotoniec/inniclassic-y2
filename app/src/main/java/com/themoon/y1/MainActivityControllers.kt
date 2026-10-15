@@ -623,6 +623,7 @@ internal fun MainActivity.handleMainMenuAction(action: String) {
     when (action) {
         "OPEN_BROWSER", "MUSIC" -> {
             browserController.isAudiobookLibraryMode = false
+            this.isAudiobookLibraryMode = false
             browserController.currentBrowserMode = BrowserMode.Root
             changeScreen(MainActivity.STATE_BROWSER)
             browserController.buildFileBrowserUI()
@@ -659,6 +660,7 @@ internal fun MainActivity.handleMainMenuAction(action: String) {
         }
         "OPEN_AUDIOBOOKS" -> {
             browserController.isAudiobookLibraryMode = true
+            this.isAudiobookLibraryMode = true
             browserController.currentBrowserMode = BrowserMode.Audiobooks
             changeScreen(ScreenState.Browser(BrowserMode.Audiobooks))
             browserController.buildFileBrowserUI()

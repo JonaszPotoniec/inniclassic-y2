@@ -106,14 +106,17 @@ class MediaLibraryManager private constructor() {
                     }
                 }
 
+                deduplicateLibrary(musicLibrary)
+                deduplicateLibrary(audiobookLibrary)
+
                 val existingMusic = HashSet<String>()
                 synchronized(musicLibrary) {
-                    for (item in musicLibrary) existingMusic.add(item.file.absolutePath)
+                    for (item in musicLibrary) existingMusic.add(normalizePathKey(item.file))
                 }
 
                 val existingBooks = HashSet<String>()
                 synchronized(audiobookLibrary) {
-                    for (item in audiobookLibrary) existingBooks.add(item.file.absolutePath)
+                    for (item in audiobookLibrary) existingBooks.add(normalizePathKey(item.file))
                 }
 
                 StoragePaths.invalidate()
@@ -130,6 +133,8 @@ class MediaLibraryManager private constructor() {
                     scanned = scanDirectory(bookDir, audiobookLibrary, existingBooks, blacklist, scanned, total, isAudiobook = true, listener)
                 }
 
+                deduplicateLibrary(musicLibrary)
+                deduplicateLibrary(audiobookLibrary)
                 saveLibraryCache()
                 rebuildUniqueAlbumList()
                 AlbumCoverManager.getInstance().pregenerateThumbnails(uniqueAlbumList)
@@ -143,10 +148,33 @@ class MediaLibraryManager private constructor() {
         }, "y1-media-scanner").start()
     }
 
+    private fun normalizePathKey(file: File): String {
+        return try {
+            file.canonicalPath.lowercase(java.util.Locale.US)
+        } catch (_: Exception) {
+            file.absolutePath.lowercase(java.util.Locale.US)
+        }
+    }
+
+    fun deduplicateLibrary(list: MutableList<SongItem>) {
+        synchronized(list) {
+            val seen = HashSet<String>()
+            val it = list.iterator()
+            while (it.hasNext()) {
+                val item = it.next()
+                val key = normalizePathKey(item.file)
+                if (!seen.add(key)) {
+                    trackNumberMap.remove(item.file.absolutePath)
+                    it.remove()
+                }
+            }
+        }
+    }
+
     private fun scanDirectory(
         folder: File,
         targetList: MutableList<SongItem>,
-        existingPaths: Set<String>,
+        existingPaths: MutableSet<String>,
         blacklist: Set<String>,
         startScanned: Int,
         total: Int,
@@ -167,7 +195,8 @@ class MediaLibraryManager private constructor() {
                 }
                 if (blacklist.contains(f.absolutePath)) continue
 
-                if (existingPaths.contains(f.absolutePath)) {
+                val fileKey = normalizePathKey(f)
+                if (existingPaths.contains(fileKey) || existingPaths.contains(f.absolutePath)) {
                     scanned++
                     if (total > 0 && scanned % 10 == 0) {
                         listener?.onProgress(scanned, total)
@@ -269,9 +298,9 @@ class MediaLibraryManager private constructor() {
                         try {
                             val parentName = f.parentFile?.parentFile?.name
                             val folderName = f.parentFile?.name
-                            if (!parentName.isNullOrEmpty() && parentName != "Music" && parentName != "Audiobooks" && !StoragePaths.isStorageVolumeName(parentName)) {
+                            if (!parentName.isNullOrEmpty() && !parentName.equals("Music", ignoreCase = true) && !parentName.equals("Audiobooks", ignoreCase = true) && !StoragePaths.isStorageVolumeName(parentName)) {
                                 artist = parentName
-                            } else if (!folderName.isNullOrEmpty() && folderName != "Music" && folderName != "Audiobooks" && !StoragePaths.isStorageVolumeName(folderName)) {
+                            } else if (!folderName.isNullOrEmpty() && !folderName.equals("Music", ignoreCase = true) && !folderName.equals("Audiobooks", ignoreCase = true) && !StoragePaths.isStorageVolumeName(folderName)) {
                                 artist = folderName
                             }
                         } catch (_: Exception) {}
@@ -281,7 +310,7 @@ class MediaLibraryManager private constructor() {
                         album = al
                     } else {
                         val folderName = f.parentFile?.name
-                        if (!folderName.isNullOrEmpty() && folderName != "Music" && folderName != "Audiobooks" && !StoragePaths.isStorageVolumeName(folderName)) {
+                        if (!folderName.isNullOrEmpty() && !folderName.equals("Music", ignoreCase = true) && !folderName.equals("Audiobooks", ignoreCase = true) && !StoragePaths.isStorageVolumeName(folderName)) {
                             album = folderName
                         }
                     }
@@ -301,6 +330,8 @@ class MediaLibraryManager private constructor() {
 
                 val song = SongItem(f, title, artist, album, year, genre, albumArtist, composer)
                 targetList.add(song)
+                existingPaths.add(fileKey)
+                existingPaths.add(f.absolutePath)
                 trackNumberMap[f.absolutePath] = trackNum
 
                 scanned++
@@ -414,6 +445,7 @@ class MediaLibraryManager private constructor() {
 
     private fun jsonToSongList(arr: JSONArray?, target: MutableList<SongItem>, isAudiobook: Boolean) {
         if (arr == null) return
+        val seen = HashSet<String>()
         target.clear()
         for (i in 0 until arr.length()) {
             try {
@@ -427,11 +459,14 @@ class MediaLibraryManager private constructor() {
                     if (!StoragePaths.isUnderMusic(f)) continue
                 }
 
+                val key = normalizePathKey(f)
+                if (!seen.add(key)) continue
+
                 val song = SongItem(
                     f,
                     o.optString("title", f.name),
-                    o.optString("artist", "Unknown Artist"),
-                    o.optString("album", "Unknown Album"),
+                    o.optString("artist", if (isAudiobook) "Unknown Author" else "Unknown Artist"),
+                    o.optString("album", if (isAudiobook) "Unknown Book" else "Unknown Album"),
                     o.optString("year", "Unknown Year"),
                     o.optString("genre", "Unknown Genre"),
                     o.optString("albumArtist", ""),

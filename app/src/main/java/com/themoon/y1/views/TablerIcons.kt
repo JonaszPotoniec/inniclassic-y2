@@ -121,6 +121,13 @@ object TablerIcons {
         "M9 17v-13h10v13",
         "M9 8h10"
     )
+    val BOOK: Array<String> = arrayOf(
+        "M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0",
+        "M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0",
+        "M3 6l0 13",
+        "M12 6l0 13",
+        "M21 6l0 13"
+    )
 
     /**
      * Renders a Tabler icon centered on a rounded card tile.

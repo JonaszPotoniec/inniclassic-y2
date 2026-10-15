@@ -164,7 +164,9 @@ object StoragePaths {
 
     fun isAudiobooksRoot(absolutePath: String?): Boolean {
         if (absolutePath == null) return false
-        if (absolutePath == "$PRIMARY_PATH/Audiobooks" || absolutePath == "$SECONDARY_PATH/Audiobooks") return true
+        if (absolutePath == "$PRIMARY_PATH/Audiobooks" || absolutePath == "$SECONDARY_PATH/Audiobooks" ||
+            absolutePath == "$PRIMARY_PATH/audiobooks" || absolutePath == "$SECONDARY_PATH/audiobooks"
+        ) return true
         for (dir in getAudiobooksDirs()) {
             if (absolutePath == dir.absolutePath) return true
         }
@@ -177,7 +179,9 @@ object StoragePaths {
     fun isUnderAudiobooks(absolutePath: String?): Boolean {
         if (absolutePath == null) return false
         if (absolutePath.startsWith("$PRIMARY_PATH/Audiobooks") ||
-            absolutePath.startsWith("$SECONDARY_PATH/Audiobooks")
+            absolutePath.startsWith("$SECONDARY_PATH/Audiobooks") ||
+            absolutePath.startsWith("$PRIMARY_PATH/audiobooks") ||
+            absolutePath.startsWith("$SECONDARY_PATH/audiobooks")
         ) return true
         for (dir in getAudiobooksDirs()) {
             val root = dir.absolutePath
@@ -236,13 +240,35 @@ object StoragePaths {
         if (hasSecondaryStorage()) {
             addIfMissing(dirs, File(SECONDARY_PATH, name))
         }
+        val lower = name.lowercase(Locale.US)
+        if (lower != name) {
+            val primLower = File(getPrimaryRoot(), lower)
+            if (primLower.exists()) addIfMissing(dirs, primLower)
+            val pPathLower = File(PRIMARY_PATH, lower)
+            if (pPathLower.exists()) addIfMissing(dirs, pPathLower)
+            if (hasSecondaryStorage()) {
+                val secLower = File(SECONDARY_PATH, lower)
+                if (secLower.exists()) addIfMissing(dirs, secLower)
+            }
+        }
         return dirs
     }
 
     private fun addIfMissing(dirs: MutableList<File>, dir: File) {
-        if (!containsSameRoot(dirs, dir)) {
-            dirs.add(dir)
+        val path = dir.absolutePath
+        val dirCanon = try { dir.canonicalPath } catch (_: Exception) { path }
+        for (i in dirs.indices) {
+            val existing = dirs[i]
+            val existingCanon = try { existing.canonicalPath } catch (_: Exception) { existing.absolutePath }
+            if (existing.absolutePath == path) return
+            if (existingCanon.equals(dirCanon, ignoreCase = true) || existing.absolutePath.equals(path, ignoreCase = true)) {
+                if (!existing.exists() && dir.exists()) {
+                    dirs[i] = dir
+                }
+                return
+            }
         }
+        dirs.add(dir)
     }
 
     private fun firstUsableRoot(vararg candidates: String): File? {
@@ -285,8 +311,12 @@ object StoragePaths {
 
     fun containsSameRoot(roots: List<File>, candidate: File): Boolean {
         val path = candidate.absolutePath
+        val candCanon = try { candidate.canonicalPath } catch (_: Exception) { path }
         for (existing in roots) {
+            val existingCanon = try { existing.canonicalPath } catch (_: Exception) { existing.absolutePath }
             if (existing.absolutePath == path) return true
+            if (existingCanon.equals(candCanon, ignoreCase = true)) return true
+            if (existing.absolutePath.equals(path, ignoreCase = true)) return true
         }
         return false
     }

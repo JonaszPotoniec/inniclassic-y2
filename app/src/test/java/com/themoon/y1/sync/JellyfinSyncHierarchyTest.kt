@@ -113,4 +113,60 @@ class JellyfinSyncHierarchyTest {
         assertEquals("Interstellar", hierarchy.moviesList[1].name)
         assertEquals(2, hierarchy.allItemIds.size)
     }
+
+    @Test
+    fun testBooksHierarchyAndTriState() {
+        val ch1 = JellyfinMediaItem().apply {
+            id = "ch1"; name = "Chapter 1"; artist = "Brandon Sanderson"
+            album = "The Way of Kings"; indexNumber = 1; fileSize = 1000
+            parentId = "bookParent123"
+        }
+        val ch2 = JellyfinMediaItem().apply {
+            id = "ch2"; name = "Chapter 2"; artist = "Brandon Sanderson"
+            album = "The Way of Kings"; indexNumber = 2; fileSize = 1200
+        }
+        val ch3 = JellyfinMediaItem().apply {
+            id = "ch3"; name = "Prologue"; artist = "Brandon Sanderson"
+            album = "Words of Radiance"; indexNumber = 1; fileSize = 800
+        }
+
+        val hierarchy = JellyfinSyncHierarchy.buildBooksHierarchy(listOf(ch1, ch2, ch3))
+
+        assertEquals(1, hierarchy.authorsList.size)
+        assertEquals(3, hierarchy.allItemIds.size)
+        assertEquals(3000, hierarchy.totalLibrarySize)
+
+        val author = hierarchy.authorsList[0]
+        assertEquals("Brandon Sanderson", author.name)
+        assertEquals(2, author.books.size)
+
+        val wayOfKings = author.books.firstOrNull { it.name == "The Way of Kings" }
+        assertNotNull(wayOfKings)
+        assertEquals("bookParent123", wayOfKings!!.id)
+        assertEquals(2, wayOfKings!!.chapters.size)
+
+        val wordsOfRadiance = author.books.firstOrNull { it.name == "Words of Radiance" }
+        assertNotNull(wordsOfRadiance)
+        assertEquals(1, wordsOfRadiance!!.chapters.size)
+
+        // TriState checks
+        val selected = mutableSetOf<String>()
+        assertEquals(TriState.UNCHECKED, author.getTriState(selected))
+        assertEquals(TriState.UNCHECKED, wayOfKings.getTriState(selected))
+
+        selected.add("ch1")
+        assertEquals(TriState.INDETERMINATE, author.getTriState(selected))
+        assertEquals(TriState.INDETERMINATE, wayOfKings.getTriState(selected))
+        assertEquals(1, author.getSelectedCount(selected))
+        assertEquals(1, wayOfKings.getSelectedCount(selected))
+
+        selected.add("ch2")
+        assertEquals(TriState.INDETERMINATE, author.getTriState(selected))
+        assertEquals(TriState.CHECKED, wayOfKings.getTriState(selected))
+
+        selected.add("ch3")
+        assertEquals(TriState.CHECKED, author.getTriState(selected))
+        assertEquals(TriState.CHECKED, wordsOfRadiance.getTriState(selected))
+        assertEquals(3, author.getSelectedCount(selected))
+    }
 }

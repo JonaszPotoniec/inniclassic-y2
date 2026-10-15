@@ -88,8 +88,43 @@ class JellyfinSyncHierarchy {
         }
     }
 
+    class AuthorNode(
+        val name: String
+    ) {
+        val books: MutableList<BookNode> = ArrayList()
+        val allChapterIds: MutableSet<String> = HashSet()
+        var totalSize: Long = 0
+
+        fun getTriState(selectedIds: Set<String>?): TriState {
+            return computeTriState(allChapterIds, selectedIds)
+        }
+
+        fun getSelectedCount(selectedIds: Set<String>?): Int {
+            return countSelected(allChapterIds, selectedIds)
+        }
+    }
+
+    class BookNode(
+        val id: String,
+        val name: String,
+        val authorName: String
+    ) {
+        val chapters: MutableList<JellyfinMediaItem> = ArrayList()
+        val allChapterIds: MutableSet<String> = HashSet()
+        var totalSize: Long = 0
+
+        fun getTriState(selectedIds: Set<String>?): TriState {
+            return computeTriState(allChapterIds, selectedIds)
+        }
+
+        fun getSelectedCount(selectedIds: Set<String>?): Int {
+            return countSelected(allChapterIds, selectedIds)
+        }
+    }
+
     val seriesList: MutableList<SeriesNode> = ArrayList()
     val artistsList: MutableList<ArtistNode> = ArrayList()
+    val authorsList: MutableList<AuthorNode> = ArrayList()
     val moviesList: MutableList<JellyfinMediaItem> = ArrayList()
     val allItemIds: MutableSet<String> = HashSet()
     var totalLibrarySize: Long = 0
@@ -283,6 +318,88 @@ class JellyfinSyncHierarchy {
                 val n2 = o2.name ?: ""
                 n1.compareTo(n2, ignoreCase = true)
             })
+
+            return hierarchy
+        }
+
+        fun buildBooksHierarchy(chapters: List<JellyfinMediaItem>?): JellyfinSyncHierarchy {
+            val hierarchy = JellyfinSyncHierarchy()
+            if (chapters.isNullOrEmpty()) return hierarchy
+
+            val authorMap = HashMap<String, AuthorNode>()
+            val bookMap = HashMap<String, BookNode>()
+
+            for (ch in chapters) {
+                val chId = ch.id
+                if (chId.isNullOrEmpty()) continue
+                hierarchy.allItemIds.add(chId)
+                hierarchy.totalLibrarySize += ch.fileSize
+
+                val rawAuthor = if (!ch.albumArtist.isNullOrBlank()) {
+                    ch.albumArtist
+                } else if (!ch.artist.isNullOrBlank()) {
+                    ch.artist
+                } else {
+                    "Unknown Author"
+                }
+                val authorName: String = if (!rawAuthor.isNullOrBlank()) rawAuthor else "Unknown Author"
+
+                val authorKey = authorName.lowercase()
+                var autNode = authorMap[authorKey]
+                if (autNode == null) {
+                    autNode = AuthorNode(authorName)
+                    authorMap[authorKey] = autNode
+                    hierarchy.authorsList.add(autNode)
+                }
+                autNode.allChapterIds.add(chId)
+                autNode.totalSize += ch.fileSize
+
+                val rawBook = if (!ch.album.isNullOrBlank()) {
+                    ch.album
+                } else if (!ch.seriesName.isNullOrBlank()) {
+                    ch.seriesName
+                } else {
+                    ch.name
+                }
+                val bookTitle: String = if (!rawBook.isNullOrBlank()) rawBook else "Unknown Book"
+                val bookKey = authorKey + "_" + bookTitle.lowercase()
+
+                var bkNode = bookMap[bookKey]
+                if (bkNode == null) {
+                    val bookId = ch.albumId ?: ch.parentId ?: ch.seriesId.ifEmpty { bookKey }
+                    bkNode = BookNode(bookId, bookTitle, authorName)
+                    bookMap[bookKey] = bkNode
+                    autNode.books.add(bkNode)
+                }
+                bkNode.chapters.add(ch)
+                bkNode.allChapterIds.add(chId)
+                bkNode.totalSize += ch.fileSize
+            }
+
+            // Sort authors by name
+            Collections.sort(hierarchy.authorsList, Comparator { o1, o2 ->
+                o1.name.compareTo(o2.name, ignoreCase = true)
+            })
+
+            // Sort books by name, and chapters by parentIndexNumber (part/disc) then indexNumber
+            for (autNode in hierarchy.authorsList) {
+                Collections.sort(autNode.books, Comparator { o1, o2 ->
+                    o1.name.compareTo(o2.name, ignoreCase = true)
+                })
+                for (bkNode in autNode.books) {
+                    Collections.sort(bkNode.chapters, Comparator { o1, o2 ->
+                        if (o1.parentIndexNumber != o2.parentIndexNumber) {
+                            return@Comparator o1.parentIndexNumber.compareTo(o2.parentIndexNumber)
+                        }
+                        if (o1.indexNumber != o2.indexNumber) {
+                            return@Comparator o1.indexNumber.compareTo(o2.indexNumber)
+                        }
+                        val n1 = o1.name ?: ""
+                        val n2 = o2.name ?: ""
+                        n1.compareTo(n2, ignoreCase = true)
+                    })
+                }
+            }
 
             return hierarchy
         }
