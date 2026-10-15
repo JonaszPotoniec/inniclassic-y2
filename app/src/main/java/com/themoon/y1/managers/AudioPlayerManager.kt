@@ -1023,12 +1023,16 @@ class AudioPlayerManager private constructor() {
             if (main != null && main.currentPlaylist.isNotEmpty()) {
                 if (main.currentIndex in 0 until main.currentPlaylist.size) {
                     val filePath = main.currentPlaylist[main.currentIndex].absolutePath
-                    if (StoragePaths.isUnderAudiobooks(filePath) || filePath.contains("/Podcasts") || filePath.startsWith("/PODCAST_STREAM") || main.isAudiobookLibraryMode) {
+                    val isAudiobook = StoragePaths.isUnderAudiobooks(filePath) || filePath.contains("/Audiobooks", ignoreCase = true) || main.isAudiobookLibraryMode
+                    if (isAudiobook || filePath.contains("/Podcasts") || filePath.startsWith("/PODCAST_STREAM")) {
                         AudiobookManager.getInstance(main).saveBookmark(filePath, getCurrentPosition(), main.currentIndex)
-                        main.prefs.edit()
+                        val editor = main.prefs.edit()
                             .putInt("book_pos_$filePath", getCurrentPosition())
                             .putInt("book_dur_$filePath", getDuration())
-                            .apply()
+                        if (isAudiobook) {
+                            editor.putString("last_played_audiobook_path", filePath)
+                        }
+                        editor.apply()
                     }
                 }
             }
@@ -1594,6 +1598,7 @@ class AudioPlayerManager private constructor() {
         val dur = getDuration().toLong().coerceAtLeast(0L)
         if (dur > 0L) editor.putLong("last_played_duration", dur)
         if (sync) editor.commit() else editor.apply()
+        saveAudiobookBookmarkIfNeeded()
     }
 
     fun restoreLastPlaybackState(main: MainActivity): Boolean {
@@ -1660,15 +1665,32 @@ class AudioPlayerManager private constructor() {
                 restoredOriginal.addAll(restoredPlaylist)
             }
 
+            val savedPos = main.prefs.getLong("last_played_position", 0L).coerceAtLeast(0L)
+            val savedDur = main.prefs.getLong("last_played_duration", 0L).coerceAtLeast(0L)
+            val isAudiobook = main.prefs.getBoolean("last_played_is_audiobook", false)
+
+            if ((isAudiobook || StoragePaths.isUnderAudiobooks(targetFile.absolutePath)) && restoredPlaylist.size <= 1) {
+                val parent = targetFile.parentFile
+                if (parent != null && parent.exists()) {
+                    val chaps = parent.listFiles()?.filter { AudiobookManager.isAudioFile(it) }?.sortedWith { f1, f2 ->
+                        val t1 = MainActivity.trackNumberMap[f1.absolutePath] ?: 0
+                        val t2 = MainActivity.trackNumberMap[f2.absolutePath] ?: 0
+                        if (t1 != t2 && t1 > 0 && t2 > 0) t1.compareTo(t2) else f1.name.compareTo(f2.name, ignoreCase = true)
+                    }
+                    if (!chaps.isNullOrEmpty() && chaps.size > 1) {
+                        restoredPlaylist.clear()
+                        restoredPlaylist.addAll(chaps)
+                        restoredOriginal.clear()
+                        restoredOriginal.addAll(chaps)
+                    }
+                }
+            }
+
             var savedIndex = main.prefs.getInt("last_played_song_index", 0)
             if (savedIndex !in restoredPlaylist.indices || restoredPlaylist[savedIndex].absolutePath != targetFile.absolutePath) {
                 savedIndex = restoredPlaylist.indexOfFirst { it.absolutePath == targetFile.absolutePath }
                 if (savedIndex == -1) savedIndex = 0
             }
-
-            val savedPos = main.prefs.getLong("last_played_position", 0L).coerceAtLeast(0L)
-            val savedDur = main.prefs.getLong("last_played_duration", 0L).coerceAtLeast(0L)
-            val isAudiobook = main.prefs.getBoolean("last_played_is_audiobook", false)
 
             main.originalPlaylist.clear()
             main.originalPlaylist.addAll(restoredOriginal)

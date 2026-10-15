@@ -406,5 +406,7 @@
   "Failed to fetch libraries": "ライブラリの取得に失敗しました",
   "Libraries updated": "ライブラリが更新されました",
   "Classic Light": "クラシック（ライト）",
-  "Classic Dark": "クラシック（ダーク）"
+  "Classic Dark": "クラシック（ダーク）",
+  "Continue": "続ける",
+  "Scan": "スキャン"
 }

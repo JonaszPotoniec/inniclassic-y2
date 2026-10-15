@@ -422,5 +422,7 @@
   "Failed to fetch libraries": "Error al obtener las bibliotecas",
   "Libraries updated": "Bibliotecas actualizadas",
   "Classic Light": "Clásico claro",
-  "Classic Dark": "Clásico oscuro"
+  "Classic Dark": "Clásico oscuro",
+  "Continue": "Continuar",
+  "Scan": "Escanear"
 }

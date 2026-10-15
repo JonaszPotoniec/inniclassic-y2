@@ -422,5 +422,7 @@
   "Failed to fetch libraries": "获取媒体库失败",
   "Libraries updated": "媒体库已更新",
   "Classic Light": "经典浅色",
-  "Classic Dark": "经典深色"
+  "Classic Dark": "经典深色",
+  "Continue": "继续",
+  "Scan": "扫描"
 }

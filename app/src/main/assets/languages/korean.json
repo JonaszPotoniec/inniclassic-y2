@@ -422,5 +422,7 @@
   "Failed to fetch libraries": "라이브러리를 가져오지 못했습니다",
   "Libraries updated": "라이브러리가 업데이트되었습니다",
   "Classic Light": "클래식 라이트",
-  "Classic Dark": "클래식 다크"
+  "Classic Dark": "클래식 다크",
+  "Continue": "이어듣기",
+  "Scan": "스캔"
 }

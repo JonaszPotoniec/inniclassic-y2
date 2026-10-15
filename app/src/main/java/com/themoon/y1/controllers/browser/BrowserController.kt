@@ -379,27 +379,71 @@ class BrowserController(
             updateHeaderTitle(localize("Audiobooks"))
             showBrowserCoverPane()
 
-            val btnFolder = createListButtonWithIcon("\uE2C7", localize("Folders"), null)
-            btnFolder.setOnClickListener {
+            val btnContinue = createListButtonWithIcon("\uE037", localize("Continue"), null)
+            btnContinue.setOnClickListener {
                 clickFeedback()
-                lastBrowserFocusText = localize("Folders")
-                val root = StoragePaths.getAudiobooksDir()
-                currentBrowserMode = BrowserMode.Folder(root)
-                currentFolder = root
-                buildFileBrowserUI()
-            }
-            containerBrowserItems.addView(btnFolder)
+                val main = MainActivity.instance ?: return@setOnClickListener
+                main.isAudiobookLibraryMode = true
+                val bookPrefs = activity.getSharedPreferences("Y1_AUDIOBOOK_BOOKMARKS", Context.MODE_PRIVATE)
+                val savedPath = main.prefs.getString("last_played_audiobook_path", null)
+                    ?: bookPrefs.getString("LAST_AUDIOBOOK_PATH", null)
+                    ?: if (main.prefs.getBoolean("last_played_is_audiobook", false)) {
+                        main.prefs.getString("last_played_song_path", null)
+                    } else null
+                val file = if (!savedPath.isNullOrEmpty()) File(savedPath) else null
+                val targetFile = if (file != null && file.exists()) file else MainActivity.audiobookLibrary.firstOrNull()?.file
+                if (targetFile != null && targetFile.exists()) {
+                    val bookChapters = ArrayList<File>()
+                    val bookItem = MainActivity.audiobookLibrary.firstOrNull { it.file.absolutePath == targetFile.absolutePath }
+                    if (bookItem != null && bookItem.album.isNotEmpty()) {
+                        val matching = MainActivity.audiobookLibrary.filter {
+                            it.album.equals(bookItem.album, ignoreCase = true) &&
+                            (bookItem.artist.isEmpty() || it.artist.equals(bookItem.artist, ignoreCase = true) || it.albumArtist.equals(bookItem.albumArtist, ignoreCase = true))
+                        }.sortedWith { s1, s2 ->
+                            val t1 = MainActivity.trackNumberMap[s1.file.absolutePath] ?: 0
+                            val t2 = MainActivity.trackNumberMap[s2.file.absolutePath] ?: 0
+                            if (t1 != t2 && t1 > 0 && t2 > 0) t1.compareTo(t2) else s1.title.compareTo(s2.title, ignoreCase = true)
+                        }
+                        for (s in matching) {
+                            bookChapters.add(s.file)
+                        }
+                    }
+                    if (bookChapters.isEmpty()) {
+                        val parent = targetFile.parentFile ?: StoragePaths.getAudiobooksDir()
+                        val files = parent.listFiles()
+                        if (files != null) {
+                            for (f in files) {
+                                if (AudiobookManager.isAudioFile(f)) bookChapters.add(f)
+                            }
+                            bookChapters.sortWith { f1, f2 ->
+                                val t1 = MainActivity.trackNumberMap[f1.absolutePath] ?: 0
+                                val t2 = MainActivity.trackNumberMap[f2.absolutePath] ?: 0
+                                if (t1 != t2 && t1 > 0 && t2 > 0) t1.compareTo(t2) else f1.name.compareTo(f2.name, ignoreCase = true)
+                            }
+                        }
+                    }
+                    if (bookChapters.isEmpty()) bookChapters.add(targetFile)
 
-            val btnAuthor = createListButtonWithIcon("\uE7FD", localize("Authors"), null)
-            btnAuthor.setOnClickListener {
-                clickFeedback()
-                lastBrowserFocusText = localize("Authors")
-                currentBrowserMode = BrowserMode.Artists
-                virtualQueryValue = ""
-                categoryArtistFilter = ""
-                buildVirtualCategories("ARTIST")
+                    val curPlaying = AudioPlayerManager.getInstance().currentlyPlayingFilePath
+                    if (curPlaying == targetFile.absolutePath && main.currentPlaylist.size == bookChapters.size && main.currentPlaylist.isNotEmpty()) {
+                        if (!AudioPlayerManager.getInstance().isPlaying()) {
+                            AudioPlayerManager.getInstance().playOrPauseMusic()
+                        }
+                        onNavigateToScreen(ScreenState.Player)
+                        return@setOnClickListener
+                    }
+
+                    var targetIdx = bookChapters.indexOfFirst { it.absolutePath == targetFile.absolutePath }
+                    if (targetIdx == -1) targetIdx = 0
+                    val savedPos = main.prefs.getInt("book_pos_" + targetFile.absolutePath, 0)
+                        .takeIf { it > 0 } ?: AudiobookManager.getInstance(main).getSavedPosition(targetFile.absolutePath)
+                    AudioPlayerManager.getInstance().playTrackListWithOffset(bookChapters, targetIdx, savedPos)
+                    onNavigateToScreen(ScreenState.Player)
+                } else {
+                    Toast.makeText(activity, localize("No audiobooks found"), Toast.LENGTH_SHORT).show()
+                }
             }
-            containerBrowserItems.addView(btnAuthor)
+            containerBrowserItems.addView(btnContinue)
 
             val btnBook = createListButtonWithIcon("\uE86D", localize("Books"), null)
             btnBook.setOnClickListener {
@@ -412,15 +456,16 @@ class BrowserController(
             }
             containerBrowserItems.addView(btnBook)
 
-            val btnAll = createListButtonWithIcon("\uE8FE", localize("All Audiobooks"), null)
-            btnAll.setOnClickListener {
+            val btnAuthor = createListButtonWithIcon("\uE7FD", localize("Authors"), null)
+            btnAuthor.setOnClickListener {
                 clickFeedback()
-                lastBrowserFocusText = localize("All Audiobooks")
-                currentBrowserMode = BrowserMode.VirtualSongs
-                virtualQueryType = "ALL"
-                buildVirtualSongs()
+                lastBrowserFocusText = localize("Authors")
+                currentBrowserMode = BrowserMode.Artists
+                virtualQueryValue = ""
+                categoryArtistFilter = ""
+                buildVirtualCategories("ARTIST")
             }
-            containerBrowserItems.addView(btnAll)
+            containerBrowserItems.addView(btnAuthor)
         }
 
         val isScanning = MainActivity.instance?.isCustomScanning == true
@@ -493,7 +538,7 @@ class BrowserController(
         val categories = ArrayList(uniqueCategories)
         Collections.sort(categories, java.lang.String.CASE_INSENSITIVE_ORDER)
 
-        if ((type == "ALBUM" && categoryArtistFilter.isNotEmpty()) || type == "GENRE_ARTIST" || type == "GENRE_ALBUM") {
+        if (!isAudiobookLibraryMode && ((type == "ALBUM" && categoryArtistFilter.isNotEmpty()) || type == "GENRE_ARTIST" || type == "GENRE_ALBUM")) {
             categories.add(0, ALL_SONGS_SENTINEL)
         }
 

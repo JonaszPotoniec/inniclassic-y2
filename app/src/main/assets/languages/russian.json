@@ -422,5 +422,7 @@
   "Failed to fetch libraries": "Не удалось получить библиотеки",
   "Libraries updated": "Библиотеки обновлены",
   "Classic Light": "Классическая светлая",
-  "Classic Dark": "Классическая тёмная"
+  "Classic Dark": "Классическая тёмная",
+  "Continue": "Продолжить",
+  "Scan": "Сканировать"
 }
