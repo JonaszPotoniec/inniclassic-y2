@@ -33,6 +33,7 @@ open class MigrationManager {
     private fun registerDefaultMigrations() {
         registerMigration(Migration001RestoreDeduplicatedSongs())
         registerMigration(Migration002PurgeOemDemoMedia())
+        registerMigration(Migration003MigrateVideoDirectories())
     }
 
     /**

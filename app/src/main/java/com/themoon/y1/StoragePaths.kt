@@ -99,16 +99,29 @@ object StoragePaths {
     /** Folder-browser / mkdir default - always primary. */
     fun getMusicDir(): File = primaryMediaDir("Music")
 
-    fun getAudiobooksDir(): File = primaryMediaDir("Audiobooks")
-
-    fun getVideosDir(): File = primaryMediaDir("Videos")
-
     /** All Music folders to scan (primary + readable secondary). */
     fun getMusicDirs(): List<File> = mediaDirs("Music")
 
+    fun getAudiobooksDir(): File = primaryMediaDir("Audiobooks")
+
     fun getAudiobooksDirs(): List<File> = mediaDirs("Audiobooks")
 
-    fun getVideosDirs(): List<File> = mediaDirs("Videos")
+    fun getMoviesDir(): File = primaryMediaDir("Movies")
+
+    fun getMoviesDirs(): List<File> = mediaDirs("Movies")
+
+    fun getTvShowsDir(): File = primaryMediaDir("Tvshows")
+
+    fun getTvShowsDirs(): List<File> = mediaDirs("Tvshows")
+
+    fun getVideosDir(): File = getMoviesDir()
+
+    fun getVideosDirs(): List<File> {
+        val list = ArrayList<File>()
+        list.addAll(getMoviesDirs())
+        list.addAll(getTvShowsDirs())
+        return list
+    }
 
     fun getPodcastsDir(): File = File(getPrimaryRoot(), "Podcasts")
 
@@ -152,15 +165,37 @@ object StoragePaths {
 
     fun isVideosRoot(absolutePath: String?): Boolean {
         if (absolutePath == null) return false
-        if (absolutePath == "$PRIMARY_PATH/Videos" || absolutePath == "$SECONDARY_PATH/Videos") return true
+        if (absolutePath == "$PRIMARY_PATH/Videos" || absolutePath == "$SECONDARY_PATH/Videos" ||
+            absolutePath == "$PRIMARY_PATH/Movies" || absolutePath == "$SECONDARY_PATH/Movies" ||
+            absolutePath == "$PRIMARY_PATH/Tvshows" || absolutePath == "$SECONDARY_PATH/Tvshows"
+        ) return true
+        for (dir in getVideosDirs()) {
+            if (absolutePath == dir.absolutePath) return true
+        }
         for (root in getAllRoots()) {
-            if (absolutePath == File(root, "Videos").absolutePath) return true
+            if (absolutePath == File(root, "Videos").absolutePath ||
+                absolutePath == File(root, "Video").absolutePath ||
+                absolutePath == File(root, "Movies").absolutePath ||
+                absolutePath == File(root, "Tvshows").absolutePath
+            ) return true
         }
         return false
     }
 
     fun isVideosRoot(file: File?): Boolean =
         file != null && isVideosRoot(file.absolutePath)
+
+    fun isUnderVideos(absolutePath: String?): Boolean {
+        if (absolutePath == null) return false
+        for (dir in getVideosDirs()) {
+            val root = dir.absolutePath
+            if (absolutePath == root || absolutePath.startsWith("$root/")) return true
+        }
+        return false
+    }
+
+    fun isUnderVideos(file: File?): Boolean =
+        file != null && isUnderVideos(file.absolutePath)
 
     fun isAudiobooksRoot(absolutePath: String?): Boolean {
         if (absolutePath == null) return false

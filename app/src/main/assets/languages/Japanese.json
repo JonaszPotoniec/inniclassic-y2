@@ -408,5 +408,13 @@
   "Classic Light": "クラシック（ライト）",
   "Classic Dark": "クラシック（ダーク）",
   "Continue": "続ける",
-  "Scan": "スキャン"
+  "Scan": "スキャン",
+  "Movies": "映画",
+  "TV Series": "テレビ番組",
+  "By Directory": "フォルダ別",
+  "Season": "シーズン",
+  "Episode": "エピソード",
+  "No movies found.": "映画が見つかりません。",
+  "No TV series found.": "テレビ番組が見つかりません。",
+  "No videos found in this folder.": "このフォルダに動画はありません。"
 }

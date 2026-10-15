@@ -424,5 +424,13 @@
   "Classic Light": "经典浅色",
   "Classic Dark": "经典深色",
   "Continue": "继续",
-  "Scan": "扫描"
+  "Scan": "扫描",
+  "Movies": "电影",
+  "TV Series": "电视剧",
+  "By Directory": "按文件夹",
+  "Season": "季",
+  "Episode": "剧集",
+  "No movies found.": "未找到电影。",
+  "No TV series found.": "未找到电视剧。",
+  "No videos found in this folder.": "此文件夹中未找到视频。"
 }

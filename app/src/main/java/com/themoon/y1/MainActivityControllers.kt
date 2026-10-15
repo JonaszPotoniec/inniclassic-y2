@@ -40,6 +40,7 @@ import com.themoon.y1.managers.OtaUpdateManager
 import com.themoon.y1.navigation.BrowserMode
 import com.themoon.y1.navigation.NavigationManager
 import com.themoon.y1.navigation.ScreenState
+import com.themoon.y1.navigation.VideoMode
 import com.themoon.y1.podcasts.PodcastDownloadManager
 import com.themoon.y1.podcasts.PodcastRepository
 import com.themoon.y1.views.ListItemViewFactory
@@ -303,19 +304,27 @@ internal fun MainActivity.initControllers() {
     videoBrowserController = VideoBrowserController(
         activity = this,
         rootView = layoutVideosMode as ViewGroup,
-        videosProvider = { videoFiles },
+        movieVideosProvider = { movieVideos },
+        tvSeriesProvider = { tvSeriesList },
+        allVideosProvider = { videoFiles },
         onVideoSelected = { file ->
             changeScreen(ScreenState.VideoPlayer(file))
         },
-        clickFeedback = { clickFeedback() },
+        onNavigateToMode = { mode ->
+            changeScreen(ScreenState.Videos(mode))
+        },
         onNavigateBack = { NavigationManager.getInstance().popBackStack() },
-        localize = { t(it) }
+        clickFeedback = { clickFeedback() },
+        localize = { t(it) },
+        updateHeaderTitle = { title ->
+            tvStatusBarTitle?.text = title
+        }
     )
 
     videoPlayerController = VideoPlayerController(
         activity = this,
         rootView = layoutVideoPlayerMode as ViewGroup,
-        onExitRequested = { changeScreen(MainActivity.STATE_VIDEOS) },
+        onExitRequested = { NavigationManager.getInstance().popBackStack() },
         onAdjustVolume = { adjustVolume(it) },
         clickFeedback = { clickFeedback() },
         localize = { t(it) }
@@ -629,8 +638,7 @@ internal fun MainActivity.handleMainMenuAction(action: String) {
             browserController.buildFileBrowserUI()
         }
         "OPEN_VIDEOS", "VIDEOS" -> {
-            changeScreen(MainActivity.STATE_VIDEOS)
-            videoBrowserController.buildVideoListUI()
+            changeScreen(ScreenState.Videos(VideoMode.Root))
         }
         "OPEN_COVER_FLOW", "PHOTOS" -> {
             changeScreen(MainActivity.STATE_COVERFLOW)

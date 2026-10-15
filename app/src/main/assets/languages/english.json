@@ -609,5 +609,13 @@
   "Libraries updated": "Libraries updated",
   "Classic Light": "Classic Light",
   "Classic Dark": "Classic Dark",
-  "Scan": "Scan"
+  "Scan": "Scan",
+  "Movies": "Movies",
+  "TV Series": "TV Series",
+  "By Directory": "By Directory",
+  "Season": "Season",
+  "Episode": "Episode",
+  "No movies found.": "No movies found.",
+  "No TV series found.": "No TV series found.",
+  "No videos found in this folder.": "No videos found in this folder."
 }

@@ -95,6 +95,7 @@ class VideoPlayerManager private constructor() {
         applyMasterVolume()
 
         MainActivity.instance?.let { act ->
+            act.prefs.edit().putString("last_played_video_path", videoFile.absolutePath).apply()
             val savedPos = act.prefs.getLong("video_pos_" + videoFile.absolutePath, 0)
             if (savedPos > 0) {
                 player.time = savedPos

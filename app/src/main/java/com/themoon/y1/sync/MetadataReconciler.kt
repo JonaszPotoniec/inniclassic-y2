@@ -156,7 +156,6 @@ object MetadataReconciler {
     /**
      * Reconciles remote video (movie / tv) items against local files and sync ledger.
      */
-
     fun reconcileVideos(
         remoteItems: List<JellyfinMediaItem>,
         ledger: SyncLedger
@@ -166,17 +165,76 @@ object MetadataReconciler {
         for (remote in remoteItems) {
             val remoteId = remote.id ?: continue
             val ledgerItem = ledger.getItem(remoteId)
+            var foundFile: File? = null
+
             val ledgerPath = ledgerItem?.localPath
             if (ledgerPath != null) {
-                val localFile = File(ledgerPath)
-                if (localFile.exists() && localFile.length() > 0) {
-                    ledgerItem.orphaned = false
-                    continue
+                val directFile = File(ledgerPath)
+                if (directFile.exists() && directFile.length() > 0) {
+                    foundFile = directFile
+                } else {
+                    // Check if a file with same base name but different extension exists in parent
+                    val p = directFile.parentFile
+                    if (p != null) {
+                        foundFile = FileUtils.findExistingMatchingFile(p, directFile.nameWithoutExtension, FileUtils.VIDEO_EXTENSIONS)
+                    }
                 }
             }
+
+            // Fallback: check across all storage roots if file already exists in standard location
+            if (foundFile == null) {
+                foundFile = findVideoOnDisk(remote)
+            }
+
+            val existing = foundFile
+            if (existing != null && existing.exists() && existing.length() > 0) {
+                if (ledgerItem != null) {
+                    ledgerItem.localPath = existing.absolutePath
+                    ledgerItem.fileSize = existing.length()
+                    ledgerItem.orphaned = false
+                } else {
+                    ledger.putItem(
+                        SyncLedger.LedgerItem(
+                            remoteId,
+                            remote.libraryId,
+                            remote.collectionType,
+                            existing.absolutePath,
+                            existing.length(),
+                            remote.serverDateModified,
+                            false
+                        )
+                    )
+                }
+                continue
+            }
+
             result.itemsToDownload.add(remote)
         }
 
         return result
+    }
+
+    private fun findVideoOnDisk(item: JellyfinMediaItem): File? {
+        val isTv = "tvshows".equals(item.collectionType, ignoreCase = true)
+        val roots = com.themoon.y1.StoragePaths.getAllRoots()
+        for (root in roots) {
+            if (isTv) {
+                val series = FileUtils.sanitizeFilename(if (!item.seriesName.isNullOrEmpty()) item.seriesName else "Unknown Series")
+                val epBase = String.format(Locale.US, "S%02dE%02d - %s", item.parentIndexNumber, item.indexNumber, FileUtils.sanitizeFilename(item.name))
+                val seriesDir = File(root, "Tvshows/Jellyfin/$series")
+                val match = FileUtils.findExistingMatchingFile(seriesDir, epBase, FileUtils.VIDEO_EXTENSIONS)
+                if (match != null) return match
+            } else {
+                val y = item.year
+                val yearSuffix = if (!y.isNullOrEmpty() && !y.contains("Unknown")) " ($y)" else ""
+                val movBase = FileUtils.sanitizeFilename(item.name) + yearSuffix
+                val moviesDir = File(root, "Movies/Jellyfin")
+                val match = FileUtils.findExistingMatchingFile(moviesDir, movBase, FileUtils.VIDEO_EXTENSIONS)
+                if (match != null) return match
+                val matchNoYear = FileUtils.findExistingMatchingFile(moviesDir, FileUtils.sanitizeFilename(item.name), FileUtils.VIDEO_EXTENSIONS)
+                if (matchNoYear != null) return matchNoYear
+            }
+        }
+        return null
     }
 }

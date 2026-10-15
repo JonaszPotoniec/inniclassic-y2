@@ -79,6 +79,8 @@ import com.themoon.y1.managers.UsbMassStorageController
 import com.themoon.y1.managers.UsbStorageUiManager
 import com.themoon.y1.managers.VirtualVolumeManager
 import com.themoon.y1.models.SongItem
+import com.themoon.y1.models.TvSeries
+import com.themoon.y1.models.VideoItem
 import com.themoon.y1.navigation.BrowserMode
 import com.themoon.y1.navigation.InputRouter
 import com.themoon.y1.navigation.NavigationManager
@@ -208,6 +210,8 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     val virtualSongList: ArrayList<File> = ArrayList()
     val uniqueAlbumList: ArrayList<SongItem> = ArrayList()
     val videoFiles: ArrayList<File> = ArrayList()
+    val movieVideos: ArrayList<VideoItem> = ArrayList()
+    val tvSeriesList: ArrayList<TvSeries> = ArrayList()
     var virtualListSelectedIndex: Int = 0
     var virtualQueryType: String = ""
     var virtualQueryValue: String = ""
@@ -288,6 +292,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     lateinit var podcastController: PodcastController
     lateinit var musicQuizController: MusicQuizController
     lateinit var videoBrowserController: VideoBrowserController
+    fun isVideosControllerInitialized(): Boolean = ::videoBrowserController.isInitialized
     lateinit var videoPlayerController: VideoPlayerController
     lateinit var bluetoothController: BluetoothController
     lateinit var wifiController: WifiController
@@ -377,6 +382,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             android.util.Log.i("InniClassic", "Secondary storage not ready yet at onCreate, will load library once mounted")
             playbackRestored = AudioPlayerManager.getInstance().restoreLastPlaybackState(this)
         } else {
+            runMigrationsAsync()
             loadLibraryCache()
             playbackRestored = AudioPlayerManager.getInstance().restoreLastPlaybackState(this)
         }
@@ -384,6 +390,9 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         externalSdMountMonitor = ExternalSdMountMonitor(this).apply {
             setListener(object : ExternalSdMountMonitor.Listener {
                 override fun onSecondaryStorageReady() {
+                    StoragePaths.invalidate()
+                    runMigrationsAsync()
+                    scanVideos()
                     runOnUiThread {
                         if (customLibrary.isEmpty()) {
                             loadLibraryCache()
@@ -502,7 +511,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             STATE_STORAGE -> ScreenState.Storage
             STATE_WEBSERVER -> ScreenState.WebServer
             STATE_QUIZ -> ScreenState.MusicQuiz
-            STATE_VIDEOS -> ScreenState.Videos
+            STATE_VIDEOS -> ScreenState.Videos()
             STATE_COVERFLOW -> ScreenState.CoverFlow
             STATE_EQUALIZER -> ScreenState.Equalizer
             STATE_FM_RADIO -> ScreenState.FmRadio
@@ -724,6 +733,23 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     fun rebuildUniqueAlbumList() = rebuildUniqueAlbumListInternal()
     fun scanVideos() = scanVideosInternal()
 
+    fun runMigrationsAsync() {
+        Thread({
+            try {
+                val mgr = com.themoon.y1.migrations.MigrationManager.getInstance(applicationContext)
+                val count = mgr.applyPendingMigrations()
+                com.themoon.y1.migrations.Migration003MigrateVideoDirectories.updateSyncLedgerPaths()
+                if (count > 0 && mgr.migrationContext?.isMediaRescanRequested == true) {
+                    runOnUiThread {
+                        scanVideos()
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("InniClassic", "Error applying migrations", e)
+            }
+        }, "y1-migrations").start()
+    }
+
     fun showFastScrollLetter(rawText: String) {
         val navState = NavigationManager.getInstance().currentState
         val bcMode = if (::browserController.isInitialized) browserController.currentBrowserMode else BrowserMode.Root
@@ -922,7 +948,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             STATE_STORAGE -> t("About")
             STATE_WEBSERVER -> t("Upload")
             STATE_QUIZ -> t("Music Quiz")
-            STATE_VIDEOS -> t("Videos")
+            STATE_VIDEOS -> if (::videoBrowserController.isInitialized) videoBrowserController.getCurrentTitle() else t("Videos")
             STATE_COVERFLOW -> {
                 val total = uniqueAlbumList.size
                 if (total > 0 && ::coverFlowController.isInitialized) {

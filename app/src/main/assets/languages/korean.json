@@ -424,5 +424,13 @@
   "Classic Light": "클래식 라이트",
   "Classic Dark": "클래식 다크",
   "Continue": "이어듣기",
-  "Scan": "스캔"
+  "Scan": "스캔",
+  "Movies": "영화",
+  "TV Series": "TV 프로그램",
+  "By Directory": "폴더별",
+  "Season": "시즌",
+  "Episode": "에피소드",
+  "No movies found.": "영화를 찾을 수 없습니다.",
+  "No TV series found.": "TV 프로그램을 찾을 수 없습니다.",
+  "No videos found in this folder.": "이 폴더에 동영상이 없습니다."
 }

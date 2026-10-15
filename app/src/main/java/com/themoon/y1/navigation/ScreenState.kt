@@ -17,7 +17,7 @@ sealed interface ScreenState {
     data object Storage : ScreenState
     data object WebServer : ScreenState
     data object MusicQuiz : ScreenState
-    data object Videos : ScreenState
+    data class Videos(val mode: VideoMode = VideoMode.Root) : ScreenState
     data class VideoPlayer(val videoFile: File) : ScreenState
     data object CoverFlow : ScreenState
     data object Playlists : ScreenState
@@ -68,4 +68,16 @@ sealed interface SettingsSubMode {
     data class Jellyfin(val depth: Int = 0) : SettingsSubMode
     data object Radio : SettingsSubMode
     data object RadioSavedChannels : SettingsSubMode
+}
+
+/**
+ * Sub-modes within Video library navigation.
+ */
+sealed interface VideoMode {
+    data object Root : VideoMode
+    data object Movies : VideoMode
+    data object TvShows : VideoMode
+    data class TvSeasons(val seriesName: String) : VideoMode
+    data class TvEpisodes(val seriesName: String, val seasonNumber: Int) : VideoMode
+    data class Directory(val directory: File) : VideoMode
 }

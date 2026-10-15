@@ -424,5 +424,13 @@
   "Classic Light": "Классическая светлая",
   "Classic Dark": "Классическая тёмная",
   "Continue": "Продолжить",
-  "Scan": "Сканировать"
+  "Scan": "Сканировать",
+  "Movies": "Фильмы",
+  "TV Series": "Сериалы",
+  "By Directory": "По папкам",
+  "Season": "Сезон",
+  "Episode": "Серия",
+  "No movies found.": "Фильмы не найдены.",
+  "No TV series found.": "Сериалы не найдены.",
+  "No videos found in this folder.": "В этой папке нет видео."
 }

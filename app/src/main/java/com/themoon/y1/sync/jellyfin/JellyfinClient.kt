@@ -705,7 +705,12 @@ class JellyfinClient(rawUrl: String?, deviceId: String?) {
         if (cancelToken != null && cancelToken.isCancelled()) return
         val destParent = destination.parentFile
         if (destination.exists()) return
-        if (destParent != null) {
+
+        val isFolderCover = destination.name.equals("cover.jpg", ignoreCase = true) ||
+                destination.name.equals("folder.jpg", ignoreCase = true) ||
+                destination.name.equals("cover.jpeg", ignoreCase = true)
+
+        if (isFolderCover && destParent != null) {
             val f1 = File(destParent, "cover.jpg")
             val f2 = File(destParent, "folder.jpg")
             val f3 = File(destParent, "cover.jpeg")
@@ -752,7 +757,7 @@ class JellyfinClient(rawUrl: String?, deviceId: String?) {
 
                     if (cancelToken == null || !cancelToken.isCancelled()) {
                         tmpFile.renameTo(destination)
-                        if (destParent != null && destination.exists()) {
+                        if (isFolderCover && destParent != null && destination.exists()) {
                             val destName = destination.name.lowercase(Locale.US)
                             val altName = if (destName.startsWith("cover.")) "folder.jpg" else "cover.jpg"
                             val altFile = File(destParent, altName)

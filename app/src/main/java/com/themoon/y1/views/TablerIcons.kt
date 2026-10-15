@@ -128,6 +128,9 @@ object TablerIcons {
         "M12 6l0 13",
         "M21 6l0 13"
     )
+    val FOLDER: Array<String> = arrayOf(
+        "M5 4h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2"
+    )
 
     /**
      * Renders a Tabler icon centered on a rounded card tile.

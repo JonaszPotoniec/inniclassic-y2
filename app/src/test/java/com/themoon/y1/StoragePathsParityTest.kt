@@ -461,8 +461,10 @@ class StoragePathsParityTest {
         assertEquals("Audiobooks", StoragePaths.getAudiobooksDir().name)
         assertEquals(primaryRoot, StoragePaths.getAudiobooksDir().parentFile)
 
-        assertEquals("Videos", StoragePaths.getVideosDir().name)
-        assertEquals(primaryRoot, StoragePaths.getVideosDir().parentFile)
+        assertEquals("Movies", StoragePaths.getMoviesDir().name)
+        assertEquals(primaryRoot, StoragePaths.getMoviesDir().parentFile)
+        assertEquals("Tvshows", StoragePaths.getTvShowsDir().name)
+        assertEquals(primaryRoot, StoragePaths.getTvShowsDir().parentFile)
 
         assertEquals("Podcasts", StoragePaths.getPodcastsDir().name)
         assertEquals(primaryRoot, StoragePaths.getPodcastsDir().parentFile)
@@ -477,7 +479,7 @@ class StoragePathsParityTest {
         assertTrue(audiobookDirs.any { it.name == "Audiobooks" })
 
         val videoDirs = StoragePaths.getVideosDirs()
-        assertTrue(videoDirs.any { it.name == "Videos" })
+        assertTrue(videoDirs.any { it.name == "Movies" || it.name == "Tvshows" })
     }
 
     @Test

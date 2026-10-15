@@ -424,5 +424,13 @@
   "Classic Light": "Clásico claro",
   "Classic Dark": "Clásico oscuro",
   "Continue": "Continuar",
-  "Scan": "Escanear"
+  "Scan": "Escanear",
+  "Movies": "Películas",
+  "TV Series": "Series de TV",
+  "By Directory": "Por carpetas",
+  "Season": "Temporada",
+  "Episode": "Episodio",
+  "No movies found.": "No se encontraron películas.",
+  "No TV series found.": "No se encontraron series de TV.",
+  "No videos found in this folder.": "No se encontraron videos en esta carpeta."
 }
