@@ -332,7 +332,7 @@ class AudioPlayerManager private constructor() {
         }
     }
 
-    fun playTrackList(list: List<File>, index: Int) {
+    fun playTrackList(list: List<File>, index: Int, initialSeekMs: Long = -1L) {
         saveAudiobookBookmarkIfNeeded()
 
         val main = MainActivity.instance ?: return
@@ -376,7 +376,7 @@ class AudioPlayerManager private constructor() {
             }
             exoPlayer?.let { exo ->
                 exo.stop()
-                exo.setMediaItems(mediaItems, main.currentIndex, 0)
+                exo.setMediaItems(mediaItems, main.currentIndex, if (initialSeekMs > 0) initialSeekMs else 0L)
                 exo.shuffleModeEnabled = false
                 exo.setPlaybackParameters(PlaybackParameters(currentSpeed, 1.0f))
                 exo.prepare()
@@ -384,13 +384,20 @@ class AudioPlayerManager private constructor() {
             }
         }
 
-        prepareMusicTrack(main.currentIndex)
+        val seekParam = if (initialSeekMs >= 0) initialSeekMs else 0L
+        prepareMusicTrack(main.currentIndex, initialSeekMs = seekParam)
         main.updatePlayerUI()
     }
 
     private fun shouldUseGaplessQueue(list: List<File>): Boolean {
+        val main = MainActivity.instance
+        if (main?.isAudiobookLibraryMode == true) return false
         if (list.size > 15) return false
         for (f in list) {
+            val p = f.absolutePath
+            if (p.contains("/Audiobooks", ignoreCase = true) || p.contains("/Podcasts", ignoreCase = true) || p.startsWith("/PODCAST_STREAM")) {
+                return false
+            }
             if (f.name.lowercase(Locale.US).endsWith(".flac")) return false
         }
         return true
@@ -469,25 +476,23 @@ class AudioPlayerManager private constructor() {
     }
 
     fun playTrackListWithOffset(list: List<File>, index: Int, offsetMs: Int) {
-        playTrackList(list, index)
+        val initialSeek = if (offsetMs > 0) offsetMs.toLong() else -1L
+        playTrackList(list, index, initialSeekMs = initialSeek)
         if (offsetMs > 0) {
-            try {
-                seekRelative(offsetMs - getCurrentPosition())
-                val totalSec = offsetMs / 1000
-                val min = totalSec / 60
-                val sec = totalSec % 60
-                MainActivity.instance?.let { main ->
-                    main.runOnUiThread {
-                        try {
-                            val toast = Toast.makeText(main, "Resuming playback from ${min}m ${sec}s", Toast.LENGTH_SHORT)
-                            val toastLayout = toast.view as? android.widget.LinearLayout
-                            val toastTV = toastLayout?.getChildAt(0) as? android.widget.TextView
-                            toastTV?.textSize = 18f
-                            toast.show()
-                        } catch (ignored: Exception) {}
-                    }
+            val totalSec = offsetMs / 1000
+            val min = totalSec / 60
+            val sec = totalSec % 60
+            MainActivity.instance?.let { main ->
+                main.runOnUiThread {
+                    try {
+                        val toast = Toast.makeText(main, "Resuming playback from ${min}m ${sec}s", Toast.LENGTH_SHORT)
+                        val toastLayout = toast.view as? android.widget.LinearLayout
+                        val toastTV = toastLayout?.getChildAt(0) as? android.widget.TextView
+                        toastTV?.textSize = 18f
+                        toast.show()
+                    } catch (ignored: Exception) {}
                 }
-            } catch (ignored: Exception) {}
+            }
         }
     }
 
@@ -647,16 +652,39 @@ class AudioPlayerManager private constructor() {
         main.tvPlayerAlbum.text = ""
         main.ivAlbumArt.setImageResource(R.drawable.default_album)
         main.ivPlayerBgBlur.setImageResource(0)
-        if (initialSeekMs > 0) {
-            val curS = (initialSeekMs / 1000) % 60
-            val curM = initialSeekMs / (1000 * 60)
+        val isAudiobookOrPodcast = main.isAudiobookLibraryMode ||
+                StoragePaths.isUnderAudiobooks(track.absolutePath) ||
+                track.absolutePath.contains("/Audiobooks", ignoreCase = true) ||
+                track.absolutePath.contains("/Podcasts", ignoreCase = true) ||
+                track.absolutePath.startsWith("/PODCAST_STREAM")
+
+        val effectiveSeekMs = if (initialSeekMs > 0) {
+            initialSeekMs
+        } else if (isAudiobookOrPodcast) {
+            val p = main.prefs.getInt("book_pos_" + track.absolutePath, 0)
+            if (p > 0) p.toLong() else AudiobookManager.getInstance(main).getSavedPosition(track.absolutePath).toLong()
+        } else {
+            0L
+        }
+
+        val effectiveDurMs = if (initialDurationMs > 0) {
+            initialDurationMs
+        } else if (isAudiobookOrPodcast) {
+            main.prefs.getInt("book_dur_" + track.absolutePath, 0).toLong()
+        } else {
+            0L
+        }
+
+        if (effectiveSeekMs > 0) {
+            val curS = (effectiveSeekMs / 1000) % 60
+            val curM = effectiveSeekMs / (1000 * 60)
             main.tvPlayerTimeCurrent.text = String.format(Locale.US, "%02d:%02d", curM, curS)
-            if (initialDurationMs > 0) {
-                val remaining = (initialDurationMs - initialSeekMs).coerceAtLeast(0)
+            if (effectiveDurMs > 0) {
+                val remaining = (effectiveDurMs - effectiveSeekMs).coerceAtLeast(0)
                 val remS = (remaining / 1000) % 60
                 val remM = remaining / (1000 * 60)
                 main.tvPlayerTimeTotal.text = String.format(Locale.US, "-%02d:%02d", remM, remS)
-                main.playerProgress.progress = ((initialSeekMs * 100) / initialDurationMs).toInt()
+                main.playerProgress.progress = ((effectiveSeekMs * 100) / effectiveDurMs).toInt()
             } else {
                 main.tvPlayerTimeTotal.text = "00:00"
                 main.playerProgress.progress = 0
@@ -890,13 +918,8 @@ class AudioPlayerManager private constructor() {
                 player.setDataSource(currentFileInputStream!!.fd)
                 player.prepare()
 
-                if (initialSeekMs > 0) {
-                    player.seekTo(initialSeekMs.toInt())
-                } else {
-                    val savedPos = main.prefs.getInt("book_pos_" + track.absolutePath, 0)
-                    if (savedPos > 0 && (main.isAudiobookLibraryMode || track.absolutePath.contains("/Audiobooks"))) {
-                        player.seekTo(savedPos)
-                    }
+                if (effectiveSeekMs > 0) {
+                    player.seekTo(effectiveSeekMs.toInt())
                 }
 
                 if (!main.isPausedByHand) {
@@ -949,13 +972,8 @@ class AudioPlayerManager private constructor() {
                 val isShuffle = main.prefs.getBoolean("shuffle", false)
                 exoPlayer?.shuffleModeEnabled = isShuffle
 
-                if (initialSeekMs > 0) {
-                    exoPlayer?.seekTo(initialSeekMs)
-                } else {
-                    val savedPos = main.prefs.getInt("book_pos_" + track.absolutePath, 0)
-                    if (savedPos > 0 && (main.isAudiobookLibraryMode || track.absolutePath.contains("/Audiobooks"))) {
-                        exoPlayer?.seekTo(savedPos.toLong())
-                    }
+                if (effectiveSeekMs > 0) {
+                    exoPlayer?.seekTo(effectiveSeekMs)
                 }
 
                 exoPlayer?.setPlaybackParameters(PlaybackParameters(currentSpeed, 1.0f))
