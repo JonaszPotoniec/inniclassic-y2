@@ -379,6 +379,7 @@ class PlayerController(
         val prefs = activity.getSharedPreferences("y1_settings", Activity.MODE_PRIVATE)
         val repeatMode = (prefs.getInt("repeat_mode", 0) + 1) % 3
         prefs.edit().putInt("repeat_mode", repeatMode).commit()
+        AudioPlayerManager.getInstance().setRepeatMode(repeatMode)
         updateShuffleRepeatStatusIcons()
     }
 

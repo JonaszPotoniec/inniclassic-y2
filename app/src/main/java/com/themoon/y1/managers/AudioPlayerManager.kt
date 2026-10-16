@@ -190,6 +190,12 @@ class AudioPlayerManager private constructor() {
         renderersFactory.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
 
         exoPlayer = SimpleExoPlayer.Builder(context.applicationContext, renderersFactory).build().apply {
+            val initialRepeatMode = MainActivity.instance?.prefs?.getInt("repeat_mode", 0) ?: 0
+            repeatMode = when (initialRepeatMode) {
+                1 -> Player.REPEAT_MODE_ONE
+                2 -> Player.REPEAT_MODE_ALL
+                else -> Player.REPEAT_MODE_OFF
+            }
             addListener(object : Player.EventListener {
                 override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
                     isPlayingActive = playWhenReady && (playbackState == Player.STATE_READY || playbackState == Player.STATE_BUFFERING)
@@ -287,6 +293,17 @@ class AudioPlayerManager private constructor() {
         }
     }
 
+    fun setRepeatMode(mode: Int) {
+        if (exoPlayer != null && !isUsingLegacyPlayer) {
+            val exoRepeatMode = when (mode) {
+                1 -> Player.REPEAT_MODE_ONE
+                2 -> Player.REPEAT_MODE_ALL
+                else -> Player.REPEAT_MODE_OFF
+            }
+            exoPlayer?.repeatMode = exoRepeatMode
+        }
+    }
+
     fun getCurrentSpeed(): Float = currentSpeed
 
     private fun handleTrackCompletion() {
@@ -311,15 +328,30 @@ class AudioPlayerManager private constructor() {
                     if (main.currentIndex < main.currentPlaylist.size - 1) {
                         nextTrack()
                     } else {
-                        main.currentIndex = 0
-                        prepareMusicTrack(main.currentIndex)
+                        isPlayingActive = false
+                        stopPeriodicPositionSaver()
                         main.isPausedByHand = true
+                        main.currentIndex = 0
+
+                        if (isUsingLegacyPlayer && legacyPlayer != null) {
+                            try {
+                                legacyPlayer?.pause()
+                                legacyPlayer?.seekTo(0)
+                            } catch (ignored: Exception) {}
+                        } else if (exoPlayer != null) {
+                            exoPlayer?.playWhenReady = false
+                            if (isGaplessQueueActive) {
+                                exoPlayer?.seekTo(0, 0L)
+                            }
+                        }
+
+                        prepareMusicTrack(0, initialSeekMs = 0L)
                         main.updatePlayerUI()
                         savePlaybackState(sync = true)
                     }
                 }
             } catch (e: Exception) {
-                nextTrack()
+                android.util.Log.e("AudioPlayerManager", "Error in handleTrackCompletion: ${e.message}", e)
             }
         }
     }
@@ -351,6 +383,7 @@ class AudioPlayerManager private constructor() {
         main.currentPlaylist.addAll(newList)
 
         val isShuffle = main.prefs.getBoolean("shuffle", false)
+        val repeatPref = main.prefs.getInt("repeat_mode", 0)
         if (isShuffle) {
             Collections.shuffle(main.currentPlaylist)
             main.currentIndex = main.currentPlaylist.indexOf(targetSong)
@@ -361,6 +394,7 @@ class AudioPlayerManager private constructor() {
 
         if (!isUsingLegacyPlayer && exoPlayer != null) {
             exoPlayer?.shuffleModeEnabled = isShuffle
+            setRepeatMode(repeatPref)
         }
         main.isPausedByHand = false
 
@@ -378,6 +412,12 @@ class AudioPlayerManager private constructor() {
                 exo.stop()
                 exo.setMediaItems(mediaItems, main.currentIndex, if (initialSeekMs > 0) initialSeekMs else 0L)
                 exo.shuffleModeEnabled = false
+                val exoRepeatMode = when (repeatPref) {
+                    1 -> Player.REPEAT_MODE_ONE
+                    2 -> Player.REPEAT_MODE_ALL
+                    else -> Player.REPEAT_MODE_OFF
+                }
+                exo.repeatMode = exoRepeatMode
                 exo.setPlaybackParameters(PlaybackParameters(currentSpeed, 1.0f))
                 exo.prepare()
                 if (!main.isPausedByHand) exo.playWhenReady = true
@@ -389,7 +429,7 @@ class AudioPlayerManager private constructor() {
         main.updatePlayerUI()
     }
 
-    private fun shouldUseGaplessQueue(list: List<File>): Boolean {
+    internal fun shouldUseGaplessQueue(list: List<File>): Boolean {
         val main = MainActivity.instance
         if (main?.isAudiobookLibraryMode == true) return false
         if (list.size > 15) return false
@@ -1701,8 +1741,10 @@ class AudioPlayerManager private constructor() {
             main.isAudiobookLibraryMode = isAudiobook
 
             val isShuffle = main.prefs.getBoolean("shuffle", false)
+            val repeatPref = main.prefs.getInt("repeat_mode", 0)
             if (!isUsingLegacyPlayer && exoPlayer != null) {
                 exoPlayer?.shuffleModeEnabled = isShuffle
+                setRepeatMode(repeatPref)
             }
 
             isGaplessQueueActive = !isShuffle && shouldUseGaplessQueue(main.currentPlaylist)
@@ -1719,6 +1761,12 @@ class AudioPlayerManager private constructor() {
                     exo.stop()
                     exo.setMediaItems(mediaItems, main.currentIndex, savedPos)
                     exo.shuffleModeEnabled = false
+                    val exoRepeatMode = when (repeatPref) {
+                        1 -> Player.REPEAT_MODE_ONE
+                        2 -> Player.REPEAT_MODE_ALL
+                        else -> Player.REPEAT_MODE_OFF
+                    }
+                    exo.repeatMode = exoRepeatMode
                     exo.setPlaybackParameters(PlaybackParameters(currentSpeed, 1.0f))
                     exo.playWhenReady = false
                     exo.prepare()

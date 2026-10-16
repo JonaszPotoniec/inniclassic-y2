@@ -124,4 +124,39 @@ class PlaybackStatePersistenceTest {
         assertEquals("-02:20", remFormatted)
         assertEquals(34, progress)
     }
+
+    @Test
+    fun testRepeatModeMappingParity() {
+        fun getRepeatModeText(mode: Int): String = when (mode) {
+            1 -> "One"
+            2 -> "All"
+            else -> "Off"
+        }
+
+        assertEquals("Off", getRepeatModeText(0))
+        assertEquals("One", getRepeatModeText(1))
+        assertEquals("All", getRepeatModeText(2))
+        assertEquals("Off", getRepeatModeText(3))
+    }
+
+    @Test
+    fun testShouldUseGaplessQueue_returnsFalseForOver15Tracks() {
+        val apm = AudioPlayerManager.getInstance()
+        val tracks = (1..16).map { File(tempFolder.root, "track$it.mp3") }
+        assertFalse("Lists with > 15 tracks must not use gapless queue", apm.shouldUseGaplessQueue(tracks))
+    }
+
+    @Test
+    fun testShouldUseGaplessQueue_returnsFalseForFlac() {
+        val apm = AudioPlayerManager.getInstance()
+        val tracks = (1..5).map { File(tempFolder.root, "track$it.flac") }
+        assertFalse("Lists with FLAC files must not use gapless queue", apm.shouldUseGaplessQueue(tracks))
+    }
+
+    @Test
+    fun testShouldUseGaplessQueue_returnsTrueForStandardMp3Album() {
+        val apm = AudioPlayerManager.getInstance()
+        val tracks = (1..12).map { File(tempFolder.root, "track$it.mp3") }
+        assertTrue("Standard <=15 track MP3 album must use gapless queue", apm.shouldUseGaplessQueue(tracks))
+    }
 }

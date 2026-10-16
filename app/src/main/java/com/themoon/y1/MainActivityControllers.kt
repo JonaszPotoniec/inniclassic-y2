@@ -571,12 +571,13 @@ internal fun MainActivity.initControllers() {
         cycleRepeatMode = {
             repeatMode = (repeatMode + 1) % 3
             prefs.edit().putInt("repeat_mode", repeatMode).apply()
+            AudioPlayerManager.getInstance().setRepeatMode(repeatMode)
             updatePlayerUI()
         },
         getRepeatModeText = { mode ->
             when (mode) {
-                1 -> t("All")
-                2 -> t("One")
+                1 -> t("One")
+                2 -> t("All")
                 else -> t("Off")
             }
         },
