@@ -434,5 +434,15 @@
   "Episode": "에피소드",
   "No movies found.": "영화를 찾을 수 없습니다.",
   "No TV series found.": "TV 프로그램을 찾을 수 없습니다.",
-  "No videos found in this folder.": "이 폴더에 동영상이 없습니다."
+  "No videos found in this folder.": "이 폴더에 동영상이 없습니다.",
+  "Leaderboard": "순위표",
+  "Play Game": "게임 시작",
+  "No scores yet": "기록 없음",
+  "Clear Scores": "기록 삭제",
+  "Scores Cleared": "기록이 삭제되었습니다",
+  "Perfect Round! +1 Life": "퍼펙트 라운드! +1 라이프",
+  "Final Score": "최종 점수",
+  "Back": "뒤로",
+  "Buy 1 Heart ($1,500)": "하트 1개 구매 ($1,500)",
+  "Heart Purchased": "하트 구매 완료"
 }

@@ -649,7 +649,7 @@ internal fun MainActivity.handleMainMenuAction(action: String) {
         }
         "OPEN_MUSIC_QUIZ", "EXTRAS" -> {
             changeScreen(MainActivity.STATE_QUIZ)
-            musicQuizController.startSession()
+            musicQuizController.showStartHub()
         }
         "OPEN_SETTINGS", "SETTINGS" -> {
             changeScreen(MainActivity.STATE_SETTINGS)

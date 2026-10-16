@@ -11,19 +11,24 @@ import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
+import com.themoon.y1.managers.AlbumCoverManager
 import com.themoon.y1.managers.AudioPlayerManager
+import com.themoon.y1.managers.MediaLibraryManager
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.quiz.MusicQuizEngine
+import com.themoon.y1.quiz.QuizLeaderboardManager
 import com.themoon.y1.views.SquareImageView
 import java.io.File
 import java.io.FileInputStream
@@ -31,8 +36,9 @@ import java.util.Locale
 
 /**
  * Controller for the iPod Music Quiz game.
- * Manages game UI, 4-option text answers, 3-cover picture options, round transitions,
- * timers, scoring, and Click Wheel navigation.
+ * Manages game UI, Start Hub, Leaderboard, endless rounds with non-linear speedup,
+ * high-contrast visual answer feedback, 4-option text answers, 3-cover picture options,
+ * paused round transitions, and Click Wheel navigation.
  */
 class MusicQuizController(
     private val activity: Activity,
@@ -43,8 +49,18 @@ class MusicQuizController(
     private val localize: (String) -> String
 ) : ScreenController {
 
+    companion object {
+        private const val MODE_HUB = 0
+        private const val MODE_GAME = 1
+        private const val MODE_ROUND_PAUSE = 2
+        private const val MODE_LEADERBOARD = 3
+        private const val MODE_GAME_OVER = 4
+    }
+
     private val engine = MusicQuizEngine(activity)
+    private val leaderboardManager = QuizLeaderboardManager(activity)
     private val handler = Handler(Looper.getMainLooper())
+    private val coverArtCache = HashMap<String, Boolean>()
 
     private val layoutQuiz: LinearLayout = if (rootView.id == R.id.layout_music_quiz_mode) rootView as LinearLayout else rootView.findViewById(R.id.layout_music_quiz_mode)
     private val containerQuizItems: LinearLayout = rootView.findViewById(R.id.container_quiz_items)
@@ -58,10 +74,13 @@ class MusicQuizController(
     private var isAnswered = false
     private var wasPlayingBeforeStart = false
     private var countDownTimer: CountDownTimer? = null
+    private var currentScreenMode = MODE_HUB
+    private var totalQuestionTimeMs = 15000L
+    private var currentTimerMillisRemaining = 0L
 
     override fun onEnter(state: ScreenState) {
         layoutQuiz.visibility = View.VISIBLE
-        startSession()
+        showStartHub()
     }
 
     override fun onExit() {
@@ -70,16 +89,63 @@ class MusicQuizController(
         layoutQuiz.visibility = View.GONE
     }
 
+    fun showStartHub() {
+        currentScreenMode = MODE_HUB
+        cancelTimer()
+        engine.stopPreview()
+
+        pbQuizTimer?.progress = 0
+        val highScore = leaderboardManager.getHighScore()
+        val bestText = if (highScore > 0) "\n${localize("Best")}: ${String.format(Locale.US, "$%,d", highScore)}" else ""
+        tvQuizPrompt?.text = localize("Music Quiz") + bestText
+        tvQuizRound?.text = "♪"
+        tvQuizLives?.text = ""
+        tvQuizScore?.text = ""
+
+        containerQuizItems.orientation = LinearLayout.VERTICAL
+        containerQuizItems.removeAllViews()
+
+        val btnPlay = createAnswerPill(localize("Play Game"))
+        btnPlay.setOnClickListener {
+            clickFeedback()
+            startSession()
+        }
+        containerQuizItems.addView(btnPlay)
+
+        val btnLeaderboard = createAnswerPill(localize("Leaderboard"))
+        btnLeaderboard.setOnClickListener {
+            clickFeedback()
+            showLeaderboardView(fromGameOver = false)
+        }
+        containerQuizItems.addView(btnLeaderboard)
+
+        val btnExit = createAnswerPill(localize("Exit"))
+        btnExit.setOnClickListener {
+            clickFeedback()
+            exitQuiz()
+        }
+        containerQuizItems.addView(btnExit)
+
+        containerQuizItems.postDelayed({
+            if (containerQuizItems.childCount > 0) {
+                containerQuizItems.getChildAt(0).requestFocus()
+            }
+        }, 50)
+    }
+
     fun startSession() {
+        currentScreenMode = MODE_GAME
         wasPlayingBeforeStart = AudioPlayerManager.getInstance().isPlaying()
         if (wasPlayingBeforeStart) {
             AudioPlayerManager.getInstance().playOrPauseMusic()
         }
 
+        engine.coverArtPredicate = { hasCoverArt(it) }
+
         val hasEnoughSongs = engine.resetSession(libraryProvider())
         if (!hasEnoughSongs) {
             Toast.makeText(activity, localize("Not enough songs in your library for Music Quiz."), Toast.LENGTH_LONG).show()
-            exitQuiz()
+            showStartHub()
             return
         }
 
@@ -88,15 +154,7 @@ class MusicQuizController(
     }
 
     private fun loadNextQuestion() {
-        if (engine.isRoundComplete()) {
-            if (engine.isVictory()) {
-                showVictory()
-            } else {
-                showRoundCompleteTransition()
-            }
-            return
-        }
-
+        currentScreenMode = MODE_GAME
         isAnswered = false
         val question = engine.nextQuestion { type, song ->
             val title = "“${song.title}”"
@@ -104,7 +162,6 @@ class MusicQuizController(
                 MusicQuizEngine.TYPE_ARTIST -> "${localize("Which artist released")} $title?"
                 MusicQuizEngine.TYPE_ALBUM -> "${localize("Which album is")} $title ${localize("from?")}"
                 MusicQuizEngine.TYPE_YEAR -> "${localize("What year was")} $title ${localize("released?")}"
-                MusicQuizEngine.TYPE_GENRE -> "${localize("What genre is")} $title?"
                 MusicQuizEngine.TYPE_ALBUM_COVER -> localize("Which cover matches this song's album?")
                 else -> localize("What song is playing?")
             }
@@ -122,12 +179,26 @@ class MusicQuizController(
         containerQuizItems.removeAllViews()
 
         if (question.type == MusicQuizEngine.TYPE_ALBUM_COVER) {
+            val bitmaps = question.coverOptions.map { loadSongCoverBitmap(it.file, it.album) }
+            if (bitmaps.any { it == null }) {
+                question.coverOptions.forEachIndexed { idx, opt ->
+                    if (bitmaps[idx] == null) {
+                        val key = AlbumCoverManager.getAlbumKey(opt.file, opt.album)
+                        coverArtCache[key] = false
+                    }
+                }
+                loadNextQuestion()
+                return
+            }
+
             containerQuizItems.orientation = LinearLayout.HORIZONTAL
-            for (coverFile in question.coverOptions) {
-                val tile = createCoverOptionTile(coverFile)
+            for (i in question.coverOptions.indices) {
+                val coverOpt = question.coverOptions[i]
+                val bmp = bitmaps[i]!!
+                val tile = createCoverOptionTile(coverOpt, bmp)
                 tile.setOnClickListener {
                     clickFeedback()
-                    onAnswerSelected(coverFile.parentFile?.name ?: "")
+                    onAnswerSelected(coverOpt.album)
                 }
                 containerQuizItems.addView(tile)
             }
@@ -158,16 +229,46 @@ class MusicQuizController(
         cancelTimer()
 
         val question = currentQuestion ?: return
-        val correct = engine.submitAnswer(selected, question)
+        val remainingFraction = if (totalQuestionTimeMs > 0L) {
+            currentTimerMillisRemaining.toFloat() / totalQuestionTimeMs.toFloat()
+        } else 0f
 
-        if (correct) {
-            Toast.makeText(activity, "✅ " + localize("Correct!"), Toast.LENGTH_SHORT).show()
+        val correct = engine.submitAnswer(selected, question, remainingFraction)
+
+        // Visual feedback
+        if (question.type == MusicQuizEngine.TYPE_ALBUM_COVER) {
+            for (i in 0 until containerQuizItems.childCount) {
+                val tile = containerQuizItems.getChildAt(i)
+                val coverOpt = question.coverOptions.getOrNull(i) ?: continue
+                val isThisCorrect = coverOpt.album.equals(question.correctAnswer, ignoreCase = true)
+                val isThisSelected = selected != null && coverOpt.album.equals(selected, ignoreCase = true)
+
+                if (isThisSelected) {
+                    tile.setBackgroundResource(
+                        if (correct) R.drawable.quiz_cover_tile_correct else R.drawable.quiz_cover_tile_incorrect
+                    )
+                } else if (!correct && isThisCorrect) {
+                    tile.setBackgroundResource(R.drawable.quiz_cover_tile_correct)
+                }
+            }
         } else {
-            Toast.makeText(
-                activity,
-                "❌ " + localize("It was: ") + question.correctAnswer,
-                Toast.LENGTH_SHORT
-            ).show()
+            for (i in 0 until containerQuizItems.childCount) {
+                val row = containerQuizItems.getChildAt(i) as? LinearLayout ?: continue
+                val tvText = row.getChildAt(1) as? TextView
+                val optText = tvText?.text?.toString() ?: ""
+                val isThisCorrect = optText.equals(question.correctAnswer, ignoreCase = true)
+                val isThisSelected = selected != null && optText.equals(selected, ignoreCase = true)
+
+                if (isThisSelected) {
+                    row.setBackgroundResource(
+                        if (correct) R.drawable.quiz_answer_pill_correct else R.drawable.quiz_answer_pill_incorrect
+                    )
+                    tvText?.setTextColor(0xFFFFFFFF.toInt())
+                } else if (!correct && isThisCorrect) {
+                    row.setBackgroundResource(R.drawable.quiz_answer_pill_correct)
+                    tvText?.setTextColor(0xFFFFFFFF.toInt())
+                }
+            }
         }
 
         updateScoreLivesUI()
@@ -175,23 +276,29 @@ class MusicQuizController(
         handler.postDelayed({
             if (engine.isGameOver) {
                 showGameOver()
+            } else if (engine.isRoundComplete()) {
+                showRoundCompleteTransition()
             } else {
                 loadNextQuestion()
             }
-        }, 1200)
+        }, 800)
     }
 
     private fun startTimer() {
         cancelTimer()
-        pbQuizTimer?.max = MusicQuizEngine.QUESTION_TIME_MS.toInt()
-        pbQuizTimer?.progress = MusicQuizEngine.QUESTION_TIME_MS.toInt()
+        totalQuestionTimeMs = engine.getQuestionTimeMs()
+        currentTimerMillisRemaining = totalQuestionTimeMs
+        pbQuizTimer?.max = totalQuestionTimeMs.toInt()
+        pbQuizTimer?.progress = totalQuestionTimeMs.toInt()
 
-        countDownTimer = object : CountDownTimer(MusicQuizEngine.QUESTION_TIME_MS, 100) {
+        countDownTimer = object : CountDownTimer(totalQuestionTimeMs, 50) {
             override fun onTick(millisUntilFinished: Long) {
+                currentTimerMillisRemaining = millisUntilFinished
                 pbQuizTimer?.progress = millisUntilFinished.toInt()
             }
 
             override fun onFinish() {
+                currentTimerMillisRemaining = 0L
                 pbQuizTimer?.progress = 0
                 if (!isAnswered) {
                     onAnswerSelected(null)
@@ -206,11 +313,11 @@ class MusicQuizController(
     }
 
     private fun updateScoreLivesUI() {
-        tvQuizScore?.text = String.format(Locale.US, "$%,d", engine.score * 100)
-        tvQuizRound?.text = engine.questionInRound.toString()
+        tvQuizScore?.text = String.format(Locale.US, "$%,d", engine.score)
+        tvQuizRound?.text = engine.roundNumber.toString()
         if (tvQuizLives != null) {
             val hearts = StringBuilder()
-            for (i in 0 until MusicQuizEngine.INITIAL_LIVES) {
+            for (i in 0 until MusicQuizEngine.MAX_LIVES) {
                 hearts.append(if (i < engine.lives) "♥ " else "♡ ")
             }
             tvQuizLives.text = hearts.toString().trim()
@@ -218,9 +325,21 @@ class MusicQuizController(
     }
 
     private fun showRoundCompleteTransition() {
+        currentScreenMode = MODE_ROUND_PAUSE
+        cancelTimer()
+        engine.stopPreview()
         pbQuizTimer?.progress = 0
-        tvQuizPrompt?.text = "${localize("Round ")}${engine.roundNumber} ${localize("Complete!")}"
+
+        val completedRound = engine.roundNumber
+        val perfectRoundBonus = engine.advanceRound()
+
+        val bonusNotice = if (perfectRoundBonus) {
+            "\n★ " + localize("Perfect Round! +1 Life")
+        } else ""
+
+        tvQuizPrompt?.text = "${localize("Round ")}$completedRound ${localize("Complete!")}$bonusNotice"
         updateScoreLivesUI()
+        tvQuizRound?.text = completedRound.toString()
 
         containerQuizItems.orientation = LinearLayout.VERTICAL
         containerQuizItems.removeAllViews()
@@ -228,41 +347,38 @@ class MusicQuizController(
         val btnContinue = createAnswerPill(localize("Continue"))
         btnContinue.setOnClickListener {
             clickFeedback()
-            engine.advanceRound()
             loadNextQuestion()
         }
         containerQuizItems.addView(btnContinue)
 
-        containerQuizItems.postDelayed({
-            if (containerQuizItems.childCount > 0) {
-                containerQuizItems.getChildAt(0).requestFocus()
+        val btnBuyHeart = createAnswerPill(localize("Buy 1 Heart ($1,500)"))
+
+        fun setBuyButtonDisabled(label: String) {
+            btnBuyHeart.onFocusChangeListener = null
+            btnBuyHeart.isFocusable = false
+            btnBuyHeart.isClickable = false
+            btnBuyHeart.alpha = 0.5f
+            btnBuyHeart.setBackgroundResource(R.drawable.quiz_answer_pill_disabled)
+            btnBuyHeart.getChildAt(0)?.visibility = View.INVISIBLE
+            val tvText = btnBuyHeart.getChildAt(1) as? TextView
+            tvText?.setTextColor(0xFFB0B5BA.toInt())
+            tvText?.text = label
+        }
+
+        if (engine.canBuyHeart()) {
+            btnBuyHeart.setOnClickListener {
+                if (engine.buyHeart()) {
+                    clickFeedback()
+                    updateScoreLivesUI()
+                    tvQuizRound?.text = completedRound.toString()
+                    setBuyButtonDisabled("✓ " + localize("Heart Purchased"))
+                    btnContinue.requestFocus()
+                }
             }
-        }, 50)
-    }
-
-    private fun showVictory() {
-        val prefs = activity.getSharedPreferences("AppPrefs", 0)
-        var highScore = prefs.getInt("quiz_high_score", 0)
-        val isNewHighScore = engine.score > highScore
-        if (isNewHighScore) {
-            prefs.edit().putInt("quiz_high_score", engine.score).apply()
-            highScore = engine.score
+        } else {
+            setBuyButtonDisabled(localize("Buy 1 Heart ($1,500)"))
         }
-
-        tvQuizPrompt?.text = "🏆 " + localize("You beat all 5 rounds!") + "\n" +
-                (if (isNewHighScore) localize("New High Score!") else "${localize("Best")}: $${highScore * 100}")
-        pbQuizTimer?.progress = 0
-        updateScoreLivesUI()
-
-        containerQuizItems.orientation = LinearLayout.VERTICAL
-        containerQuizItems.removeAllViews()
-
-        val btnAgain = createAnswerPill(localize("Play Again"))
-        btnAgain.setOnClickListener {
-            clickFeedback()
-            startSession()
-        }
-        containerQuizItems.addView(btnAgain)
+        containerQuizItems.addView(btnBuyHeart)
 
         val btnExit = createAnswerPill(localize("Exit"))
         btnExit.setOnClickListener {
@@ -279,17 +395,20 @@ class MusicQuizController(
     }
 
     private fun showGameOver() {
-        val prefs = activity.getSharedPreferences("AppPrefs", 0)
-        var highScore = prefs.getInt("quiz_high_score", 0)
-        val isNewHighScore = engine.score > highScore
-        if (isNewHighScore) {
-            prefs.edit().putInt("quiz_high_score", engine.score).apply()
-            highScore = engine.score
-        }
-
-        tvQuizPrompt?.text = localize("Game Over!") + "\n" +
-                (if (isNewHighScore) "🏆 " + localize("New High Score!") else "${localize("Best")}: $${highScore * 100}")
+        currentScreenMode = MODE_GAME_OVER
+        cancelTimer()
+        engine.stopPreview()
         pbQuizTimer?.progress = 0
+
+        val isNewHighScore = leaderboardManager.recordScore(engine.score, engine.roundNumber)
+        val highScore = leaderboardManager.getHighScore()
+
+        val title = localize("Game Over!")
+        val scoreStr = String.format(Locale.US, "$%,d", engine.score)
+        val roundStr = "${localize("Round ")}${engine.roundNumber}"
+        val highScoreNotice = if (isNewHighScore) "🏆 " + localize("New High Score!") else "${localize("Best")}: ${String.format(Locale.US, "$%,d", highScore)}"
+
+        tvQuizPrompt?.text = "$title\n$scoreStr ($roundStr)\n$highScoreNotice"
         updateScoreLivesUI()
 
         containerQuizItems.orientation = LinearLayout.VERTICAL
@@ -302,6 +421,13 @@ class MusicQuizController(
         }
         containerQuizItems.addView(btnAgain)
 
+        val btnLeaderboard = createAnswerPill(localize("Leaderboard"))
+        btnLeaderboard.setOnClickListener {
+            clickFeedback()
+            showLeaderboardView(fromGameOver = true)
+        }
+        containerQuizItems.addView(btnLeaderboard)
+
         val btnExit = createAnswerPill(localize("Exit"))
         btnExit.setOnClickListener {
             clickFeedback()
@@ -312,6 +438,90 @@ class MusicQuizController(
         containerQuizItems.postDelayed({
             if (containerQuizItems.childCount > 0) {
                 containerQuizItems.getChildAt(0).requestFocus()
+            }
+        }, 50)
+    }
+
+    private fun showLeaderboardView(fromGameOver: Boolean) {
+        currentScreenMode = MODE_LEADERBOARD
+        cancelTimer()
+        engine.stopPreview()
+        pbQuizTimer?.progress = 0
+
+        tvQuizPrompt?.text = localize("Leaderboard")
+        tvQuizRound?.text = "★"
+        tvQuizLives?.text = ""
+        tvQuizScore?.text = ""
+
+        containerQuizItems.orientation = LinearLayout.VERTICAL
+        containerQuizItems.removeAllViews()
+
+        val scrollView = ScrollView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            isVerticalScrollBarEnabled = false
+        }
+
+        val scrollContent = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        }
+        scrollView.addView(scrollContent)
+        containerQuizItems.addView(scrollView)
+
+        val entries = leaderboardManager.getTopEntries()
+        if (entries.isEmpty()) {
+            val emptyPill = createAnswerPill(localize("No scores yet"))
+            emptyPill.isFocusable = false
+            scrollContent.addView(emptyPill)
+        } else {
+            val dateFormat = java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM)
+            for ((index, entry) in entries.withIndex()) {
+                val rank = index + 1
+                val dateStr = dateFormat.format(java.util.Date(entry.timestamp))
+                val scoreStr = String.format(Locale.US, "$%,d", entry.score)
+                val roundStr = "R${entry.round}"
+                val text = "#$rank   $scoreStr   $dateStr   ($roundStr)"
+                val row = createLeaderboardRow(text)
+                scrollContent.addView(row)
+            }
+        }
+
+        val btnBack = createAnswerPill(localize("Back"))
+        btnBack.setOnClickListener {
+            clickFeedback()
+            if (fromGameOver) {
+                showGameOver()
+            } else {
+                showStartHub()
+            }
+        }
+        scrollContent.addView(btnBack)
+
+        if (entries.isNotEmpty()) {
+            val btnClear = createAnswerPill(localize("Clear Scores"))
+            btnClear.setOnClickListener {
+                clickFeedback()
+                leaderboardManager.clearLeaderboard()
+                Toast.makeText(activity, localize("Scores Cleared"), Toast.LENGTH_SHORT).show()
+                showLeaderboardView(fromGameOver)
+            }
+            scrollContent.addView(btnClear)
+        }
+
+        scrollContent.postDelayed({
+            if (scrollContent.childCount > 0) {
+                val target = scrollContent.getChildAt(0)
+                if (target.isFocusable) {
+                    target.requestFocus()
+                } else {
+                    btnBack.requestFocus()
+                }
             }
         }, 50)
     }
@@ -331,15 +541,14 @@ class MusicQuizController(
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (keyCode == 21) {
             val current = activity.currentFocus
-            if (current != null && current.parent == containerQuizItems) {
-                val idx = containerQuizItems.indexOfChild(current)
-                for (i in idx - 1 downTo 0) {
-                    val next = containerQuizItems.getChildAt(i)
-                    if (next != null && next.visibility == View.VISIBLE && next.isFocusable) {
-                        next.requestFocus()
-                        clickFeedback()
-                        break
-                    }
+            val container = (current?.parent as? ViewGroup) ?: containerQuizItems
+            val idx = container.indexOfChild(current)
+            for (i in idx - 1 downTo 0) {
+                val next = container.getChildAt(i)
+                if (next != null && next.visibility == View.VISIBLE && next.isFocusable) {
+                    next.requestFocus()
+                    clickFeedback()
+                    break
                 }
             }
             return true
@@ -347,15 +556,14 @@ class MusicQuizController(
 
         if (keyCode == 22) {
             val current = activity.currentFocus
-            if (current != null && current.parent == containerQuizItems) {
-                val idx = containerQuizItems.indexOfChild(current)
-                for (i in idx + 1 until containerQuizItems.childCount) {
-                    val next = containerQuizItems.getChildAt(i)
-                    if (next != null && next.visibility == View.VISIBLE && next.isFocusable) {
-                        next.requestFocus()
-                        clickFeedback()
-                        break
-                    }
+            val container = (current?.parent as? ViewGroup) ?: containerQuizItems
+            val idx = container.indexOfChild(current)
+            for (i in idx + 1 until container.childCount) {
+                val next = container.getChildAt(i)
+                if (next != null && next.visibility == View.VISIBLE && next.isFocusable) {
+                    next.requestFocus()
+                    clickFeedback()
+                    break
                 }
             }
             return true
@@ -368,7 +576,17 @@ class MusicQuizController(
         }
 
         if (keyCode == KeyEvent.KEYCODE_BACK) {
-            exitQuiz()
+            when (currentScreenMode) {
+                MODE_LEADERBOARD -> {
+                    showStartHub()
+                }
+                MODE_GAME -> {
+                    exitQuiz()
+                }
+                else -> {
+                    exitQuiz()
+                }
+            }
             return true
         }
 
@@ -376,6 +594,10 @@ class MusicQuizController(
     }
 
     override fun onBackPressed(): Boolean {
+        if (currentScreenMode == MODE_LEADERBOARD) {
+            showStartHub()
+            return true
+        }
         exitQuiz()
         return true
     }
@@ -441,7 +663,67 @@ class MusicQuizController(
         return row
     }
 
-    private fun createCoverOptionTile(songFile: File): LinearLayout {
+    private fun createLeaderboardRow(text: String): LinearLayout {
+        val d = activity.resources.displayMetrics.density
+        val row = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            isFocusable = true
+            isClickable = false
+            setBackgroundResource(R.drawable.quiz_answer_pill_normal)
+            val padH = (14 * d).toInt()
+            val padV = (6 * d).toInt()
+            setPadding(padH, padV, padH, padV)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, (2 * d).toInt(), 0, (2 * d).toInt())
+            }
+        }
+
+        val dot = View(activity).apply {
+            val dotSize = (10 * d).toInt()
+            layoutParams = LinearLayout.LayoutParams(dotSize, dotSize).apply {
+                rightMargin = (10 * d).toInt()
+            }
+            setBackgroundResource(R.drawable.quiz_dot_filled)
+            visibility = View.INVISIBLE
+        }
+
+        val tvText = TextView(activity).apply {
+            setText(text)
+            textSize = 15f
+            setTextColor(0xFF173350.toInt())
+            typeface = ThemeManager.getCustomFontBold()
+            setSingleLine(true)
+            ellipsize = android.text.TextUtils.TruncateAt.MARQUEE
+            marqueeRepeatLimit = -1
+            isHorizontalFadingEdgeEnabled = true
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f)
+        }
+
+        row.addView(dot)
+        row.addView(tvText)
+
+        row.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                row.setBackgroundResource(R.drawable.quiz_answer_pill_focused)
+                tvText.setTextColor(0xFFFFFFFF.toInt())
+                dot.visibility = View.VISIBLE
+                tvText.isSelected = true
+            } else {
+                row.setBackgroundResource(R.drawable.quiz_answer_pill_normal)
+                tvText.setTextColor(0xFF173350.toInt())
+                dot.visibility = View.INVISIBLE
+                tvText.isSelected = false
+            }
+        }
+
+        return row
+    }
+
+    private fun createCoverOptionTile(option: MusicQuizEngine.CoverOption, bitmap: Bitmap): LinearLayout {
         val d = activity.resources.displayMetrics.density
         val tile = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
@@ -459,17 +741,13 @@ class MusicQuizController(
 
         val ivCover = SquareImageView(activity).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
-            setImageResource(R.drawable.default_album)
+            setImageBitmap(bitmap)
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
         }
         tile.addView(ivCover)
-
-        loadQuizCoverArt(songFile) { bmp ->
-            bmp?.let { ivCover.setImageBitmap(it) }
-        }
 
         tile.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
             tile.setBackgroundResource(
@@ -480,51 +758,89 @@ class MusicQuizController(
         return tile
     }
 
-    private fun loadQuizCoverArt(file: File, callback: (Bitmap?) -> Unit) {
-        Thread {
-            var art: Bitmap? = null
-            try {
-                val path = file.absolutePath
-                val lower = path.lowercase(Locale.US)
-                if (lower.endsWith(".m4a") || lower.endsWith(".alac")) {
-                    val tags = AudioPlayerManager.getInstance().extractAlacMetadata(file)
-                    if (tags != null && tags.size > 5 && tags[5] != null) {
-                        val pic = tags[5] as ByteArray
-                        val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
-                        art = BitmapFactory.decodeByteArray(pic, 0, pic.size, opts)
-                    }
-                } else {
-                    val mmr = MediaMetadataRetriever()
-                    val fis = FileInputStream(file)
-                    try {
-                        mmr.setDataSource(fis.fd)
-                        val pic = mmr.embeddedPicture
-                        if (pic != null && pic.isNotEmpty()) {
-                            val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
-                            art = BitmapFactory.decodeByteArray(pic, 0, pic.size, opts)
-                        }
-                    } finally {
-                        try { fis.close() } catch (ignored: Exception) {}
-                        try { mmr.release() } catch (ignored: Exception) {}
-                    }
+    private fun hasCoverArt(song: SongItem): Boolean {
+        val album = song.album
+        if (album.isNullOrBlank() || album.trim().lowercase().startsWith("unknown")) {
+            return false
+        }
+        val file = song.file
+        val key = AlbumCoverManager.getAlbumKey(file, album)
+        coverArtCache[key]?.let { return it }
+
+        val bmp = loadSongCoverBitmap(file, album)
+        val hasArt = bmp != null
+        coverArtCache[key] = hasArt
+        return hasArt
+    }
+
+    private fun loadSongCoverBitmap(file: File, album: String?): Bitmap? {
+        val key = AlbumCoverManager.getAlbumKey(file, album)
+        val manager = AlbumCoverManager.getInstance()
+
+        // 1. In-memory LRU
+        manager.getMemoryCover(key)?.let { return it }
+
+        // 2. Pre-scaled disk cache
+        manager.getThumbnailDirect(key)?.let { return it }
+
+        // 3. Folder cover (cover.jpg, folder.jpg)
+        try {
+            val folderCover = file.parentFile?.let { MediaLibraryManager.getInstance().findFolderCover(it) }
+            if (folderCover != null && folderCover.exists()) {
+                val bmp = AlbumCoverManager.decodeSampledBitmapFromFile(
+                    folderCover.absolutePath,
+                    AlbumCoverManager.THUMB_SIZE,
+                    AlbumCoverManager.THUMB_SIZE
+                )
+                if (bmp != null) return bmp
+            }
+        } catch (ignored: Throwable) {}
+
+        // 4. StoragePaths covers dir
+        try {
+            val nameWithoutExt = file.nameWithoutExtension
+            val manualCover = File(StoragePaths.getCoversDir(), "$nameWithoutExt.jpg")
+            if (manualCover.exists()) {
+                val bmp = AlbumCoverManager.decodeSampledBitmapFromFile(
+                    manualCover.absolutePath,
+                    AlbumCoverManager.THUMB_SIZE,
+                    AlbumCoverManager.THUMB_SIZE
+                )
+                if (bmp != null) return bmp
+            }
+        } catch (ignored: Throwable) {}
+
+        // 5. Embedded art
+        try {
+            val path = file.absolutePath
+            val lower = path.lowercase(Locale.US)
+            var embeddedBytes: ByteArray? = null
+            if (lower.endsWith(".m4a") || lower.endsWith(".alac")) {
+                val tags = AudioPlayerManager.getInstance().extractAlacMetadata(file)
+                if (tags.size > 5 && tags[5] != null) {
+                    embeddedBytes = tags[5] as? ByteArray
                 }
-            } catch (ignored: Exception) {}
-
-            if (art == null) {
+            } else {
+                val mmr = MediaMetadataRetriever()
+                val fis = FileInputStream(file)
                 try {
-                    val nameWithoutExt = file.nameWithoutExtension
-                    val manualCoverFile = File(StoragePaths.getCoversDir(), "$nameWithoutExt.jpg")
-                    if (manualCoverFile.exists()) {
-                        val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
-                        art = BitmapFactory.decodeFile(manualCoverFile.absolutePath, opts)
-                    }
-                } catch (ignored: Exception) {}
+                    mmr.setDataSource(fis.fd)
+                    embeddedBytes = mmr.embeddedPicture
+                } finally {
+                    try { fis.close() } catch (ignored: Throwable) {}
+                    try { mmr.release() } catch (ignored: Throwable) {}
+                }
             }
+            if (embeddedBytes != null && embeddedBytes.isNotEmpty()) {
+                val bmp = AlbumCoverManager.decodeSampledBitmapFromByteArray(
+                    embeddedBytes,
+                    AlbumCoverManager.THUMB_SIZE,
+                    AlbumCoverManager.THUMB_SIZE
+                )
+                if (bmp != null) return bmp
+            }
+        } catch (ignored: Throwable) {}
 
-            val finalArt = art
-            activity.runOnUiThread {
-                callback(finalArt)
-            }
-        }.start()
+        return null
     }
 }

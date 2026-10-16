@@ -434,5 +434,15 @@
   "Episode": "Серия",
   "No movies found.": "Фильмы не найдены.",
   "No TV series found.": "Сериалы не найдены.",
-  "No videos found in this folder.": "В этой папке нет видео."
+  "No videos found in this folder.": "В этой папке нет видео.",
+  "Leaderboard": "Таблица рекордов",
+  "Play Game": "Играть",
+  "No scores yet": "Пока нет результатов",
+  "Clear Scores": "Очистить результаты",
+  "Scores Cleared": "Результаты очищены",
+  "Perfect Round! +1 Life": "Идеальный раунд! +1 Жизнь",
+  "Final Score": "Итоговый счёт",
+  "Back": "Назад",
+  "Buy 1 Heart ($1,500)": "Купить 1 сердце ($1 500)",
+  "Heart Purchased": "Сердце куплено"
 }

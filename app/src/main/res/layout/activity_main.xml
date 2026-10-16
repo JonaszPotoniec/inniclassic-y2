@@ -306,7 +306,7 @@
         android:visibility="gone">
 
         <RelativeLayout android:layout_width="match_parent" android:layout_height="26dp" android:layout_marginBottom="4dp">
-            <TextView android:id="@+id/tv_quiz_round" android:layout_width="26dp" android:layout_height="26dp" android:layout_alignParentLeft="true" android:background="@drawable/quiz_round_badge" android:gravity="center" android:text="1" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold"/>
+            <TextView android:id="@+id/tv_quiz_round" android:layout_width="wrap_content" android:minWidth="26dp" android:layout_height="26dp" android:paddingLeft="5dp" android:paddingRight="5dp" android:layout_alignParentLeft="true" android:background="@drawable/quiz_round_badge" android:gravity="center" android:text="1" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold"/>
             <TextView android:id="@+id/tv_quiz_lives" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentRight="true" android:layout_centerVertical="true" android:text="♥ ♥ ♥" android:textColor="#FF6B6B" android:textSize="15sp" android:textStyle="bold"/>
         </RelativeLayout>
 

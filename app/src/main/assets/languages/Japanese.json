@@ -418,5 +418,15 @@
   "Episode": "エピソード",
   "No movies found.": "映画が見つかりません。",
   "No TV series found.": "テレビ番組が見つかりません。",
-  "No videos found in this folder.": "このフォルダに動画はありません。"
+  "No videos found in this folder.": "このフォルダに動画はありません。",
+  "Leaderboard": "リーダーボード",
+  "Play Game": "ゲームを始める",
+  "No scores yet": "スコアがありません",
+  "Clear Scores": "スコアを消去",
+  "Scores Cleared": "スコアが消去されました",
+  "Perfect Round! +1 Life": "パーフェクト！+1 ライフ",
+  "Final Score": "最終スコア",
+  "Back": "戻る",
+  "Buy 1 Heart ($1,500)": "ハートを1つ購入 ($1,500)",
+  "Heart Purchased": "ハート購入済み"
 }

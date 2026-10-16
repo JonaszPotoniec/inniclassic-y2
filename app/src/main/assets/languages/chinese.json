@@ -434,5 +434,15 @@
   "Episode": "剧集",
   "No movies found.": "未找到电影。",
   "No TV series found.": "未找到电视剧。",
-  "No videos found in this folder.": "此文件夹中未找到视频。"
+  "No videos found in this folder.": "此文件夹中未找到视频。",
+  "Leaderboard": "排行榜",
+  "Play Game": "开始游戏",
+  "No scores yet": "暂无记录",
+  "Clear Scores": "清除记录",
+  "Scores Cleared": "记录已清除",
+  "Perfect Round! +1 Life": "完美回合！+1 生命",
+  "Final Score": "最终得分",
+  "Back": "返回",
+  "Buy 1 Heart ($1,500)": "购买 1 颗心 ($1,500)",
+  "Heart Purchased": "已购买心"
 }

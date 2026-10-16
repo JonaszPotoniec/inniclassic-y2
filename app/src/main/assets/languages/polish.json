@@ -619,5 +619,15 @@
   "Episode": "Odcinek",
   "No movies found.": "Nie znaleziono filmów.",
   "No TV series found.": "Nie znaleziono seriali.",
-  "No videos found in this folder.": "Brak plików wideo w tym folderze."
+  "No videos found in this folder.": "Brak plików wideo w tym folderze.",
+  "Leaderboard": "Tabela wyników",
+  "Play Game": "Rozpocznij grę",
+  "No scores yet": "Brak wyników",
+  "Clear Scores": "Wyczyść wyniki",
+  "Scores Cleared": "Wyniki wyczyszczone",
+  "Perfect Round! +1 Life": "Runda bezbłędna! +1 Życie",
+  "Final Score": "Wynik końcowy",
+  "Back": "Wstecz",
+  "Buy 1 Heart ($1,500)": "Kup 1 serce ($1 500)",
+  "Heart Purchased": "Kupiono serce"
 }
