@@ -173,5 +173,4 @@ For anyone tracking this project against [ismileblue/y1_launcher](https://github
 - Distributed under the same license as upstream — see [LICENSE](LICENSE) (free for personal/educational, non-commercial use).
 
 If InniClassic's useful to you, you can [buy me a coffee](https://buymeacoffee.com/gz17egcara) — totally optional, never required.
-
-See [CHANGELOG.md](CHANGELOG.md) for the full version history.
+See [GitHub Releases](https://github.com/JonaszPotoniec/inniclassic-y2/releases) for the full version history.
