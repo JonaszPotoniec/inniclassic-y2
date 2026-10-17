@@ -16,7 +16,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="horizontal"
-        android:paddingTop="36dp"
+        android:paddingTop="0dp"
         android:visibility="visible"
         android:background="#00000000">
 
@@ -120,16 +120,16 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:orientation="vertical"
-            android:paddingTop="36dp"
-            android:paddingLeft="10dp"
-            android:paddingRight="10dp"
-            android:paddingBottom="10dp">
+            android:paddingTop="26dp"
+            android:paddingLeft="0dp"
+            android:paddingRight="0dp"
+            android:paddingBottom="0dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginBottom="6dp">
+                android:visibility="gone">
 
                 <TextView
                     android:id="@+id/tv_browser_path"
@@ -185,17 +185,67 @@
     </LinearLayout>
 
     <LinearLayout
+        android:id="@+id/layout_videos_mode"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal"
+        android:background="#66000000"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/layout_videos_left_pane"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:paddingTop="26dp"
+            android:paddingBottom="0dp"
+            android:paddingLeft="0dp"
+            android:paddingRight="0dp">
+
+            <ScrollView
+                android:id="@+id/scroll_videos"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:fillViewport="true">
+                <LinearLayout
+                    android:id="@+id/container_video_items"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:clipChildren="false"
+                    android:clipToPadding="false" />
+            </ScrollView>
+        </LinearLayout>
+
+        <FrameLayout
+            android:id="@+id/frame_video_cover"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/iv_video_cover"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:src="@drawable/video_circle" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <LinearLayout
         android:id="@+id/layout_settings_mode"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:paddingTop="36dp"
-        android:paddingBottom="10dp"
-        android:paddingLeft="10dp"
-        android:paddingRight="10dp"
+        android:paddingTop="26dp"
+        android:paddingBottom="0dp"
+        android:paddingLeft="0dp"
+        android:paddingRight="0dp"
         android:background="#66000000"
         android:visibility="gone">
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="SETTINGS" android:textColor="#BBFFFFFF" android:textSize="16sp" android:textStyle="bold" android:singleLine="true" android:layout_marginBottom="6dp"/>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="SETTINGS" android:textColor="#BBFFFFFF" android:textSize="16sp" android:textStyle="bold" android:singleLine="true" android:visibility="gone"/>
         <ScrollView android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
             <LinearLayout android:id="@+id/container_settings_items" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" />
         </ScrollView>
@@ -206,13 +256,13 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:paddingTop="36dp"
-        android:paddingBottom="10dp"
-        android:paddingLeft="10dp"
-        android:paddingRight="10dp"
+        android:paddingTop="26dp"
+        android:paddingBottom="0dp"
+        android:paddingLeft="0dp"
+        android:paddingRight="0dp"
         android:background="#66000000"
         android:visibility="gone">
-        <TextView android:id="@+id/tv_storage_header" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="ABOUT" android:textColor="#BBFFFFFF" android:textSize="16sp" android:textStyle="bold" android:singleLine="true" android:layout_marginBottom="6dp"/>
+        <TextView android:id="@+id/tv_storage_header" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="ABOUT" android:textColor="#BBFFFFFF" android:textSize="16sp" android:textStyle="bold" android:singleLine="true" android:visibility="gone"/>
         <ScrollView android:id="@+id/scroll_storage" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
             <LinearLayout android:id="@+id/container_storage_items" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" />
         </ScrollView>
@@ -223,14 +273,14 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:paddingTop="36dp"
-        android:paddingBottom="10dp"
-        android:paddingLeft="10dp"
-        android:paddingRight="10dp"
+        android:paddingTop="26dp"
+        android:paddingBottom="0dp"
+        android:paddingLeft="0dp"
+        android:paddingRight="0dp"
         android:background="#66000000"
         android:visibility="gone">
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="BLUETOOTH SCAN" android:textColor="#BBFFFFFF" android:textSize="16sp" android:textStyle="bold" android:layout_marginBottom="6dp"/>
-        <Button android:id="@+id/btn_scan_bt" android:layout_width="match_parent" android:layout_height="40dp" android:text="🔍 Scan Devices" android:textColor="#FFFFFF" android:textSize="16sp" android:background="#15FFFFFF" android:focusable="true"/>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="BLUETOOTH SCAN" android:textColor="#BBFFFFFF" android:textSize="16sp" android:textStyle="bold" android:visibility="gone"/>
+        <Button android:id="@+id/btn_scan_bt" android:layout_width="match_parent" android:layout_height="33dp" android:text="🔍 Scan Devices" android:textColor="#FFFFFF" android:textSize="16sp" android:background="#15FFFFFF" android:focusable="true"/>
         <ScrollView android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true" android:layout_marginTop="5dp">
             <LinearLayout android:id="@+id/container_bt_items" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" />
         </ScrollView>
@@ -241,14 +291,14 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:paddingTop="36dp"
-        android:paddingBottom="10dp"
-        android:paddingLeft="10dp"
-        android:paddingRight="10dp"
+        android:paddingTop="26dp"
+        android:paddingBottom="0dp"
+        android:paddingLeft="0dp"
+        android:paddingRight="0dp"
         android:background="#66000000"
         android:visibility="gone">
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="WI-FI NETWORKS" android:textColor="#BBFFFFFF" android:textSize="16sp" android:textStyle="bold" android:layout_marginBottom="6dp"/>
-        <Button android:id="@+id/btn_scan_wifi" android:layout_width="match_parent" android:layout_height="40dp" android:text="🔍 Scan Networks" android:textColor="#FFFFFF" android:textSize="16sp" android:background="#15FFFFFF" android:focusable="true"/>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="WI-FI NETWORKS" android:textColor="#BBFFFFFF" android:textSize="16sp" android:textStyle="bold" android:visibility="gone"/>
+        <Button android:id="@+id/btn_scan_wifi" android:layout_width="match_parent" android:layout_height="33dp" android:text="🔍 Scan Networks" android:textColor="#FFFFFF" android:textSize="16sp" android:background="#15FFFFFF" android:focusable="true"/>
         <ScrollView android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true" android:layout_marginTop="5dp">
             <LinearLayout android:id="@+id/container_wifi_items" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" />
         </ScrollView>
@@ -306,7 +356,7 @@
         android:visibility="gone">
 
         <RelativeLayout android:layout_width="match_parent" android:layout_height="26dp" android:layout_marginBottom="4dp">
-            <TextView android:id="@+id/tv_quiz_round" android:layout_width="26dp" android:layout_height="26dp" android:layout_alignParentLeft="true" android:background="@drawable/quiz_round_badge" android:gravity="center" android:text="1" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold"/>
+            <TextView android:id="@+id/tv_quiz_round" android:layout_width="wrap_content" android:minWidth="26dp" android:layout_height="26dp" android:paddingLeft="5dp" android:paddingRight="5dp" android:layout_alignParentLeft="true" android:background="@drawable/quiz_round_badge" android:gravity="center" android:text="1" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold"/>
             <TextView android:id="@+id/tv_quiz_lives" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentRight="true" android:layout_centerVertical="true" android:text="♥ ♥ ♥" android:textColor="#FF6B6B" android:textSize="15sp" android:textStyle="bold"/>
         </RelativeLayout>
 
@@ -351,7 +401,7 @@
             </LinearLayout>
         </RelativeLayout>
 
-        <!-- 🚀 커버+텍스트 뭉치를 사용 가능한 세로 공간 안에서 정중앙 배치! -->
+        <!-- Center album art and metadata vertically in available space -->
         <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center_vertical" android:paddingTop="16dp" android:paddingBottom="46dp" android:paddingLeft="14dp" android:paddingRight="14dp">
 
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="top">
@@ -361,7 +411,7 @@
                         <com.themoon.y1.views.SquareImageView android:id="@+id/iv_album_art" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="centerCrop" android:src="@drawable/default_album" android:background="#DDDDDD" />
                         <ImageView android:id="@+id/iv_pause_overlay" android:layout_width="56dp" android:layout_height="56dp" android:layout_gravity="center" android:src="@android:drawable/ic_media_pause" android:visibility="gone" />
                     </FrameLayout>
-                    <!-- 🚀 [신규 추가] 아래로 살짝 비치는 반사 효과 (iPod 스타일) -->
+                    <!-- Album art floor reflection -->
                     <FrameLayout android:id="@+id/frame_album_reflection" android:layout_width="220dp" android:layout_height="32dp" android:layout_marginTop="1dp"
                         android:rotationY="18">
                         <ImageView android:id="@+id/iv_album_reflection" android:layout_width="220dp" android:layout_height="220dp" android:layout_gravity="top" android:scaleY="-1" android:scaleType="centerCrop" android:alpha="0.30" android:src="@drawable/default_album" />
@@ -379,28 +429,28 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- 🚀 [수정] 진행바를 화면 맨 아래로, 좌우 여백을 줘서 조금 짧게, 더 두껍게. 시간 글씨는 굵고 크게! -->
+        <!-- Bottom progress bar and track elapsed/remaining time -->
         <LinearLayout android:id="@+id/row_player_progress" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="bottom" android:orientation="horizontal" android:gravity="center_vertical" android:paddingLeft="26dp" android:paddingRight="26dp" android:paddingBottom="14dp">
             <TextView android:id="@+id/tv_player_time_current" android:layout_width="54dp" android:layout_height="wrap_content" android:text="0:00" android:textColor="#000000" android:textStyle="bold" android:textSize="16sp" android:layout_marginRight="10dp"/>
             <ProgressBar android:id="@+id/player_progress" style="?android:attr/progressBarStyleHorizontal" android:progressDrawable="@drawable/progress_bar_now_playing" android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:max="100" android:progress="0"/>
             <TextView android:id="@+id/tv_player_time_total" android:layout_width="54dp" android:layout_height="wrap_content" android:text="-0:00" android:textColor="#000000" android:textStyle="bold" android:textSize="16sp" android:layout_marginLeft="10dp"/>
         </LinearLayout>
 
-        <!-- 🚀 [iPod 스타일] 볼륨 조절 시 Progress 바와 똑같은 모양으로 일시적으로 겹쳐 보여주는 인라인 볼륨 게이지 -->
+        <!-- Temporary inline volume gauge replacing progress bar -->
         <LinearLayout android:id="@+id/row_player_volume" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="bottom" android:orientation="horizontal" android:gravity="center_vertical" android:paddingLeft="26dp" android:paddingRight="26dp" android:paddingBottom="14dp" android:visibility="gone">
             <ImageView android:id="@+id/tv_player_volume_down" android:layout_width="16dp" android:layout_height="18dp" android:src="@drawable/ic_ipod_volume_down" android:tint="#000000" android:scaleType="fitCenter" android:layout_marginRight="10dp" android:contentDescription="Volume Down"/>
             <ProgressBar android:id="@+id/player_volume_progress" style="?android:attr/progressBarStyleHorizontal" android:progressDrawable="@drawable/progress_bar_now_playing" android:layout_width="0dp" android:layout_height="26dp" android:layout_weight="1" android:max="30" android:progress="0"/>
             <ImageView android:id="@+id/tv_player_volume_up" android:layout_width="24dp" android:layout_height="20dp" android:src="@drawable/ic_ipod_volume_up" android:tint="#000000" android:scaleType="fitCenter" android:layout_marginLeft="10dp" android:contentDescription="Volume Up"/>
         </LinearLayout>
 
-        <!-- 🚀 [iPod 스타일] Center 클릭으로 순환되는 2번째 상태: Seek(탐색) 바, 다이아몬드 손잡이를 휠로 움직여 곡 위치 점프 -->
+        <!-- Scrub seek bar with diamond thumb -->
         <LinearLayout android:id="@+id/row_player_seek" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="bottom" android:orientation="horizontal" android:gravity="center_vertical" android:paddingLeft="26dp" android:paddingRight="26dp" android:paddingBottom="14dp" android:visibility="gone">
             <TextView android:id="@+id/tv_player_seek_current" android:layout_width="54dp" android:layout_height="wrap_content" android:text="0:00" android:textColor="#000000" android:textStyle="bold" android:textSize="16sp" android:layout_marginRight="10dp"/>
             <SeekBar android:id="@+id/seek_player_scrub" android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:max="1000" android:progress="0" android:progressDrawable="@drawable/progress_bar_now_playing" android:thumb="@drawable/seek_diamond_thumb" android:splitTrack="false" android:focusable="false" android:clickable="false"/>
             <TextView android:id="@+id/tv_player_seek_total" android:layout_width="54dp" android:layout_height="wrap_content" android:text="-0:00" android:textColor="#000000" android:textStyle="bold" android:textSize="16sp" android:layout_marginLeft="10dp"/>
         </LinearLayout>
 
-        <!-- 🚀 [iPod 스타일] 3번째 상태: Shuffle & Repeat 빠른 전환 위젯 -->
+        <!-- Quick shuffle and repeat mode toggles -->
         <LinearLayout android:id="@+id/row_player_shuffle_repeat" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="bottom" android:orientation="horizontal" android:gravity="center" android:paddingBottom="18dp" android:visibility="gone">
             <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginRight="30dp">
                 <ImageView android:id="@+id/iv_scrub_shuffle_icon" android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_shuffle" android:tint="#6194D1" android:layout_marginRight="8dp"/>
@@ -412,7 +462,7 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- 🚀 [iPod 스타일] 4번째 상태: 별점 매기기 (휠로 조절) -->
+        <!-- Star rating widget -->
         <LinearLayout android:id="@+id/row_player_rating_scrub" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="bottom" android:orientation="horizontal" android:gravity="center" android:paddingBottom="18dp" android:visibility="gone">
             <TextView android:id="@+id/tv_scrub_star_1" android:layout_width="32dp" android:gravity="center" android:layout_height="wrap_content" android:text="•" android:textColor="#6194D1" android:textSize="30sp" android:layout_marginLeft="4dp" android:layout_marginRight="4dp"/>
             <TextView android:id="@+id/tv_scrub_star_2" android:layout_width="32dp" android:gravity="center" android:layout_height="wrap_content" android:text="•" android:textColor="#6194D1" android:textSize="30sp" android:layout_marginLeft="4dp" android:layout_marginRight="4dp"/>
@@ -442,11 +492,7 @@
             android:text="12:00 AM"
             android:textColor="#FFFFFF"
             android:textSize="13sp"
-            android:textStyle="bold"
-            android:shadowColor="#FF000000"
-            android:shadowDx="1"
-            android:shadowDy="1"
-            android:shadowRadius="2" />
+            android:textStyle="bold" />
 
         <LinearLayout
             android:id="@+id/layout_status_right_group"
@@ -459,7 +505,7 @@
             <ImageView android:id="@+id/iv_status_headphone" android:layout_width="16dp" android:layout_height="16dp" android:src="@drawable/ic_headphone" android:visibility="gone" android:layout_marginRight="6dp"/>
             <ImageView android:id="@+id/iv_status_wifi" android:layout_width="16dp" android:layout_height="16dp" android:visibility="gone" android:layout_marginRight="6dp"/>
             <ImageView android:id="@+id/iv_status_bluetooth" android:layout_width="16dp" android:layout_height="16dp" android:src="@drawable/ic_bluetooth" android:visibility="gone" android:layout_marginRight="8dp"/>
-            <TextView android:id="@+id/tv_status_battery" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="100%" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold" android:shadowColor="#FF000000" android:shadowDx="1" android:shadowDy="1" android:shadowRadius="2"/>
+            <TextView android:id="@+id/tv_status_battery" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="100%" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold" />
         </LinearLayout>
     </RelativeLayout>
 
@@ -533,24 +579,7 @@
         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Enter the above address in your PC browser.\nPress [Back] to return." android:textColor="#888888" android:textSize="16sp" android:gravity="center"/>
     </LinearLayout>
 
-    <LinearLayout
-        android:id="@+id/layout_videos_mode"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:paddingTop="36dp"
-        android:paddingBottom="10dp"
-        android:paddingLeft="10dp"
-        android:paddingRight="10dp"
-        android:background="#66000000"
-        android:visibility="gone">
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="VIDEOS" android:textColor="#BBFFFFFF" android:textSize="16sp" android:textStyle="bold" android:singleLine="true" android:layout_marginBottom="6dp"/>
-        <ScrollView android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
-            <LinearLayout android:id="@+id/container_video_items" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" />
-        </ScrollView>
-    </LinearLayout>
-
-    <!-- 🚀 [신규 추가] 비디오 재생 화면: ExoPlayer가 그리는 SurfaceView 위에 최소한의 정보만 오버레이 -->
+    <!-- Video playback overlay with title and progress -->
     <FrameLayout
         android:id="@+id/layout_video_player_mode"
         android:layout_width="match_parent"
@@ -558,7 +587,7 @@
         android:background="#FF000000"
         android:visibility="gone">
 
-        <SurfaceView android:id="@+id/surface_video" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_gravity="center" />
+        <SurfaceView android:id="@+id/surface_video" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_gravity="center" android:visibility="gone" />
 
         <TextView android:id="@+id/tv_video_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="top" android:padding="14dp" android:text="Video" android:textColor="#FFFFFFFF" android:textSize="16sp" android:textStyle="bold" android:singleLine="true" android:ellipsize="end" android:shadowColor="#FF000000" android:shadowDx="1" android:shadowDy="1" android:shadowRadius="3"/>
 
@@ -568,7 +597,7 @@
             <TextView android:id="@+id/tv_video_time_total" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="-0:00" android:textColor="#FFFFFFFF" android:textStyle="bold" android:textSize="14sp" android:layout_marginLeft="10dp" android:shadowColor="#FF000000" android:shadowDx="1" android:shadowDy="1" android:shadowRadius="3"/>
         </LinearLayout>
 
-        <!-- 🚀 [탐색 모드 안내] 길게 눌러서 볼륨/탐색 모드를 전환했을 때 잠깐 보여주는 라벨 -->
+        <!-- Temporary mode hint overlay -->
         <TextView android:id="@+id/tv_video_mode_hint" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center" android:text="Seek Mode" android:textColor="#FFFFFFFF" android:textSize="20sp" android:textStyle="bold" android:background="#AA000000" android:padding="14dp" android:visibility="gone"/>
     </FrameLayout>
 </FrameLayout>

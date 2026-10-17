@@ -8,6 +8,10 @@ on:
     tags:
       - "v*"
       - "[0-9]*"
+  pull_request:
+    branches:
+      - main
+      - master
   workflow_dispatch:
 
 permissions:
@@ -96,6 +100,17 @@ jobs:
           echo "release_name=${RELEASE_NAME}" >> "$GITHUB_OUTPUT"
           echo "apk_name=${APK_NAME}" >> "$GITHUB_OUTPUT"
 
+      - name: Run Unit Tests
+        run: ./gradlew testDebugUnitTest
+
+      - name: Upload Unit Test Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: app/build/reports/tests/testDebugUnitTest/
+          retention-days: 7
+
       - name: Build Release APK
         run: ./gradlew assembleRelease -PappVersionCode="${{ steps.version.outputs.version_code }}" -PappVersionName="${{ steps.version.outputs.version_name }}"
 
@@ -177,6 +192,7 @@ jobs:
 
   release:
     name: Publish Release
+    if: github.event_name != 'pull_request'
     needs: [build-apk, build-roms]
     runs-on: ubuntu-latest
     steps:

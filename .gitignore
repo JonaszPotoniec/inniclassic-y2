@@ -15,3 +15,7 @@
 .claude/
 local.properties
 *.zip
+!app/src/main/assets/themes/*.zip
+scratch/
+tasks/
+tools/rom_assets/
