@@ -99,6 +99,7 @@ class SettingsController(
 
         val MUSIC_MENU_ITEMS = arrayOf(
             arrayOf("coverflow", "Cover Flow"),
+            arrayOf("recently_played", "Recently Played"),
             arrayOf("playlists", "Playlists"),
             arrayOf("track_artists", "Artists"),
             arrayOf("artists", "Album Artists"),

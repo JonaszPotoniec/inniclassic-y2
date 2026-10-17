@@ -16,29 +16,37 @@ import android.widget.BaseAdapter
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import com.themoon.y1.MainActivity
 import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.browser.BrowserController
-import com.themoon.y1.navigation.BrowserMode
 import com.themoon.y1.managers.AlbumCoverManager
+import com.themoon.y1.managers.AudioPlayerManager
+import com.themoon.y1.managers.RecentlyPlayedManager
 import com.themoon.y1.models.SongItem
+import com.themoon.y1.navigation.BrowserMode
 import com.themoon.y1.views.ClassicMenuStyle
+import com.themoon.y1.views.TablerIcons
+import com.themoon.y1.views.WheelDialog
 import java.io.File
 import java.io.FileInputStream
 import java.util.Collections
+import java.util.Locale
 
 class CategoryListAdapter(
     private val items: List<String>,
     private val type: String,
     private val isAudiobook: Boolean = MainActivity.instance?.let {
         it.isAudiobookLibraryMode || (it.isBrowserControllerInitialized() && it.browserController.isAudiobookLibraryMode)
-    } ?: false
+    } ?: false,
+    private val recentAlbumEntries: List<RecentlyPlayedManager.RecentAlbumEntry>? = null
 ) : BaseAdapter() {
 
     private var albumSongCounts: MutableMap<String, Int>? = null
     private var albumFilesMap: MutableMap<String, MutableList<File>>? = null
+    private var albumArtistsMap: MutableMap<String, String>? = null
     private var cachedAllSongsCount = -1
 
     init {
@@ -46,9 +54,10 @@ class CategoryListAdapter(
             coverCache = LruCache(50)
         }
 
-        if (type == "ALBUM" || type == "GENRE_ALBUM") {
+        if (type == "ALBUM" || type == "GENRE_ALBUM" || type == "RECENTLY_PLAYED_ALBUMS") {
             val counts = HashMap<String, Int>()
             val filesMap = HashMap<String, MutableList<File>>()
+            val artists = HashMap<String, String>()
             val bc = MainActivity.instance?.browserController
             val genreFilter = bc?.categoryGenreFilter ?: ""
             val artistFilter = bc?.categoryArtistFilter ?: ""
@@ -66,7 +75,7 @@ class CategoryListAdapter(
                             continue
                         }
                     }
-                } else if (artistFilter.isNotEmpty()) {
+                } else if (type == "ALBUM" && artistFilter.isNotEmpty()) {
                     val matchField = if (isTrackArtist) song.artist else song.albumArtist
                     if (!artistFilter.equals(matchField, ignoreCase = true)) {
                         continue
@@ -82,9 +91,25 @@ class CategoryListAdapter(
                     filesMap[song.album] = files
                 }
                 files.add(song.file)
+
+                val primaryArtist = if (song.albumArtist.isNotBlank()) song.albumArtist else song.artist
+                val compKey = "${song.album.trim().lowercase(Locale.US)}||${primaryArtist.trim().lowercase(Locale.US)}"
+                val compC = counts[compKey]
+                counts[compKey] = if (compC == null) 1 else compC + 1
+                var compFiles = filesMap[compKey]
+                if (compFiles == null) {
+                    compFiles = ArrayList()
+                    filesMap[compKey] = compFiles
+                }
+                compFiles.add(song.file)
+
+                if (!artists.containsKey(song.album) && primaryArtist.isNotBlank()) {
+                    artists[song.album] = primaryArtist
+                }
             }
             albumSongCounts = counts
             albumFilesMap = filesMap
+            albumArtistsMap = artists
         }
     }
 
@@ -94,14 +119,15 @@ class CategoryListAdapter(
 
     override fun getItemId(position: Int): Long = position.toLong()
 
-    override fun getViewTypeCount(): Int = 3
+    override fun getViewTypeCount(): Int = 4
 
     override fun getItemViewType(position: Int): Int {
         val name = items[position]
         return when {
             BrowserController.ALL_SONGS_SENTINEL == name -> 0
-            type == "ALBUM" || type == "GENRE_ALBUM" -> 1
-            else -> 2
+            type == "ALBUM" || type == "GENRE_ALBUM" || (type == "RECENTLY_PLAYED_ALBUMS" && name != BrowserController.CLEAR_RECENTLY_PLAYED_SENTINEL) -> 1
+            BrowserController.CLEAR_RECENTLY_PLAYED_SENTINEL == name -> 2
+            else -> 3
         }
     }
 
@@ -109,7 +135,8 @@ class CategoryListAdapter(
         val name = items[position]
         return when {
             BrowserController.ALL_SONGS_SENTINEL == name -> getAllSongsRowView(position, convertView)
-            type == "ALBUM" || type == "GENRE_ALBUM" -> getAlbumRowView(position, convertView, name)
+            BrowserController.CLEAR_RECENTLY_PLAYED_SENTINEL == name -> getClearRecentRowView(position, convertView)
+            type == "ALBUM" || type == "GENRE_ALBUM" || type == "RECENTLY_PLAYED_ALBUMS" -> getAlbumRowView(position, convertView, name, position)
             else -> getSimpleRowView(position, convertView, name)
         }
     }
@@ -342,7 +369,7 @@ class CategoryListAdapter(
         return row
     }
 
-    private fun getAlbumRowView(position: Int, convertView: View?, name: String): View {
+    private fun getAlbumRowView(position: Int, convertView: View?, name: String, itemIndex: Int = position): View {
         val main = MainActivity.instance ?: return View(convertView?.context)
         val d = main.resources.displayMetrics.density
         val coverSize = (52f * d).toInt()
@@ -437,41 +464,48 @@ class CategoryListAdapter(
             row.addView(tvArrow)
         }
 
+        val recentEntry = if (type == "RECENTLY_PLAYED_ALBUMS") recentAlbumEntries?.getOrNull(itemIndex) else null
+        val lookupKey = recentEntry?.compositeKey ?: name
+        val displayName = recentEntry?.albumName ?: name
+
         tvArrow.setTextColor(0xFFFFFFFF.toInt())
         tvArrow.visibility = if (row.isFocused) View.VISIBLE else View.GONE
 
         ClassicMenuStyle.apply(row, tvTitle, tvArrow, 64)
-        ivCover.tag = name
+        ivCover.tag = displayName
         row.background = if (row.isFocused) main.createFocusedButtonBackground() else main.createButtonBackground(ThemeManager.getListButtonNormalBg())
         tvTitle.isSelected = row.isFocused
 
-        tvTitle.text = name
+        tvTitle.text = displayName
         tvTitle.setTextColor(if (row.isFocused) ThemeManager.getListButtonFocusedTextColor() else ThemeManager.getTextColorPrimary())
-        val songCount = albumSongCounts?.get(name) ?: 0
+        val songCount = albumSongCounts?.get(lookupKey) ?: albumSongCounts?.get(name) ?: 0
+        val artist = recentEntry?.artistName ?: albumArtistsMap?.get(name)
         tvSubtitle.text = if (isAudiobook) {
             if (songCount == 1) t1File() else "$songCount ${tFiles()}"
+        } else if (type == "RECENTLY_PLAYED_ALBUMS" && !artist.isNullOrBlank() && !artist.equals("Unknown Artist", ignoreCase = true)) {
+            "$artist • " + (if (songCount == 1) t1Song() else "$songCount ${tSongs()}")
         } else {
             if (songCount == 1) t1Song() else "$songCount ${tSongs()}"
         }
         tvSubtitle.setTextColor(if (row.isFocused) ThemeManager.getListButtonFocusedTextColor() else ThemeManager.getTextColorSecondary())
 
-        val cached = coverCache?.get(name)
+        val cached = coverCache?.get(lookupKey) ?: coverCache?.get(name)
         if (cached != null) {
             ivCover.setImageDrawable(cached)
         } else {
-            val albumFiles = albumFilesMap?.get(name)
+            val albumFiles = albumFilesMap?.get(lookupKey) ?: albumFilesMap?.get(name)
             val sampleFile = if (!albumFiles.isNullOrEmpty()) albumFiles[0] else null
-            val albumKey = if (sampleFile != null) AlbumCoverManager.getAlbumKey(sampleFile, name) else name
+            val albumKey = if (sampleFile != null) AlbumCoverManager.getAlbumKey(sampleFile, displayName) else displayName
 
             val directBmp = AlbumCoverManager.getInstance().getThumbnailDirect(albumKey)
             if (directBmp != null) {
                 val directDrawable = BitmapDrawable(row.resources, directBmp)
-                coverCache?.put(name, directDrawable)
+                coverCache?.put(lookupKey, directDrawable)
                 ivCover.setImageDrawable(directDrawable)
             } else {
                 ivCover.setImageResource(if (isAudiobook) R.drawable.book else R.drawable.default_album)
-                ivCover.tag = name
-                loadAlbumArtAsync(name, sampleFile, ivCover)
+                ivCover.tag = displayName
+                loadAlbumArtAsync(displayName, sampleFile, ivCover)
             }
         }
 
@@ -482,7 +516,9 @@ class CategoryListAdapter(
                 tvTitle.setTextColor(ThemeManager.getListButtonFocusedTextColor())
                 tvSubtitle.setTextColor(ThemeManager.getListButtonFocusedTextColor())
                 tvArrow.visibility = View.VISIBLE
-                main.showFastScrollLetter(name)
+                if (type != "RECENTLY_PLAYED_ALBUMS") {
+                    main.showFastScrollLetter(name)
+                }
                 tvTitle.isSelected = true
             } else {
                 row.background = main.createButtonBackground(ThemeManager.getListButtonNormalBg())
@@ -499,12 +535,141 @@ class CategoryListAdapter(
             main.clickFeedback()
             if (type == "GENRE_ALBUM") {
                 bc.virtualQueryType = "GENRE_ALBUM_SONGS"
+                bc.virtualQueryValue = name
+            } else if (type == "RECENTLY_PLAYED_ALBUMS") {
+                bc.virtualQueryType = "RECENTLY_PLAYED_ALBUM"
+                bc.virtualQueryValue = displayName
+                bc.categoryArtistFilter = recentEntry?.artistName?.takeIf { !it.equals("Unknown Artist", ignoreCase = true) } ?: ""
+                bc.categoryArtistFilterIsTrackArtist = false
             } else {
                 bc.virtualQueryType = type
+                bc.virtualQueryValue = name
             }
-            bc.virtualQueryValue = name
             bc.currentBrowserMode = BrowserMode.VirtualSongs
             bc.buildVirtualSongs()
+        }
+
+        row.setOnLongClickListener {
+            main.clickFeedback()
+            main.isLongPressConsumed = true
+            val tracks = albumFilesMap?.get(lookupKey) ?: albumFilesMap?.get(name)
+            if (!tracks.isNullOrEmpty()) {
+                val shuffled = ArrayList(tracks)
+                Collections.shuffle(shuffled)
+                AudioPlayerManager.getInstance().playTrackList(shuffled, 0)
+                main.changeScreen(MainActivity.STATE_PLAYER)
+            }
+            true
+        }
+
+        return row
+    }
+
+    private fun getClearRecentRowView(position: Int, convertView: View?): View {
+        val main = MainActivity.instance ?: return View(convertView?.context)
+        val d = main.resources.displayMetrics.density
+        val rowHeight = if (ThemeManager.isClassicTheme()) (ClassicMenuStyle.ROW_HEIGHT_DP * d).toInt() else (48f * d).toInt()
+        val padX = ((if (ThemeManager.isClassicTheme()) 8 else 12) * d).toInt()
+
+        val isClearRowValid = convertView is LinearLayout &&
+            "clear_recent_row" == convertView.tag &&
+            convertView.childCount > 2
+
+        val row: LinearLayout
+        val ivIcon: ImageView
+        val tvText: TextView
+        val tvArrow: TextView
+
+        if (isClearRowValid && convertView != null) {
+            row = convertView as LinearLayout
+            ivIcon = row.getChildAt(0) as ImageView
+            tvText = row.getChildAt(1) as TextView
+            tvArrow = row.getChildAt(2) as TextView
+        } else {
+            row = LinearLayout(main).apply {
+                tag = "clear_recent_row"
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                layoutParams = AbsListView.LayoutParams(
+                    AbsListView.LayoutParams.MATCH_PARENT,
+                    rowHeight
+                )
+                setPadding(padX, 0, padX, 0)
+                isFocusable = true
+                isClickable = true
+                isSoundEffectsEnabled = false
+                background = main.createButtonBackground(ThemeManager.getListButtonNormalBg())
+            }
+
+            val iconSize = (18f * d).toInt()
+            ivIcon = ImageView(main).apply {
+                val lp = LinearLayout.LayoutParams(iconSize, iconSize).apply {
+                    rightMargin = (10f * d).toInt()
+                }
+                layoutParams = lp
+            }
+            row.addView(ivIcon)
+
+            tvText = TextView(main).apply {
+                setTextSize(TypedValue.COMPLEX_UNIT_PX, ThemeManager.getListTextSize() * d)
+                typeface = if (ThemeManager.isClassicTheme()) ThemeManager.getCustomFontBold() else ThemeManager.getCustomFont()
+                isSingleLine = true
+                ellipsize = TextUtils.TruncateAt.MARQUEE
+                val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                layoutParams = lp
+            }
+            row.addView(tvText)
+
+            tvArrow = TextView(main).apply {
+                text = "〉"
+                setTextSize(TypedValue.COMPLEX_UNIT_PX, 18f * d)
+                visibility = View.GONE
+                val lpArrow = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    leftMargin = (6f * d).toInt()
+                }
+                layoutParams = lpArrow
+            }
+            row.addView(tvArrow)
+        }
+
+        val normalColor = 0xFFFF5555.toInt()
+        val focusedColor = ThemeManager.getListButtonFocusedTextColor()
+        val isFocused = row.isFocused
+
+        row.background = if (isFocused) main.createFocusedButtonBackground() else main.createButtonBackground(ThemeManager.getListButtonNormalBg())
+        tvText.text = main.t("Clear Recently Played")
+        tvText.setTextColor(if (isFocused) focusedColor else normalColor)
+        tvArrow.setTextColor(0xFFFFFFFF.toInt())
+        tvArrow.visibility = if (isFocused) View.VISIBLE else View.GONE
+        ClassicMenuStyle.apply(row, tvText, tvArrow, ClassicMenuStyle.ROW_HEIGHT_DP)
+
+        val iconColor = if (isFocused) focusedColor else normalColor
+        val iconSize = (18f * d).toInt()
+        ivIcon.setImageBitmap(TablerIcons.render(TablerIcons.TRASH, iconSize, iconColor))
+
+        row.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
+            row.background = if (hasFocus) main.createFocusedButtonBackground() else main.createButtonBackground(ThemeManager.getListButtonNormalBg())
+            tvText.setTextColor(if (hasFocus) focusedColor else normalColor)
+            tvArrow.visibility = if (hasFocus) View.VISIBLE else View.GONE
+            ivIcon.setImageBitmap(TablerIcons.render(TablerIcons.TRASH, iconSize, if (hasFocus) focusedColor else normalColor))
+            main.virtualListSelectedIndex = position
+        }
+
+        row.setOnClickListener {
+            main.clickFeedback()
+            WheelDialog.show(main) {
+                title = main.t("Clear Recently Played")
+                message = main.t("Are you sure you want to clear your recently played history?")
+                positiveButton(main.t("Clear"), isDestructive = true) {
+                    RecentlyPlayedManager.getInstance(main).clear()
+                    main.browserController.buildRecentlyPlayedAlbums()
+                    Toast.makeText(main, main.t("Recently played cleared."), Toast.LENGTH_SHORT).show()
+                }
+                negativeButton(main.t("Cancel"))
+            }
         }
 
         return row

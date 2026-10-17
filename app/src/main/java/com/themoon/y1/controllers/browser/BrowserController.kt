@@ -33,6 +33,7 @@ import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.managers.AlbumCoverManager
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.managers.AudiobookManager
+import com.themoon.y1.managers.RecentlyPlayedManager
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.BrowserMode
 import com.themoon.y1.navigation.ScreenState
@@ -109,6 +110,7 @@ class BrowserController(
     companion object {
         private const val FOLDER_ROW_CHUNK_SIZE = 25
         const val ALL_SONGS_SENTINEL = "__ALL_SONGS__"
+        const val CLEAR_RECENTLY_PLAYED_SENTINEL = "__CLEAR_RECENTLY_PLAYED__"
     }
 
     override fun onEnter(state: ScreenState) {
@@ -173,6 +175,10 @@ class BrowserController(
                     virtualQueryType = "RECENT"
                     buildVirtualSongs()
                 }
+                is BrowserMode.RecentlyPlayed -> {
+                    isAudiobookLibraryMode = false
+                    buildRecentlyPlayedAlbums()
+                }
                 is BrowserMode.Audiobooks -> {
                     isAudiobookLibraryMode = true
                     buildFileBrowserUI()
@@ -197,6 +203,7 @@ class BrowserController(
             is BrowserMode.Folder -> buildFolderBrowserUI()
             is BrowserMode.VirtualSongs -> buildVirtualSongs()
             is BrowserMode.Favorites -> buildVirtualSongsForFavorites()
+            is BrowserMode.RecentlyPlayed -> buildRecentlyPlayedAlbums()
             else -> {}
         }
     }
@@ -226,6 +233,17 @@ class BrowserController(
                     onCoverFlowRequested()
                 }
                 containerBrowserItems.addView(btnCoverFlow)
+            }
+
+            if (!isMusicMenuItemHidden("recently_played")) {
+                val btnRecentlyPlayed = createListButtonWithIcon("\uE8B6", localize("Recently Played"), null)
+                btnRecentlyPlayed.setOnClickListener {
+                    clickFeedback()
+                    lastBrowserFocusText = localize("Recently Played")
+                    currentBrowserMode = BrowserMode.RecentlyPlayed
+                    buildRecentlyPlayedAlbums()
+                }
+                containerBrowserItems.addView(btnRecentlyPlayed)
             }
 
             if (!isMusicMenuItemHidden("playlists")) {
@@ -619,10 +637,10 @@ class BrowserController(
                     virtualQueryType == "ALL" || virtualQueryType == "RECENT" -> isMatch = true
                     virtualQueryType == "ARTIST" && song.artist == virtualQueryValue -> isMatch = true
                     virtualQueryType == "ARTIST_ALL_ALBUMS" && song.albumArtist == virtualQueryValue -> isMatch = true
-                    virtualQueryType == "ALBUM" && song.album == virtualQueryValue -> {
+                    (virtualQueryType == "ALBUM" || virtualQueryType == "RECENTLY_PLAYED_ALBUM") && song.album == virtualQueryValue -> {
                         if (categoryArtistFilter.isNotEmpty()) {
                             val matchField = if (categoryArtistFilterIsTrackArtist) song.artist else song.albumArtist
-                            isMatch = categoryArtistFilter == matchField
+                            isMatch = categoryArtistFilter.equals(matchField, ignoreCase = true) || categoryArtistFilter.equals(song.artist, ignoreCase = true)
                         } else {
                             isMatch = true
                         }
@@ -652,7 +670,7 @@ class BrowserController(
         }
 
         Collections.sort(targetSongs) { s1, s2 ->
-            if ("ALBUM" == virtualQueryType || "COVER_FLOW_ALBUM" == virtualQueryType || "GENRE_ALBUM_SONGS" == virtualQueryType) {
+            if ("ALBUM" == virtualQueryType || "COVER_FLOW_ALBUM" == virtualQueryType || "GENRE_ALBUM_SONGS" == virtualQueryType || "RECENTLY_PLAYED_ALBUM" == virtualQueryType) {
                 val t1 = MainActivity.trackNumberMap[s1.file.absolutePath] ?: 0
                 val t2 = MainActivity.trackNumberMap[s2.file.absolutePath] ?: 0
                 if (t1 != t2) {
@@ -747,6 +765,49 @@ class BrowserController(
             } else if (listVirtualSongs.childCount > 0) {
                 listVirtualSongs.getChildAt(0)?.requestFocus()
             }
+        }
+    }
+
+    fun buildRecentlyPlayedAlbums() {
+        hideBrowserCoverPane()
+        val statusBar = rootView.findViewById<View>(R.id.layout_status_bar)
+        statusBar?.background = createStatusBarBackground()
+
+        if (MainActivity.instance?.isCustomScanning == true) {
+            showLoadingPopup()
+            currentBrowserMode = BrowserMode.Root
+            buildFileBrowserUI()
+            return
+        }
+
+        scrollViewBrowser?.visibility = View.GONE
+        listVirtualSongs?.visibility = View.VISIBLE
+        hzIndexScroll?.visibility = View.GONE
+
+        updateHeaderTitle(localize("Recently Played"))
+
+        val activeLibrary = if (isAudiobookLibraryMode) MainActivity.audiobookLibrary else MainActivity.customLibrary
+        val recentEntries = RecentlyPlayedManager.getInstance(activity).getRecentAlbums(activeLibrary)
+
+        val items = ArrayList<String>()
+        if (recentEntries.isEmpty()) {
+            Toast.makeText(activity, localize("No recently played albums yet."), Toast.LENGTH_SHORT).show()
+        } else {
+            for (entry in recentEntries) {
+                items.add(entry.albumName)
+            }
+            items.add(CLEAR_RECENTLY_PLAYED_SENTINEL)
+        }
+
+        currentScrollIndexList.clear()
+        currentScrollIndexList.addAll(items)
+
+        val adapter = CategoryListAdapter(items, "RECENTLY_PLAYED_ALBUMS", isAudiobookLibraryMode, recentEntries)
+        listVirtualSongs?.adapter = adapter
+
+        virtualListSelectedIndex = 0
+        listVirtualSongs?.post {
+            navigateVirtualListTo(virtualListSelectedIndex)
         }
     }
 
@@ -1252,6 +1313,10 @@ class BrowserController(
             is BrowserMode.VirtualSongs -> {
                 when (virtualQueryType) {
                     "COVER_FLOW_ALBUM" -> onNavigateBackToMenu()
+                    "RECENTLY_PLAYED_ALBUM" -> {
+                        currentBrowserMode = BrowserMode.RecentlyPlayed
+                        buildRecentlyPlayedAlbums()
+                    }
                     "GENRE_ALBUM_SONGS" -> {
                         currentBrowserMode = BrowserMode.GenreAlbums(categoryGenreFilter, categoryArtistFilter)
                         buildVirtualCategories("GENRE_ALBUM")
@@ -1385,6 +1450,12 @@ class BrowserController(
             is BrowserMode.RecentlyAdded -> {
                 currentBrowserMode = BrowserMode.Root
                 lastBrowserFocusText = localize("Recently Added")
+                buildFileBrowserUI()
+                return true
+            }
+            is BrowserMode.RecentlyPlayed -> {
+                currentBrowserMode = BrowserMode.Root
+                lastBrowserFocusText = localize("Recently Played")
                 buildFileBrowserUI()
                 return true
             }

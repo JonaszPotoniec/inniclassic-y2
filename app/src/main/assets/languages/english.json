@@ -629,5 +629,10 @@
   "Final Score": "Final Score",
   "Back": "Back",
   "Buy 1 Heart ($1,500)": "Buy 1 Heart ($1,500)",
-  "Heart Purchased": "Heart Purchased"
+  "Heart Purchased": "Heart Purchased",
+  "Recently Played": "Recently Played",
+  "No recently played albums yet.": "No recently played albums yet.",
+  "Clear Recently Played": "Clear Recently Played",
+  "Are you sure you want to clear your recently played history?": "Are you sure you want to clear your recently played history?",
+  "Recently played cleared.": "Recently played cleared."
 }

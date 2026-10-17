@@ -444,5 +444,10 @@
   "Final Score": "최종 점수",
   "Back": "뒤로",
   "Buy 1 Heart ($1,500)": "하트 1개 구매 ($1,500)",
-  "Heart Purchased": "하트 구매 완료"
+  "Heart Purchased": "하트 구매 완료",
+  "Recently Played": "최근 재생된 음악",
+  "No recently played albums yet.": "최근 재생된 앨범이 없습니다.",
+  "Clear Recently Played": "최근 재생 기록 지우기",
+  "Are you sure you want to clear your recently played history?": "최근 재생 기록을 지우시겠습니까?",
+  "Recently played cleared.": "최근 재생 기록이 삭제되었습니다."
 }

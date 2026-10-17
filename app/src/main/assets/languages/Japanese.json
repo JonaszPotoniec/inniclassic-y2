@@ -428,5 +428,10 @@
   "Final Score": "最終スコア",
   "Back": "戻る",
   "Buy 1 Heart ($1,500)": "ハートを1つ購入 ($1,500)",
-  "Heart Purchased": "ハート購入済み"
+  "Heart Purchased": "ハート購入済み",
+  "Recently Played": "最近再生した項目",
+  "No recently played albums yet.": "最近再生したアルバムはありません。",
+  "Clear Recently Played": "最近再生した項目を消去",
+  "Are you sure you want to clear your recently played history?": "最近再生した履歴を消去してもよろしいですか？",
+  "Recently played cleared.": "最近再生した項目を消去しました。"
 }

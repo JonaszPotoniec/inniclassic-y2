@@ -444,5 +444,10 @@
   "Final Score": "最终得分",
   "Back": "返回",
   "Buy 1 Heart ($1,500)": "购买 1 颗心 ($1,500)",
-  "Heart Purchased": "已购买心"
+  "Heart Purchased": "已购买心",
+  "Recently Played": "最近播放",
+  "No recently played albums yet.": "暂无最近播放的专辑。",
+  "Clear Recently Played": "清除最近播放",
+  "Are you sure you want to clear your recently played history?": "确定要清除最近播放历史记录吗？",
+  "Recently played cleared.": "已清除最近播放记录。"
 }

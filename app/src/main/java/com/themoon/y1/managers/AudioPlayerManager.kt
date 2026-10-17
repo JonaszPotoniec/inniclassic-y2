@@ -225,6 +225,13 @@ class AudioPlayerManager private constructor() {
                                             duration.toLong(),
                                             pendingScrobblePath
                                         )
+                                        if (main.currentPlaylist.isNotEmpty() && main.currentIndex in main.currentPlaylist.indices) {
+                                            RecentlyPlayedManager.getInstance(main).onTrackStarted(
+                                                main.currentPlaylist[main.currentIndex],
+                                                pendingScrobbleAlbum,
+                                                pendingScrobbleArtist
+                                            )
+                                        }
                                     }
                                     if (main.currentPlaylist.isNotEmpty()) {
                                         main.updateAudioQualityInfo(main.currentPlaylist[main.currentIndex])
@@ -565,6 +572,7 @@ class AudioPlayerManager private constructor() {
             val player = legacyPlayer ?: return
             if (player.isPlaying) {
                 isPlayingActive = false
+                RecentlyPlayedManager.getInstance(MainActivity.instance).onPlaybackPausedOrStopped()
                 saveAudiobookBookmarkIfNeeded()
                 player.pause()
                 stopPeriodicPositionSaver()
@@ -576,11 +584,21 @@ class AudioPlayerManager private constructor() {
                 startPeriodicPositionSaver()
                 MainActivity.instance?.isPausedByHand = false
                 savePlaybackPositionOnly(sync = false)
+                MainActivity.instance?.let { main ->
+                    if (main.currentPlaylist.isNotEmpty() && main.currentIndex in main.currentPlaylist.indices) {
+                        RecentlyPlayedManager.getInstance(main).onTrackStarted(
+                            main.currentPlaylist[main.currentIndex],
+                            pendingScrobbleAlbum,
+                            pendingScrobbleArtist
+                        )
+                    }
+                }
             }
         } else if (exoPlayer != null) {
             val player = exoPlayer ?: return
             if (player.playWhenReady) {
                 isPlayingActive = false
+                RecentlyPlayedManager.getInstance(MainActivity.instance).onPlaybackPausedOrStopped()
                 saveAudiobookBookmarkIfNeeded()
                 player.playWhenReady = false
                 stopPeriodicPositionSaver()
@@ -592,6 +610,15 @@ class AudioPlayerManager private constructor() {
                 startPeriodicPositionSaver()
                 MainActivity.instance?.isPausedByHand = false
                 savePlaybackPositionOnly(sync = false)
+                MainActivity.instance?.let { main ->
+                    if (main.currentPlaylist.isNotEmpty() && main.currentIndex in main.currentPlaylist.indices) {
+                        RecentlyPlayedManager.getInstance(main).onTrackStarted(
+                            main.currentPlaylist[main.currentIndex],
+                            pendingScrobbleAlbum,
+                            pendingScrobbleArtist
+                        )
+                    }
+                }
             }
         }
         MainActivity.instance?.updatePlayerUI()
@@ -986,6 +1013,13 @@ class AudioPlayerManager private constructor() {
                         duration.toLong(),
                         pendingScrobblePath
                     )
+                    if (main.currentPlaylist.isNotEmpty() && main.currentIndex in main.currentPlaylist.indices) {
+                        RecentlyPlayedManager.getInstance(main).onTrackStarted(
+                            main.currentPlaylist[main.currentIndex],
+                            pendingScrobbleAlbum,
+                            pendingScrobbleArtist
+                        )
+                    }
                 }
             } else if (isGaplessQueueActive) {
                 exoPlayer?.setPlaybackParameters(PlaybackParameters(currentSpeed, 1.0f))
@@ -1136,6 +1170,7 @@ class AudioPlayerManager private constructor() {
 
     fun releasePlayer() {
         isPlayingActive = false
+        RecentlyPlayedManager.getInstance(MainActivity.instance).onPlaybackPausedOrStopped()
         currentlyPlayingFilePath = null
         stopPeriodicPositionSaver()
         exoPlayer?.release()

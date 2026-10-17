@@ -444,5 +444,10 @@
   "Final Score": "Итоговый счёт",
   "Back": "Назад",
   "Buy 1 Heart ($1,500)": "Купить 1 сердце ($1 500)",
-  "Heart Purchased": "Сердце куплено"
+  "Heart Purchased": "Сердце куплено",
+  "Recently Played": "Недавно воспроизведенные",
+  "No recently played albums yet.": "Нет недавно воспроизведенных альбомов.",
+  "Clear Recently Played": "Очистить недавно воспроизведенные",
+  "Are you sure you want to clear your recently played history?": "Вы уверены, что хотите очистить историю недавно воспроизведенных?",
+  "Recently played cleared.": "История воспроизведения очищена."
 }

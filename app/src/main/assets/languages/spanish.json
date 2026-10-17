@@ -444,5 +444,10 @@
   "Final Score": "Puntuación final",
   "Back": "Atrás",
   "Buy 1 Heart ($1,500)": "Comprar 1 corazón ($1.500)",
-  "Heart Purchased": "Corazón comprado"
+  "Heart Purchased": "Corazón comprado",
+  "Recently Played": "Reproducido recientemente",
+  "No recently played albums yet.": "Aún no hay álbumes reproducidos recientemente.",
+  "Clear Recently Played": "Borrar reproducido recientemente",
+  "Are you sure you want to clear your recently played history?": "¿Seguro que deseas borrar el historial de reproducción reciente?",
+  "Recently played cleared.": "Historial de reproducción reciente borrado."
 }
