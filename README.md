@@ -4,16 +4,9 @@
   <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Platform">
   <img src="https://img.shields.io/badge/Device-Innioasis%20Y1%20%26%20Y2-blue?style=flat-square" alt="Device">
   <img src="https://img.shields.io/badge/Status-Beta-Orange?style=flat-square" alt="Status">
-  <img src="https://img.shields.io/badge/Version-1.5.0-informational?style=flat-square" alt="Version">
-  <a href="https://buymeacoffee.com/gz17egcara"><img src="https://img.shields.io/badge/Buy%20me%20a-coffee-FFDD00?style=flat-square&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee"></a>
 </p>
 
-**InniClassic** is a launcher for the **Innioasis Y1 and Y2** built directly on top of and based on [ismileblue/y1_launcher](https://github.com/ismileblue/y1_launcher) (JJ Launcher / MO-ON Launcher) — all credit for the original launcher, media engine, and theme system goes to that project. The goal of InniClassic is to turn JJ Launcher into as close to the original **iPod Classic experience** as possible, while going beyond it where it makes sense (FM Radio, Podcasts, Video, a from-scratch Music Quiz).
-
-This is **not** a GitHub "Fork" in the technical sense (it's a separate repository), but it is built directly on top of JJ Launcher's source and stays close to upstream so future JJ Launcher releases can keep being merged in.
-
-> [!NOTE]
-> Supports both the **Innioasis Y1** (Android 4.2.2) and **Innioasis Y2** (Android 4.4.2), including dual storage (`/storage/sdcard0` and `/storage/sdcard1`), automatic SD self-healing, Y2 clickwheel layout, and hardware FM radio.
+InniClassic is an iPod Classic-style launcher and media player for Innioasis Y1 and Y2 portable audio players, based on [FabianZettl/inniclassic](https://github.com/FabianZettl/inniclassic) and [ismileblue/y1_launcher](https://github.com/ismileblue/y1_launcher). It recreates the classic click wheel interface while adding features like hardware FM radio, podcasts, video playback, and a library-based Music Quiz.
 
 ---
 
@@ -32,145 +25,120 @@ This is **not** a GitHub "Fork" in the technical sense (it's a separate reposito
 ## Features
 
 ### The iPod Classic experience
-- Bundled **iPod Classic** theme (light + dark variant), aiming for a 1:1 look: plain-text menu lists, real system-matched bold typography, tight iPod-accurate spacing, and a status bar that shows the current screen's name instead of a clock
-- Two-pane Main Menu and Music menu, both sharing the exact same look and behavior: menu list on the left, a slowly panning ("Ken Burns") album cover on the right that bleeds all the way to the top of the screen, behind the status bar
-- Redesigned **Now Playing** screen — large angled album cover with a reflection underneath (toggleable via **Album Cover Tilt**), a glass-look progress/volume bar, and a scrolling marquee for titles too long to fit
-- Center-click on Now Playing cycles **Progress → Seek → Shuffle & Repeat → Rating**, inspired by the iPod Classic (the wheel previews a seek position in 5-second steps, cycles shuffle/repeat, or sets a star rating depending on the state; volume control otherwise)
-- **Confirm seeking** — in Seek mode, turn the wheel to choose a position, then press Center to apply it and return to Progress. Without turning the wheel, Center continues through the other display modes.
-- **Key lock** — hold Center for 0.8 seconds to lock; hold Center again to unlock. A short Center press selects items or cycles Now Playing modes.
-- **On-The-Go playlist** and a **Now Playing hold-menu** (long-press Play/Pause): Add/Remove Favorite, Add to On-The-Go, Browse Album, Browse Artist, Toggle Visualizer (song rating is set from the bottom-bar Rating mode instead — see above)
-- **Synced lyrics** — "Toggle Visualizer" swaps the spectrum analyzer for a scrolling, time-synced lyrics view whenever lyrics are found for the current track: an external `.lrc` file next to the song (same filename), or embedded lyrics (ID3 `USLT` for MP3, FLAC/ALAC tags) — synced if they contain `[mm:ss.xx]` timestamps, otherwise shown as plain scrolling text
-- **Favorites** with a heart indicator on Now Playing (hollow when not favorited, filled red when it is)
-- Fast-scroll letter jump on every alphabetized list, like spinning a real click wheel
-- A from-scratch recreation of the classic **iPod Music Quiz** using your own library, 5 rounds of 8 questions with round-complete and victory screens
+- Bundled iPod Classic theme in light and dark variants: plain text menu lists, system-matched typography, authentic spacing, and a status bar showing the active screen name rather than a clock.
+- Two-pane Main Menu and Music menu sharing the same layout: menu list on the left and a slowly panning album cover on the right extending behind the status bar.
+- Redesigned Now Playing screen with a large angled album cover, an optional mirror reflection below it (controlled by Album Cover Tilt), a glass progress and volume bar, and marquee scrolling for longer titles.
+- Center button on Now Playing cycles between Progress, Seek, Shuffle & Repeat, and Rating. When cycling, the click wheel previews seek positions in 5-second steps, toggles shuffle and repeat modes, or sets star ratings, defaulting to volume control otherwise.
+- In Seek mode, spinning the wheel selects a time offset; pressing Center applies the seek and returns to Progress. Pressing Center without turning advances to the next mode.
+- On-The-Go playlist creation and a Now Playing hold menu (long-press Play/Pause) for adding favorites, queueing to On-The-Go, browsing by album or artist, and switching visualizers.
+- Synced lyrics support replacing the spectrum visualizer when lyrics exist for the current track, reading either adjacent `.lrc` files or embedded tags (`USLT` in MP3, or FLAC and ALAC lyrics tags). Timestamps in `[mm:ss.xx]` format scroll smoothly in time with the song.
+- Favorites system with a heart icon on the Now Playing screen, highlighted red when favorited.
+- Fast-scroll letter jumping on alphabetized lists matching original click wheel navigation.
+- Rebuilt iPod Music Quiz in endless survival mode using tracks from your local library, featuring six questions per round, non-linear timer scaling, persistent top-10 leaderboards, and a between-rounds heart shop.
 
 ### Music library
-- **Artists**, **Album Artists**, **Albums**, **Songs**, **Genres**, **Composers**, **Playlists**, **Favorites** — Artists groups by the literal track artist tag (so features/collaborations show up individually), Album Artists is the traditional grouped view
-- Wide format support: MP3, FLAC, WAV, OGG Vorbis, Opus (including `.ogg`-extension Opus files), ALAC/M4A, AAC
-- **Gapless playback** for albums and playlists of 15 tracks or fewer (see [Known limitations](#known-limitations))
-- **Shuffle** row pinned to the top of All Songs, matching stock Y1 firmware
-- **Cover art**: use at least **600×600**, ideally **1000×1000 or larger** — the Main Menu and Music menu covers pan slowly ("Ken Burns") across a panel that's rendered close to full screen height and then overscanned further for the pan itself, so anything smaller (e.g. 300×300) looks visibly soft/blurry once it's stretched and moving. Embedded cover art (ID3/FLAC/ALAC tags) and folder `cover.jpg`/`folder.jpg` are both supported.
-- **Last.fm scrobbling** — every track you play past the halfway point (or 4 minutes, whichever comes first) is automatically appended to a local `.scrobbler.log` at the root of your SD card (Audioscrobbler 1.1 format, same idea as Rockbox) — no setup, no account, works out of the box. To also send scrobbles to a real Last.fm account, turn on **Settings → Sync Scrobbles to Last.fm** and log in via **Settings → Last.fm Account** through a browser-based flow (the device shows a URL/QR you open on your phone or PC, since typing credentials with a click wheel is painful) — scrobbles queue locally and get sent once you're logged in and online. Note `.scrobbler.log` starts with a dot, so it won't show up in file managers/apps that hide hidden files by default.
+- Library browsing by Artists, Album Artists, Albums, Songs, Genres, Composers, Playlists, and Favorites. The Artists view splits by individual track artist tags so guest features appear distinctly, while Album Artists groups releases by main artist.
+- Recently played albums shelf tracking playback history with direct full-album navigation.
+- Audio format support covering MP3, FLAC, WAV, OGG Vorbis, Opus (including Opus audio inside `.ogg` containers), ALAC/M4A, and AAC.
+- Gapless playback for albums and playlists containing 15 tracks or fewer (see [Known limitations](#known-limitations)).
+- Shuffle shortcut pinned to the top of the All Songs list, matching original Y1 firmware behavior.
+- High-resolution cover art support. Using square images of at least 600x600 pixels (preferably 1000x1000 or larger) avoids blur during the panning animation across the menu split screen. Both embedded tags (ID3, FLAC, ALAC) and directory images (`cover.jpg` or `folder.jpg`) are detected automatically.
+- Built-in Last.fm scrobbling. Tracks played past the midpoint or four minutes are logged to `.scrobbler.log` on the SD card root in Audioscrobbler 1.1 format. To upload scrobbles directly to Last.fm, enable Settings > Sync Scrobbles to Last.fm and authenticate via Settings > Last.fm Account. The device displays a QR code and URL to open on a phone or computer, queuing scrobbles locally until a network connection is available.
 
 ### Beyond music
-- **Podcasts** — subscribe, stream, download for offline listening
-- **FM Radio** — talks to the real hardware tuner directly, no need for the stock radio app
-- **Video playback** — a dedicated Videos folder on the SD card, full-screen playback with wheel-driven volume and Previous/Next seeking (10 seconds), powered by libVLC for stable, correctly-synced playback. The Videos list shows a real thumbnail per file, playback remembers where you left off, and **Settings → Fill Video Screen** lets you choose between preserving the original aspect ratio (letterboxed) or filling the whole screen (see [Known limitations](#known-limitations))
-- **Audiobooks** — bookmarked, resumable playback
-- **Wireless PC Upload** — a small web server for copying music onto the device over Wi-Fi, no cable needed
+- Jellyfin music synchronization client with QuickConnect pairing, remote library browsing, offline track caching, and automatic library scanning.
+- Podcast manager supporting feed subscriptions, direct streaming, and episode downloads for offline listening.
+- Built-in FM radio communicating directly with the internal tuner chip.
+- Video player with dedicated library browsing from the Videos folder on storage. Playback uses libVLC for frame synchronization, provides click wheel volume control, seeks in 10-second jumps using Previous and Next buttons, generates video thumbnails, and remembers playback positions. The Fill Video Screen setting toggles between letterboxing and filling the display.
+- Audiobook player with automatic bookmarking and resumed playback.
+- Wireless music transfer through an embedded local web server accessible over Wi-Fi.
 
 ### Innioasis Y2 support
-- **Dual storage & multi-volume scanning**: seamlessly indexes Music, Audiobooks, and Videos across internal storage (`/storage/sdcard0`) and external MicroSD (`/storage/sdcard1`).
-- **MicroSD watchdog & self-healing engine**: background monitor that automatically detects unmounted or degraded FAT/exFAT filesystems, runs self-healing repair tools, remounts `fuse_sdcard1`, and triggers a library rescan when storage is ready.
-- **Hardware FM Radio on Y2**: automatically bypasses Android 4.4.2 Airplane Mode tuner lockouts (`ensureAirplaneModeOff()`), synchronizes MediaTek FM streams, and holds a partial wake lock to prevent playback drops on screen sleep.
-- **Hardware clickwheel layout**: includes `scripts/Y2.kl` mapping input scancodes 103 and 108 to `DPAD_LEFT` and `DPAD_RIGHT`.
-- **Low-gain headphone volume curve**: re-calibrates MediaTek hardware Headset gain tables so minimum volume (Step 1) is ~18 dB quieter, enabling comfortable, quiet listening with sensitive headphones (e.g. Koss Porta Pro, IEMs).
-- **ROM builder script**: `scripts/build-rom.sh` generates flashable images for Y1 (Type A, Type B with InniClassic boot logo) and Y2 (stripping Solar artifacts, installing InniClassic with Y2 keylayout, and tuning headphone gain).
-
-### Installable two ways
-- **Flashable ROM** (`rom.zip`) via the [Innioasis Updater](https://www.innioasis.com/pages/download) — no ADB required
-- Standalone **APK** for updating an existing install
-
-### Under the hood
-- A round of crash fixes for library browsing (Artists/Albums/Genres), FLAC playback, and the backlight timer not resetting during active use
-- Debloated further — a number of never-used stock Android/MediaTek system apps (Exchange sync, live-wallpaper demos, SIM toolkit, text-to-speech, etc.) can be safely disabled to free up RAM and reduce background CPU/battery use
-- Reduced background CPU wake-ups: the Now Playing progress ticker and the clock/widget refresh loop used to keep doing full work every 500ms–1s even when their screen wasn't visible (or the display was off) — both now sit idle unless actually needed
+- Dual storage library scanning that indexes music, audiobooks, and videos across internal storage (`/storage/sdcard0`) and external microSD cards (`/storage/sdcard1`).
+- MicroSD watchdog monitor that detects unmounted or degraded FAT and exFAT partitions, applies filesystem repairs, remounts `fuse_sdcard1`, and triggers a library refresh once ready.
+- Hardware FM radio integration on Android 4.4.2 that clears Airplane Mode tuner lockouts (`ensureAirplaneModeOff()`), synchronizes MediaTek audio streams, and uses a wake lock to keep radio audio playing when the screen sleeps.
+- Hardware click wheel key mapping (`scripts/Y2.kl`) linking hardware scancodes 103 and 108 to `DPAD_LEFT` and `DPAD_RIGHT`.
+- Lower headphone output curve that recalibrates MediaTek hardware headset gain tables, cutting minimum output (step 1) by roughly 18 dB for sensitive IEMs and low-impedance headphones.
+- ROM builder script (`scripts/build-rom.sh`) to assemble update images for Y1 (hardware revisions Type A and Type B) and Y2 devices.
 
 ## Known limitations
 
-- **Gapless playback** only activates for playlists of 15 tracks or fewer, with shuffle off and no FLAC files in the queue. FLAC decoding runs on a separate legacy engine that can't share ExoPlayer's native queue, and very large/shuffled queues (e.g. "All Songs") intentionally keep using the older, proven per-track loading path.
-- **Video playback** now uses libVLC rather than ExoPlayer, after finding that ExoPlayer's precise frame-timing API doesn't exist before Android API 21, and its fallback for older devices is effectively broken on the Y1's API 17 (audio stayed in sync, but picture played back many times faster than real time). Playback is stable now. For smooth playback, keep source files modest — 640×480, 30fps, ~2 Mbps or less (see [`tools/handbrake_y1_preset.json`](tools/handbrake_y1_preset.json) for a ready-to-import HandBrake preset).
+- Gapless playback works on queues of 15 tracks or fewer, with shuffle disabled and without FLAC tracks. FLAC uses a standalone decoding pipeline separate from ExoPlayer, while large or shuffled queues retain track-by-track loading.
+- Video playback runs on libVLC because ExoPlayer lacks frame-timing mechanisms on Android versions prior to 5.0 (API 21). For dependable playback, encode source videos around 640x480 resolution, 30 fps, and bitrates near 2 Mbps or lower (see [`tools/handbrake_y1_preset.json`](tools/handbrake_y1_preset.json) for a HandBrake profile).
 
 ## Installation
 
-There are two ways to get InniClassic onto your Innioasis Y1. Method 1 is recommended for most people — it's a single flash and there's nothing else to install or uninstall afterward.
+Two installation methods are available depending on whether you want a full ROM install or an APK update.
 
 ### Method 1: Innioasis Updater (recommended)
 
-The ROM package installs the latest **Y1 Firmware 3.1.2** with **InniClassic** already baked in as the system launcher — no ADB, no manual uninstall step, nothing else to do afterward.
+Prebuilt firmware packages with InniClassic preinstalled as the default system launcher are available on [Releases](https://github.com/JonaszPotoniec/inniclassic-y2/releases):
+- Innioasis Y2: `rom_y2.zip` (Android 4.4.2 KitKat)
+- Innioasis Y1: `rom_y1_type_a.zip` or `rom_y1_type_b.zip` depending on hardware revision
 
-1. Download `rom.zip` from this repo's [Releases](../../releases) page — the Innioasis Updater expects this exact filename, so keep it as-is after downloading.
-2. Open the [Innioasis Updater](https://www.innioasis.com/pages/download), select that zip as a local firmware file, and follow the on-screen instructions.
-3. Once it finishes and the device reboots, InniClassic is the active launcher — nothing further to install.
+To flash via the updater:
+1. Download the archive matching your device from [Releases](https://github.com/JonaszPotoniec/inniclassic-y2/releases) and ensure it is named `rom.zip` (required by the updater tool).
+2. Open the [Innioasis Updater](https://www.innioasis.com/pages/download), choose `rom.zip` as the local firmware package, and follow the on-screen steps.
+3. Once the flashing process completes and the player restarts, InniClassic starts automatically.
 
 > [!WARNING]
-> Flashing firmware always carries some risk. Make sure the device stays connected and powered throughout the flash, and don't interrupt it.
+> Keep the device connected and powered until the update finishes. Do not unplug the cable during the flash.
 
-### Method 2: Install just the APK over an existing JJ Launcher setup
+### Method 2: Standalone APK update
 
-Use this if you already have JJ Launcher running (via the stock firmware or Method 1's ROM from an earlier version) and just want to update the app itself.
+Use this method to update the app on an existing device without reflashing the full system partition.
 
-1. **Uninstall the existing launcher app first** — this step is required, not optional (see [why](#replacing-the-stock-jj-launcher-app) below):
+1. Uninstall the existing launcher package first:
    ```bash
    adb uninstall com.themoon.y1
    ```
-   If that fails because it's baked into your firmware image as a system app, use this instead:
+   If pre-installed as a system application, uninstall it for the current user:
    ```bash
    adb shell pm uninstall --user 0 com.themoon.y1
    ```
-2. Connect the device to your PC and download the latest `InniClassic-<version>.apk` from this repo's [Releases](../../releases) page.
-3. Install it:
+   > [!NOTE]
+   > Uninstalling is required due to differing APK signature keys between builds. Your music library, custom themes in `/storage/sdcard0/Y1_Themes`, and `.scrobbler.log` on storage remain untouched.
+2. Download `InniClassic-<version>.apk` from [Releases](https://github.com/JonaszPotoniec/inniclassic-y2/releases).
+3. Install the APK via ADB:
    ```bash
    adb install InniClassic-<version>.apk
    ```
-4. (Optional, only if Bluetooth pairing ever asks for a permission you can't grant from the UI):
+4. Optional step if Bluetooth pairing prompts for elevated permissions unavailable through the interface:
    ```bash
    adb shell pm grant com.themoon.y1 android.permission.WRITE_SECURE_SETTINGS
    ```
 
-The local `.scrobbler.log` works automatically with no setup. To also sync scrobbles to a real Last.fm account, turn on **Settings → Sync Scrobbles to Last.fm** and log in via **Settings → Last.fm Account** through the browser-based flow (the device shows a URL/QR you open on your phone or PC). To use a custom theme other than the bundled iPod Classic one, see JJ Launcher's original theme documentation.
+## Pre-building the library cache
 
-### Replacing the stock JJ Launcher app
+InniClassic caches scanned track metadata to `.y1_library_cache.json` at the root of the SD card. Files already indexed in this file skip tag extraction during subsequent scans.
 
-(This only applies to Method 2 — Method 1's ROM already ships with InniClassic pre-installed, so there's nothing to replace.)
+For large music libraries with thousands of songs, you can generate this cache on a computer using [`tools/build_library_cache.py`](tools/build_library_cache.py). Running tag extraction on desktop hardware takes seconds, leaving the portable player to perform only a fast file existence check when the card is inserted.
 
-Both InniClassic and the stock JJ Launcher use the same package name (`com.themoon.y1`), but InniClassic's release APKs are currently **debug-signed** (see [Building it yourself](#building-it-yourself) — there's no shared release keystore yet). Android refuses to install an APK over an existing app if the signing certificate doesn't match, so skipping the uninstall step above and just running `adb install -r` will fail with:
-
-```
-Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE: ... signatures do not match]
-```
-or on older Android versions:
-```
-INSTALL_PARSE_FAILED_INCONSISTENT_CERTIFICATES
-```
-
-That's why the uninstall step above always comes before installing — there's no way around it as long as InniClassic ships debug-signed builds.
-
-**What you keep, what you lose:** uninstalling only clears the app's private settings (app-internal preferences like toggles and any saved Last.fm session — you'll need to log in again). Your **music library**, **themes** (`/storage/sdcard0/Y1_Themes`), and the **`.scrobbler.log`** all live on the SD card, outside the app's private storage, so they're untouched and picked up again automatically on first launch.
-
-## Speeding up large library scans
-
-InniClassic caches your scanned library to a plain JSON file at the SD card's root (`.y1_library_cache.json`); any file already listed there is skipped during the next scan instead of being re-tagged. If you have a large library (thousands of tracks) and add music on your PC, [`tools/build_library_cache.py`](tools/build_library_cache.py) pre-builds that same cache file on your PC — much faster than the device's CPU — so the next on-device scan is just a quick existence check instead of tagging everything from scratch.
-
-Requires the card to be accessible as a normal drive (card reader or USB mass storage, not MTP) and `pip install mutagen`:
+The script requires Python with the `mutagen` package installed (`pip install mutagen`) and direct filesystem access to the microSD card through a card reader or USB mass storage mode (MTP is not supported):
 
 ```bash
 python3 tools/build_library_cache.py /path/to/sdcard
 ```
 
-Run it any time after copying new music over, before putting the card back in the device.
+Run the script after transferring music to the card and before mounting it back into the player.
 
-## Building it yourself
+## Building from source
 
-Last.fm requires every client to use its own API credentials, so none are shipped in this repository. To build from source:
+Last.fm API credentials are not included in this repository. To compile with scrobbling support:
 
-1. Register a free API account at [last.fm/api/account/create](https://www.last.fm/api/account/create).
-2. Add these two lines to your own `local.properties` (already gitignored, never committed):
+1. Register an API application at [last.fm/api/account/create](https://www.last.fm/api/account/create).
+2. Add your credentials to `local.properties`:
    ```properties
    lastfm.api.key=YOUR_KEY
    lastfm.api.secret=YOUR_SECRET
    ```
-3. Build as usual (`./gradlew assembleDebug`). Without a key, the app still runs fine — scrobbling simply won't authenticate.
+3. Compile with `./gradlew assembleDebug`. If you omit the keys, the build succeeds and all features work except Last.fm submission.
 
-## What's different from upstream JJ Launcher
+## Credits and license
 
-For anyone tracking this project against [ismileblue/y1_launcher](https://github.com/ismileblue/y1_launcher): everything in [Features](#features) above was added or substantially changed on top of JJ Launcher. Anything not mentioned there (media scanner internals, EQ, Bluetooth pairing, Wi-Fi keyboard, the custom theme engine, etc.) still works as in the original project — see upstream's documentation for that.
+- Original InniClassic project by Fabian Zettl: [FabianZettl/inniclassic](https://github.com/FabianZettl/inniclassic).
+- Derived from [ismileblue/y1_launcher](https://github.com/ismileblue/y1_launcher) (JJ Launcher / MO-ON Launcher) by ismileblue.
+- The iPod Classic interface uses [Nimbus Sans](https://en.wikipedia.org/wiki/Nimbus_Sans) (URW++), a metric-compatible alternative to Helvetica.
+- Distributed under upstream's license terms; see [LICENSE](LICENSE) for personal and educational use guidelines.
 
-## Credits & License
-
-- Based on [ismileblue/y1_launcher](https://github.com/ismileblue/y1_launcher) (JJ Launcher / MO-ON Launcher) — all credit for the original launcher, media engine, and theme system goes to the original author.
-- The bundled iPod Classic theme's system font is [Nimbus Sans](https://en.wikipedia.org/wiki/Nimbus_Sans) (URW++), a free, metric-compatible alternative to Helvetica.
-- Distributed under the same license as upstream — see [LICENSE](LICENSE) (free for personal/educational, non-commercial use).
-
-If InniClassic's useful to you, you can [buy me a coffee](https://buymeacoffee.com/gz17egcara) — totally optional, never required.
-See [GitHub Releases](https://github.com/JonaszPotoniec/inniclassic-y2/releases) for the full version history.
+Version history is documented on [GitHub Releases](https://github.com/JonaszPotoniec/inniclassic-y2/releases).
