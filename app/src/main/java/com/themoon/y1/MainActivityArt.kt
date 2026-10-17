@@ -10,15 +10,7 @@ import java.io.File
 import java.io.FileInputStream
 
 internal fun MainActivity.createStatusBarBackground(): GradientDrawable {
-    val base = ThemeManager.getStatusBarBackgroundColor()
-    val hsv = FloatArray(3)
-    Color.colorToHSV(base, hsv)
-    hsv[2] = Math.min(1f, hsv[2] * 1.15f)
-    val lighter = (base and 0xFF000000.toInt()) or (Color.HSVToColor(hsv) and 0x00FFFFFF)
-    Color.colorToHSV(base, hsv)
-    hsv[2] = Math.max(0f, hsv[2] * 0.85f)
-    val darker = (base and 0xFF000000.toInt()) or (Color.HSVToColor(hsv) and 0x00FFFFFF)
-    return GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(lighter, base, darker))
+    return ThemeManager.createStatusBarBackground()
 }
 
 internal fun MainActivity.updateMainMenuBackgroundInternal() {
@@ -188,10 +180,7 @@ internal fun MainActivity.applyThemeInternal() {
             } else {
                 statusBar.background = createStatusBarBackground()
             }
-            val slp = statusBar.layoutParams
-            val density = resources.displayMetrics.density
-            slp.width = if (currentScreenState == MainActivity.STATE_MENU) (242 * density).toInt() else android.view.ViewGroup.LayoutParams.MATCH_PARENT
-            statusBar.layoutParams = slp
+            updateStatusBarWidth()
         }
 
         val primary = ThemeManager.getTextColorPrimary()

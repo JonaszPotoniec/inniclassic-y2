@@ -34,6 +34,7 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import com.themoon.y1.views.AlphabetIndexBar
 import com.themoon.y1.views.BatteryIconView
+import com.themoon.y1.views.ClassicMenuStyle
 import com.themoon.y1.views.TablerIcons
 import android.view.View
 import android.view.ViewGroup
@@ -961,6 +962,30 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             STATE_FM_RADIO -> t("Radio")
             STATE_JELLYFIN -> t("Jellyfin")
             else -> t("iPod")
+        }
+    }
+
+    fun isPaneBasedScreen(): Boolean {
+        return when (currentScreenState) {
+            STATE_MENU -> true
+            STATE_BROWSER -> ::browserController.isInitialized && browserController.isCoverPaneActive()
+            STATE_VIDEOS -> ::videoBrowserController.isInitialized && videoBrowserController.isCoverPaneActive()
+            else -> false
+        }
+    }
+
+    fun updateStatusBarWidth() {
+        val statusBar = findViewById<View>(R.id.layout_status_bar) ?: return
+        val density = resources.displayMetrics.density
+        val slp = statusBar.layoutParams ?: return
+        val targetWidth = if (isPaneBasedScreen()) {
+            (ClassicMenuStyle.PANE_WIDTH_DP * density).toInt()
+        } else {
+            ViewGroup.LayoutParams.MATCH_PARENT
+        }
+        if (slp.width != targetWidth) {
+            slp.width = targetWidth
+            statusBar.layoutParams = slp
         }
     }
 

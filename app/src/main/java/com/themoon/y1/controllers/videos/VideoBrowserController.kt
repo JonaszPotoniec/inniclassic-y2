@@ -68,6 +68,8 @@ class VideoBrowserController(
         thumbCache.evictAll()
     }
 
+    fun isCoverPaneActive(): Boolean = frameVideoCover?.visibility == View.VISIBLE
+
     fun getCurrentTitle(): String {
         return when (val mode = currentVideoMode) {
             is VideoMode.Root -> localize("Videos")
@@ -95,14 +97,13 @@ class VideoBrowserController(
     }
 
     fun buildCurrentModeUI() {
-        val density = activity.resources.displayMetrics.density
         val classic = ThemeManager.isClassicTheme()
 
         layoutVideos.setBackgroundColor(if (classic) ThemeManager.getOverlayBackgroundColor() else 0x66000000)
 
         val params = layoutVideos.layoutParams as? FrameLayout.LayoutParams
-        if (params != null) {
-            params.topMargin = if (classic) (26 * density).toInt() else 0
+        if (params != null && params.topMargin != 0) {
+            params.topMargin = 0
             layoutVideos.layoutParams = params
         }
 
@@ -818,6 +819,7 @@ class VideoBrowserController(
         frame.visibility = View.VISIBLE
         val density = activity.resources.displayMetrics.density
 
+        layoutVideosLeftPane?.setPadding(0, (ClassicMenuStyle.STATUS_HEIGHT_DP * density).toInt(), 0, 0)
         if (ThemeManager.isClassicTheme() && layoutVideosLeftPane != null) {
             val left = layoutVideosLeftPane.layoutParams as? LinearLayout.LayoutParams
             if (left != null) {
@@ -830,8 +832,9 @@ class VideoBrowserController(
         val statusBar = activity.findViewById<View>(R.id.layout_status_bar)
         if (statusBar != null) {
             val slp = statusBar.layoutParams
-            slp.width = (242 * density).toInt()
+            slp.width = (ClassicMenuStyle.PANE_WIDTH_DP * density).toInt()
             statusBar.layoutParams = slp
+            statusBar.background = ThemeManager.createStatusBarBackground()
         }
 
         if (frame.findViewWithTag<View>("video_pane_shadow") == null) {
@@ -867,6 +870,8 @@ class VideoBrowserController(
     }
 
     private fun hideCoverPane() {
+        val density = activity.resources.displayMetrics.density
+        layoutVideosLeftPane?.setPadding(0, (ClassicMenuStyle.STATUS_HEIGHT_DP * density).toInt(), 0, 0)
         if (ThemeManager.isClassicTheme() && layoutVideosLeftPane != null) {
             val left = layoutVideosLeftPane.layoutParams as? LinearLayout.LayoutParams
             if (left != null) {
@@ -881,6 +886,7 @@ class VideoBrowserController(
             val slp = statusBar.layoutParams
             slp.width = ViewGroup.LayoutParams.MATCH_PARENT
             statusBar.layoutParams = slp
+            statusBar.background = ThemeManager.createStatusBarBackground()
         }
 
         frameVideoCover?.visibility = View.GONE

@@ -376,6 +376,23 @@ class ThemeManagerParityTest {
     }
 
     @Test
+    fun testCreateStatusBarBackground_classicLightAndDark() {
+        // Classic Light theme: uses fixed brushed silver gradient colors
+        ThemeManager.availableThemes.add(createStubTheme("Classic Light"))
+        ThemeManager.setThemeIndex(0)
+        assertTrue(ThemeManager.isClassicLightTheme())
+        val lightDrawable = ThemeManager.createStatusBarBackground()
+        assertNotNull("Classic Light status bar drawable must not be null", lightDrawable)
+
+        // Classic Dark / Custom theme: uses HSV dynamic brightness calculation
+        ThemeManager.availableThemes.add(createStubTheme("Classic Dark", statusBarBg = 0xFF222222.toInt()))
+        ThemeManager.setThemeIndex(1)
+        assertFalse(ThemeManager.isClassicLightTheme())
+        val darkDrawable = ThemeManager.createStatusBarBackground()
+        assertNotNull("Classic Dark status bar drawable must not be null", darkDrawable)
+    }
+
+    @Test
     fun testGetButtonRadius_nonNegative() {
         // Fallback default theme has radius 0
         ThemeManager.availableThemes.clear()

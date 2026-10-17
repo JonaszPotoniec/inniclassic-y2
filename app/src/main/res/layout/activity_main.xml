@@ -185,6 +185,56 @@
     </LinearLayout>
 
     <LinearLayout
+        android:id="@+id/layout_videos_mode"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal"
+        android:background="#66000000"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/layout_videos_left_pane"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:paddingTop="26dp"
+            android:paddingBottom="0dp"
+            android:paddingLeft="0dp"
+            android:paddingRight="0dp">
+
+            <ScrollView
+                android:id="@+id/scroll_videos"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:fillViewport="true">
+                <LinearLayout
+                    android:id="@+id/container_video_items"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:clipChildren="false"
+                    android:clipToPadding="false" />
+            </ScrollView>
+        </LinearLayout>
+
+        <FrameLayout
+            android:id="@+id/frame_video_cover"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/iv_video_cover"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:src="@drawable/video_circle" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <LinearLayout
         android:id="@+id/layout_settings_mode"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -527,56 +577,6 @@
         <TextView android:id="@+id/tv_server_ip" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="http://---.---.---.---:8080" android:textColor="#888888" android:textSize="18sp" android:textStyle="bold" android:layout_marginBottom="50dp"/>
         <Button android:id="@+id/btn_server_toggle" android:layout_width="350dp" android:layout_height="wrap_content" android:text="START SERVER" android:textSize="22sp" android:textColor="#FFFFFF" android:background="#00000000" android:padding="15dp" android:layout_marginBottom="30dp" android:focusable="true"/>
         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Enter the above address in your PC browser.\nPress [Back] to return." android:textColor="#888888" android:textSize="16sp" android:gravity="center"/>
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/layout_videos_mode"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="horizontal"
-        android:background="#66000000"
-        android:visibility="gone">
-
-        <LinearLayout
-            android:id="@+id/layout_videos_left_pane"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:paddingTop="26dp"
-            android:paddingBottom="0dp"
-            android:paddingLeft="0dp"
-            android:paddingRight="0dp">
-
-            <ScrollView
-                android:id="@+id/scroll_videos"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:fillViewport="true">
-                <LinearLayout
-                    android:id="@+id/container_video_items"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:clipChildren="false"
-                    android:clipToPadding="false" />
-            </ScrollView>
-        </LinearLayout>
-
-        <FrameLayout
-            android:id="@+id/frame_video_cover"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:visibility="gone">
-
-            <ImageView
-                android:id="@+id/iv_video_cover"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:scaleType="centerCrop"
-                android:src="@drawable/video_circle" />
-        </FrameLayout>
     </LinearLayout>
 
     <!-- Video playback overlay with title and progress -->

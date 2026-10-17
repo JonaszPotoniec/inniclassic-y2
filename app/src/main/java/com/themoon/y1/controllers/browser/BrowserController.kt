@@ -209,8 +209,8 @@ class BrowserController(
     }
 
     fun buildFileBrowserUI() {
-        val statusBar = rootView.findViewById<View>(R.id.layout_status_bar)
-        statusBar?.background = createStatusBarBackground()
+        val statusBar = activity.findViewById<View>(R.id.layout_status_bar)
+        statusBar?.background = ThemeManager.createStatusBarBackground()
 
         scrollViewBrowser?.visibility = View.VISIBLE
         listVirtualSongs?.visibility = View.GONE
@@ -576,8 +576,8 @@ class BrowserController(
 
     fun buildVirtualSongs() {
         hideBrowserCoverPane()
-        val statusBar = rootView.findViewById<View>(R.id.layout_status_bar)
-        statusBar?.background = createStatusBarBackground()
+        val statusBar = activity.findViewById<View>(R.id.layout_status_bar)
+        statusBar?.background = ThemeManager.createStatusBarBackground()
 
         if (MainActivity.instance?.isCustomScanning == true) {
             showLoadingPopup()
@@ -770,8 +770,8 @@ class BrowserController(
 
     fun buildRecentlyPlayedAlbums() {
         hideBrowserCoverPane()
-        val statusBar = rootView.findViewById<View>(R.id.layout_status_bar)
-        statusBar?.background = createStatusBarBackground()
+        val statusBar = activity.findViewById<View>(R.id.layout_status_bar)
+        statusBar?.background = ThemeManager.createStatusBarBackground()
 
         if (MainActivity.instance?.isCustomScanning == true) {
             showLoadingPopup()
@@ -1078,6 +1078,8 @@ class BrowserController(
         alphabetIndexBarHelper?.build(currentScrollIndexList)
     }
 
+    fun isCoverPaneActive(): Boolean = frameBrowserCover?.visibility == View.VISIBLE
+
     fun getCurrentBrowserTitle(): String {
         val pathText = tvBrowserPath.text?.toString()
         if (!pathText.isNullOrBlank()) {
@@ -1106,11 +1108,12 @@ class BrowserController(
             }
         }
 
-        val statusBar = rootView.findViewById<View>(R.id.layout_status_bar)
+        val statusBar = activity.findViewById<View>(R.id.layout_status_bar)
         if (statusBar != null) {
             val slp = statusBar.layoutParams
-            slp.width = (242 * density).toInt()
+            slp.width = (ClassicMenuStyle.PANE_WIDTH_DP * density).toInt()
             statusBar.layoutParams = slp
+            statusBar.background = ThemeManager.createStatusBarBackground()
         }
 
         if (frame.findViewWithTag<View>("pane_shadow") == null) {
@@ -1159,11 +1162,12 @@ class BrowserController(
             }
         }
         frameBrowserCover?.visibility = View.GONE
-        val statusBar = rootView.findViewById<View>(R.id.layout_status_bar)
+        val statusBar = activity.findViewById<View>(R.id.layout_status_bar)
         if (statusBar != null) {
             val slp = statusBar.layoutParams
             slp.width = ViewGroup.LayoutParams.MATCH_PARENT
             statusBar.layoutParams = slp
+            statusBar.background = ThemeManager.createStatusBarBackground()
         }
     }
 
@@ -1260,21 +1264,6 @@ class BrowserController(
             val radius = ThemeManager.getButtonRadius() * activity.resources.displayMetrics.density
             cornerRadius = radius
         }
-    }
-
-    private fun createStatusBarBackground(): GradientDrawable {
-        if (ThemeManager.isClassicLightTheme()) {
-            return GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xFFF7F7F7.toInt(), 0xFFDADADA.toInt(), 0xFFB6B6B6.toInt()))
-        }
-        val base = ThemeManager.getStatusBarBackgroundColor()
-        val hsv = FloatArray(3)
-        Color.colorToHSV(base, hsv)
-        hsv[2] = Math.min(1f, hsv[2] * 1.12f)
-        val lighter = (base and 0xFF000000.toInt()) or (Color.HSVToColor(hsv) and 0x00FFFFFF)
-        Color.colorToHSV(base, hsv)
-        hsv[2] = Math.max(0f, hsv[2] * 0.88f)
-        val darker = (base and 0xFF000000.toInt()) or (Color.HSVToColor(hsv) and 0x00FFFFFF)
-        return GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(lighter, base, darker))
     }
 
     override fun onBackPressed(): Boolean {

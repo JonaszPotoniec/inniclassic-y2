@@ -22,6 +22,7 @@ import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.CircularBatteryView
+import com.themoon.y1.views.ClassicMenuStyle
 import com.themoon.y1.views.CustomAnalogClockView
 import com.themoon.y1.views.WidgetBatteryBarView
 import java.util.Locale
@@ -119,8 +120,9 @@ class MainMenuController(
         val statusBarForWidth = activity.findViewById<View>(R.id.layout_status_bar)
         if (statusBarForWidth != null) {
             val slpMenu = statusBarForWidth.layoutParams
-            slpMenu.width = (242 * density).toInt()
+            slpMenu.width = (ClassicMenuStyle.PANE_WIDTH_DP * density).toInt()
             statusBarForWidth.layoutParams = slpMenu
+            statusBarForWidth.background = ThemeManager.createStatusBarBackground()
         }
 
         for (i in 0 until mainMenu.childCount) {

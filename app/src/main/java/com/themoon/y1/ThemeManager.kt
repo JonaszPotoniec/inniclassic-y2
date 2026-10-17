@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import org.json.JSONObject
 import java.io.BufferedInputStream
 import java.io.File
@@ -153,6 +154,24 @@ object ThemeManager {
     fun getStatusBarBackgroundColor(): Int {
         if (availableThemes.isEmpty()) return 0x66000000
         return availableThemes[currentThemeIndex].statusBarBg
+    }
+
+    fun createStatusBarBackground(): GradientDrawable {
+        if (isClassicLightTheme()) {
+            return GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(0xFFF7F7F7.toInt(), 0xFFDADADA.toInt(), 0xFFB6B6B6.toInt())
+            )
+        }
+        val base = getStatusBarBackgroundColor()
+        val hsv = FloatArray(3)
+        Color.colorToHSV(base, hsv)
+        hsv[2] = Math.min(1f, hsv[2] * 1.15f)
+        val lighter = (base and 0xFF000000.toInt()) or (Color.HSVToColor(hsv) and 0x00FFFFFF)
+        Color.colorToHSV(base, hsv)
+        hsv[2] = Math.max(0f, hsv[2] * 0.85f)
+        val darker = (base and 0xFF000000.toInt()) or (Color.HSVToColor(hsv) and 0x00FFFFFF)
+        return GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(lighter, base, darker))
     }
 
     fun loadThemesFromStorage(themeFolder: File) {
