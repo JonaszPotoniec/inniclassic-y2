@@ -613,14 +613,14 @@ class SettingsController(
         val btnServerMenu = createSettingRow(localize("Web Server"), "〉 ")
         btnServerMenu.setOnClickListener {
             clickFeedback()
-            onNavigateToScreen(8) // STATE_WEBSERVER
+            onNavigateToScreen(MainActivity.STATE_WEBSERVER)
         }
         containerSettingsItems.addView(btnServerMenu)
 
         val btnWifiMenu = createSettingRow(localize("Wi-Fi"), "〉 ")
         btnWifiMenu.setOnClickListener {
             clickFeedback()
-            onNavigateToScreen(6) // STATE_WIFI
+            onNavigateToScreen(MainActivity.STATE_WIFI)
         }
         containerSettingsItems.addView(btnWifiMenu)
 
@@ -665,7 +665,7 @@ class SettingsController(
         val btnBtMenu = createSettingRow(localize("Bluetooth"), "〉 ")
         btnBtMenu.setOnClickListener {
             clickFeedback()
-            onNavigateToScreen(5) // STATE_BLUETOOTH
+            onNavigateToScreen(MainActivity.STATE_BLUETOOTH)
         }
         containerSettingsItems.addView(btnBtMenu)
 
@@ -700,7 +700,7 @@ class SettingsController(
                     .setNegativeButton(localize("Cancel"), null)
                     .show()
             } else {
-                onNavigateToScreen(7) // STATE_WIFI_KEYBOARD
+                onNavigateToScreen(MainActivity.STATE_WIFI_KEYBOARD)
             }
         }
         containerSettingsItems.addView(btnLastFmAccount)
@@ -708,7 +708,7 @@ class SettingsController(
         val btnBrightMenu = createSettingRow(localize("Display Brightness"), "〉 ")
         btnBrightMenu.setOnClickListener {
             clickFeedback()
-            onNavigateToScreen(3) // STATE_BRIGHTNESS
+            onNavigateToScreen(MainActivity.STATE_BRIGHTNESS)
         }
         containerSettingsItems.addView(btnBrightMenu)
 
@@ -731,7 +731,7 @@ class SettingsController(
         val btnStorageMenu = createSettingRow(localize("About"), "〉 ")
         btnStorageMenu.setOnClickListener {
             clickFeedback()
-            onNavigateToScreen(4) // STATE_STORAGE
+            onNavigateToScreen(MainActivity.STATE_STORAGE)
         }
         containerSettingsItems.addView(btnStorageMenu)
 
