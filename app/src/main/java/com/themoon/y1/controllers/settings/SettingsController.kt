@@ -35,6 +35,7 @@ import com.themoon.y1.views.TablerIcons
 import java.io.File
 import java.util.Calendar
 import java.util.Locale
+import java.util.TimeZone
 
 /**
  * Controller for Settings screens:
@@ -97,6 +98,34 @@ class SettingsController(
         val TIMEOUT_VALUES = intArrayOf(15000, 30000, 60000, 300000)
         val TIMEOUT_NAMES = arrayOf("15 Sec", "30 Sec", "1 Min", "5 Min")
         val VIBE_STRENGTH_NAMES = arrayOf("Weak", "Normal (Vibe)", "Strong")
+
+        // Common IANA zones covering the main UTC offsets, short enough to scroll with the wheel
+        val TIME_ZONE_IDS = arrayOf(
+            "Pacific/Honolulu", "America/Anchorage", "America/Los_Angeles", "America/Denver",
+            "America/Chicago", "America/Mexico_City", "America/New_York", "America/Bogota",
+            "America/Halifax", "America/St_Johns", "America/Sao_Paulo", "America/Argentina/Buenos_Aires",
+            "Atlantic/South_Georgia", "Atlantic/Azores", "GMT", "Europe/London", "Europe/Lisbon",
+            "Europe/Paris", "Europe/Berlin", "Europe/Madrid", "Europe/Rome", "Europe/Warsaw",
+            "Africa/Lagos", "Europe/Athens", "Europe/Helsinki", "Africa/Cairo", "Africa/Johannesburg",
+            "Europe/Moscow", "Europe/Istanbul", "Asia/Riyadh", "Asia/Tehran", "Asia/Dubai",
+            "Asia/Karachi", "Asia/Kolkata", "Asia/Kathmandu", "Asia/Dhaka", "Asia/Bangkok",
+            "Asia/Jakarta", "Asia/Shanghai", "Asia/Hong_Kong", "Asia/Singapore", "Australia/Perth",
+            "Asia/Tokyo", "Asia/Seoul", "Australia/Adelaide", "Australia/Brisbane", "Australia/Sydney",
+            "Pacific/Auckland"
+        )
+
+        fun timeZoneCityName(zoneId: String): String = zoneId.substringAfterLast('/').replace('_', ' ')
+
+        // e.g. "UTC+01:00 London" (offset at the given time, so it includes summer time)
+        fun timeZoneLabel(zoneId: String, nowMs: Long): String {
+            val offsetMin = TimeZone.getTimeZone(zoneId).getOffset(nowMs) / 60000
+            val sign = if (offsetMin < 0) "-" else "+"
+            val absMin = Math.abs(offsetMin)
+            return String.format(
+                Locale.US, "UTC%s%02d:%02d %s",
+                sign, absMin / 60, absMin % 60, timeZoneCityName(zoneId)
+            )
+        }
 
         val MUSIC_MENU_ITEMS = arrayOf(
             arrayOf("coverflow", "Cover Flow"),
@@ -1075,6 +1104,13 @@ class SettingsController(
         }
         containerSettingsItems.addView(rowTitleClock)
 
+        val rowTimeZone = createSettingRow(localize("Time Zone"), timeZoneCityName(TimeZone.getDefault().id))
+        rowTimeZone.setOnClickListener {
+            clickFeedback()
+            buildTimeZoneSelectorUI()
+        }
+        containerSettingsItems.addView(rowTimeZone)
+
         val rowYear = createSettingRow(localize("Year"), dtYear.toString())
         rowYear.setOnClickListener {
             clickFeedback()
@@ -1160,6 +1196,57 @@ class SettingsController(
         } catch (_: Exception) {
             Toast.makeText(activity, localize("Failed: Root access required."), Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun applySystemTimeZone(zoneId: String) {
+        try {
+            // AlarmManager.setTimeZone needs SET_TIME_ZONE (signature|system), so call it through su.
+            // Transaction 3 is IAlarmManager.setTimeZone on API 19: it saves persist.sys.timezone,
+            // updates the kernel zone and broadcasts ACTION_TIMEZONE_CHANGED to refresh the clocks.
+            val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", "service call alarm 3 s16 $zoneId"))
+            proc.waitFor()
+            TimeZone.setDefault(null)
+            if (TimeZone.getDefault().id != zoneId) {
+                Toast.makeText(activity, localize("Failed: Root access required."), Toast.LENGTH_SHORT).show()
+            }
+        } catch (_: Exception) {
+            Toast.makeText(activity, localize("Failed: Root access required."), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun buildTimeZoneSelectorUI() {
+        currentSettingsDepth = 2
+        containerSettingsItems.removeAllViews()
+
+        val currentId = TimeZone.getDefault().id
+        val now = System.currentTimeMillis()
+        val ids = if (currentId in TIME_ZONE_IDS) TIME_ZONE_IDS else arrayOf(currentId) + TIME_ZONE_IDS
+        var focusBtn: View? = null
+        for (id in ids.sortedBy { TimeZone.getTimeZone(it).getOffset(now) }) {
+            val isSelected = id == currentId
+            val btn = createTablerListButton(
+                if (isSelected) TablerIcons.CHECK else null,
+                timeZoneLabel(id, now),
+                if (isSelected) 0xFF00FF00.toInt() else ThemeManager.getTextColorPrimary(),
+                if (isSelected) 0xFF00FF00.toInt() else ThemeManager.getListButtonFocusedTextColor()
+            )
+            btn.setOnClickListener {
+                clickFeedback()
+                applySystemTimeZone(id)
+                // The clock itself is unchanged, but its local time moved, so reload the picker values
+                val c = Calendar.getInstance()
+                dtYear = c.get(Calendar.YEAR)
+                dtMonth = c.get(Calendar.MONTH) + 1
+                dtDay = c.get(Calendar.DAY_OF_MONTH)
+                dtHour = c.get(Calendar.HOUR_OF_DAY)
+                dtMinute = c.get(Calendar.MINUTE)
+                buildDateTimeUI()
+            }
+            containerSettingsItems.addView(btn)
+            if (isSelected) focusBtn = btn
+        }
+
+        focusBtn?.requestFocus() ?: containerSettingsItems.getChildAt(0)?.requestFocus()
     }
 
     private fun buildDateTimeSelectorUI(type: String, min: Int, max: Int, currentValue: Int) {

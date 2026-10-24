@@ -25,6 +25,7 @@ polish_dict = {
   "Minute": "Minuta",
   "Date & Time": "Data i godzina",
   "Time Format": "Format czasu",
+  "Time Zone": "Strefa czasowa",
   "Time in Title": "Czas w tytule",
   "Today": "Dzisiaj",
   "Yesterday": "Wczoraj",

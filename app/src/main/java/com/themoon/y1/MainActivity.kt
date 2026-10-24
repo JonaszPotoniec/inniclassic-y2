@@ -1196,7 +1196,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                     powerBacklightManager?.cancelTimer()
                     updateScreenOffFeedback(false)
                 }
-                Intent.ACTION_TIME_TICK, Intent.ACTION_TIME_CHANGED -> {
+                Intent.ACTION_TIME_TICK, Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED -> {
                     homeWidgetsController?.refreshWidgets()
                 }
                 Intent.ACTION_SHUTDOWN, "android.intent.action.QUICKBOOT_POWEROFF", "com.htc.intent.action.QUICKBOOT_POWEROFF" -> {
@@ -1244,6 +1244,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             addAction(ConnectivityManager.CONNECTIVITY_ACTION)
             addAction(Intent.ACTION_TIME_TICK)
             addAction(Intent.ACTION_TIME_CHANGED)
+            addAction(Intent.ACTION_TIMEZONE_CHANGED)
             addAction(Intent.ACTION_SHUTDOWN)
             addAction("android.intent.action.QUICKBOOT_POWEROFF")
             addAction("com.htc.intent.action.QUICKBOOT_POWEROFF")
