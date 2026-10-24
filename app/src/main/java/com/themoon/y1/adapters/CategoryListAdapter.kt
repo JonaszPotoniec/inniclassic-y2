@@ -50,7 +50,7 @@ class CategoryListAdapter(
     private var albumFilesMap: MutableMap<String, MutableList<File>>? = null
     private var albumArtistsMap: MutableMap<String, String>? = null
     private var cachedAllSongsCount = -1
-    private val showAlbumArtist = type == "ALBUM" && MainActivity.instance?.browserController?.categoryArtistFilter.isNullOrEmpty()
+    private val showAlbumArtist = AlbumKey.byArtist && type == "ALBUM" && MainActivity.instance?.browserController?.categoryArtistFilter.isNullOrEmpty()
 
     init {
         if (coverCache == null) {
@@ -544,7 +544,7 @@ class CategoryListAdapter(
             } else if (type == "RECENTLY_PLAYED_ALBUMS") {
                 bc.virtualQueryType = "RECENTLY_PLAYED_ALBUM"
                 bc.virtualQueryValue = displayName
-                bc.categoryArtistFilter = recentEntry?.artistName?.takeIf { !it.equals("Unknown Artist", ignoreCase = true) } ?: ""
+                bc.categoryArtistFilter = recentEntry?.artistName?.takeIf { AlbumKey.byArtist && !it.equals("Unknown Artist", ignoreCase = true) } ?: ""
                 bc.categoryArtistFilterIsTrackArtist = false
                 bc.virtualQueryAlbumArtist = bc.categoryArtistFilter
             } else {

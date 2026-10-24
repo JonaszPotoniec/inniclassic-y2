@@ -31,6 +31,7 @@ import com.themoon.y1.managers.AutoThemeManager
 import com.themoon.y1.managers.FmRadioManager
 import com.themoon.y1.managers.LanguageManager
 import com.themoon.y1.managers.LastFmScrobbler
+import com.themoon.y1.models.AlbumKey
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.sync.jellyfin.JellyfinSyncProvider
 import com.themoon.y1.views.ListEdges
@@ -617,6 +618,15 @@ class SettingsController(
             buildMusicMenuVisibilitySettingsUI()
         }
         containerSettingsItems.addView(btnMusicMenuVisibility)
+
+        val btnGroupAlbums = createSettingRow(localize("Group Albums"), groupAlbumsLabel())
+        btnGroupAlbums.setOnClickListener {
+            clickFeedback()
+            prefs.edit().putBoolean(AlbumKey.PREF_BY_ARTIST, !AlbumKey.byArtist).commit()
+            applyAlbumGrouping()
+            (btnGroupAlbums.getChildAt(1) as? TextView)?.text = groupAlbumsLabel()
+        }
+        containerSettingsItems.addView(btnGroupAlbums)
 
         var isLoopScrollOn = prefs.getBoolean("loop_scroll_on", true)
         val btnLoopScrollToggle = createSettingRow(
@@ -1614,6 +1624,14 @@ class SettingsController(
         }
     }
 
+    private fun groupAlbumsLabel(): String = localize(if (AlbumKey.byArtist) "By Title and Artist" else "By Title")
+
+    /** Reads Group Albums and rebuilds the album lists, so the next Albums or Cover Flow screen uses it. */
+    private fun applyAlbumGrouping() {
+        AlbumKey.byArtist = prefs.getBoolean(AlbumKey.PREF_BY_ARTIST, false)
+        mainActivity?.rebuildUniqueAlbumList()
+    }
+
     private fun resetAllAppSettings() {
         AutoThemeManager.reset(activity, prefs)
         try {
@@ -1633,6 +1651,7 @@ class SettingsController(
                 .remove(ListEdges.PREF_KEY)
                 .remove("eq_preset")
                 .remove("eq_profile_id")
+                .remove(AlbumKey.PREF_BY_ARTIST)
                 .remove("auto_fetch")
                 .remove(com.themoon.y1.views.CoverPane.PREF)
                 .commit()
@@ -1645,6 +1664,7 @@ class SettingsController(
         ListEdges.reload(activity)
         com.themoon.y1.managers.PowerBacklightManager.getInstance(activity).backlightTimerIndex = 3
         resetBacklightTimer()
+        applyAlbumGrouping()
 
         // The player keeps its own repeat mode: set it back to Off too.
         mainActivity?.repeatMode = 0

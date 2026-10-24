@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
 import com.themoon.y1.MainActivity
+import com.themoon.y1.models.AlbumKey
 import com.themoon.y1.models.SongItem
 import org.json.JSONArray
 import org.json.JSONObject
@@ -14,7 +15,7 @@ import java.util.Locale
 
 /**
  * Manages tracking and persistence of recently played albums (up to 50 distinct albums).
- * Albums are tracked with a composite key of (albumName, artistName).
+ * Albums are tracked with a composite key of (albumName, artistName), or of albumName only (see AlbumKey).
  * Includes a 5-second playback debounce to avoid recording rapid skips.
  */
 class RecentlyPlayedManager private constructor(context: Context) {
@@ -25,7 +26,7 @@ class RecentlyPlayedManager private constructor(context: Context) {
         val timestamp: Long
     ) {
         val compositeKey: String
-            get() = "${albumName.trim().lowercase(Locale.US)}||${artistName.trim().lowercase(Locale.US)}"
+            get() = AlbumKey.of(albumName, artistName)
     }
 
     private val prefs: SharedPreferences =
@@ -179,7 +180,7 @@ class RecentlyPlayedManager private constructor(context: Context) {
             val key = entry.compositeKey
             val albumOnly = entry.albumName.trim().lowercase(Locale.US)
             existingAlbums.contains(key) || existingAlbums.contains(albumOnly)
-        }
+        }.distinctBy { it.compositeKey }
     }
 
     fun clear() {

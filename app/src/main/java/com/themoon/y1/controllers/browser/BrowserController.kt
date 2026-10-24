@@ -586,7 +586,7 @@ class BrowserController(
 
         val categories = ArrayList(uniqueCategories)
         Collections.sort(categories, java.lang.String.CASE_INSENSITIVE_ORDER)
-        // Albums with the same title stay apart: one row per title + album artist.
+        // One row per album as Group Albums tells (AlbumKey): title, or title + album artist.
         var albumArtists: ArrayList<String>? = null
         if (type == "ALBUM" || type == "GENRE_ALBUM") {
             val albums = AlbumKey.firstSongPerAlbum(albumSongs).sortedWith(
