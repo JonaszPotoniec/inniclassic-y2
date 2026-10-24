@@ -25,6 +25,7 @@ import com.themoon.y1.controllers.browser.BrowserController
 import com.themoon.y1.managers.AlbumCoverManager
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.managers.RecentlyPlayedManager
+import com.themoon.y1.models.AlbumKey
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.BrowserMode
 import com.themoon.y1.views.ClassicMenuStyle
@@ -33,7 +34,6 @@ import com.themoon.y1.views.WheelDialog
 import java.io.File
 import java.io.FileInputStream
 import java.util.Collections
-import java.util.Locale
 
 class CategoryListAdapter(
     private val items: List<String>,
@@ -41,13 +41,16 @@ class CategoryListAdapter(
     private val isAudiobook: Boolean = MainActivity.instance?.let {
         it.isAudiobookLibraryMode || (it.isBrowserControllerInitialized() && it.browserController.isAudiobookLibraryMode)
     } ?: false,
-    private val recentAlbumEntries: List<RecentlyPlayedManager.RecentAlbumEntry>? = null
+    private val recentAlbumEntries: List<RecentlyPlayedManager.RecentAlbumEntry>? = null,
+    /** Album artist of each album row in [items], so albums with the same title stay apart. */
+    private val albumArtists: List<String>? = null
 ) : BaseAdapter() {
 
     private var albumSongCounts: MutableMap<String, Int>? = null
     private var albumFilesMap: MutableMap<String, MutableList<File>>? = null
     private var albumArtistsMap: MutableMap<String, String>? = null
     private var cachedAllSongsCount = -1
+    private val showAlbumArtist = type == "ALBUM" && MainActivity.instance?.browserController?.categoryArtistFilter.isNullOrEmpty()
 
     init {
         if (coverCache == null) {
@@ -93,7 +96,7 @@ class CategoryListAdapter(
                 files.add(song.file)
 
                 val primaryArtist = if (song.albumArtist.isNotBlank()) song.albumArtist else song.artist
-                val compKey = "${song.album.trim().lowercase(Locale.US)}||${primaryArtist.trim().lowercase(Locale.US)}"
+                val compKey = AlbumKey.of(song)
                 val compC = counts[compKey]
                 counts[compKey] = if (compC == null) 1 else compC + 1
                 var compFiles = filesMap[compKey]
@@ -465,31 +468,32 @@ class CategoryListAdapter(
         }
 
         val recentEntry = if (type == "RECENTLY_PLAYED_ALBUMS") recentAlbumEntries?.getOrNull(itemIndex) else null
-        val lookupKey = recentEntry?.compositeKey ?: name
+        val albumArtist = albumArtists?.getOrNull(itemIndex)
+        val lookupKey = recentEntry?.compositeKey ?: albumArtist?.let { AlbumKey.of(name, it) } ?: name
         val displayName = recentEntry?.albumName ?: name
 
         tvArrow.setTextColor(0xFFFFFFFF.toInt())
         tvArrow.visibility = if (row.isFocused) View.VISIBLE else View.GONE
 
         ClassicMenuStyle.apply(row, tvTitle, tvArrow, 64)
-        ivCover.tag = displayName
+        ivCover.tag = lookupKey
         row.background = if (row.isFocused) main.createFocusedButtonBackground() else main.createButtonBackground(ThemeManager.getListButtonNormalBg())
         tvTitle.isSelected = row.isFocused
 
         tvTitle.text = displayName
         tvTitle.setTextColor(if (row.isFocused) ThemeManager.getListButtonFocusedTextColor() else ThemeManager.getTextColorPrimary())
         val songCount = albumSongCounts?.get(lookupKey) ?: albumSongCounts?.get(name) ?: 0
-        val artist = recentEntry?.artistName ?: albumArtistsMap?.get(name)
+        val artist = recentEntry?.artistName ?: albumArtist ?: albumArtistsMap?.get(name)
         tvSubtitle.text = if (isAudiobook) {
             if (songCount == 1) t1File() else "$songCount ${tFiles()}"
-        } else if (type == "RECENTLY_PLAYED_ALBUMS" && !artist.isNullOrBlank() && !artist.equals("Unknown Artist", ignoreCase = true)) {
+        } else if ((type == "RECENTLY_PLAYED_ALBUMS" || showAlbumArtist) && !artist.isNullOrBlank() && !artist.equals("Unknown Artist", ignoreCase = true)) {
             "$artist • " + (if (songCount == 1) t1Song() else "$songCount ${tSongs()}")
         } else {
             if (songCount == 1) t1Song() else "$songCount ${tSongs()}"
         }
         tvSubtitle.setTextColor(if (row.isFocused) ThemeManager.getListButtonFocusedTextColor() else ThemeManager.getTextColorSecondary())
 
-        val cached = coverCache?.get(lookupKey) ?: coverCache?.get(name)
+        val cached = coverCache?.get(lookupKey)
         if (cached != null) {
             ivCover.setImageDrawable(cached)
         } else {
@@ -504,8 +508,8 @@ class CategoryListAdapter(
                 ivCover.setImageDrawable(directDrawable)
             } else {
                 ivCover.setImageResource(if (isAudiobook) R.drawable.book else R.drawable.default_album)
-                ivCover.tag = displayName
-                loadAlbumArtAsync(displayName, sampleFile, ivCover)
+                ivCover.tag = lookupKey
+                loadAlbumArtAsync(lookupKey, displayName, sampleFile, ivCover)
             }
         }
 
@@ -536,14 +540,17 @@ class CategoryListAdapter(
             if (type == "GENRE_ALBUM") {
                 bc.virtualQueryType = "GENRE_ALBUM_SONGS"
                 bc.virtualQueryValue = name
+                bc.virtualQueryAlbumArtist = albumArtist ?: ""
             } else if (type == "RECENTLY_PLAYED_ALBUMS") {
                 bc.virtualQueryType = "RECENTLY_PLAYED_ALBUM"
                 bc.virtualQueryValue = displayName
                 bc.categoryArtistFilter = recentEntry?.artistName?.takeIf { !it.equals("Unknown Artist", ignoreCase = true) } ?: ""
                 bc.categoryArtistFilterIsTrackArtist = false
+                bc.virtualQueryAlbumArtist = bc.categoryArtistFilter
             } else {
                 bc.virtualQueryType = type
                 bc.virtualQueryValue = name
+                bc.virtualQueryAlbumArtist = albumArtist ?: ""
             }
             bc.currentBrowserMode = BrowserMode.VirtualSongs
             bc.buildVirtualSongs()
@@ -675,7 +682,7 @@ class CategoryListAdapter(
         return row
     }
 
-    private fun loadAlbumArtAsync(name: String, sampleFile: File?, targetView: ImageView) {
+    private fun loadAlbumArtAsync(cacheKey: String, name: String, sampleFile: File?, targetView: ImageView) {
         if (sampleFile == null) return
         val stubItem = SongItem(sampleFile, "", "", name)
         AlbumCoverManager.getInstance().loadCoverAsync(stubItem, object : AlbumCoverManager.CoverCallback {
@@ -683,8 +690,8 @@ class CategoryListAdapter(
                 if (cover != null) {
                     val res = MainActivity.instance?.resources ?: targetView.resources
                     val result = BitmapDrawable(res, cover)
-                    coverCache?.put(name, result)
-                    if (name == targetView.tag) {
+                    coverCache?.put(cacheKey, result)
+                    if (cacheKey == targetView.tag) {
                         targetView.setImageDrawable(result)
                     }
                 }

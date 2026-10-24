@@ -12,6 +12,7 @@ import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
+import com.themoon.y1.models.AlbumKey
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.ScreenState
 import java.io.File
@@ -73,7 +74,7 @@ class StorageController(
         val uniqueAlbums = HashSet<String>()
         val uniqueArtists = HashSet<String>()
         for (song in songs) {
-            if (song.album.isNotBlank()) uniqueAlbums.add(song.album)
+            if (song.album.isNotBlank()) uniqueAlbums.add(AlbumKey.of(song))
             if (song.albumArtist.isNotBlank()) uniqueArtists.add(song.albumArtist)
         }
 

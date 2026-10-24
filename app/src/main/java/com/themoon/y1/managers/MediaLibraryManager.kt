@@ -3,6 +3,7 @@ package com.themoon.y1.managers
 import android.content.Context
 import android.util.Log
 import com.themoon.y1.StoragePaths
+import com.themoon.y1.models.AlbumKey
 import com.themoon.y1.models.SongItem
 import org.json.JSONArray
 import org.json.JSONObject
@@ -490,8 +491,7 @@ class MediaLibraryManager private constructor() {
         val albumMap = LinkedHashMap<String, ArrayList<SongItem>>()
         for (song in combinedLibrary) {
             if (song.file == null) continue
-            val album = if (!song.album.isNullOrBlank()) song.album.trim() else "Unknown Album"
-            val key = album.lowercase(java.util.Locale.US)
+            val key = AlbumKey.of(song)
             val list = albumMap.getOrPut(key) { ArrayList() }
             list.add(song)
         }

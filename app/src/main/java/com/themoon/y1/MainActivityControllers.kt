@@ -37,6 +37,7 @@ import com.themoon.y1.controllers.videos.VideoPlayerController
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.managers.MediaLibraryManager
 import com.themoon.y1.managers.OtaUpdateManager
+import com.themoon.y1.models.AlbumKey
 import com.themoon.y1.navigation.BrowserMode
 import com.themoon.y1.navigation.NavigationManager
 import com.themoon.y1.navigation.ScreenState
@@ -190,6 +191,7 @@ internal fun MainActivity.initControllers() {
         onAlbumSelected = { album ->
             browserController.virtualQueryType = "COVER_FLOW_ALBUM"
             browserController.virtualQueryValue = album.album
+            browserController.virtualQueryAlbumArtist = AlbumKey.artistOf(album)
             changeScreen(ScreenState.Browser(BrowserMode.VirtualSongs))
         },
         onNavigateBack = { NavigationManager.getInstance().popBackStack() },
@@ -215,6 +217,10 @@ internal fun MainActivity.initControllers() {
             changeScreen(MainActivity.STATE_BROWSER)
             browserController.virtualQueryType = "ALBUM"
             browserController.virtualQueryValue = album
+            // The menu gives only the title; take the album artist from the song that plays.
+            val playingPath = currentPlaylist.getOrNull(currentIndex)?.absolutePath
+            val playingSong = MainActivity.customLibrary.firstOrNull { it.file.absolutePath == playingPath }
+            browserController.virtualQueryAlbumArtist = playingSong?.let { AlbumKey.artistOf(it) } ?: ""
             browserController.buildVirtualSongs()
         },
         onBrowseArtist = { artist ->
