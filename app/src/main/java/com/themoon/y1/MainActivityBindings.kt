@@ -123,7 +123,6 @@ internal fun MainActivity.applyRootSystemSettings() {
     try {
         val pkg = packageName
         val combinedCmd = "setprop persist.bluetooth.avrcpversion 1.6 && " +
-                "setprop persist.sys.timezone GMT && " +
                 "settings put global wifi_sleep_policy 2 && " +
                 "pm grant $pkg android.permission.DUMP && " +
                 "pm grant $pkg android.permission.BATTERY_STATS && " +
