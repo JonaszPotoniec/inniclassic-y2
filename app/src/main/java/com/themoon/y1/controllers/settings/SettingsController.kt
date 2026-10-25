@@ -1227,8 +1227,8 @@ class SettingsController(
             val btn = createTablerListButton(
                 if (isSelected) TablerIcons.CHECK else null,
                 timeZoneLabel(id, now),
-                if (isSelected) 0xFF00FF00.toInt() else ThemeManager.getTextColorPrimary(),
-                if (isSelected) 0xFF00FF00.toInt() else ThemeManager.getListButtonFocusedTextColor()
+                ThemeManager.getTextColorPrimary(),
+                ThemeManager.getListButtonFocusedTextColor()
             )
             btn.setOnClickListener {
                 clickFeedback()
