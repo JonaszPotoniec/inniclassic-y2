@@ -464,6 +464,14 @@ class PlayerController(
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == 23 || keyCode == KeyEvent.KEYCODE_ENTER) {
             if ((event.flags and KeyEvent.FLAG_CANCELED_LONG_PRESS) == 0) {
+                val prefs = activity.getSharedPreferences("AppPrefs", Activity.MODE_PRIVATE)
+                if (!prefs.getBoolean("double_click_favorite", true)) {
+                    // No double-click to wait for, so act on the single press at once.
+                    doubleClickHandler.removeCallbacks(singleClickRunnable)
+                    lastCenterUpTime = 0
+                    cycleBottomState()
+                    return true
+                }
                 val now = System.currentTimeMillis()
                 if (now - lastCenterUpTime < 300) {
                     doubleClickHandler.removeCallbacks(singleClickRunnable)

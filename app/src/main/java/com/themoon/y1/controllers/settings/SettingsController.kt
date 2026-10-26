@@ -478,6 +478,20 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnScreenOffCtrl)
 
+        var isDoubleClickFavoriteEnabled = prefs.getBoolean("double_click_favorite", true)
+        val btnDoubleClickFavorite = createSettingRow(
+            localize("Double-Click to Favorite"),
+            if (isDoubleClickFavoriteEnabled) localize("ON") else localize("OFF")
+        )
+        btnDoubleClickFavorite.setOnClickListener {
+            clickFeedback()
+            isDoubleClickFavoriteEnabled = !isDoubleClickFavoriteEnabled
+            prefs.edit().putBoolean("double_click_favorite", isDoubleClickFavoriteEnabled).commit()
+            val tvStatus = btnDoubleClickFavorite.getChildAt(1) as? TextView
+            tvStatus?.text = if (isDoubleClickFavoriteEnabled) localize("ON") else localize("OFF")
+        }
+        containerSettingsItems.addView(btnDoubleClickFavorite)
+
         var isUsbPromptEnabled = prefs.getBoolean("usb_storage_prompt", true)
         val btnUsbPrompt = createSettingRow(
             localize("Ask on USB Connect"),
@@ -1459,6 +1473,7 @@ class SettingsController(
                 .remove("album_tilt_enabled")
                 .remove("backlight_timer_index")
                 .remove("screen_off_control")
+                .remove("double_click_favorite")
                 .remove("repeat_mode")
                 .remove("repeat")
                 .remove("loop_scroll_on")

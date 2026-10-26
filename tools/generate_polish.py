@@ -383,6 +383,7 @@ polish_dict = {
   "Wheel Loop Scroll": "Pętla przewijania kółkiem",
   "Display Brightness": "Jasność ekranu",
   "Screen-Off Control": "Sterowanie przy wyłączonym ekranie",
+  "Double-Click to Favorite": "Dwuklik dodaje do ulubionych",
   "Vibration": "Wibracje",
   "Vibration Power": "Zasilanie wibracji",
   "Vibration Strength": "Siła wibracji",
