@@ -408,6 +408,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             }
         }, "y1-ums-init-check").start()
 
+        com.themoon.y1.views.LowBatteryWarningView.install(this)
         registerReceivers()
 
         try {
