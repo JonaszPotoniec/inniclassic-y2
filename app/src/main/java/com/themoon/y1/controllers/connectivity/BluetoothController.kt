@@ -22,6 +22,7 @@ import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.ListItemViewFactory
+import com.themoon.y1.views.RowGlyphs
 import com.themoon.y1.views.TablerIcons
 import java.lang.reflect.Method
 
@@ -254,12 +255,9 @@ class BluetoothController(
             }
         } catch (ignored: Exception) {}
 
-        // A check mark shows the connected device, as in the Wi-Fi list; the text keeps the theme colour.
-        val btnDevice = if (isConnected) {
-            createTablerListButton(TablerIcons.CHECK, name, null, ThemeManager.getTextColorPrimary(), ThemeManager.getTextColorPrimary())
-        } else {
-            createTablerListButton(devIcon, name, null, ThemeManager.getTextColorSecondary(), ThemeManager.getTextColorPrimary())
-        }
+        // As in the Wi-Fi list: the tick column on the left (tick on the connected device only), the name,
+        // then the device type on the right.
+        val btnDevice = createDeviceRow(name, devIcon, isConnected)
 
         val isConnectedDevice = isConnected
         val btnConnect = if (isConnectedDevice) {
@@ -343,7 +341,7 @@ class BluetoothController(
             }
         } catch (ignored: Exception) {}
 
-        val btnDevice = createTablerListButton(devIcon, displayName, null, ThemeManager.getTextColorSecondary(), ThemeManager.getTextColorPrimary())
+        val btnDevice = createDeviceRow(displayName, devIcon, false)
         btnDevice.setOnClickListener {
             clickFeedback()
             connectBluetoothAudio(device)
@@ -352,6 +350,10 @@ class BluetoothController(
         val insertIndex = Math.max(0, containerBtItems.childCount - 1)
         containerBtItems.addView(btnDevice, insertIndex)
     }
+
+    private fun createDeviceRow(name: String, devIcon: Array<String>, isConnected: Boolean): View =
+        ListItemViewFactory.createChoiceRowWithRightIcons(activity, name, isConnected, RowGlyphs.deviceSlots(
+            if (devIcon === TablerIcons.HEADPHONES) RowGlyphs.Kind.HEADPHONES else RowGlyphs.Kind.BLUETOOTH))
 
     fun onDiscoveryFinished() {
         btnScanBt.text = localize("Scan Complete (Retry)")

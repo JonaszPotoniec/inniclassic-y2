@@ -467,4 +467,34 @@ object ListItemViewFactory {
         row.setOnFocusChangeListener { _, hasFocus -> updateBg(hasFocus) }
         return row
     }
+
+    /**
+     * A row of the Wi-Fi and Bluetooth lists, like macOS: a tick column on the left (the tick shows only on the
+     * chosen row, so the text does not move), the name, then status glyphs in fixed slots on the right (lock, signal,
+     * device type; [RowGlyphsView]). The tick column has the same size as the single-choice lists. The glyphs are as
+     * tall as the capital letters of the name and on its baseline, in the primary text colour (as macOS: black or
+     * white, not grey), and in the focused text colour on the focused row.
+     */
+    fun createChoiceRowWithRightIcons(
+        context: Context,
+        text: String,
+        isChecked: Boolean,
+        slots: List<RowGlyphs.Slot>
+    ): View {
+        val row = createTablerListButtonWithRightIcon(context, TablerIcons.CHECK, text) as LinearLayout
+        if (!isChecked) row.getChildAt(0).visibility = View.INVISIBLE
+
+        val glyphs = RowGlyphsView(context, slots).apply {
+            textView = row.getChildAt(1) as TextView
+            color = ThemeManager.getTextColorPrimary()
+        }
+        row.addView(glyphs)
+
+        val rowFocusListener = row.onFocusChangeListener
+        row.setOnFocusChangeListener { v, hasFocus ->
+            rowFocusListener?.onFocusChange(v, hasFocus)
+            glyphs.color = if (hasFocus) ThemeManager.getListButtonFocusedTextColor() else ThemeManager.getTextColorPrimary()
+        }
+        return row
+    }
 }
