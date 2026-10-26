@@ -76,11 +76,17 @@ class MainMenuController(
     // Stable logical keys keep wheel navigation independent of Android resource IDs
     private val dynamicViewIds = SparseIntArray()
 
+    // Resource ids for the rows (see res/values/ids.xml): a generated id makes Android 4.4 log a warning for each key
+    private val rowIds: IntArray by lazy {
+        val ids = activity.resources.obtainTypedArray(R.array.main_menu_row_ids)
+        IntArray(ids.length()) { ids.getResourceId(it, View.NO_ID) }.also { ids.recycle() }
+    }
+
     private fun dynamicViewId(key: Int): Int {
         if (key == View.NO_ID) return View.NO_ID
         var id = dynamicViewIds.get(key, View.NO_ID)
         if (id == View.NO_ID) {
-            id = View.generateViewId()
+            id = rowIds.getOrElse(dynamicViewIds.size()) { View.generateViewId() }
             dynamicViewIds.put(key, id)
         }
         return id

@@ -298,6 +298,6 @@ class WifiController(
     }
 
     companion object {
-        private const val WIFI_POWER_ROW_ID = 999992
+        private val WIFI_POWER_ROW_ID = R.id.wifi_power_row
     }
 }

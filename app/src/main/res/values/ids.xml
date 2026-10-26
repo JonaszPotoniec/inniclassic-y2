@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Ids for views made in code. An id from View.generateViewId() or a plain number (1002, 999992) has no
+    package byte, and on Android 4.4 each View.toString() of the view then logs
+    "W/ResourceType: No package identifier when getting name for resource number 0x..." and throws and
+    catches a NotFoundException. The MediaTek build of the Y2 calls View.toString() of the focused view for
+    each key press and focus change, and of each TextView that it measures. So focusable views and
+    TextViews made in code need resource ids.
+-->
+<resources>
+    <item name="coverflow_title" type="id" />
+    <item name="coverflow_artist" type="id" />
+    <item name="wifi_power_row" type="id" />
+
+    <!-- Main menu rows, in order. A menu with more rows uses View.generateViewId() for the rest. -->
+    <item name="main_menu_row_0" type="id" />
+    <item name="main_menu_row_1" type="id" />
+    <item name="main_menu_row_2" type="id" />
+    <item name="main_menu_row_3" type="id" />
+    <item name="main_menu_row_4" type="id" />
+    <item name="main_menu_row_5" type="id" />
+    <item name="main_menu_row_6" type="id" />
+    <item name="main_menu_row_7" type="id" />
+    <item name="main_menu_row_8" type="id" />
+    <item name="main_menu_row_9" type="id" />
+    <item name="main_menu_row_10" type="id" />
+    <item name="main_menu_row_11" type="id" />
+    <item name="main_menu_row_12" type="id" />
+    <item name="main_menu_row_13" type="id" />
+    <item name="main_menu_row_14" type="id" />
+    <item name="main_menu_row_15" type="id" />
+    <item name="main_menu_row_16" type="id" />
+    <item name="main_menu_row_17" type="id" />
+    <item name="main_menu_row_18" type="id" />
+    <item name="main_menu_row_19" type="id" />
+    <item name="main_menu_row_20" type="id" />
+    <item name="main_menu_row_21" type="id" />
+    <item name="main_menu_row_22" type="id" />
+    <item name="main_menu_row_23" type="id" />
+    <item name="main_menu_row_24" type="id" />
+    <item name="main_menu_row_25" type="id" />
+    <item name="main_menu_row_26" type="id" />
+    <item name="main_menu_row_27" type="id" />
+    <item name="main_menu_row_28" type="id" />
+    <item name="main_menu_row_29" type="id" />
+    <item name="main_menu_row_30" type="id" />
+    <item name="main_menu_row_31" type="id" />
+    <array name="main_menu_row_ids">
+        <item>@id/main_menu_row_0</item>
+        <item>@id/main_menu_row_1</item>
+        <item>@id/main_menu_row_2</item>
+        <item>@id/main_menu_row_3</item>
+        <item>@id/main_menu_row_4</item>
+        <item>@id/main_menu_row_5</item>
+        <item>@id/main_menu_row_6</item>
+        <item>@id/main_menu_row_7</item>
+        <item>@id/main_menu_row_8</item>
+        <item>@id/main_menu_row_9</item>
+        <item>@id/main_menu_row_10</item>
+        <item>@id/main_menu_row_11</item>
+        <item>@id/main_menu_row_12</item>
+        <item>@id/main_menu_row_13</item>
+        <item>@id/main_menu_row_14</item>
+        <item>@id/main_menu_row_15</item>
+        <item>@id/main_menu_row_16</item>
+        <item>@id/main_menu_row_17</item>
+        <item>@id/main_menu_row_18</item>
+        <item>@id/main_menu_row_19</item>
+        <item>@id/main_menu_row_20</item>
+        <item>@id/main_menu_row_21</item>
+        <item>@id/main_menu_row_22</item>
+        <item>@id/main_menu_row_23</item>
+        <item>@id/main_menu_row_24</item>
+        <item>@id/main_menu_row_25</item>
+        <item>@id/main_menu_row_26</item>
+        <item>@id/main_menu_row_27</item>
+        <item>@id/main_menu_row_28</item>
+        <item>@id/main_menu_row_29</item>
+        <item>@id/main_menu_row_30</item>
+        <item>@id/main_menu_row_31</item>
+    </array>
+</resources>
