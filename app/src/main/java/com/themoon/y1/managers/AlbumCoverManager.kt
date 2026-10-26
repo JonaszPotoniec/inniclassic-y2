@@ -17,6 +17,7 @@ import android.util.LruCache
 import android.widget.Toast
 import com.themoon.y1.MainActivity
 import com.themoon.y1.StoragePaths
+import com.themoon.y1.controllers.coverflow.CoverFlowGeometry
 import com.themoon.y1.models.SongItem
 import java.io.File
 import java.io.FileInputStream
@@ -469,7 +470,8 @@ class AlbumCoverManager private constructor() {
             return try {
                 val w = src.width
                 val h = src.height
-                val reqH = h / 4
+                // The iPod reflection: as tall as 78/192 of the cover, from 28 % opacity at the top to 0.
+                val reqH = h * CoverFlowGeometry.REFLECTION_HEIGHT / CoverFlowGeometry.COVER_SIZE
                 if (reqH <= 0) return null
 
                 val matrix = Matrix().apply {
@@ -486,7 +488,7 @@ class AlbumCoverManager private constructor() {
                 val paint = Paint().apply {
                     shader = LinearGradient(
                         0f, 0f, 0f, reqH.toFloat(),
-                        0x44FFFFFF, 0x00FFFFFF,
+                        (CoverFlowGeometry.REFLECTION_TOP_ALPHA shl 24) or 0xFFFFFF, 0x00FFFFFF,
                         Shader.TileMode.CLAMP
                     )
                     xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)

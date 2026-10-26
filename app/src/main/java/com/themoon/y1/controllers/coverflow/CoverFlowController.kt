@@ -114,9 +114,12 @@ class CoverFlowController(
             currentCoverFlowIndex = 0
         }
 
+        val d = activity.resources.displayMetrics.density
         val cfLayout = CoverFlowLayout(activity).apply {
             clipChildren = false
             clipToPadding = false
+            // The cover top is at the iPod position for the space below the status bar.
+            childTopForHeight = { height -> (CoverFlowGeometry.coverTop((height / d).toInt()) * d).toInt() }
         }
         coverFlowContainer = cfLayout
         containerBrowserItems.clipChildren = false
@@ -126,10 +129,11 @@ class CoverFlowController(
             scrollViewBrowser.clipToPadding = false
         }
 
-        val containerHeight = (380 * activity.resources.displayMetrics.density).toInt()
+        // Fill the space below the status bar (the ScrollView fills its viewport), so that
+        // the cards are placed in it for each status bar height.
         containerBrowserItems.addView(
             cfLayout,
-            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, containerHeight)
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         )
 
         val views = arrayOfNulls<View>(visibleCoversCount)
@@ -176,35 +180,25 @@ class CoverFlowController(
             views[i]?.let { setCardTitleAlpha(it, i == centerIdx, 0) }
         }
 
-        val statusTitle = localize("Cover Flow") + " (" + (currentCoverFlowIndex + 1) + "/" + total + ")"
+        val statusTitle = CoverFlowTitle.format(localize("Cover Flow"), currentCoverFlowIndex + 1, total)
         tvBrowserPath.text = statusTitle
         activity.findViewById<TextView>(R.id.tv_status_clock)?.text = statusTitle
     }
 
     private fun getTransXForDist(dist: Int, d: Float): Float {
-        return when (dist) {
-            0 -> 0f
-            1 -> 130 * d
-            2 -> 170 * d
-            3 -> 215 * d
-            else -> 270 * d
-        }
+        return CoverFlowGeometry.translationX(dist, sideTilt) * d
     }
 
     private fun getRotYForDist(dist: Int): Float {
-        return if (dist == 0) 0f else 65f
+        return if (dist == 0) 0f else sideTilt.rotationY
     }
 
     private fun getScaleForDist(dist: Int): Float {
-        return when (dist) {
-            0 -> 1.0f
-            1, 2, 3 -> 0.8f
-            else -> 0.75f
-        }
+        return if (dist == 0) 1.0f else sideTilt.scale
     }
 
     private fun getAlphaForDist(dist: Int): Float {
-        return if (dist <= 3) 1.0f else 0.0f
+        return if (dist <= CoverFlowGeometry.SIDE_COUNT) 1.0f else 0.0f
     }
 
     private fun bindCoverData(card: View, dataIndex: Int) {
@@ -272,69 +266,45 @@ class CoverFlowController(
 
     private fun createSingleCoverView(): View {
         val d = activity.resources.displayMetrics.density
-        val card = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-        }
+        val coverSize = (CoverFlowGeometry.COVER_SIZE * d).toInt()
+        // The cover is at the top of the card, the reflection directly under it, and the text on the reflection.
+        val card = FrameLayout(activity)
 
-        val lp = FrameLayout.LayoutParams((350 * d).toInt(), (320 * d).toInt()).apply {
-            gravity = Gravity.CENTER
-            topMargin = (-20 * d).toInt()
+        // CoverFlowLayout puts the top of the card (the cover top) at the iPod position.
+        val lp = FrameLayout.LayoutParams((CoverFlowGeometry.TEXT_WIDTH * d).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
         }
         card.layoutParams = lp
+        // Scale and turn the side cards about the cover centre (x) and the iPod vanishing line (y).
+        // Setting one pivot stops Android from centring the other, so set both.
+        card.pivotX = lp.width / 2f
+        card.pivotY = coverSize * CoverFlowGeometry.PIVOT_Y_FRACTION
+        // The camera distance sets the perspective (Android: distance / densityDpi inches, 72 px per inch).
+        card.cameraDistance = sideTilt.cameraDistancePx * d * activity.resources.displayMetrics.densityDpi / 72f
         card.setLayerType(View.LAYER_TYPE_NONE, null)
 
         // Smooth edges while the cards turn (see SmoothEdges)
         val ivCover = SmoothEdgeImageView(activity).apply {
             id = COVER_VIEW_ID
-            layoutParams = LinearLayout.LayoutParams((200 * d).toInt(), (200 * d).toInt()).apply {
-                gravity = Gravity.CENTER_HORIZONTAL
+            layoutParams = FrameLayout.LayoutParams(coverSize, coverSize).apply {
+                gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
             }
             scaleType = ImageView.ScaleType.CENTER_CROP
         }
 
         val ivReflection = SmoothEdgeImageView(activity).apply {
             id = REFLECTION_VIEW_ID
-            layoutParams = LinearLayout.LayoutParams((200 * d).toInt(), (50 * d).toInt()).apply {
-                gravity = Gravity.CENTER_HORIZONTAL
-                topMargin = (2 * d).toInt()
+            layoutParams = FrameLayout.LayoutParams(coverSize, (CoverFlowGeometry.REFLECTION_HEIGHT * d).toInt()).apply {
+                gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+                topMargin = coverSize
             }
             scaleType = ImageView.ScaleType.CENTER_CROP
         }
 
-        val tvTitle = TextView(activity).apply {
-            id = TITLE_VIEW_ID
-            setTextColor(ThemeManager.getTextColorPrimary())
-            setTextSize(TypedValue.COMPLEX_UNIT_PX, 18f * d)
-            typeface = ThemeManager.getCustomFontBold()
-            gravity = Gravity.CENTER
-            isSingleLine = true
-            ellipsize = android.text.TextUtils.TruncateAt.END
-            alpha = 0f
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = (-40 * d).toInt()
-                bottomMargin = 0
-            }
-        }
-
-        val tvArtist = TextView(activity).apply {
-            id = ARTIST_VIEW_ID
-            setTextColor(ThemeManager.getTextColorSecondary())
-            textSize = 16.5f
-            gravity = Gravity.CENTER
-            isSingleLine = true
-            ellipsize = android.text.TextUtils.TruncateAt.END
-            alpha = 0f
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = (2 * d).toInt()
-            }
-        }
+        // Album (bold, primary colour: black on the Classic themes), then artist (regular, secondary colour),
+        // on the iPod baselines.
+        val tvTitle = createCardText(TITLE_VIEW_ID, CoverFlowGeometry.TITLE_SIZE * d, CoverFlowGeometry.TITLE_BASELINE * d, bold = true)
+        val tvArtist = createCardText(ARTIST_VIEW_ID, CoverFlowGeometry.ARTIST_SIZE * d, CoverFlowGeometry.ARTIST_BASELINE * d, bold = false)
 
         card.addView(ivCover)
         card.addView(ivReflection)
@@ -352,6 +322,28 @@ class CoverFlowController(
         }
 
         return card
+    }
+
+    /** One line of centred text (bold or regular theme font) whose baseline is [baseline] px below the card top. */
+    private fun createCardText(viewId: Int, sizePx: Float, baseline: Float, bold: Boolean): TextView {
+        return TextView(activity).apply {
+            id = viewId
+            setTextColor(if (bold) ThemeManager.getTextColorPrimary() else ThemeManager.getTextColorSecondary())
+            setTextSize(TypedValue.COMPLEX_UNIT_PX, sizePx)
+            typeface = if (bold) ThemeManager.getCustomFontBold() else ThemeManager.getCustomFont()
+            includeFontPadding = false
+            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            isSingleLine = true
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            alpha = 0f
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                // Without font padding, the baseline is -ascent below the top of the view.
+                topMargin = Math.round(baseline + paint.fontMetricsInt.ascent)
+            }
+        }
     }
 
     private fun setCardTitleAlpha(card: View, isCenter: Boolean, duration: Int) {
@@ -498,7 +490,7 @@ class CoverFlowController(
             animateTransform(views[i], transX, rotY, scale, alpha, duration)
         }
 
-        val statusTitle = localize("Cover Flow") + " (" + (currentCoverFlowIndex + 1) + "/" + total + ")"
+        val statusTitle = CoverFlowTitle.format(localize("Cover Flow"), currentCoverFlowIndex + 1, total)
         tvBrowserPath.text = statusTitle
         activity.findViewById<TextView>(R.id.tv_status_clock)?.text = statusTitle
     }
@@ -537,5 +529,8 @@ class CoverFlowController(
         private val TITLE_VIEW_ID = R.id.coverflow_title
         private val ARTIST_VIEW_ID = R.id.coverflow_artist
         private const val REFLECTION_VIEW_ID = 1004
+
+        // Scale, angle and perspective of the side covers (see CoverFlowGeometry)
+        private val sideTilt = CoverFlowGeometry.sideTilt()
     }
 }

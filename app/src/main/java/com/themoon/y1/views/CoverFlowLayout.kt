@@ -28,6 +28,22 @@ class CoverFlowLayout @JvmOverloads constructor(
         clipToPadding = false
     }
 
+    /**
+     * Gives the top of all children (px) for the height of this layout. When it is null, the children
+     * stay where FrameLayout puts them (gravity and margins).
+     */
+    var childTopForHeight: ((height: Int) -> Int)? = null
+
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        val childTop = childTopForHeight?.invoke(bottom - top) ?: return
+        for (i in 0 until childCount) {
+            val child = getChildAt(i)
+            // Moves the child without a new layout pass.
+            if (child.top != childTop) child.offsetTopAndBottom(childTop - child.top)
+        }
+    }
+
     private fun updateDrawingOrder(childCount: Int) {
         if (mDrawingOrder == null || mDrawingOrder?.size != childCount) {
             mDrawingOrder = IntArray(childCount)

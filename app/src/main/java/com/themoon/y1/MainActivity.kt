@@ -965,7 +965,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             STATE_COVERFLOW -> {
                 val total = uniqueAlbumList.size
                 if (total > 0 && ::coverFlowController.isInitialized) {
-                    "${t("Cover Flow")} (${coverFlowController.currentCoverFlowIndex + 1}/$total)"
+                    com.themoon.y1.controllers.coverflow.CoverFlowTitle.format(t("Cover Flow"), coverFlowController.currentCoverFlowIndex + 1, total)
                 } else {
                     t("Cover Flow")
                 }
