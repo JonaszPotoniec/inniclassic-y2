@@ -97,6 +97,10 @@ class PlaylistController(
         containerBrowserItems.removeAllViews()
     }
 
+    override fun onThemeChanged() {
+        com.themoon.y1.navigation.NavigationManager.getInstance().currentState?.let { onEnter(it) }
+    }
+
     fun buildPlaylistsUI() {
         scrollViewBrowser?.visibility = View.VISIBLE
         listVirtualSongs?.visibility = View.GONE

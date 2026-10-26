@@ -152,7 +152,8 @@ class PlayerController(
     }
 
     fun applyThemeColors() {
-        val classic = ThemeManager.isClassicTheme()
+        // Classic Light keeps the iPod colours; Classic Dark and the other themes use the theme colours
+        val classic = ThemeManager.isClassicLightTheme()
         if (classic) {
             layoutPlayerMode.setBackgroundColor(0xFFFFFFFF.toInt())
             tvPlayerTitle.setTextColor(0xFF000000.toInt())
@@ -168,6 +169,7 @@ class PlayerController(
             tvPlayerTimeCurrent.setTextColor(ThemeManager.getTextColorPrimary())
             tvPlayerTimeTotal.setTextColor(ThemeManager.getTextColorPrimary())
         }
+        NowPlayingTheme.apply(rootView)
         applyAlbumTiltSetting()
     }
 

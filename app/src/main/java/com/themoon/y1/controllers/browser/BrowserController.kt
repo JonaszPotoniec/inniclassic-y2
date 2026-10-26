@@ -209,6 +209,22 @@ class BrowserController(
         }
     }
 
+    override fun onThemeChanged() {
+        // Not onEnter: it clears the filters of the category lists. The list position is kept (ListPosition).
+        when (currentBrowserMode) {
+            is BrowserMode.Artists -> buildVirtualCategories("ARTIST")
+            is BrowserMode.TrackArtists -> buildVirtualCategories("TRACK_ARTIST")
+            is BrowserMode.Albums -> buildVirtualCategories("ALBUM")
+            is BrowserMode.Genres -> buildVirtualCategories("GENRE")
+            is BrowserMode.GenreArtists -> buildVirtualCategories("GENRE_ARTIST")
+            is BrowserMode.GenreAlbums -> buildVirtualCategories("GENRE_ALBUM")
+            is BrowserMode.Composers -> buildVirtualCategories("COMPOSER")
+            is BrowserMode.Years -> buildVirtualCategories("YEAR")
+            is BrowserMode.RecentlyAdded -> buildVirtualSongs()
+            else -> onRefreshUI()
+        }
+    }
+
     fun buildFileBrowserUI() {
         val statusBar = activity.findViewById<View>(R.id.layout_status_bar)
         statusBar?.background = ThemeManager.createStatusBarBackground()

@@ -14,6 +14,11 @@ interface ScreenController {
     fun onExit() {}
     fun onRefreshUI() {}
 
+    /** The theme changed while this screen shows: make it again in the new theme, with the same focus. */
+    fun onThemeChanged() {
+        onRefreshUI()
+    }
+
     fun dispatchKeyEvent(event: KeyEvent): Boolean = false
     fun onWheel(delta: Int, event: KeyEvent): Boolean = false
     fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean = false

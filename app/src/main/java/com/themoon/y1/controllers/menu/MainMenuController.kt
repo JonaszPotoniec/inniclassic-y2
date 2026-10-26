@@ -114,6 +114,13 @@ class MainMenuController(
         buildDynamicMainMenuUI()
     }
 
+    override fun onThemeChanged() {
+        // onExit saves the focused item only when the user leaves the main menu
+        val idx = activity.currentFocus?.let { currentButtons.indexOf(it) } ?: -1
+        if (idx >= 0) lastMainMenuFocusIndex = idx
+        buildDynamicMainMenuUI()
+    }
+
     fun buildDynamicMainMenuUI() {
         val safeMenuIndex = lastMainMenuFocusIndex
         val mainMenu = layoutMainMenu

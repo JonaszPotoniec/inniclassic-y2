@@ -96,6 +96,10 @@ class VideoBrowserController(
         hideCoverPane()
     }
 
+    override fun onThemeChanged() {
+        buildCurrentModeUI()
+    }
+
     fun buildCurrentModeUI() {
         val classic = ThemeManager.isClassicTheme()
 

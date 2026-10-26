@@ -85,6 +85,11 @@ class EqualizerController(
         currentAdjustingBand = -1
     }
 
+    override fun onThemeChanged() {
+        // The graphic EQ and the profile list keep their colours until they close (no lost band state)
+        if (!isGraphicEqOpen && !isProfileSelectorOpen) buildEqualizerSettingsUI()
+    }
+
     fun buildEqualizerSettingsUI() {
         isGraphicEqOpen = false
         isProfileSelectorOpen = false

@@ -56,6 +56,10 @@ class WebServerController(
         layoutWebServer.visibility = View.GONE
     }
 
+    override fun onThemeChanged() {
+        updateUI()
+    }
+
     fun toggleServer() {
         if (isServerRunning) {
             webServer?.stopServer()

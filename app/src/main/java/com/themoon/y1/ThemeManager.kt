@@ -1,6 +1,7 @@
 package com.themoon.y1
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
@@ -68,6 +69,19 @@ object ThemeManager {
     var availableThemes: MutableList<ThemeData> = ArrayList()
 
     private var currentThemeIndex: Int = 0
+
+    /** Goes up by one at each theme change (see [selectTheme]). */
+    @Volatile
+    var themeGeneration: Int = 0
+        private set
+
+    // Fonts by file, path, size and time, so that a new load of the themes does not make new Typeface objects
+    private val fontCache = HashMap<String, Typeface>()
+
+    private val WIDGET_TYPES = listOf(
+        "widget_clock", "widget_analog_clock", "widget_battery",
+        "widget_circular_battery", "widget_album", "widget_focus_image"
+    )
 
     private val OBSOLETE_THEMES = setOf(
         "Clean Light",
@@ -175,6 +189,8 @@ object ThemeManager {
     }
 
     fun loadThemesFromStorage(themeFolder: File) {
+        // A new theme folder can sort before the current theme, so find the current theme again by name
+        val currentName = if (availableThemes.isEmpty()) null else getCurrentTheme().name
         availableThemes.clear()
 
         if (!themeFolder.exists()) {
@@ -261,10 +277,7 @@ object ThemeManager {
                             if (json.has("font")) {
                                 val fontFile = File(subFolder, json.getString("font"))
                                 if (fontFile.exists() && fontFile.isFile) {
-                                    try {
-                                        parsedFont = Typeface.createFromFile(fontFile)
-                                    } catch (_: Exception) {
-                                    }
+                                    parsedFont = loadFont(fontFile) ?: Typeface.DEFAULT
                                 }
                             }
 
@@ -272,10 +285,7 @@ object ThemeManager {
                             if (json.has("fontBold")) {
                                 val fontBoldFile = File(subFolder, json.getString("fontBold"))
                                 if (fontBoldFile.exists() && fontBoldFile.isFile) {
-                                    try {
-                                        parsedFontBold = Typeface.createFromFile(fontBoldFile)
-                                    } catch (_: Exception) {
-                                    }
+                                    parsedFontBold = loadFont(fontBoldFile)
                                 }
                             }
 
@@ -352,6 +362,51 @@ object ThemeManager {
             else if (b.name == "Classic Light") 1
             else a.name.compareTo(b.name)
         })
+
+        if (currentName != null) {
+            val index = findThemeIndexByName(currentName)
+            if (index >= 0) currentThemeIndex = index
+        }
+    }
+
+    private fun loadFont(file: File): Typeface? {
+        val key = file.absolutePath + "|" + file.length() + "|" + file.lastModified()
+        fontCache[key]?.let { return it }
+        return try {
+            Typeface.createFromFile(file).also { fontCache[key] = it }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Makes [name] the current theme and saves it, with its background and main menu widgets, as a tap
+     * in Settings → Theme does. False if the theme is not installed or is already the current theme.
+     */
+    fun selectTheme(prefs: SharedPreferences, name: String): Boolean {
+        val index = findThemeIndexByName(name)
+        if (index < 0) return false
+        val theme = availableThemes[index]
+        val changed = index != currentThemeIndex || getCurrentTheme().name != prefs.getString("app_theme_name", null)
+        setThemeIndex(index)
+        try {
+            val editor = prefs.edit()
+                .putInt("app_theme_index", index)
+                .putString("app_theme_name", theme.name)
+                .putString("current_theme_name", theme.name)
+            if (hasThemeBackground(theme)) editor.putString("bg_path", "THEME_DEFAULT")
+            val types = theme.menuElements.map { it.type }.toSet()
+            for (widget in WIDGET_TYPES) editor.putBoolean(widget, widget in types)
+            editor.commit()
+        } catch (_: Exception) {
+        }
+        if (changed) themeGeneration++
+        return changed
+    }
+
+    fun hasThemeBackground(theme: ThemeData): Boolean {
+        if (theme.bgImage.isNotEmpty() && File(theme.folderPath, theme.bgImage).exists()) return true
+        return File(theme.folderPath, "background.png").exists() || File(theme.folderPath, "bg.png").exists()
     }
 
     fun setThemeIndex(index: Int) {

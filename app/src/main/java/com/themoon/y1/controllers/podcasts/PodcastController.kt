@@ -104,6 +104,15 @@ class PodcastController(
     override fun onExit() {
     }
 
+    override fun onThemeChanged() {
+        when (currentMode) {
+            // The episode list comes from the network: make only its rows again
+            is BrowserMode.PodcastEpisodes -> listVirtualSongs.adapter = listVirtualSongs.adapter
+            is BrowserMode.PodcastManage -> buildManageUI()
+            else -> buildChannelsUI()
+        }
+    }
+
     fun buildChannelsUI() {
         currentMode = BrowserMode.PodcastChannels
         scrollViewBrowser?.visibility = View.VISIBLE
