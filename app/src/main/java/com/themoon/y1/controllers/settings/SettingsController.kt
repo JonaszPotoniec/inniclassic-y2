@@ -863,6 +863,8 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnLegal)
 
+        SettingsBackupUi.addRows(activity, containerSettingsItems, createSettingRow, clickFeedback, localize)
+
         val btnResetAll = createSettingRow(localize("Reset All Settings"), "〉 ")
         btnResetAll.setOnClickListener {
             clickFeedback()
