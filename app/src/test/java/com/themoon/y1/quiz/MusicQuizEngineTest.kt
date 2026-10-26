@@ -7,8 +7,12 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import java.util.Random
 
 class MusicQuizEngineTest {
+
+    // A fixed seed makes the random questions the same at each run.
+    private fun newEngine() = MusicQuizEngine(random = Random(42))
 
     private fun createSong(
         title: String,
@@ -22,7 +26,7 @@ class MusicQuizEngineTest {
 
     @Test
     fun testResetSession_validation() {
-        val engine = MusicQuizEngine()
+        val engine = newEngine()
         val emptyList = emptyList<SongItem>()
         assertFalse(engine.resetSession(emptyList))
 
@@ -49,7 +53,7 @@ class MusicQuizEngineTest {
 
     @Test
     fun testQuestionsPerRound_isSix() {
-        val engine = MusicQuizEngine()
+        val engine = newEngine()
         val songs = (1..10).map { createSong("Song $it") }
         engine.resetSession(songs)
 
@@ -66,7 +70,7 @@ class MusicQuizEngineTest {
 
     @Test
     fun testNonLinearQuestionTimeScaling() {
-        val engine = MusicQuizEngine()
+        val engine = newEngine()
         val songs = (1..10).map { createSong("Song $it") }
         engine.resetSession(songs)
 
@@ -91,7 +95,7 @@ class MusicQuizEngineTest {
 
     @Test
     fun testPerfectRoundLifeRecovery_cappedAtFive() {
-        val engine = MusicQuizEngine()
+        val engine = newEngine()
         val songs = (1..10).map { createSong("Song $it") }
         engine.resetSession(songs)
         assertEquals(3, engine.lives)
@@ -125,7 +129,7 @@ class MusicQuizEngineTest {
 
     @Test
     fun testCoverArtPredicate_filtersCoverlessAlbums() {
-        val engine = MusicQuizEngine()
+        val engine = newEngine()
         val songs = listOf(
             createSong("Song 1", album = "Album 1"),
             createSong("Song 2", album = "Album 2"),
@@ -173,7 +177,7 @@ class MusicQuizEngineTest {
 
     @Test
     fun testTieredYearDistractorDistances_notCentered() {
-        val engine = MusicQuizEngine()
+        val engine = newEngine()
         val songs = listOf(
             createSong("Song 1", year = "2000"),
             createSong("Song 2", year = "1995"),
@@ -250,7 +254,7 @@ class MusicQuizEngineTest {
 
     @Test
     fun testTimeDecayScoring() {
-        val engine = MusicQuizEngine()
+        val engine = newEngine()
         val songs = (1..10).map { createSong("Song $it") }
         engine.resetSession(songs)
 
@@ -267,7 +271,7 @@ class MusicQuizEngineTest {
 
     @Test
     fun testBuyHeart_pricingAndLimits() {
-        val engine = MusicQuizEngine()
+        val engine = newEngine()
         val songs = (1..10).map { createSong("Song $it") }
         engine.resetSession(songs)
 

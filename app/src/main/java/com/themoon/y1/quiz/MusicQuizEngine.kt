@@ -15,7 +15,7 @@ import java.util.Random
  * endless progressive rounds (6 questions per round), non-linear speed scaling,
  * time-decay scoring, life recovery, and audio sample preview player.
  */
-class MusicQuizEngine(private val context: Context? = null) {
+class MusicQuizEngine(private val context: Context? = null, private val random: Random = Random()) {
 
     companion object {
         const val QUESTIONS_PER_ROUND = 6
@@ -67,7 +67,6 @@ class MusicQuizEngine(private val context: Context? = null) {
 
     private val quizPool = ArrayList<SongItem>()
     private var previewPlayer: MediaPlayer? = null
-    private val random = Random()
     private var lastTargetSongFile: File? = null
 
     fun resetSession(library: List<SongItem>): Boolean {
@@ -191,7 +190,7 @@ class MusicQuizEngine(private val context: Context? = null) {
             albumReps[targetSong.album?.trim()?.lowercase() ?: ""] = targetSong
 
             val repList = ArrayList(albumReps.values)
-            Collections.shuffle(repList)
+            Collections.shuffle(repList, random)
 
             val coverOptions = ArrayList<SongItem>()
             coverOptions.add(targetSong)
@@ -200,7 +199,7 @@ class MusicQuizEngine(private val context: Context? = null) {
                 val exists = coverOptions.any { it.album.equals(rep.album, ignoreCase = true) }
                 if (!exists) coverOptions.add(rep)
             }
-            Collections.shuffle(coverOptions)
+            Collections.shuffle(coverOptions, random)
 
             return QuizQuestion(
                 type = selectedType,
@@ -320,7 +319,7 @@ class MusicQuizEngine(private val context: Context? = null) {
         }
 
         val list = years.map { it.toString() }.toMutableList()
-        Collections.shuffle(list)
+        Collections.shuffle(list, random)
         return list
     }
 
@@ -341,7 +340,7 @@ class MusicQuizEngine(private val context: Context? = null) {
             val fallbackText = getFieldValue(pool[random.nextInt(pool.size)], selectedType) ?: ""
             optionList.add(fallbackText)
         }
-        Collections.shuffle(optionList)
+        Collections.shuffle(optionList, random)
         return optionList
     }
 
