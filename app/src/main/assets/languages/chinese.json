@@ -202,7 +202,6 @@
   "Not a valid settings backup.": "不是有效的设置备份。",
   "Import failed.": "导入失败。",
   "Web Server": "网页服务器",
-  "Auto Fetch Album Art": "自动检索专辑封面",
   "Clear Cache & Track Info": "清除缓存和轨道信息",
   "Delete all downloaded album covers and saved track information (Title/Artist)?": "是否删除所有下载的专辑封面和保存的轨道信息 (标题/艺术家)？",
   "Clear": "清除",

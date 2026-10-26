@@ -118,6 +118,12 @@ class SettingsGroupsTest {
     }
 
     @Test
+    fun libraryHasNoAutoFetchRow() {
+        assertEquals(TOP, SettingsGroups.groupOf("Auto Fetch Album Art"))
+        assertTrue("Auto Fetch Album Art" !in rowLabels())
+    }
+
+    @Test
     fun topLevelShowsOnlyGroupsWithRowsThenLooseRows() {
         val (shown, entries) = SettingsGroups.page(listOf("Power Off", "New Row", "Shuffle Mode", "Theme"), TOP)
         assertEquals(TOP, shown)

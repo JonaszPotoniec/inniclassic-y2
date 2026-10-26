@@ -47,8 +47,7 @@ object SettingsGroups {
             "Bluetooth", "Wi-Fi", "Cell Radio", "Web Server", "Ask on USB Connect"
         )),
         Group("Library", listOf(
-            "Auto Fetch Album Art", "Clear Album Art & Info", "Jellyfin Sync", "Sync Scrobbles to Last.fm",
-            "Last.fm Account"
+            "Clear Album Art & Info", "Jellyfin Sync", "Sync Scrobbles to Last.fm", "Last.fm Account"
         )),
         Group("Date & Time", listOf("Date & Time"), direct = true),
         Group("General", listOf(

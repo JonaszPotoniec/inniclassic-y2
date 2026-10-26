@@ -206,7 +206,6 @@
   "Not a valid settings backup.": "올바른 설정 백업이 아닙니다.",
   "Import failed.": "가져오기에 실패했습니다.",
   "Web Server": "웹 서버",
-  "Auto Fetch Album Art": "앨범 아트 자동 검색",
   "Clear Cache & Track Info": "캐시 및 트랙 정보 초기화",
   "Delete all downloaded album covers and saved track information (Title/Artist)?": "다운로드된 모든 앨범 커버와 저장된 트랙 정보(제목/아티스트)를 삭제하시겠습니까?",
   "Clear": "초기화",

@@ -202,7 +202,6 @@
   "Not a valid settings backup.": "No es una copia de ajustes válida.",
   "Import failed.": "Error al importar.",
   "Web Server": "Servidor Web",
-  "Auto Fetch Album Art": "Buscar portadas automáticamente",
   "Clear Cache & Track Info": "Limpiar caché e info de pistas",
   "Delete all downloaded album covers and saved track information (Title/Artist)?": "¿Eliminar todas las portadas descargadas y la información guardada (Título/Artista)?",
   "Clear": "Limpiar",

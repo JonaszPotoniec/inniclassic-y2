@@ -758,20 +758,6 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnJellyfin)
 
-        var isAutoFetchEnabled = prefs.getBoolean("auto_fetch", false)
-        val btnAutoFetch = createSettingRow(
-            localize("Auto Fetch Album Art"),
-            onOff(isAutoFetchEnabled, localize)
-        )
-        btnAutoFetch.setOnClickListener {
-            clickFeedback()
-            isAutoFetchEnabled = !isAutoFetchEnabled
-            prefs.edit().putBoolean("auto_fetch", isAutoFetchEnabled).commit()
-            val tvStatus = btnAutoFetch.getChildAt(1) as? TextView
-            tvStatus?.text = onOff(isAutoFetchEnabled, localize)
-        }
-        containerSettingsItems.addView(btnAutoFetch)
-
         val btnClearCache = createSettingRow(localize("Clear Album Art & Info"), "〉 ")
         btnClearCache.setOnClickListener {
             clickFeedback()
@@ -1684,7 +1670,6 @@ class SettingsController(
                 .remove("eq_preset")
                 .remove("eq_profile_id")
                 .remove(AlbumKey.PREF_BY_ARTIST)
-                .remove("auto_fetch")
                 .remove(com.themoon.y1.views.CoverPane.PREF)
                 .commit()
         } catch (_: Exception) {}

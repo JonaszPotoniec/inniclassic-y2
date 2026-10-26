@@ -255,7 +255,6 @@
   "Not a valid settings backup.": "有効な設定バックアップではありません。",
   "Import failed.": "インポートに失敗しました。",
   "Web Server": "ウェブサーバー",
-  "Auto Fetch Album Art": "アルバムアート自動検索",
   "Clear Cache & Track Info": "キャッシュとトラック情報をクリア",
   "Delete all downloaded album covers and saved track information (Title/Artist)?": "ダウンロードしたすべてのカバー画像と保存されたトラック情報（タイトル/アーティスト）を削除しますか？",
   "Clear": "クリア",

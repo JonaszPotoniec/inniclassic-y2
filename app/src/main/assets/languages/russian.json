@@ -255,7 +255,6 @@
   "Not a valid settings backup.": "Это не резервная копия настроек.",
   "Import failed.": "Ошибка импорта.",
   "Web Server": "Веб-сервер",
-  "Auto Fetch Album Art": "Автопоиск обложек",
   "Clear Cache & Track Info": "Очистить кэш и инфо",
   "Delete all downloaded album covers and saved track information (Title/Artist)?": "Удалить все скачанные обложки альбомов и сохраненную информацию о треках (Название/Исполнитель)?",
   "Clear": "Очистить",
