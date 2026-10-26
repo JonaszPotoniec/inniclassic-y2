@@ -1462,8 +1462,11 @@ class SettingsController(
                 tvRight?.textSize = 22f
             }
 
-            row.setOnFocusChangeListener { _, hasFocus ->
+            // Keep the row highlight of createSettingRow: this listener replaces its listener.
+            val rowHighlight = row.onFocusChangeListener
+            row.setOnFocusChangeListener { v, hasFocus ->
                 if (isMenuReorderMode) return@setOnFocusChangeListener
+                rowHighlight?.onFocusChange(v, hasFocus)
                 val currHidden = prefs.getBoolean("hide_btn_" + el.id, false)
                 if (hasFocus) {
                     tvRight?.setTextColor(ThemeManager.getListButtonFocusedTextColor())
@@ -1528,7 +1531,10 @@ class SettingsController(
                 if (isHidden) ThemeManager.getTextColorSecondary() else ThemeManager.getTextColorPrimary()
             )
 
-            row.setOnFocusChangeListener { _, hasFocus ->
+            // Keep the row highlight of createSettingRow: this listener replaces its listener.
+            val rowHighlight = row.onFocusChangeListener
+            row.setOnFocusChangeListener { v, hasFocus ->
+                rowHighlight?.onFocusChange(v, hasFocus)
                 val currHidden = com.themoon.y1.controllers.browser.MusicMenuItems.isHidden(prefs, id)
                 if (hasFocus) {
                     tvRight?.setTextColor(ThemeManager.getListButtonFocusedTextColor())
@@ -1588,6 +1594,8 @@ class SettingsController(
         } else {
             isMenuReorderMode = false
             if (currentReorderRow != null) {
+                // Replace the red reorder background with the normal row highlight.
+                currentReorderRow?.let { it.onFocusChangeListener?.onFocusChange(it, it.hasFocus()) }
                 val tvRight = (currentReorderRow as? LinearLayout)?.getChildAt(1) as? TextView
                 val currentIcon = tvRight?.text?.toString()?.replace(" ↕", "") ?: ""
                 tvRight?.text = currentIcon
