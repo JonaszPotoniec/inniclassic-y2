@@ -1487,6 +1487,7 @@ class SettingsController(
                 clickFeedback()
                 val newState = !prefs.getBoolean("hide_btn_" + el.id, false)
                 prefs.edit().putBoolean("hide_btn_" + el.id, newState).commit()
+                com.themoon.y1.FeatureVisibility.onMenuButtonToggled(activity, el.action, newState)
                 tvRight?.text = if (newState) "\uE5CD" else "\uE8F4"
                 if (row.hasFocus()) {
                     tvRight?.setTextColor(ThemeManager.getListButtonFocusedTextColor())

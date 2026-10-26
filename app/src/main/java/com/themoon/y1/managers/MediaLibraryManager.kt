@@ -124,13 +124,14 @@ class MediaLibraryManager private constructor() {
 
                 var total = 0
                 for (musicDir in StoragePaths.getMusicDirs()) total += countAudioFiles(musicDir)
-                for (bookDir in StoragePaths.getAudiobooksDirs()) total += countAudioFiles(bookDir)
+                val bookDirs = if (com.themoon.y1.FeatureVisibility.isHidden(context, com.themoon.y1.FeatureVisibility.AUDIOBOOKS)) emptyList() else StoragePaths.getAudiobooksDirs()
+                for (bookDir in bookDirs) total += countAudioFiles(bookDir)
 
                 var scanned = 0
                 for (musicDir in StoragePaths.getMusicDirs()) {
                     scanned = scanDirectory(musicDir, musicLibrary, existingMusic, blacklist, scanned, total, isAudiobook = false, listener)
                 }
-                for (bookDir in StoragePaths.getAudiobooksDirs()) {
+                for (bookDir in bookDirs) {
                     scanned = scanDirectory(bookDir, audiobookLibrary, existingBooks, blacklist, scanned, total, isAudiobook = true, listener)
                 }
 

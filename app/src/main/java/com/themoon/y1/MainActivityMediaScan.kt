@@ -119,6 +119,7 @@ internal fun MainActivity.rebuildUniqueAlbumListInternal() {
 }
 
 internal fun MainActivity.scanVideosInternal() {
+    if (FeatureVisibility.isHidden(this, FeatureVisibility.VIDEOS)) return
     var anyMigrated = false
     for (root in StoragePaths.getAllRoots()) {
         val v1 = File(root, "Videos")

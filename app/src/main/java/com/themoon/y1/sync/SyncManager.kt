@@ -243,6 +243,10 @@ class SyncManager internal constructor(context: Context? = null) {
             if ("off".equals(syncMode, ignoreCase = true)) {
                 continue
             }
+            if (com.themoon.y1.FeatureVisibility.skipsJellyfinLibrary(ctx, lib.collectionType)) {
+                for (item in ledger.getItemsByLibrary(lib.id)) seenServerItemIds.add(item.jellyfinId) // keep the local files
+                continue
+            }
 
             updateState(SyncState.SCANNING_REMOTE, "Scanning " + lib.name + "...")
 
