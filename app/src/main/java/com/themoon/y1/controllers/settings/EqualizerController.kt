@@ -22,6 +22,7 @@ import com.themoon.y1.managers.AudioEffectManager
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.EqSliderView
+import com.themoon.y1.views.ListItemViewFactory
 import com.themoon.y1.views.TablerIcons
 
 /**
@@ -338,7 +339,7 @@ class EqualizerController(
         for (i in eqPresetNames.indices) {
             val presetId = "preset_$i"
             val isCurrent = currentEqProfile == presetId
-            val row = createSettingRow(localize(eqPresetNames[i]), if (isCurrent) "✓" else "")
+            val row = ListItemViewFactory.createCheckListButton(activity, localize(eqPresetNames[i]), isCurrent)
             row.setOnClickListener {
                 clickFeedback()
                 currentEqProfile = presetId
@@ -355,7 +356,7 @@ class EqualizerController(
                 if (name.isBlank()) continue
                 val profileId = "custom_$name"
                 val isCurrent = currentEqProfile == profileId
-                val row = createSettingRow(name, if (isCurrent) "✓" else "")
+                val row = ListItemViewFactory.createCheckListButton(activity, name, isCurrent)
                 row.setOnClickListener {
                     clickFeedback()
                     currentEqProfile = profileId

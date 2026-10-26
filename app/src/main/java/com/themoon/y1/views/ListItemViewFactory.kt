@@ -364,6 +364,17 @@ object ListItemViewFactory {
         focusedIconColor = focusedColor
     )
 
+    /**
+     * A row of a single-choice list (Theme, Language, EQ preset...). Each row keeps the tick column on the
+     * left, so the text does not move; only the chosen row shows the tick ([CheckMarkView]). Normal text and
+     * focus colours.
+     */
+    fun createCheckListButton(context: Context, text: String, isChecked: Boolean): View {
+        val row = createTablerListButton(context, TablerIcons.CHECK, text)
+        if (!isChecked) (row as ViewGroup).getChildAt(0).visibility = View.INVISIBLE
+        return row
+    }
+
     fun createTablerListButtonWithRightIcon(
         context: Context,
         iconPaths: Array<String>?,
@@ -393,7 +404,11 @@ object ListItemViewFactory {
 
         val iconSize = (18f * d).toInt()
         var ivLeft: ImageView? = null
-        if (iconPaths != null) {
+        // The tick of a selection list: the same column, but as tall as the capital letters of the text.
+        val tick = if (iconPaths === TablerIcons.CHECK) CheckMarkView(context) else null
+        if (tick != null) {
+            row.addView(tick)
+        } else if (iconPaths != null) {
             ivLeft = ImageView(context).apply {
                 layoutParams = LinearLayout.LayoutParams(iconSize, iconSize).apply {
                     rightMargin = (10f * d).toInt()
@@ -416,6 +431,7 @@ object ListItemViewFactory {
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f)
         }
         row.addView(tv)
+        tick?.textView = tv
 
         val rightIconSize = (16f * d).toInt()
         var ivRight: ImageView? = null
@@ -433,12 +449,14 @@ object ListItemViewFactory {
             row.background = if (focused) {
                 tv.setTextColor(actualFocusedTextColor)
                 tv.isSelected = true
+                tick?.color = actualFocusedIconColor
                 if (iconPaths != null) ivLeft?.setImageBitmap(TablerIcons.render(iconPaths, iconSize, actualFocusedIconColor))
                 if (rightIconPaths != null) ivRight?.setImageBitmap(TablerIcons.render(rightIconPaths, rightIconSize, actualFocusedIconColor))
                 createFocusedButtonBackground(context)
             } else {
                 tv.setTextColor(actualTextColor)
                 tv.isSelected = false
+                tick?.color = actualIconColor
                 if (iconPaths != null) ivLeft?.setImageBitmap(TablerIcons.render(iconPaths, iconSize, actualIconColor))
                 if (rightIconPaths != null) ivRight?.setImageBitmap(TablerIcons.render(rightIconPaths, rightIconSize, ThemeManager.getTextColorSecondary()))
                 createButtonBackground(context, ThemeManager.getListButtonNormalBg())
