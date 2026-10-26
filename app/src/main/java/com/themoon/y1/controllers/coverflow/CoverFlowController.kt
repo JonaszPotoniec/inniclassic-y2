@@ -17,6 +17,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import com.themoon.y1.MainActivity
 import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
@@ -58,6 +59,34 @@ class CoverFlowController(
     private var coverFlowDirectionChangeTime = 0L
     private var lastCoverFlowWheelTime = 0L
 
+    // Speed scrolling: after a fast wheel turn, the wheel moves through the artist letters (see CoverFlowLetterJump).
+    private val letterJump = CoverFlowLetterJump(uniqueAlbumList, object : CoverFlowLetterJump.Ui {
+        override fun showLetter(letter: String) { MainActivity.instance?.showJumpLetter(letter) }
+        override fun hideLetter() { MainActivity.instance?.hideFastScrollLetter() }
+        override fun goTo(index: Int) = settleOnAlbum(index)
+        override fun click() = clickFeedback()
+        override fun postDelayed(task: Runnable, delayMs: Long) { rootView.postDelayed(task, delayMs) }
+        override fun cancel(task: Runnable) { rootView.removeCallbacks(task) }
+    })
+
+    // Fly-by at the end of a letter jump (see CoverFlowFlyBy). Positions are album numbers that can be
+    // fractional, and can be outside 0 until total after wheel steps (the cards show them modulo total).
+    private var flying = false
+    private var flyStartPos = 0f
+    private var flyTarget = 0
+    private var flyStartTime = 0L
+    private var flyDurationMs = 0L
+    /** The position on the screen now. */
+    private var flyPos = 0f
+    /** The album of the centre card (views[centre]) during a fly-by; the other cards have the next albums. */
+    private var cardsBase = 0
+    private val flyFrame = Runnable { onFlyFrame() }
+    // Card position, angle, scale and alpha at each slot (-4..4), made at the start of a fly-by: no work for them in a frame.
+    private val slotX = FloatArray(visibleCoversCount)
+    private val slotRotY = FloatArray(visibleCoversCount)
+    private val slotScale = FloatArray(visibleCoversCount)
+    private val slotAlpha = FloatArray(visibleCoversCount)
+
     override fun onEnter(state: ScreenState) {
         buildCoverFlowUI()
     }
@@ -78,12 +107,16 @@ class CoverFlowController(
     }
 
     override fun onExit() {
+        letterJump.reset()
+        stopFlyBy()
         cancelAllAnimations()
         // Keep the layout and its cards for the next entry (no new views and bitmaps).
         containerBrowserItems.removeAllViews()
     }
 
     fun buildCoverFlowUI() {
+        letterJump.reset()
+        stopFlyBy()
         val statusBar = activity.findViewById<View>(R.id.layout_status_bar)
         statusBar?.setBackgroundColor(0x00000000)
 
@@ -546,6 +579,13 @@ class CoverFlowController(
         val lag = now - eventTime
         val diff = now - lastCoverFlowWheelTime
         lastCoverFlowWheelTime = now
+        if (letterJump.onStep(dir, eventTime, currentCoverFlowIndex)) return
+        if (flying) {
+            // The step takes over from where the covers are now: the fly-by goes one album past its target.
+            flyTo(flyTarget + dir)
+            if (lag <= 40) clickFeedback()
+            return
+        }
 
         val duration: Int = when {
             lag > 40 || diff < 40 -> 0
@@ -559,6 +599,138 @@ class CoverFlowController(
             clickFeedback()
         }
     }
+
+    /** End of a letter jump: the covers scroll past fast to album [index]. */
+    private fun settleOnAlbum(index: Int) {
+        val total = uniqueAlbumList.size
+        if (index !in 0 until total) return
+        if (flying) {
+            // In the numbers of the running fly-by (its target can be outside 0 until total after wheel steps).
+            flyTo(index + flyTarget - wrap(flyTarget, total))
+        } else if (index != currentCoverFlowIndex) {
+            flyTo(index)
+        }
+    }
+
+    /**
+     * Starts a fly-by to album [target] from the position on the screen, or changes the target of the running
+     * fly-by (the covers continue from where they are). The album count and select use [target] immediately.
+     */
+    private fun flyTo(target: Int) {
+        val total = uniqueAlbumList.size
+        val views = cfViews ?: return
+        val container = coverFlowContainer ?: return
+        if (total == 0) return
+        if (!flying) {
+            cancelAllAnimations()
+            makeSlots()
+            cardsBase = currentCoverFlowIndex
+            flyPos = currentCoverFlowIndex.toFloat()
+            for (card in views) card?.let { setCardTitleAlpha(it, false, CoverFlowFlyBy.TEXT_FADE_MS) }
+            flying = true
+        }
+        flyStartPos = flyPos
+        flyTarget = target
+        flyStartTime = SystemClock.uptimeMillis()
+        flyDurationMs = CoverFlowFlyBy.durationMs(target - flyPos)
+        currentCoverFlowIndex = wrap(target, total)
+        container.removeCallbacks(flyFrame)
+        container.postOnAnimation(flyFrame)
+    }
+
+    private fun onFlyFrame() {
+        if (!flying) return
+        val elapsed = SystemClock.uptimeMillis() - flyStartTime
+        val done = elapsed >= flyDurationMs
+        flyPos = if (done) flyTarget.toFloat()
+        else flyStartPos + CoverFlowFlyBy.offsetAt(elapsed, flyDurationMs, flyTarget - flyStartPos)
+        placeCards(flyPos)
+        if (!done) {
+            coverFlowContainer?.postOnAnimation(flyFrame)
+            return
+        }
+        stopFlyBy()
+        // Exact positions, the album count, then the text of the centre album fades in.
+        initCoverFlowPositions()
+        cfViews?.get(visibleCoversCount / 2)?.let {
+            setCardTitleAlpha(it, false, 0)
+            setCardTitleAlpha(it, true, CoverFlowFlyBy.TEXT_FADE_MS)
+        }
+    }
+
+    private fun stopFlyBy() {
+        if (!flying) return
+        flying = false
+        coverFlowContainer?.removeCallbacks(flyFrame)
+    }
+
+    /**
+     * Puts the cards at position [pos] (album number, can be fractional). The cards move in the views array as in
+     * a wheel step; only the cards that come in get a new album (from the cover cache, else the placeholder).
+     */
+    private fun placeCards(pos: Float) {
+        val views = cfViews ?: return
+        val total = uniqueAlbumList.size
+        if (total == 0) return
+        val centerIdx = visibleCoversCount / 2
+        val base = Math.floor(pos.toDouble()).toInt()
+        val shift = base - cardsBase
+        if (shift >= visibleCoversCount || shift <= -visibleCoversCount) {
+            for (i in 0 until visibleCoversCount) views[i]?.let { bindCoverData(it, wrap(base + i - centerIdx, total)) }
+        } else if (shift > 0) {
+            repeat(shift) {
+                val first = views[0]
+                for (i in 0 until visibleCoversCount - 1) views[i] = views[i + 1]
+                views[visibleCoversCount - 1] = first
+            }
+            for (i in visibleCoversCount - shift until visibleCoversCount) {
+                views[i]?.let { bindCoverData(it, wrap(base + i - centerIdx, total)) }
+            }
+        } else if (shift < 0) {
+            repeat(-shift) {
+                val last = views[visibleCoversCount - 1]
+                for (i in visibleCoversCount - 1 downTo 1) views[i] = views[i - 1]
+                views[0] = last
+            }
+            for (i in 0 until -shift) views[i]?.let { bindCoverData(it, wrap(base + i - centerIdx, total)) }
+        }
+        cardsBase = base
+        val frac = pos - base
+        for (i in 0 until visibleCoversCount) views[i]?.let { placeCard(it, i - centerIdx - frac) }
+    }
+
+    /** Puts [card] at [offset] albums from the centre: between two slots, the values are interpolated. */
+    private fun placeCard(card: View, offset: Float) {
+        val maxDist = visibleCoversCount / 2
+        val o = offset.coerceIn(-maxDist.toFloat(), maxDist.toFloat())
+        val k = Math.floor(o.toDouble()).toInt()
+        val t = o - k
+        val a = k + maxDist
+        val b = if (t > 0f) a + 1 else a
+        card.translationX = slotX[a] + (slotX[b] - slotX[a]) * t
+        card.rotationY = slotRotY[a] + (slotRotY[b] - slotRotY[a]) * t
+        val scale = slotScale[a] + (slotScale[b] - slotScale[a]) * t
+        card.scaleX = scale
+        card.scaleY = scale
+        // A card at alpha 0 is not drawn.
+        card.alpha = slotAlpha[a] + (slotAlpha[b] - slotAlpha[a]) * t
+    }
+
+    /** The slot values, the same as in [initCoverFlowPositions]. */
+    private fun makeSlots() {
+        val d = activity.resources.displayMetrics.density
+        val centerIdx = visibleCoversCount / 2
+        for (i in 0 until visibleCoversCount) {
+            val dist = Math.abs(i - centerIdx)
+            val sign = if (i < centerIdx) -1f else 1f
+            slotX[i] = sign * getTransXForDist(dist, d)
+            slotRotY[i] = -sign * getRotYForDist(dist)
+            slotScale[i] = getScaleForDist(dist)
+            slotAlpha[i] = getAlphaForDist(dist)
+        }
+    }
+
+    private fun wrap(index: Int, total: Int): Int = ((index % total) + total) % total
 
     private fun scrollCoverFlow(isNext: Boolean, duration: Int) {
         val total = uniqueAlbumList.size
@@ -624,6 +796,8 @@ class CoverFlowController(
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // Letter mode: a centre press only ends it; Back and Play/Pause end it, then work as usual.
+        if (letterJump.onKey(event.keyCode, event.action == KeyEvent.ACTION_DOWN, event.repeatCount)) return true
         if (event.action == KeyEvent.ACTION_DOWN && (event.keyCode == 21 || event.keyCode == 22)) {
             handleCoverFlowWheelInput(event.keyCode, event)
             return true
