@@ -171,9 +171,10 @@ class WifiController(
             if (wifiInfo != null && wifiInfo.ssid != null) {
                 connectedSSID = wifiInfo.ssid.replace("\"", "")
             }
+            val networks = results.filterNot { WifiScanFilter.isDriverWarning(it.BSSID, it.SSID) }
 
             // 1. Current connected Wi-Fi at the top
-            for (result in results) {
+            for (result in networks) {
                 val ssid = result.SSID
                 if (!ssid.isNullOrEmpty() && !foundWifiNetworks.contains(ssid)) {
                     if (ssid == connectedSSID) {
@@ -184,7 +185,7 @@ class WifiController(
             }
 
             // 2. Remaining available Wi-Fi networks
-            for (result in results) {
+            for (result in networks) {
                 val ssid = result.SSID
                 if (!ssid.isNullOrEmpty() && !foundWifiNetworks.contains(ssid)) {
                     foundWifiNetworks.add(ssid)
