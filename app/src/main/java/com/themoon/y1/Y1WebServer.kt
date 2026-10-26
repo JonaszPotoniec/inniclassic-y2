@@ -569,8 +569,8 @@ class Y1WebServer @JvmOverloads constructor(
                             "    let box = document.getElementById('statusBox');" +
                             "    if (s.loggedIn) {" +
                             "      box.innerHTML = `<p>Logged in as <b id='lastfmUsername'></b></p>` +" +
-                            "        `<button onclick='setEnabled(\${!s.enabled})'>Turn Scrobbling \${s.enabled ? 'OFF' : 'ON'}</button>` +" +
-                            "        `<p>Scrobbling is currently <b>\${s.enabled ? 'ON' : 'OFF'}</b></p>` +" +
+                            "        `<button onclick='setEnabled(\${!s.enabled})'>Turn scrobbling \${s.enabled ? 'off' : 'on'}</button>` +" +
+                            "        `<p>Scrobbling is <b>\${s.enabled ? 'on' : 'off'}</b></p>` +" +
                             "        `<button class='danger' onclick='doLogout()'>Log Out</button>`;" +
                             "      document.getElementById('lastfmUsername').textContent = '@' + s.username;" +
                             "      document.getElementById('loginBox').style.display = 'none';" +

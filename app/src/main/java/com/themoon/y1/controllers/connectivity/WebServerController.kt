@@ -85,7 +85,7 @@ class WebServerController(
         } else {
             val wm = activity.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
             if (wm == null || !wm.isWifiEnabled) {
-                Toast.makeText(activity, localize("Please turn ON Wi-Fi first"), Toast.LENGTH_SHORT).show()
+                Toast.makeText(activity, localize("Turn on Wi-Fi first"), Toast.LENGTH_SHORT).show()
                 return
             }
 

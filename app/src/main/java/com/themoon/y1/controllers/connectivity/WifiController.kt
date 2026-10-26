@@ -94,7 +94,7 @@ class WifiController(
             }
             wm?.startScan()
         } else {
-            btnScanWifi.text = localize("Wi-Fi is OFF")
+            btnScanWifi.text = localize("Wi-Fi is off")
             if (containerWifiItems.childCount > 0) {
                 containerWifiItems.getChildAt(0).requestFocus()
             }
@@ -125,10 +125,10 @@ class WifiController(
                 if (wm != null) {
                     val isCurrentlyOn = wm.isWifiEnabled
                     if (isCurrentlyOn) {
-                        Toast.makeText(activity, localize("Turning Wi-Fi OFF..."), Toast.LENGTH_SHORT).show()
+                        Toast.makeText(activity, localize("Turning Wi-Fi off…"), Toast.LENGTH_SHORT).show()
                         wm.isWifiEnabled = false
                     } else {
-                        Toast.makeText(activity, localize("Turning Wi-Fi ON..."), Toast.LENGTH_SHORT).show()
+                        Toast.makeText(activity, localize("Turning Wi-Fi on…"), Toast.LENGTH_SHORT).show()
                         wm.isWifiEnabled = true
                     }
                     val tvRight = btnToggle.getChildAt(1) as? TextView

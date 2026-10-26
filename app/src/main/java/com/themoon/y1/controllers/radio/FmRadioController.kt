@@ -379,7 +379,7 @@ class FmRadioController(
                     text = "● " + localize("PLAYING")
                     setTextColor(themeHighlightColor)
                 } else {
-                    text = localize("OFF") + " (" + localize("Press Center or Play to Turn ON") + ")"
+                    text = localize("Off (press Center or Play to turn on)")
                     setTextColor(0xFF888888.toInt())
                 }
                 textSize = 14f
@@ -576,7 +576,7 @@ class FmRadioController(
                 tvStatus.text = "● " + localize("PLAYING")
                 tvStatus.setTextColor(themeHighlightColor)
             } else {
-                tvStatus.text = localize("OFF") + " (" + localize("Press Center or Play to Turn ON") + ")"
+                tvStatus.text = localize("Off (press Center or Play to turn on)")
                 tvStatus.setTextColor(0xFF888888.toInt())
             }
         }
