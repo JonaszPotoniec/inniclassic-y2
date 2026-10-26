@@ -345,6 +345,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             ?: prefs.getString("current_theme_name", "Classic Light")
         val themeIdx = ThemeManager.findThemeIndexByName(savedThemeName)
         if (themeIdx != -1) ThemeManager.setThemeIndex(themeIdx)
+        com.themoon.y1.managers.AutoThemeManager.applyAtStart(prefs)
 
         loadPreferences()
         initViewBindings()
@@ -448,6 +449,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         updateMainMenuBackground()
         changeScreen(STATE_MENU)
         applyTheme()
+        com.themoon.y1.managers.AutoThemeManager.start(this)
         Handler(Looper.getMainLooper()).postDelayed({ usbStateReceiverReady = true }, 2000)
     }
 
