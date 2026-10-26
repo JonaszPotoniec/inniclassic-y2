@@ -557,7 +557,8 @@ internal fun MainActivity.initControllers() {
         },
         resetBacklightTimer = { powerBacklightManager?.resetTimer() },
         applySoundSetting = {
-            isSoundEffectEnabled = prefs.getBoolean("sound_effect", true)
+            isSoundEffectEnabled = prefs.getBoolean("sound", true)
+            updateScreenOffFeedback(true)
         },
         applyAlbumTiltSetting = {
             isAlbumTiltEnabled = prefs.getBoolean("album_tilt_effect", true)

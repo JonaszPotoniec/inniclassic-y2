@@ -378,6 +378,7 @@ class SettingsController(
             clickFeedback()
             isSoundCheckEnabled = !isSoundCheckEnabled
             prefs.edit().putBoolean("sound_check_enabled", isSoundCheckEnabled).commit()
+            mainActivity?.isSoundCheckEnabled = isSoundCheckEnabled
             val tvStatus = btnSoundCheck.getChildAt(1) as? TextView
             tvStatus?.text = if (isSoundCheckEnabled) localize("ON") else localize("OFF")
             AudioEffectManager.getInstance().applySoundCheck()
@@ -946,6 +947,7 @@ class SettingsController(
         )
         btnToggle.setOnClickListener {
             isVibrationEnabled = !isVibrationEnabled
+            mainActivity?.isVibrationEnabled = isVibrationEnabled
             clickFeedback()
             val tv = btnToggle.getChildAt(1) as? TextView
             tv?.text = if (isVibrationEnabled) localize("ON") else localize("OFF")
@@ -968,6 +970,7 @@ class SettingsController(
         )
         btnStrength.setOnClickListener {
             vibrationStrengthLevel = (vibrationStrengthLevel + 1) % 3
+            mainActivity?.vibrationStrengthLevel = vibrationStrengthLevel
             clickFeedback()
             val tv = btnStrength.getChildAt(1) as? TextView
             tv?.text = localize(VIBE_STRENGTH_NAMES[vibrationStrengthLevel])
@@ -1465,6 +1468,7 @@ class SettingsController(
                 .commit()
         } catch (_: Exception) {}
 
+        mainActivity?.isSoundCheckEnabled = false
         AudioEffectManager.getInstance().applySoundCheck()
         AudioEffectManager.getInstance().applyEqProfile()
         applyAlbumTiltSetting()

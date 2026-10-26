@@ -130,6 +130,11 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         const val VIRTUAL_VOLUME_STEPS = 30
 
         var instance: MainActivity? = null
+
+        // Whether this app process holds a mute on STREAM_SYSTEM (see setSystemSoundsMuted)
+        @Volatile
+        private var isSystemStreamMuted = false
+
         val customLibrary: ArrayList<SongItem> = ArrayList()
         val audiobookLibrary: ArrayList<SongItem> = ArrayList()
         val trackNumberMap: HashMap<String, Int> = HashMap()
@@ -909,7 +914,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     fun updateScreenOffFeedback(screenOn: Boolean) {
         try {
             if (screenOn) {
-                audioManager.setStreamMute(AudioManager.STREAM_SYSTEM, !isSoundEffectEnabled)
+                setSystemSoundsMuted(!isSoundEffectEnabled)
                 Settings.System.putInt(
                     contentResolver,
                     Settings.System.SOUND_EFFECTS_ENABLED,
@@ -922,12 +927,25 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                 )
             } else {
                 if (!isScreenOffControlEnabled) {
-                    audioManager.setStreamMute(AudioManager.STREAM_SYSTEM, true)
+                    setSystemSoundsMuted(true)
                     Settings.System.putInt(contentResolver, Settings.System.SOUND_EFFECTS_ENABLED, 0)
                     Settings.System.putInt(contentResolver, Settings.System.HAPTIC_FEEDBACK_ENABLED, 0)
                 }
             }
         } catch (_: Exception) {}
+    }
+
+    /**
+     * On API 19 setStreamMute is reference-counted per AudioManager: each mute needs its own unmute, and
+     * extra mutes keep the stream muted. So mute or unmute only when the state changes, always through the
+     * application's AudioManager, so that a recreated activity uses the same mute. Android removes the
+     * mute when the app process dies.
+     */
+    private fun setSystemSoundsMuted(muted: Boolean) {
+        if (muted == isSystemStreamMuted) return
+        val am = applicationContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        am.setStreamMute(AudioManager.STREAM_SYSTEM, muted)
+        isSystemStreamMuted = muted
     }
 
     private fun autoManageWifiPower(isGoingToSleep: Boolean) {
