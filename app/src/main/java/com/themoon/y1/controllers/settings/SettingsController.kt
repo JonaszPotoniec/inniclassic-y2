@@ -1149,56 +1149,104 @@ class SettingsController(
         }
         containerSettingsItems.addView(rowMinute)
 
-        createCategoryHeader("━━━━━━━━━━━━━━")
-
-        val btnApply = createListButton(localize("APPLY DATE & TIME"))
-        btnApply.setTextColor(0xFFFFFFFF.toInt())
-        btnApply.typeface = ThemeManager.getCustomFontBold()
-        btnApply.setOnClickListener {
-            clickFeedback()
-            applySystemDateTime()
-            buildSettingsUI()
-        }
-        containerSettingsItems.addView(btnApply)
+        // A new value applies at once (setClockField): no Apply button.
+        addSyncTimeRow()
 
         if (containerSettingsItems.childCount > 0) {
             containerSettingsItems.getChildAt(0)?.requestFocus()
         }
     }
 
-    private fun applySystemDateTime() {
-        try {
-            val cmd = "settings put global auto_time 0; settings put system auto_time 0; "
-            val targetYMD = String.format(Locale.US, "%04d%02d%02d", dtYear, dtMonth, dtDay)
-            val dateToolbox = String.format(
-                Locale.US, "%04d%02d%02d.%02d%02d%02d",
-                dtYear, dtMonth, dtDay, dtHour, dtMinute, 0
-            )
-            val datePosix = String.format(
-                Locale.US, "%02d%02d%02d%02d%04d.00",
-                dtMonth, dtDay, dtHour, dtMinute, dtYear
-            )
-            val dateString = String.format(
-                Locale.US, "%04d-%02d-%02d %02d:%02d:%02d",
-                dtYear, dtMonth, dtDay, dtHour, dtMinute, 0
-            )
-            val executeCmd = cmd +
-                "date -s $dateToolbox; " +
-                "if [ \"$(date +%Y%m%d)\" != \"$targetYMD\" ]; then " +
-                "  date $datePosix; " +
-                "  if [ \"$(date +%Y%m%d)\" != \"$targetYMD\" ]; then " +
-                "    date -s \"$dateString\"; " +
-                "  fi; " +
-                "fi; " +
-                "hwclock -w; sync"
+    // Date & Time → Sync Time Now: the last result (shown as the row value for SYNC_RESULT_MS), and the row itself
+    private var syncResult: String? = null
+    private var syncResultAt = 0L
+    private var syncRunning = false
+    private var syncRow: View? = null
+    private val SYNC_RESULT_MS = 120000L
 
-            val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", executeCmd))
-            proc.waitFor()
-            activity.sendBroadcast(Intent(Intent.ACTION_TIME_CHANGED))
-            Toast.makeText(activity, localize("Time applied successfully!"), Toast.LENGTH_SHORT).show()
-        } catch (_: Exception) {
-            Toast.makeText(activity, localize("Failed: Root access required."), Toast.LENGTH_SHORT).show()
+    /** Date & Time → Sync Time Now: sets the clock from the internet now (DateTimeSync). Only with Wi-Fi, else grey. */
+    private fun addSyncTimeRow() {
+        val online = DateTimeSync.isWifiConnected(activity)
+        val recent = syncResult?.takeIf { android.os.SystemClock.elapsedRealtime() - syncResultAt < SYNC_RESULT_MS }
+        val value = when {
+            !online -> localize("Requires Wi-Fi")
+            syncRunning -> localize("Syncing…")
+            else -> recent ?: ""
         }
+        val row = createSettingRow(localize("Sync Time Now"), value)
+        if (!online) {
+            // Grey, and the wheel does not stop on it (onWheel skips rows that are not focusable)
+            row.isFocusable = false
+            for (i in 0 until row.childCount) row.getChildAt(i).alpha = 0.4f
+        }
+        row.setOnClickListener {
+            if (syncRunning) return@setOnClickListener
+            clickFeedback()
+            syncRunning = true
+            (row.getChildAt(1) as? TextView)?.text = localize("Syncing…")
+            Thread {
+                var error: String? = "No answer from the time server."
+                for (host in DateTimeSync.servers(activity)) {
+                    val time = DateTimeSync.query(host) ?: continue
+                    error = DateTimeSync.setSystemTime(time.now(), manual = false)
+                    break
+                }
+                activity.runOnUiThread { onSyncDone(error) }
+            }.start()
+        }
+        containerSettingsItems.addView(row)
+        syncRow = row
+    }
+
+    private fun onSyncDone(error: String?) {
+        syncRunning = false
+        val is24Hour = prefs.getBoolean("is_24h_format", true)
+        val time = java.text.SimpleDateFormat(if (is24Hour) "HH:mm:ss" else "h:mm:ss a", Locale.US).format(java.util.Date())
+        syncResult = if (error == null) localize("Set to") + " " + time else localize("Failed")
+        syncResultAt = android.os.SystemClock.elapsedRealtime()
+        val message = if (error == null) localize("Time set from the internet:") + " " + time else localize(error)
+        Toast.makeText(activity, message, Toast.LENGTH_SHORT).show()
+        refreshDateTimeScreen()
+    }
+
+    /** A value from the Year...Minute list: the clock changes at once, the other values stay (DateTimeSync.withField). */
+    private fun setClockField(field: String, value: Int) {
+        val target = DateTimeSync.withField(System.currentTimeMillis(), TimeZone.getDefault(), field, value)
+        Thread {
+            val error = DateTimeSync.setSystemTime(target, manual = true)
+            activity.runOnUiThread {
+                if (error != null) Toast.makeText(activity, localize(error), Toast.LENGTH_SHORT).show()
+                refreshDateTimeScreen()
+            }
+        }.start()
+    }
+
+    /** Back from a value list: the focus on the row of that value (Year...Minute), not on the first row. */
+    private fun focusDateTimeRow(label: String) {
+        val title = localize(label)
+        for (i in 0 until containerSettingsItems.childCount) {
+            val row = containerSettingsItems.getChildAt(i) as? ViewGroup ?: continue
+            if ((row.getChildAt(0) as? TextView)?.text?.toString() == title) {
+                row.requestFocus()
+                return
+            }
+        }
+    }
+
+    /** Takes Year...Minute from the clock again, and shows them if the Date & Time list shows (the focus stays). */
+    private fun refreshDateTimeScreen() {
+        val c = Calendar.getInstance()
+        dtYear = c.get(Calendar.YEAR)
+        dtMonth = c.get(Calendar.MONTH) + 1
+        dtDay = c.get(Calendar.DAY_OF_MONTH)
+        dtHour = c.get(Calendar.HOUR_OF_DAY)
+        dtMinute = c.get(Calendar.MINUTE)
+        val row = syncRow ?: return
+        if (currentSettingsDepth != 1 || containerSettingsItems.indexOfChild(row) < 0) return
+        val focus = containerSettingsItems.findFocus()
+        val index = if (focus != null) containerSettingsItems.indexOfChild(focus) else -1
+        buildDateTimeUI()
+        if (index >= 0) containerSettingsItems.getChildAt(index)?.requestFocus()
     }
 
     private fun applySystemTimeZone(zoneId: String) {
@@ -1275,7 +1323,9 @@ class SettingsController(
                     "Hour" -> dtHour = valNum
                     "Minute" -> dtMinute = valNum
                 }
+                setClockField(type, valNum)
                 buildDateTimeUI()
+                focusDateTimeRow(if (type == "Hour") "Hour (24H)" else type)
             }
             containerSettingsItems.addView(btn)
             if (valNum == currentValue) focusBtn = btn
