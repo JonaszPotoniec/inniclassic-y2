@@ -91,6 +91,7 @@ import com.themoon.y1.views.ImageEffects
 import com.themoon.y1.views.ListItemViewFactory
 import java.io.File
 import java.util.ArrayList
+import java.util.Date
 import java.util.HashMap
 import java.util.HashSet
 
@@ -164,8 +165,8 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             }
         }
     var isAutoFetchEnabled: Boolean = true
-    var is24HourFormat: Boolean = false
-    var isTimeInTitleBar: Boolean = false
+    var is24HourFormat: Boolean = ClockSettings.DEFAULT_24_HOUR_FORMAT
+    var isTimeInTitleBar: Boolean = ClockSettings.DEFAULT_TIME_IN_TITLE
     var isShowBatteryPercentage: Boolean = false
     var isSoundCheckEnabled: Boolean = false
     var isAlbumTiltEnabled: Boolean = true
@@ -258,6 +259,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     var ivStatusWifi: ImageView? = null
     var ivStatusBluetooth: ImageView? = null
     var ivStatusHeadphone: ImageView? = null
+    var tvStatusTime: TextView? = null
     var tvStatusBattery: TextView? = null
     var batteryIconView: BatteryIconView? = null
     var volumeProgress: ProgressBar? = null
@@ -442,6 +444,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             }
         } catch (_: Exception) {}
 
+        updateStatusBarClock()
         updateMainMenuBackground()
         changeScreen(STATE_MENU)
         applyTheme()
@@ -453,6 +456,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         isScreenSleeping = false
         powerBacklightManager?.resetTimer()
         updateScreenOffFeedback(true)
+        updateStatusBarClock()
         applyTheme()
     }
 
@@ -967,6 +971,21 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         }
     }
 
+    fun updateStatusBarClock() {
+        val tv = tvStatusTime ?: return
+        if (isTimeInTitleBar) {
+            tv.text = ClockSettings.formatStatusBarTime(Date(), is24HourFormat)
+            tv.visibility = View.VISIBLE
+        } else {
+            tv.visibility = View.GONE
+        }
+    }
+
+    fun onClockSettingsChanged() {
+        updateStatusBarClock()
+        homeWidgetsController?.refreshWidgets()
+    }
+
     fun isPaneBasedScreen(): Boolean {
         return when (currentScreenState) {
             STATE_MENU -> true
@@ -1190,6 +1209,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                     isScreenSleeping = false
                     powerBacklightManager?.resetTimer()
                     updateScreenOffFeedback(true)
+                    updateStatusBarClock()
                 }
                 Intent.ACTION_SCREEN_OFF -> {
                     isScreenSleeping = true
@@ -1197,6 +1217,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                     updateScreenOffFeedback(false)
                 }
                 Intent.ACTION_TIME_TICK, Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED -> {
+                    updateStatusBarClock()
                     homeWidgetsController?.refreshWidgets()
                 }
                 Intent.ACTION_SHUTDOWN, "android.intent.action.QUICKBOOT_POWEROFF", "com.htc.intent.action.QUICKBOOT_POWEROFF" -> {

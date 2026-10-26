@@ -17,6 +17,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import com.themoon.y1.ClockSettings
 import com.themoon.y1.MainActivity
 import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
@@ -1077,19 +1078,20 @@ class SettingsController(
         currentSettingsDepth = 1
         containerSettingsItems.removeAllViews()
 
-        var is24HourFormat = prefs.getBoolean("is_24h_format", true)
+        var is24HourFormat = prefs.getBoolean(ClockSettings.KEY_24_HOUR_FORMAT, ClockSettings.DEFAULT_24_HOUR_FORMAT)
         val formatRightText = if (is24HourFormat) localize("24 Hour") else localize("12 Hour")
         val rowFormat = createSettingRow(localize("Time Format"), formatRightText)
         rowFormat.setOnClickListener {
             clickFeedback()
             is24HourFormat = !is24HourFormat
             mainActivity?.is24HourFormat = is24HourFormat
-            prefs.edit().putBoolean("is_24h_format", is24HourFormat).commit()
+            prefs.edit().putBoolean(ClockSettings.KEY_24_HOUR_FORMAT, is24HourFormat).commit()
+            mainActivity?.onClockSettingsChanged()
             buildDateTimeUI()
         }
         containerSettingsItems.addView(rowFormat)
 
-        var isTimeInTitleBar = prefs.getBoolean("time_in_title_bar", true)
+        var isTimeInTitleBar = prefs.getBoolean(ClockSettings.KEY_TIME_IN_TITLE, ClockSettings.DEFAULT_TIME_IN_TITLE)
         val rowTitleClock = createSettingRow(
             localize("Time in Title"),
             if (isTimeInTitleBar) localize("ON") else localize("OFF")
@@ -1098,7 +1100,8 @@ class SettingsController(
             clickFeedback()
             isTimeInTitleBar = !isTimeInTitleBar
             mainActivity?.isTimeInTitleBar = isTimeInTitleBar
-            prefs.edit().putBoolean("time_in_title_bar", isTimeInTitleBar).commit()
+            prefs.edit().putBoolean(ClockSettings.KEY_TIME_IN_TITLE, isTimeInTitleBar).commit()
+            mainActivity?.onClockSettingsChanged()
             val tvStatus = rowTitleClock.getChildAt(1) as? TextView
             tvStatus?.text = if (isTimeInTitleBar) localize("ON") else localize("OFF")
         }
@@ -1566,8 +1569,8 @@ class SettingsController(
     private fun resetAllAppSettings() {
         try {
             prefs.edit()
-                .remove("is_24h_format")
-                .remove("time_in_title_bar")
+                .remove(ClockSettings.KEY_24_HOUR_FORMAT)
+                .remove(ClockSettings.KEY_TIME_IN_TITLE)
                 .remove("show_battery_percentage")
                 .remove("volume_limit_max")
                 .remove("sound_check_enabled")
@@ -1599,8 +1602,9 @@ class SettingsController(
 
         mainActivity?.isScreenOffControlEnabled = false
         mainActivity?.isShowBatteryPercentage = false
-        mainActivity?.isTimeInTitleBar = false
-        mainActivity?.is24HourFormat = false
+        mainActivity?.isTimeInTitleBar = ClockSettings.DEFAULT_TIME_IN_TITLE
+        mainActivity?.is24HourFormat = ClockSettings.DEFAULT_24_HOUR_FORMAT
+        mainActivity?.onClockSettingsChanged()
         mainActivity?.batteryIconView?.setShowPercentage(false)
 
         Toast.makeText(activity, localize("All settings have been reset."), Toast.LENGTH_SHORT).show()

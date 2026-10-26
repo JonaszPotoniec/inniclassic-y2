@@ -114,7 +114,8 @@ internal fun MainActivity.initControllers() {
         fetchRandomIdleCoverAsync = { fetchRandomIdleCoverAsync() },
         isAudiobookMode = {
             isAudiobookLibraryMode || (isBrowserControllerInitialized() && (browserController.isAudiobookLibraryMode || browserController.currentBrowserMode is BrowserMode.Audiobooks))
-        }
+        },
+        is24HourFormat = { is24HourFormat }
     )
 
     browserController = BrowserController(

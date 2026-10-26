@@ -46,7 +46,8 @@ class HomeWidgetsController(
     private val ivBrowserCover: ImageView?,
     private val frameBrowserCover: View?,
     private val fetchRandomIdleCoverAsync: () -> Unit,
-    private val isAudiobookMode: () -> Boolean = { false }
+    private val isAudiobookMode: () -> Boolean = { false },
+    private val is24HourFormat: () -> Boolean = { true }
 ) {
 
     private val widgetViewRegistry: Map<View, ThemeManager.MenuElement>
@@ -68,7 +69,6 @@ class HomeWidgetsController(
     var isWidgetCircularBatteryOn = false
     var isWidgetFocusImageOn = false
 
-    var is24HourFormat = true
     var currentClockSize = 14
 
     var lastAlbumArtBytes: ByteArray? = null
@@ -112,7 +112,7 @@ class HomeWidgetsController(
                 clockTv.setLineSpacing(0f, 1.1f)
 
                 val now = Date()
-                val widgetTimeFormat = if (is24HourFormat) "HH:mm" else "hh:mm"
+                val widgetTimeFormat = if (is24HourFormat()) "HH:mm" else "hh:mm"
                 val sdfTime = SimpleDateFormat(widgetTimeFormat, Locale.US)
                 val sdfDate = SimpleDateFormat("EEE, MMM dd", Locale.US)
                 val timeStr = sdfTime.format(now)
