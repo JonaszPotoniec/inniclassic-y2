@@ -275,6 +275,8 @@ internal fun MainActivity.applyThemeInternal() {
                 btnServerToggle.typeface = ThemeManager.getCustomFont()
             }
         }
+
+        com.themoon.y1.views.IpodClassicLayout.apply(this)
     } catch (_: Exception) {}
 }
 

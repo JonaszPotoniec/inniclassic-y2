@@ -24,6 +24,8 @@ import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.CircularBatteryView
 import com.themoon.y1.views.ClassicMenuStyle
 import com.themoon.y1.views.CustomAnalogClockView
+import com.themoon.y1.views.IpodClassicLayout
+import com.themoon.y1.views.IpodClassicLists
 import com.themoon.y1.views.WidgetBatteryBarView
 import java.util.Locale
 import java.io.File
@@ -124,7 +126,7 @@ class MainMenuController(
     fun buildDynamicMainMenuUI() {
         val safeMenuIndex = lastMainMenuFocusIndex
         val mainMenu = layoutMainMenu
-        val statusBarHeightDp = 26
+        val statusBarHeightDp = ClassicMenuStyle.STATUS_HEIGHT_DP
         val density = activity.resources.displayMetrics.density
         val safeTopPadding = (statusBarHeightDp * density).toInt()
 
@@ -173,7 +175,7 @@ class MainMenuController(
         ivWidgetFocusImage = null
         ivAnimatedCover = null
 
-        val elements = ThemeManager.getCurrentTheme().menuElements
+        val elements = IpodClassicLists.menuElements(ThemeManager.getCurrentTheme().menuElements, activity)
         val buttonElements = ArrayList<ThemeManager.MenuElement>()
         val widgetElements = ArrayList<ThemeManager.MenuElement>()
 
@@ -410,12 +412,14 @@ class MainMenuController(
                     val animContainer = FrameLayout(activity)
                     val dm = activity.resources.displayMetrics
                     val leftPx = (el.x * density).toInt()
+                    // The iPod Classic layout (Classic themes) puts the cover below the full-width status bar (IpodClassicLists.menuElements).
+                    val topPx = if (IpodClassicLayout.isActive) (el.y * density).toInt() else 0
                     val contW = dm.widthPixels - leftPx
-                    val contH = dm.heightPixels
+                    val contH = dm.heightPixels - topPx
 
                     val coverLp = FrameLayout.LayoutParams(contW, contH).apply {
                         leftMargin = leftPx
-                        topMargin = 0
+                        topMargin = topPx
                     }
                     animContainer.layoutParams = coverLp
                     animContainer.clipChildren = true
@@ -696,6 +700,7 @@ class MainMenuController(
 
         currentButtons.clear()
         currentButtons.addAll(createdButtons)
+        IpodClassicLists.styleMainMenuButtons(createdButtons)
 
         // 3. Chain Focus Navigation Loop
         val totalBtns = createdButtons.size

@@ -241,6 +241,7 @@ object ListItemViewFactory {
 
         updateBg(false)
         btn.setOnFocusChangeListener { _, hasFocus -> updateBg(hasFocus) }
+        IpodClassicLists.styleListRow(btn, btn, null)
         return btn
     }
 
@@ -338,6 +339,7 @@ object ListItemViewFactory {
 
         updateBg(false)
         row.setOnFocusChangeListener { _, hasFocus -> updateBg(hasFocus) }
+        IpodClassicLists.styleListRow(row, tvTitle, tvVal)
         return row
     }
 
@@ -471,6 +473,7 @@ object ListItemViewFactory {
 
         updateBg(false)
         row.setOnFocusChangeListener { _, hasFocus -> updateBg(hasFocus) }
+        IpodClassicLists.styleListRow(row, tv, null)
         return row
     }
 
