@@ -8,6 +8,7 @@ import android.view.WindowManager
 import android.widget.ProgressBar
 import android.widget.TextView
 import com.themoon.y1.R
+import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.navigation.ScreenState
 
@@ -69,6 +70,8 @@ class BrightnessController(
         pbBrightness.progress = currentSystemBrightness
         val percent = ((currentSystemBrightness / 255.0f) * 100).toInt()
         tvBrightnessVal.text = "$percent%"
+        // The layout has white text: in a light theme it does not show. Use the theme text colour (as the title).
+        tvBrightnessVal.setTextColor(ThemeManager.getTextColorPrimary())
     }
 
     fun adjustBrightness(delta: Int) {
