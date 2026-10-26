@@ -317,6 +317,12 @@ object ListItemViewFactory {
             includeFontPadding = false
         }
         row.addView(tvVal)
+        // A row that opens a deeper screen: a drawn chevron (ChevronView) in place of the small "〉" text.
+        val (valueText, hasChevron) = DisclosureChevron.split(displayVal)
+        if (hasChevron) {
+            tvVal.text = valueText
+            row.addView(ChevronView(context, tvTitle))
+        }
 
         fun updateBg(focused: Boolean) {
             row.background = if (focused) {
