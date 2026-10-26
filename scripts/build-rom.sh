@@ -8,8 +8,9 @@
 # Type a|b — Y1 stock bases from rockbox-y1.
 # Type y2  — base ROM from y2-test release (Solar Y2 pack), strip Solar
 #            artefacts, install InniClassic launcher as /system/app/com.themoon.y1.apk,
-#            pin scripts/Y2.kl (wheel -> DPAD_LEFT/RIGHT), and add the stock
-#            Bluetooth.apk + Bluetooth.odex from tools/rom_assets (the base has none).
+#            pin scripts/Y2.kl (wheel -> DPAD_LEFT/RIGHT), add the stock
+#            Bluetooth.apk + Bluetooth.odex from tools/rom_assets (the base has none),
+#            and turn off the SystemUI low-battery dialog (the launcher shows its own).
 #
 # Optional override:
 #   Y2_BASE_URL=https://.../rom_y2.zip ./scripts/build-rom.sh y2 out.zip
@@ -350,6 +351,11 @@ audit_rom_contents() {
             errors=$((errors + 1))
         fi
 
+        if ! python3 "$REPO_ROOT/tools/patch_low_battery_warning.py" --check "$sys_mount/framework/framework-res.apk" >/dev/null 2>&1; then
+            echo "audit fail: framework-res.apk still has the low-battery dialog levels" >&2
+            errors=$((errors + 1))
+        fi
+
         local y2_kl=""
         for y2_kl in Generic.kl Stock.kl mtk-tpd-kpd.kl mtk-kpd.kl Rockbox.kl Y2-Rockbox.kl; do
             if [ ! -f "$sys_mount/usr/keylayout/$y2_kl" ]; then
@@ -555,6 +561,11 @@ if [ "$TYPE" = "y2" ]; then
     sudo python3 "$REPO_ROOT/tools/patch_y2_audio.py" "$MOUNT_SYS/lib/libaudiocustparam.so"
     sudo chmod 644 "$MOUNT_SYS/lib/libaudiocustparam.so"
     sudo chown root:root "$MOUNT_SYS/lib/libaudiocustparam.so"
+
+    echo "==> Turning off the SystemUI low-battery dialog and sound in framework-res.apk"
+    sudo python3 "$REPO_ROOT/tools/patch_low_battery_warning.py" "$MOUNT_SYS/framework/framework-res.apk"
+    sudo chmod 644 "$MOUNT_SYS/framework/framework-res.apk"
+    sudo chown root:root "$MOUNT_SYS/framework/framework-res.apk"
 
     echo "==> Installing stock Bluetooth.apk + Bluetooth.odex (tools/rom_assets) in /system/app"
     verify_sha256 "$REPO_ROOT/tools/rom_assets/Bluetooth.apk" "$Y2_BT_APK_SHA256"
