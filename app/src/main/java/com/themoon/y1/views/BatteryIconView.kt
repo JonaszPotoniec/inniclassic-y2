@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
@@ -35,6 +36,13 @@ class BatteryIconView @JvmOverloads constructor(
     private val rectTerminal = RectF()
     private val textBounds = Rect()
     private val boltPath = Path()
+    private val digitPath = Path()
+    private val glyphPath = Path()
+    private val glyphBounds = RectF()
+    private val glyphMatrix = Matrix()
+    private var digitHeightsSize = -1f
+    private var digitHeightsTypeface: Typeface? = null
+    private val digitHeights = FloatArray(10)
 
     init {
         paintFill = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -174,13 +182,13 @@ class BatteryIconView @JvmOverloads constructor(
 
                 buildBoltPath(boltLeft, boltTop, boltW, boltH)
 
-                val textX = startX + boltW + gap - textBounds.left
-                val textY = rectShell.centerY() - textBounds.exactCenterY()
+                buildDigitPath(text, rectShell.centerY())
+                digitPath.offset(Math.round(startX + boltW + gap - glyphBounds.left).toFloat(), 0f)
 
                 paintText.color = color
                 paintBolt.color = color
                 canvas.drawPath(boltPath, paintBolt)
-                canvas.drawText(text, textX, textY, paintText)
+                canvas.drawPath(digitPath, paintText)
 
                 if (currentFillWidth > 0) {
                     val filledColor = 0xFF1C1C1E.toInt()
@@ -189,7 +197,7 @@ class BatteryIconView @JvmOverloads constructor(
                     canvas.save()
                     canvas.clipRect(padX, 0f, padX + currentFillWidth, h)
                     canvas.drawPath(boltPath, paintBolt)
-                    canvas.drawText(text, textX, textY, paintText)
+                    canvas.drawPath(digitPath, paintText)
                     canvas.restore()
                 }
             } else {
@@ -198,19 +206,18 @@ class BatteryIconView @JvmOverloads constructor(
                     paintText.textSize = paintText.textSize * (maxContentWidth / textWidth)
                 }
 
-                paintText.getTextBounds(text, 0, text.length, textBounds)
-                val textX = rectShell.centerX() - textBounds.exactCenterX()
-                val textY = rectShell.centerY() - textBounds.exactCenterY()
+                buildDigitPath(text, rectShell.centerY())
+                digitPath.offset(Math.round(rectShell.centerX() - glyphBounds.centerX()).toFloat(), 0f)
 
                 paintText.color = color
-                canvas.drawText(text, textX, textY, paintText)
+                canvas.drawPath(digitPath, paintText)
 
                 if (currentFillWidth > 0) {
                     val filledTextColor = if (level <= 20) Color.WHITE else 0xFF1C1C1E.toInt()
                     paintText.color = filledTextColor
                     canvas.save()
                     canvas.clipRect(padX, 0f, padX + currentFillWidth, h)
-                    canvas.drawText(text, textX, textY, paintText)
+                    canvas.drawPath(digitPath, paintText)
                     canvas.restore()
                 }
             }
@@ -225,6 +232,44 @@ class BatteryIconView @JvmOverloads constructor(
             paintBolt.color = 0xFF2E7D32.toInt()
             canvas.drawPath(boltPath, paintBolt)
         }
+    }
+
+    /**
+     * Builds [digitPath] from the outlines of [text] (starting at x = 0), with each digit fitted to one box of
+     * whole pixels centred on [centerY] (see [BatteryDigitFit]). Leaves the bounds of the path in [glyphBounds].
+     * drawText() is not used: the hinting of Android 4.4 gave the digits different heights.
+     */
+    private fun buildDigitPath(text: String, centerY: Float) {
+        val height = BatteryDigitFit.boxHeight(digitHeights())
+        val baseline = BatteryDigitFit.baseline(centerY, height)
+        digitPath.reset()
+        var penX = 0f
+        for (i in text.indices) {
+            paintText.getTextPath(text, i, i + 1, Math.round(penX).toFloat(), 0f, glyphPath)
+            glyphPath.computeBounds(glyphBounds, true)
+            if (glyphBounds.height() > 0f) {
+                glyphMatrix.setScale(1f, BatteryDigitFit.scale(glyphBounds.top, glyphBounds.bottom, height))
+                glyphMatrix.postTranslate(0f, BatteryDigitFit.offset(glyphBounds.top, glyphBounds.bottom, baseline, height))
+                glyphPath.transform(glyphMatrix)
+                digitPath.addPath(glyphPath)
+            }
+            penX += paintText.measureText(text, i, i + 1)
+        }
+        digitPath.computeBounds(glyphBounds, true)
+    }
+
+    /** Heights above the baseline of the digits 0-9 at the current text size and typeface. */
+    private fun digitHeights(): FloatArray {
+        if (digitHeightsSize != paintText.textSize || digitHeightsTypeface !== paintText.typeface) {
+            for (d in 0..9) {
+                paintText.getTextPath(d.toString(), 0, 1, 0f, 0f, glyphPath)
+                glyphPath.computeBounds(glyphBounds, true)
+                digitHeights[d] = -glyphBounds.top
+            }
+            digitHeightsSize = paintText.textSize
+            digitHeightsTypeface = paintText.typeface
+        }
+        return digitHeights
     }
 
     private fun buildBoltPath(boltLeft: Float, boltTop: Float, boltW: Float, boltH: Float) {
