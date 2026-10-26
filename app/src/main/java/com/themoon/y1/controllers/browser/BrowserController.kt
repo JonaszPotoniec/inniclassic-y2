@@ -1043,6 +1043,7 @@ class BrowserController(
         if (list.count == 0) return
         val pos = Math.max(0, Math.min(targetPos, list.count - 1))
         virtualListSelectedIndex = pos
+        if (com.themoon.y1.views.ListEdges.focusRow(list, pos)) return
 
         val first = list.firstVisiblePosition
         val last = list.lastVisiblePosition

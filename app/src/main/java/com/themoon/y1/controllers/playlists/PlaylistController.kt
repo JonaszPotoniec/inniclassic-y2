@@ -427,6 +427,10 @@ class PlaylistController(
             val currentIdx = if (curFocused != null) list.getPositionForView(curFocused) else 0
             val targetPos = currentIdx + (if (delta < 0) -1 else 1)
             if (targetPos in 0 until totalCount) {
+                if (com.themoon.y1.views.ListEdges.focusRow(list, targetPos)) {
+                    clickFeedback()
+                    return true
+                }
                 list.setSelection(targetPos)
                 val visiblePos = targetPos - list.firstVisiblePosition
                 if (visiblePos in 0 until list.childCount) {

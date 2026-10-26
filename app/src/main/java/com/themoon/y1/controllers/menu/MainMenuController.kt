@@ -188,7 +188,7 @@ class MainMenuController(
 
             when (el.type) {
                 "list_box" -> {
-                    val sv = ScrollView(activity).apply {
+                    val sv = com.themoon.y1.views.EdgeFadeScrollView(activity).apply {
                         layoutParams = createDynamicLayoutParams(el, density, safeTopPadding)
                         isVerticalScrollBarEnabled = false
                         isFocusable = false

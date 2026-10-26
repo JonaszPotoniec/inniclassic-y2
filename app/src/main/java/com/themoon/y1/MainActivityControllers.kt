@@ -43,6 +43,7 @@ import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.navigation.VideoMode
 import com.themoon.y1.podcasts.PodcastDownloadManager
 import com.themoon.y1.podcasts.PodcastRepository
+import com.themoon.y1.views.EdgeFadeListView
 import com.themoon.y1.views.ListItemViewFactory
 
 internal fun MainActivity.initControllers() {
@@ -65,7 +66,7 @@ internal fun MainActivity.initControllers() {
         addView(hzIndexScroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (40 * resources.displayMetrics.density).toInt()))
     }
 
-    val listVirtualSongs = object : ListView(this) {
+    val listVirtualSongs = object : EdgeFadeListView(this) {
         override fun setVisibility(visibility: Int) {
             super.setVisibility(visibility)
             listContainer.visibility = visibility

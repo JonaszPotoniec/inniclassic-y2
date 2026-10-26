@@ -153,7 +153,7 @@
                     android:visibility="gone" />
             </LinearLayout>
 
-            <ScrollView
+            <com.themoon.y1.views.EdgeFadeScrollView
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:fillViewport="true">
@@ -165,7 +165,7 @@
                     android:orientation="vertical"
                     android:clipChildren="false"
                     android:clipToPadding="false" />
-            </ScrollView>
+            </com.themoon.y1.views.EdgeFadeScrollView>
         </LinearLayout>
 
         <FrameLayout
@@ -203,7 +203,7 @@
             android:paddingLeft="0dp"
             android:paddingRight="0dp">
 
-            <ScrollView
+            <com.themoon.y1.views.EdgeFadeScrollView
                 android:id="@+id/scroll_videos"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
@@ -215,7 +215,7 @@
                     android:orientation="vertical"
                     android:clipChildren="false"
                     android:clipToPadding="false" />
-            </ScrollView>
+            </com.themoon.y1.views.EdgeFadeScrollView>
         </LinearLayout>
 
         <FrameLayout
@@ -246,9 +246,9 @@
         android:background="#66000000"
         android:visibility="gone">
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="SETTINGS" android:textColor="#BBFFFFFF" android:textSize="16sp" android:textStyle="bold" android:singleLine="true" android:visibility="gone"/>
-        <ScrollView android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
+        <com.themoon.y1.views.EdgeFadeScrollView android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
             <LinearLayout android:id="@+id/container_settings_items" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" />
-        </ScrollView>
+        </com.themoon.y1.views.EdgeFadeScrollView>
     </LinearLayout>
 
     <LinearLayout
@@ -263,9 +263,9 @@
         android:background="#66000000"
         android:visibility="gone">
         <TextView android:id="@+id/tv_storage_header" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="ABOUT" android:textColor="#BBFFFFFF" android:textSize="16sp" android:textStyle="bold" android:singleLine="true" android:visibility="gone"/>
-        <ScrollView android:id="@+id/scroll_storage" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
+        <com.themoon.y1.views.EdgeFadeScrollView android:id="@+id/scroll_storage" android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
             <LinearLayout android:id="@+id/container_storage_items" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" />
-        </ScrollView>
+        </com.themoon.y1.views.EdgeFadeScrollView>
     </LinearLayout>
 
     <LinearLayout
@@ -281,9 +281,9 @@
         android:visibility="gone">
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="BLUETOOTH SCAN" android:textColor="#BBFFFFFF" android:textSize="16sp" android:textStyle="bold" android:visibility="gone"/>
         <Button android:id="@+id/btn_scan_bt" android:layout_width="match_parent" android:layout_height="33dp" android:text="🔍 Scan Devices" android:textColor="#FFFFFF" android:textSize="16sp" android:background="#15FFFFFF" android:focusable="true"/>
-        <ScrollView android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true" android:layout_marginTop="5dp">
+        <com.themoon.y1.views.EdgeFadeScrollView android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true" android:layout_marginTop="5dp">
             <LinearLayout android:id="@+id/container_bt_items" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" />
-        </ScrollView>
+        </com.themoon.y1.views.EdgeFadeScrollView>
     </LinearLayout>
 
     <LinearLayout
@@ -299,9 +299,9 @@
         android:visibility="gone">
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="WI-FI NETWORKS" android:textColor="#BBFFFFFF" android:textSize="16sp" android:textStyle="bold" android:visibility="gone"/>
         <Button android:id="@+id/btn_scan_wifi" android:layout_width="match_parent" android:layout_height="33dp" android:text="🔍 Scan Networks" android:textColor="#FFFFFF" android:textSize="16sp" android:background="#15FFFFFF" android:focusable="true"/>
-        <ScrollView android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true" android:layout_marginTop="5dp">
+        <com.themoon.y1.views.EdgeFadeScrollView android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true" android:layout_marginTop="5dp">
             <LinearLayout android:id="@+id/container_wifi_items" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" />
-        </ScrollView>
+        </com.themoon.y1.views.EdgeFadeScrollView>
     </LinearLayout>
 
     <LinearLayout
