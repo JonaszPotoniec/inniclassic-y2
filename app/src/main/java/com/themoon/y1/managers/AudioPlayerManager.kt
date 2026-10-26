@@ -390,9 +390,8 @@ class AudioPlayerManager private constructor() {
         val isShuffle = main.prefs.getBoolean("shuffle", false)
         val repeatPref = main.prefs.getInt("repeat_mode", 0)
         if (isShuffle) {
-            Collections.shuffle(main.currentPlaylist)
-            main.currentIndex = main.currentPlaylist.indexOf(targetSong)
-            if (main.currentIndex == -1) main.currentIndex = 0
+            shuffleWithFirst(main.currentPlaylist, targetSong)
+            main.currentIndex = 0
         } else {
             main.currentIndex = targetIndex
         }
@@ -1791,4 +1790,14 @@ class AudioPlayerManager private constructor() {
             return inst
         }
     }
+}
+
+/**
+ * Shuffles [list] in place with [first] moved to the front, so a shuffled run that starts on
+ * [first] reaches every other track before the list ends.
+ */
+internal fun <T> shuffleWithFirst(list: MutableList<T>, first: T) {
+    list.remove(first)
+    Collections.shuffle(list)
+    list.add(0, first)
 }
