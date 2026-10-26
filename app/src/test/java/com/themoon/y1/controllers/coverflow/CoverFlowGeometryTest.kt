@@ -80,4 +80,40 @@ class CoverFlowGeometryTest {
         assertTrue(pivot - outerK * pivot < 0f)
         assertTrue(pivot + outerK * (size - pivot) > size)
     }
+
+    @Test
+    fun reflectionRows_ofA256Thumbnail() {
+        // 104 of 256 rows = 78 of 192 px, so the reflection view shows the bitmap at the cover's scale.
+        assertEquals(104, CoverFlowGeometry.reflectionRows(256))
+        assertEquals(78, CoverFlowGeometry.reflectionRows(CoverFlowGeometry.COVER_SIZE))
+    }
+
+    private fun map(t: CoverFlowGeometry.Affine, x: Float, y: Float) =
+        Pair(t.scaleX * x + t.translateX, t.scaleY * y + t.translateY)
+
+    @Test
+    fun reflectionTransform_mirrorsTheBottomRowsIntoTheBox() {
+        // ImageView CENTER_CROP gives the drawable its intrinsic bounds (256 x 104) and scales the canvas.
+        val t = CoverFlowGeometry.reflectionTransform(256, 256, 0f, 0f, 256f, 104f)
+        // The bottom edge of the cover is at the top of the box (no gap), the cover top far below it.
+        assertEquals(Pair(0f, 0f), map(t, 0f, 256f))
+        assertEquals(Pair(256f, 0f), map(t, 256f, 256f))
+        // Row 152 (256 - 104) is at the bottom of the box.
+        assertEquals(104f, map(t, 0f, 152f).second, 1e-4f)
+        // Same scale as the cover in both directions.
+        assertEquals(1f, t.scaleX, 0f)
+        assertEquals(-1f, t.scaleY, 0f)
+    }
+
+    @Test
+    fun reflectionTransform_followsScaledAndMovedBounds() {
+        // SmoothEdgeImageView draws the drawable at its final size (192 x 78) inside a border.
+        val t = CoverFlowGeometry.reflectionTransform(256, 256, 2f, 3f, 192f, 78f)
+        assertEquals(0.75f, t.scaleX, 1e-6f)
+        assertEquals(-0.75f, t.scaleY, 1e-6f)
+        assertEquals(2f, map(t, 0f, 256f).first, 1e-4f)
+        assertEquals(3f, map(t, 0f, 256f).second, 1e-4f)
+        assertEquals(3f + 78f, map(t, 0f, 152f).second, 1e-4f)
+        assertEquals(2f + 192f, map(t, 256f, 152f).first, 1e-4f)
+    }
 }

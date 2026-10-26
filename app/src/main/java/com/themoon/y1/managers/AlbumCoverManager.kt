@@ -1,14 +1,10 @@
 package com.themoon.y1.managers
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
-import android.graphics.LinearGradient
-import android.graphics.Matrix
 import android.graphics.Paint
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffXfermode
-import android.graphics.Shader
 import android.media.MediaMetadataRetriever
 import android.os.Handler
 import android.os.Looper
@@ -16,13 +12,13 @@ import android.util.Log
 import android.util.LruCache
 import android.widget.Toast
 import com.themoon.y1.MainActivity
+import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
-import com.themoon.y1.controllers.coverflow.CoverFlowGeometry
+import com.themoon.y1.ThemeManager
 import com.themoon.y1.models.SongItem
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.security.MessageDigest
 import java.util.Collections
 import java.util.HashSet
 import java.util.concurrent.BlockingDeque
@@ -36,7 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger
 /**
  * High-performance centralized album art and thumbnail manager for InniClassic on Y2.
  * Provides:
- * 1. Fast in-memory LRU caching of downsampled (256x256) album covers and reflections.
+ * 1. Fast in-memory LRU caching of downsampled (256x256) album covers (Cover Flow draws the reflections from them).
  * 2. Pre-scaled disk caching in /storage/sdcard0/.y1_thumbs_cache/.
  * 3. Bounded, LIFO-priority background thread pool preventing thread storms and CPU/SD thrashing.
  * 4. Shared access for both Cover Flow and the Album List (CategoryListAdapter).
@@ -49,13 +45,25 @@ class AlbumCoverManager private constructor() {
     private val pendingKeys: MutableSet<String> = Collections.synchronizedSet(HashSet<String>())
     private val isPregeneratingFlag: AtomicBoolean = AtomicBoolean(false)
 
+    // Albums that have no art (also marked on disk), so that they are not searched again.
+    private val noArtKeys: MutableSet<String> = Collections.synchronizedSet(HashSet<String>())
+
+    // Album list of the last complete pre-generation (see CoverCacheRules.albumListSignature).
+    @Volatile
+    private var pregeneratedSignature: Long? = null
+
+    // Placeholder for albums without art, decoded one time for each theme.
+    private var placeholder: Bitmap? = null
+    private var placeholderTheme: Any? = null
+
     interface CoverCallback {
+        /** [reflection] is always null: Cover Flow draws the reflection from the cover. */
         fun onCoverLoaded(albumKey: String, cover: Bitmap?, reflection: Bitmap?)
     }
 
     init {
         val maxMemory = (Runtime.getRuntime().maxMemory() / 1024).toInt()
-        val cacheSizeKb = Math.min(8192, Math.max(2048, maxMemory / 8))
+        val cacheSizeKb = Math.min(MEMORY_CACHE_MAX_KB, Math.max(2048, maxMemory / 8))
 
         memoryCache = object : LruCache<String, Bitmap>(cacheSizeKb) {
             override fun sizeOf(key: String, bitmap: Bitmap?): Int {
@@ -93,14 +101,89 @@ class AlbumCoverManager private constructor() {
         return File(dir, getHashKey(albumKey) + ".jpg")
     }
 
+    /** Empty file that records that the album has no art. */
+    fun getNoArtMarkerFile(albumKey: String): File {
+        return File(StoragePaths.getThumbsCacheDir(), getHashKey(albumKey) + NO_ART_SUFFIX)
+    }
+
+    /** True when the album is known to have no art (memory only, no file access). */
+    fun hasNoArt(albumKey: String?): Boolean {
+        return albumKey != null && noArtKeys.contains(albumKey)
+    }
+
+    private fun markNoArt(albumKey: String, marker: File) {
+        noArtKeys.add(albumKey)
+        try {
+            if (!marker.exists()) {
+                marker.parentFile?.let { if (!it.exists()) it.mkdirs() }
+                marker.createNewFile()
+            }
+        } catch (ignored: Throwable) {}
+    }
+
+    /** Forgets all "no art" records (memory and disk), so that these albums are searched again. */
+    private fun clearNoArtNow() {
+        noArtKeys.clear()
+        try {
+            StoragePaths.getThumbsCacheDir().listFiles()?.forEach { f ->
+                if (f.name.endsWith(NO_ART_SUFFIX)) f.delete()
+            }
+        } catch (ignored: Throwable) {}
+    }
+
+    /**
+     * Placeholder for albums without art: the theme icon, decoded one time for each theme, at the
+     * thumbnail size, so that changing between it and a thumbnail does not need a new layout.
+     * Call on the main thread.
+     */
+    fun getPlaceholder(context: Context): Bitmap? {
+        val theme = ThemeManager.getCurrentTheme()
+        placeholder?.let { if (placeholderTheme === theme) return it }
+        val src = ThemeManager.getCustomIcon("icon_default_album.png", context, R.drawable.default_album) ?: return null
+        val out = try {
+            val config = if (src.hasAlpha()) Bitmap.Config.ARGB_8888 else Bitmap.Config.RGB_565
+            Bitmap.createBitmap(THUMB_SIZE, THUMB_SIZE, config).also { dst ->
+                Canvas(dst).drawBitmap(
+                    src,
+                    android.graphics.Rect(0, 0, src.width, src.height),
+                    android.graphics.Rect(0, 0, THUMB_SIZE, THUMB_SIZE),
+                    Paint(Paint.FILTER_BITMAP_FLAG)
+                )
+                src.recycle()
+            }
+        } catch (t: Throwable) {
+            src
+        }
+        placeholder = out
+        placeholderTheme = theme
+        return out
+    }
+
+    private fun signatureFile(): File = File(StoragePaths.getThumbsCacheDir(), PREGEN_SIGNATURE_FILE)
+
+    /** The signature of the last complete pre-generation, also after an app restart. */
+    private fun lastPregenSignature(): Long? {
+        pregeneratedSignature?.let { return it }
+        return try {
+            val f = signatureFile()
+            if (f.exists()) CoverCacheRules.parseSignature(f.readText()) else null
+        } catch (ignored: Throwable) {
+            null
+        }
+    }
+
+    private fun savePregenSignature(signature: Long) {
+        pregeneratedSignature = signature
+        try {
+            val f = signatureFile()
+            f.parentFile?.let { if (!it.exists()) it.mkdirs() }
+            f.writeText(CoverCacheRules.formatSignature(signature))
+        } catch (ignored: Throwable) {}
+    }
+
     fun getMemoryCover(albumKey: String?): Bitmap? {
         if (albumKey == null) return null
         return memoryCache.get(albumKey)
-    }
-
-    fun getMemoryReflection(albumKey: String?): Bitmap? {
-        if (albumKey == null) return null
-        return memoryCache.get("ref_$albumKey")
     }
 
     fun getThumbnailDirect(albumKey: String?): Bitmap? {
@@ -129,9 +212,12 @@ class AlbumCoverManager private constructor() {
         val albumKey = getAlbumKey(song.file, song.album)
 
         val memBmp = getMemoryCover(albumKey)
-        val memRef = getMemoryReflection(albumKey)
         if (memBmp != null) {
-            callback?.onCoverLoaded(albumKey, memBmp, memRef)
+            callback?.onCoverLoaded(albumKey, memBmp, null)
+            return
+        }
+        if (noArtKeys.contains(albumKey)) {
+            callback?.onCoverLoaded(albumKey, null, null)
             return
         }
 
@@ -153,24 +239,24 @@ class AlbumCoverManager private constructor() {
             }
 
             if (bmp == null) {
-                bmp = extractAndSaveThumbnail(song, diskThumb)
+                val marker = getNoArtMarkerFile(albumKey)
+                if (marker.exists()) {
+                    noArtKeys.add(albumKey)
+                } else {
+                    bmp = extractAndSaveThumbnail(song, diskThumb)
+                    if (bmp == null) markNoArt(albumKey, marker)
+                }
             }
 
-            var ref: Bitmap? = null
             if (bmp != null) {
-                ref = generateReflection(bmp)
                 memoryCache.put(albumKey, bmp)
-                if (ref != null) {
-                    memoryCache.put("ref_$albumKey", ref)
-                }
             }
 
             pendingKeys.remove(albumKey)
 
             val finalBmp = bmp
-            val finalRef = ref
             mainHandler.post {
-                callback?.onCoverLoaded(albumKey, finalBmp, finalRef)
+                callback?.onCoverLoaded(albumKey, finalBmp, null)
             }
         }
     }
@@ -297,16 +383,35 @@ class AlbumCoverManager private constructor() {
 
     fun clearCache(memoryOnly: Boolean) {
         memoryCache.evictAll()
+        // The files can have changed, so search the albums without art again.
+        noArtKeys.clear()
+        pregeneratedSignature = null
+        try { signatureFile().delete() } catch (ignored: Throwable) {}
         if (!memoryOnly) {
             clearDiskCache()
+        } else {
+            executor.execute { clearNoArtNow() }
         }
     }
 
+    /** After a library scan: the art can have changed, so albums without art are searched again. */
     fun pregenerateThumbnails(uniqueAlbums: List<SongItem>?) {
-        pregenerateThumbnails(uniqueAlbums, false)
+        startPregeneration(uniqueAlbums, force = false, retryNoArt = true, onlyIfChanged = false)
     }
 
     fun pregenerateThumbnails(uniqueAlbums: List<SongItem>?, force: Boolean) {
+        startPregeneration(uniqueAlbums, force, retryNoArt = force, onlyIfChanged = false)
+    }
+
+    /**
+     * Pre-generates only when the album list is not the same as at the last complete pre-generation
+     * (for example after a sync). Use when a screen opens; a scan pre-generates by itself.
+     */
+    fun pregenerateThumbnailsIfChanged(uniqueAlbums: List<SongItem>?) {
+        startPregeneration(uniqueAlbums, force = false, retryNoArt = false, onlyIfChanged = true)
+    }
+
+    private fun startPregeneration(uniqueAlbums: List<SongItem>?, force: Boolean, retryNoArt: Boolean, onlyIfChanged: Boolean) {
         if (uniqueAlbums.isNullOrEmpty()) return
         if (!isPregeneratingFlag.compareAndSet(false, true)) {
             Log.d(TAG, "pregenerateThumbnails: already running, skipping request.")
@@ -320,6 +425,15 @@ class AlbumCoverManager private constructor() {
 
         Thread({
             try {
+                val keys = ArrayList<String>(copy.size)
+                for (item in copy) keys.add(if (item.file != null) getAlbumKey(item.file, item.album) else "")
+                val signature = CoverCacheRules.albumListSignature(keys)
+                if (onlyIfChanged && signature == lastPregenSignature()) {
+                    Log.d(TAG, "pregenerateThumbnails: album list not changed, skipping.")
+                    return@Thread
+                }
+                if (retryNoArt) clearNoArtNow()
+
                 val startTime = System.currentTimeMillis()
                 val total = copy.size
                 var generated = 0
@@ -333,13 +447,19 @@ class AlbumCoverManager private constructor() {
                 for (i in 0 until total) {
                     val item = copy[i]
                     if (item.file == null) continue
-                    val albumKey = getAlbumKey(item.file, item.album)
+                    val albumKey = keys[i]
                     val diskThumb = getDiskThumbFile(albumKey)
+                    // Only albums without a thumbnail need the marker (one more file check).
+                    val marker by lazy { getNoArtMarkerFile(albumKey) }
+                    val hasThumb = diskThumb.exists() && diskThumb.length() > 0L
 
-                    if (force || !diskThumb.exists() || diskThumb.length() == 0L) {
+                    if (CoverCacheRules.pregenAction(force, hasThumb) { marker.exists() } == CoverCacheRules.PregenAction.EXTRACT) {
                         val bmp = extractAndSaveThumbnail(item, diskThumb)
                         if (bmp != null) {
                             generated++
+                            if (noArtKeys.remove(albumKey) || force) marker.delete()
+                        } else {
+                            markNoArt(albumKey, marker)
                         }
                         try {
                             Thread.sleep(20)
@@ -356,6 +476,7 @@ class AlbumCoverManager private constructor() {
                     }
                 }
 
+                savePregenSignature(signature)
                 val elapsed = System.currentTimeMillis() - startTime
                 val finalGenerated = generated
                 val finalSkipped = skipped
@@ -386,6 +507,11 @@ class AlbumCoverManager private constructor() {
     companion object {
         private const val TAG = "AlbumCoverManager"
         const val THUMB_SIZE: Int = 256
+        private const val NO_ART_SUFFIX = ".noart"
+        // 12 MB: approx. 96 covers. A larger cache made more GCs while it filled.
+        private const val MEMORY_CACHE_MAX_KB = 12288
+        // Signature of the album list at the last complete pre-generation (deleted with the disk cache).
+        private const val PREGEN_SIGNATURE_FILE = "pregen-albums.sig"
 
         @Volatile
         private var sInstance: AlbumCoverManager? = null
@@ -410,13 +536,7 @@ class AlbumCoverManager private constructor() {
         fun getHashKey(input: String?): String {
             val s = input ?: ""
             return try {
-                val md = MessageDigest.getInstance("MD5")
-                val bytes = md.digest(s.toByteArray(Charsets.UTF_8))
-                val sb = StringBuilder()
-                for (b in bytes) {
-                    sb.append(String.format("%02x", b))
-                }
-                sb.toString()
+                CoverCacheRules.md5Hex(s)
             } catch (t: Throwable) {
                 s.hashCode().toString()
             }
@@ -464,41 +584,6 @@ class AlbumCoverManager private constructor() {
                 }
             }
             return Math.max(1, inSampleSize)
-        }
-        fun generateReflection(src: Bitmap?): Bitmap? {
-            if (src == null) return null
-            return try {
-                val w = src.width
-                val h = src.height
-                // The iPod reflection: as tall as 78/192 of the cover, from 28 % opacity at the top to 0.
-                val reqH = h * CoverFlowGeometry.REFLECTION_HEIGHT / CoverFlowGeometry.COVER_SIZE
-                if (reqH <= 0) return null
-
-                val matrix = Matrix().apply {
-                    preScale(1f, -1f)
-                }
-
-                val flipped = Bitmap.createBitmap(src, 0, h - reqH, w, reqH, matrix, false)
-                val reflection = Bitmap.createBitmap(w, reqH, Bitmap.Config.ARGB_8888)
-
-                val canvas = Canvas(reflection)
-                canvas.drawBitmap(flipped, 0f, 0f, null)
-                flipped.recycle()
-
-                val paint = Paint().apply {
-                    shader = LinearGradient(
-                        0f, 0f, 0f, reqH.toFloat(),
-                        (CoverFlowGeometry.REFLECTION_TOP_ALPHA shl 24) or 0xFFFFFF, 0x00FFFFFF,
-                        Shader.TileMode.CLAMP
-                    )
-                    xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
-                }
-                canvas.drawRect(0f, 0f, w.toFloat(), reqH.toFloat(), paint)
-
-                reflection
-            } catch (t: Throwable) {
-                null
-            }
         }
     }
 }

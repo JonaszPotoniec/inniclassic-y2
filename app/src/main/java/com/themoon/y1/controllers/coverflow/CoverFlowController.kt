@@ -2,6 +2,7 @@ package com.themoon.y1.controllers.coverflow
 
 import android.app.Activity
 import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
 import android.os.SystemClock
 import android.util.TypedValue
 import android.view.Gravity
@@ -74,7 +75,7 @@ class CoverFlowController(
 
     override fun onExit() {
         cancelAllAnimations()
-        coverFlowContainer?.removeAllViews()
+        // Keep the layout and its cards for the next entry (no new views and bitmaps).
         containerBrowserItems.removeAllViews()
     }
 
@@ -96,7 +97,8 @@ class CoverFlowController(
             onRebuildUniqueAlbumList?.invoke()
         }
 
-        AlbumCoverManager.getInstance().pregenerateThumbnails(uniqueAlbumList, false)
+        // A scan pre-generates by itself; here only when the album list changed (for example after a sync).
+        AlbumCoverManager.getInstance().pregenerateThumbnailsIfChanged(uniqueAlbumList)
 
         if (uniqueAlbumList.isEmpty()) {
             val tvEmpty = TextView(activity).apply {
@@ -115,13 +117,16 @@ class CoverFlowController(
         }
 
         val d = activity.resources.displayMetrics.density
-        val cfLayout = CoverFlowLayout(activity).apply {
+        val cfLayout = coverFlowContainer ?: CoverFlowLayout(activity).apply {
             clipChildren = false
             clipToPadding = false
             // The cover top is at the iPod position for the space below the status bar.
             childTopForHeight = { height -> (CoverFlowGeometry.coverTop((height / d).toInt()) * d).toInt() }
+            // Changes in a card do not lay out the full window.
+            isLayoutBoundary = true
         }
         coverFlowContainer = cfLayout
+        (cfLayout.parent as? ViewGroup)?.removeView(cfLayout)
         containerBrowserItems.clipChildren = false
         containerBrowserItems.clipToPadding = false
         if (scrollViewBrowser is ViewGroup) {
@@ -136,13 +141,19 @@ class CoverFlowController(
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         )
 
-        val views = arrayOfNulls<View>(visibleCoversCount)
-        for (i in 0 until visibleCoversCount) {
-            val card = createSingleCoverView()
-            views[i] = card
-            cfLayout.addView(card)
+        val kept = cfViews
+        if (kept != null) {
+            // The theme can have changed since the cards were made.
+            kept.forEach { card -> (card?.tag as? CardState)?.let { styleCardTexts(it, d) } }
+        } else {
+            val views = arrayOfNulls<View>(visibleCoversCount)
+            for (i in 0 until visibleCoversCount) {
+                val card = createSingleCoverView()
+                views[i] = card
+                cfLayout.addView(card)
+            }
+            cfViews = views
         }
-        cfViews = views
 
         initCoverFlowPositions()
     }
@@ -218,32 +229,22 @@ class CoverFlowController(
 
         val manager = AlbumCoverManager.getInstance()
         val cachedBmp = manager.getMemoryCover(albumKey)
-        val cachedRef = manager.getMemoryReflection(albumKey)
 
         if (cachedBmp != null) {
             ivCover?.animate()?.cancel()
             ivCover?.alpha = 1.0f
-            ivCover?.setImageBitmap(cachedBmp)
-            if (ivReflection != null) {
-                ivReflection.animate().cancel()
-                ivReflection.alpha = 1.0f
-                ivReflection.setImageBitmap(cachedRef)
-                ivReflection.visibility = if (cachedRef != null) View.VISIBLE else View.INVISIBLE
-            }
+            ivCover?.let { setBitmapIfChanged(it, cachedBmp) }
+            if (ivReflection != null) showReflection(ivReflection, cachedBmp)
             return
         }
 
+        // Albums without art, and albums not yet loaded, show the placeholder (decoded one time, thumbnail size).
         ivCover?.animate()?.cancel()
         ivCover?.alpha = 1.0f
-        ivCover?.setImageBitmap(
-            ThemeManager.getCustomIcon("icon_default_album.png", activity, R.drawable.default_album)
-        )
-        if (ivReflection != null) {
-            ivReflection.animate().cancel()
-            ivReflection.alpha = 1.0f
-            ivReflection.setImageBitmap(null)
-            ivReflection.visibility = View.INVISIBLE
-        }
+        ivCover?.let { setBitmapIfChanged(it, manager.getPlaceholder(activity)) }
+        if (ivReflection != null) showReflection(ivReflection, null)
+        // Known to have no art: nothing to load.
+        if (manager.hasNoArt(albumKey)) return
 
         manager.loadCoverAsync(item, object : AlbumCoverManager.CoverCallback {
             override fun onCoverLoaded(loadedKey: String, cover: Bitmap?, reflection: Bitmap?) {
@@ -251,24 +252,46 @@ class CoverFlowController(
                     if (cover != null) {
                         ivCover.setImageBitmap(cover)
                     }
-                    if (ivReflection != null) {
-                        if (reflection != null) {
-                            ivReflection.setImageBitmap(reflection)
-                            ivReflection.visibility = View.VISIBLE
-                        } else {
-                            ivReflection.visibility = View.INVISIBLE
-                        }
-                    }
+                    if (ivReflection != null) showReflection(ivReflection, cover)
                 }
             }
         })
+    }
+
+    /**
+     * Shows the reflection of [cover] (drawn from the cover, no reflection bitmap), or hides the view with
+     * alpha 0 (not drawn) and keeps its old drawable. All reflections have the same intrinsic size, so the view
+     * never changes size: no requestLayout, which on Android 4.4 lays out the full window. setVisibility is not
+     * used for the same reason.
+     */
+    private fun showReflection(iv: ImageView, cover: Bitmap?) {
+        iv.animate().cancel()
+        if (cover != null) {
+            if ((iv.drawable as? CoverReflectionDrawable)?.cover !== cover) {
+                iv.setImageDrawable(CoverReflectionDrawable(cover, AlbumCoverManager.THUMB_SIZE))
+            }
+            iv.alpha = 1.0f
+        } else {
+            iv.alpha = 0f
+        }
+    }
+
+    /** Sets [bmp] only when the view does not already show it (a new drawable makes the card draw its art again). */
+    private fun setBitmapIfChanged(iv: ImageView, bmp: Bitmap?) {
+        if ((iv.drawable as? BitmapDrawable)?.bitmap !== bmp || (bmp == null && iv.drawable != null)) {
+            iv.setImageBitmap(bmp)
+        }
     }
 
     private fun createSingleCoverView(): View {
         val d = activity.resources.displayMetrics.density
         val coverSize = (CoverFlowGeometry.COVER_SIZE * d).toInt()
         // The cover is at the top of the card, the reflection directly under it, and the text on the reflection.
-        val card = FrameLayout(activity)
+        // No off-screen buffer when a card fades: its children do not overlap where it is not opaque
+        // (the edge cards have no text).
+        val card = object : FrameLayout(activity) {
+            override fun hasOverlappingRendering(): Boolean = false
+        }
 
         // CoverFlowLayout puts the top of the card (the cover top) at the iPod position.
         val lp = FrameLayout.LayoutParams((CoverFlowGeometry.TEXT_WIDTH * d).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT).apply {
@@ -299,12 +322,18 @@ class CoverFlowController(
                 topMargin = coverSize
             }
             scaleType = ImageView.ScaleType.CENTER_CROP
+            // Starts empty, with the reflection size, so the first reflection does not change its size.
+            setImageDrawable(CoverReflectionDrawable(null, AlbumCoverManager.THUMB_SIZE))
+            alpha = 0f
         }
 
         // Album (bold, primary colour: black on the Classic themes), then artist (regular, secondary colour),
         // on the iPod baselines.
-        val tvTitle = createCardText(TITLE_VIEW_ID, CoverFlowGeometry.TITLE_SIZE * d, CoverFlowGeometry.TITLE_BASELINE * d, bold = true)
-        val tvArtist = createCardText(ARTIST_VIEW_ID, CoverFlowGeometry.ARTIST_SIZE * d, CoverFlowGeometry.ARTIST_BASELINE * d, bold = false)
+        val tvTitle = createCardText(TITLE_VIEW_ID)
+        val tvArtist = createCardText(ARTIST_VIEW_ID)
+        val state = CardState(tvTitle, tvArtist)
+        styleCardTexts(state, d)
+        card.tag = state
 
         card.addView(ivCover)
         card.addView(ivReflection)
@@ -324,13 +353,10 @@ class CoverFlowController(
         return card
     }
 
-    /** One line of centred text (bold or regular theme font) whose baseline is [baseline] px below the card top. */
-    private fun createCardText(viewId: Int, sizePx: Float, baseline: Float, bold: Boolean): TextView {
+    /** One line of centred text, styled by [styleCardText]. */
+    private fun createCardText(viewId: Int): TextView {
         return TextView(activity).apply {
             id = viewId
-            setTextColor(if (bold) ThemeManager.getTextColorPrimary() else ThemeManager.getTextColorSecondary())
-            setTextSize(TypedValue.COMPLEX_UNIT_PX, sizePx)
-            typeface = if (bold) ThemeManager.getCustomFontBold() else ThemeManager.getCustomFont()
             includeFontPadding = false
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
             isSingleLine = true
@@ -339,24 +365,41 @@ class CoverFlowController(
             layoutParams = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                // Without font padding, the baseline is -ascent below the top of the view.
-                topMargin = Math.round(baseline + paint.fontMetricsInt.ascent)
-            }
+            )
+        }
+    }
+
+    private fun styleCardTexts(state: CardState, d: Float) {
+        styleCardText(state.title, CoverFlowGeometry.TITLE_SIZE * d, CoverFlowGeometry.TITLE_BASELINE * d, bold = true)
+        styleCardText(state.artist, CoverFlowGeometry.ARTIST_SIZE * d, CoverFlowGeometry.ARTIST_BASELINE * d, bold = false)
+    }
+
+    /** Theme colour and font (bold or regular), with the baseline [baseline] px below the card top. Sets only what changed. */
+    private fun styleCardText(tv: TextView, sizePx: Float, baseline: Float, bold: Boolean) {
+        tv.setTextColor(if (bold) ThemeManager.getTextColorPrimary() else ThemeManager.getTextColorSecondary())
+        tv.setTextSize(TypedValue.COMPLEX_UNIT_PX, sizePx)
+        tv.typeface = if (bold) ThemeManager.getCustomFontBold() else ThemeManager.getCustomFont()
+        // Without font padding, the baseline is -ascent below the top of the view.
+        val top = Math.round(baseline + tv.paint.fontMetricsInt.ascent)
+        val lp = tv.layoutParams as? FrameLayout.LayoutParams ?: return
+        if (lp.topMargin != top) {
+            lp.topMargin = top
+            tv.layoutParams = lp
         }
     }
 
     private fun setCardTitleAlpha(card: View, isCenter: Boolean, duration: Int) {
-        val tvTitle = card.findViewById<View>(TITLE_VIEW_ID)
-        val tvArtist = card.findViewById<View>(ARTIST_VIEW_ID)
-        if (tvTitle != null && tvArtist != null) {
-            val targetAlpha = if (isCenter) 1.0f else 0.0f
+        val state = card.tag as? CardState ?: return
+        // Only the old and the new centre card change; the others keep their text hidden without an animator.
+        if (CoverFlowSteps.textAnimation(state.textShown, isCenter, duration) == CoverFlowSteps.Change.NONE) return
+        state.textShown = isCenter
+        val targetAlpha = if (isCenter) 1.0f else 0.0f
+        for (tv in arrayOf(state.title, state.artist)) {
             if (duration > 0) {
-                tvTitle.animate().alpha(targetAlpha).setDuration(duration.toLong()).start()
-                tvArtist.animate().alpha(targetAlpha).setDuration(duration.toLong()).start()
+                tv.animate().alpha(targetAlpha).setDuration(duration.toLong()).start()
             } else {
-                tvTitle.alpha = targetAlpha
-                tvArtist.alpha = targetAlpha
+                tv.animate().cancel()
+                tv.alpha = targetAlpha
             }
         }
     }
@@ -368,16 +411,17 @@ class CoverFlowController(
         v.rotationY = rotY
         v.scaleX = scale
         v.scaleY = scale
+        // A card at alpha 0 is not drawn. Not setVisibility: on Android 4.4 it lays out the full window.
         v.alpha = alpha
     }
 
     private fun animateTransform(v: View?, transX: Float, rotY: Float, scale: Float, alpha: Float, duration: Int) {
         if (v == null) return
-        if (duration <= 0) {
-            applyTransform(v, transX, rotY, scale, alpha)
-        } else {
-            v.animate().translationX(transX).rotationY(rotY).scaleX(scale).scaleY(scale).alpha(alpha)
-                .setDuration(duration.toLong()).start()
+        when (CoverFlowSteps.cardAnimation(v.alpha, alpha, duration)) {
+            CoverFlowSteps.Change.NONE, CoverFlowSteps.Change.SET -> applyTransform(v, transX, rotY, scale, alpha)
+            CoverFlowSteps.Change.ANIMATE ->
+                v.animate().translationX(transX).rotationY(rotY).scaleX(scale).scaleY(scale).alpha(alpha)
+                    .setDuration(duration.toLong()).start()
         }
     }
 
@@ -522,6 +566,11 @@ class CoverFlowController(
     override fun onBackPressed(): Boolean {
         onNavigateBack()
         return true
+    }
+
+    /** Views of a card and whether its text is shown (kept in card.tag). */
+    private class CardState(val title: TextView, val artist: TextView) {
+        var textShown = false
     }
 
     companion object {

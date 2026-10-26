@@ -46,6 +46,25 @@ object CoverFlowGeometry {
      */
     const val PIVOT_Y_FRACTION = 0.727f
 
+    /** Rows of a cover bitmap [coverRows] tall that its reflection shows (78/192 of the cover). */
+    fun reflectionRows(coverRows: Int): Int = coverRows * REFLECTION_HEIGHT / COVER_SIZE
+
+    /** Scale and offset of a transform x' = scaleX * x + translateX, y' = scaleY * y + translateY. */
+    data class Affine(val scaleX: Float, val scaleY: Float, val translateX: Float, val translateY: Float)
+
+    /**
+     * Maps a cover bitmap ([coverWidth] x [coverHeight]) onto a reflection box ([left], [top], [width] x [height]):
+     * the cover is mirrored, so its bottom row is at the top of the box, and the box shows the bottom
+     * [reflectionRows] rows of the cover, at the same scale as the cover.
+     */
+    fun reflectionTransform(coverWidth: Int, coverHeight: Int, left: Float, top: Float, width: Float, height: Float): Affine {
+        require(coverWidth > 0 && coverHeight > 0)
+        val rows = reflectionRows(coverHeight).coerceAtLeast(1)
+        val sx = width / coverWidth
+        val sy = height / rows
+        return Affine(sx, -sy, left, top + sy * coverHeight)
+    }
+
     /** Top of the cover below the top of an area [areaHeight] tall (the screen below the status bar). */
     fun coverTop(areaHeight: Int): Int {
         val free = areaHeight - ARTIST_BASELINE

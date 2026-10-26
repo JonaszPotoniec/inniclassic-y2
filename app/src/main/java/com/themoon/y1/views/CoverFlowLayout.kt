@@ -34,6 +34,41 @@ class CoverFlowLayout @JvmOverloads constructor(
      */
     var childTopForHeight: ((height: Int) -> Int)? = null
 
+    /**
+     * When true, a layout request from a card does not go up to the window: this layout measures and lays out
+     * its children itself on the next message. Its own size comes from its parent (MATCH_PARENT) and does not
+     * depend on the children. On Android 4.4 each request otherwise lays out the full window, including the
+     * screen-wide ScrollView that holds this layout.
+     */
+    var isLayoutBoundary = false
+
+    private var localLayoutPending = false
+
+    private val localLayout = Runnable {
+        localLayoutPending = false
+        if (isLayoutRequested && width > 0 && height > 0 && parent != null) {
+            measure(
+                MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
+                MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY)
+            )
+            layout(left, top, right, bottom)
+            invalidate()
+        }
+    }
+
+    override fun requestLayout() {
+        if (!isLayoutBoundary || isInLayout || width == 0 || height == 0 || windowToken == null) {
+            super.requestLayout()
+            return
+        }
+        // Marks only this layout; the parents stay as they are.
+        forceLayout()
+        if (!localLayoutPending) {
+            localLayoutPending = true
+            post(localLayout)
+        }
+    }
+
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
         val childTop = childTopForHeight?.invoke(bottom - top) ?: return
