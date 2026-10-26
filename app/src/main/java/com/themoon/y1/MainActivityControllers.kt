@@ -568,7 +568,8 @@ internal fun MainActivity.initControllers() {
             updateScreenOffFeedback(true)
         },
         applyAlbumTiltSetting = {
-            isAlbumTiltEnabled = prefs.getBoolean("album_tilt_effect", true)
+            isAlbumTiltEnabled = com.themoon.y1.controllers.player.AlbumTiltSetting.isEnabled(prefs)
+            playerController.applyAlbumTiltSetting()
         },
         toggleShuffleMode = {
             isShuffleMode = !isShuffleMode

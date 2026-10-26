@@ -407,14 +407,14 @@
                 <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginRight="14dp" android:layout_marginTop="10dp">
                     <FrameLayout android:id="@+id/frame_album_art" android:layout_width="220dp" android:layout_height="220dp"
                         android:rotationY="18">
-                        <com.themoon.y1.views.SquareImageView android:id="@+id/iv_album_art" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="centerCrop" android:src="@drawable/default_album" android:background="#DDDDDD" />
+                        <com.themoon.y1.views.SmoothEdgeImageView android:id="@+id/iv_album_art" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="centerCrop" android:src="@drawable/default_album" android:background="#DDDDDD" />
                         <ImageView android:id="@+id/iv_pause_overlay" android:layout_width="56dp" android:layout_height="56dp" android:layout_gravity="center" android:src="@android:drawable/ic_media_pause" android:visibility="gone" />
                     </FrameLayout>
                     <!-- Album art floor reflection -->
                     <FrameLayout android:id="@+id/frame_album_reflection" android:layout_width="220dp" android:layout_height="32dp" android:layout_marginTop="1dp"
                         android:rotationY="18">
-                        <ImageView android:id="@+id/iv_album_reflection" android:layout_width="220dp" android:layout_height="220dp" android:layout_gravity="top" android:scaleY="-1" android:scaleType="centerCrop" android:alpha="0.30" android:src="@drawable/default_album" />
-                        <View android:layout_width="match_parent" android:layout_height="match_parent" android:background="@drawable/reflection_fade_gradient" />
+                        <!-- Fades out to the bottom of the frame (SmoothEdgeImageView.useAsReflection) -->
+                        <com.themoon.y1.views.SmoothEdgeImageView android:id="@+id/iv_album_reflection" android:layout_width="220dp" android:layout_height="220dp" android:layout_gravity="top" android:scaleY="-1" android:scaleType="centerCrop" android:alpha="0.30" android:src="@drawable/default_album" />
                     </FrameLayout>
                 </LinearLayout>
 

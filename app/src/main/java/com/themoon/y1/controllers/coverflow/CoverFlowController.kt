@@ -20,6 +20,7 @@ import com.themoon.y1.managers.AlbumCoverManager
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.CoverFlowLayout
+import com.themoon.y1.views.SmoothEdgeImageView
 
 /**
  * Controller for the 3D CoverFlow carousel view.
@@ -283,7 +284,8 @@ class CoverFlowController(
         card.layoutParams = lp
         card.setLayerType(View.LAYER_TYPE_NONE, null)
 
-        val ivCover = ImageView(activity).apply {
+        // Smooth edges while the cards turn (see SmoothEdges)
+        val ivCover = SmoothEdgeImageView(activity).apply {
             id = COVER_VIEW_ID
             layoutParams = LinearLayout.LayoutParams((200 * d).toInt(), (200 * d).toInt()).apply {
                 gravity = Gravity.CENTER_HORIZONTAL
@@ -291,7 +293,7 @@ class CoverFlowController(
             scaleType = ImageView.ScaleType.CENTER_CROP
         }
 
-        val ivReflection = ImageView(activity).apply {
+        val ivReflection = SmoothEdgeImageView(activity).apply {
             id = REFLECTION_VIEW_ID
             layoutParams = LinearLayout.LayoutParams((200 * d).toInt(), (50 * d).toInt()).apply {
                 gravity = Gravity.CENTER_HORIZONTAL
