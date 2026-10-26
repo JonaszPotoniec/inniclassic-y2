@@ -316,7 +316,7 @@ class PlayerController(
     }
 
     private fun updateShuffleRepeatScrubLabels() {
-        val prefs = activity.getSharedPreferences("y1_settings", Activity.MODE_PRIVATE)
+        val prefs = playbackPrefs()
         val isShuffle = prefs.getBoolean("shuffle", false)
         val repeatMode = prefs.getInt("repeat_mode", 0)
 
@@ -369,23 +369,28 @@ class PlayerController(
     }
 
     private fun toggleShuffleMode() {
-        val prefs = activity.getSharedPreferences("y1_settings", Activity.MODE_PRIVATE)
+        val prefs = playbackPrefs()
         val isShuffle = !prefs.getBoolean("shuffle", false)
         prefs.edit().putBoolean("shuffle", isShuffle).commit()
+        MainActivity.instance?.isShuffleMode = isShuffle
         AudioPlayerManager.getInstance().setShuffleMode(isShuffle)
         updateShuffleRepeatStatusIcons()
     }
 
     private fun cycleRepeatMode() {
-        val prefs = activity.getSharedPreferences("y1_settings", Activity.MODE_PRIVATE)
+        val prefs = playbackPrefs()
         val repeatMode = (prefs.getInt("repeat_mode", 0) + 1) % 3
         prefs.edit().putInt("repeat_mode", repeatMode).commit()
+        MainActivity.instance?.repeatMode = repeatMode
         AudioPlayerManager.getInstance().setRepeatMode(repeatMode)
         updateShuffleRepeatStatusIcons()
     }
 
+    // Same store as Settings and AudioPlayerManager, so all screens share one shuffle/repeat state.
+    private fun playbackPrefs() = activity.getSharedPreferences("AppPrefs", Activity.MODE_PRIVATE)
+
     private fun updateShuffleRepeatStatusIcons() {
-        val prefs = activity.getSharedPreferences("y1_settings", Activity.MODE_PRIVATE)
+        val prefs = playbackPrefs()
         val isShuffle = prefs.getBoolean("shuffle", false)
         val repeatMode = prefs.getInt("repeat_mode", 0)
 
