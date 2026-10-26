@@ -29,6 +29,7 @@ from pathlib import Path
 
 try:
     from mutagen import File as MutagenFile
+    from mutagen.mp4 import MP4
 except ImportError:
     print("This script needs the 'mutagen' package: pip install mutagen", file=sys.stderr)
     sys.exit(1)
@@ -58,6 +59,31 @@ def extract_track_number(raw):
         return 0
 
 
+def parse_flag(raw):
+    """Value of a compilation tag: "1" (or another non-zero number), "true" or "yes"."""
+    v = str(raw).strip().lower()
+    if not v:
+        return False
+    try:
+        return int(v) != 0
+    except ValueError:
+        return v in ("true", "yes")
+
+
+def read_compilation(local_path: Path, tags):
+    """The compilation flag: ID3 TCMP and Vorbis COMPILATION (easy tags), MP4 cpil (not in the easy tags)."""
+    raw = first_tag(tags, "compilation")
+    if raw:
+        return parse_flag(raw)
+    if local_path.suffix.lower() in (".m4a", ".m4b"):
+        try:
+            mp4 = MP4(local_path)
+            return bool(mp4.tags and mp4.tags.get("cpil"))
+        except Exception:
+            return False
+    return False
+
+
 def scan_folder(local_root: Path, device_root: str):
     entries = []
     for dirpath, _dirnames, filenames in os.walk(local_root):
@@ -70,6 +96,7 @@ def scan_folder(local_root: Path, device_root: str):
 
             title = artist = album = year = genre = album_artist = composer = ""
             track_num = 0
+            compilation = False
             try:
                 audio = MutagenFile(local_path, easy=True)
                 if audio is not None and audio.tags:
@@ -82,10 +109,11 @@ def scan_folder(local_root: Path, device_root: str):
                     album_artist = first_tag(tags, "albumartist", "album artist")
                     composer = first_tag(tags, "composer")
                     track_num = extract_track_number(first_tag(tags, "tracknumber", "track"))
+                    compilation = read_compilation(local_path, tags)
             except Exception as e:
                 print(f"  ! couldn't read tags from {local_path}: {e}", file=sys.stderr)
 
-            entries.append({
+            entry = {
                 "path": device_path,
                 "title": title,
                 "artist": artist,
@@ -95,7 +123,11 @@ def scan_folder(local_root: Path, device_root: str):
                 "albumArtist": album_artist,
                 "composer": composer,
                 "trackNum": track_num,
-            })
+            }
+            # As the app writes it: only for compilation tracks; a missing field reads as false.
+            if compilation:
+                entry["compilation"] = True
+            entries.append(entry)
     return entries
 
 

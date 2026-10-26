@@ -103,6 +103,8 @@ internal fun MainActivity.startMediaLibraryScanInternal() {
 }
 
 internal fun MainActivity.rebuildUniqueAlbumListInternal() {
+    // Runs after each library load, scan and sync: find the compilation albums once, not at each browse.
+    com.themoon.y1.models.Compilations.mark(MainActivity.customLibrary)
     uniqueAlbumList.clear()
     val seenAlbums = HashSet<String>()
     for (song in MainActivity.customLibrary) {

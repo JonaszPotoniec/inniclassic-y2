@@ -39,6 +39,7 @@ sealed interface BrowserMode {
     data object Artists : BrowserMode
     data object TrackArtists : BrowserMode
     data class Albums(val artistFilter: String? = null, val byTrackArtist: Boolean = false) : BrowserMode
+    data object Compilations : BrowserMode
     data object Genres : BrowserMode
     data class GenreArtists(val genre: String) : BrowserMode
     data class GenreAlbums(val genre: String, val artist: String? = null) : BrowserMode

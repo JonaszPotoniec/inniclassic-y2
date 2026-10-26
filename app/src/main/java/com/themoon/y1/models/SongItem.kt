@@ -12,6 +12,12 @@ class SongItem {
     var albumArtist: String
     var composer: String
 
+    /** The compilation flag of the tags (ID3 TCMP, MP4 cpil, Vorbis COMPILATION). The library cache keeps it. */
+    var compilationTag: Boolean = false
+
+    /** True if the song is on a compilation album. [Compilations.mark] sets it for all tracks of the album. */
+    var isCompilation: Boolean = false
+
     constructor(file: File, title: String, artist: String?, album: String?) {
         this.file = file
         this.title = title

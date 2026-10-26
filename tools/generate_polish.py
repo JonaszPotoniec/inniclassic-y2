@@ -62,6 +62,7 @@ polish_dict = {
   "Artists": "Wykonawcy",
   "Album Artists": "Wykonawcy albumów",
   "Albums": "Albumy",
+  "Compilations": "Składanki",
   "Songs": "Utwory",
   "Song": "Utwór",
   "All Songs": "Wszystkie utwory",

@@ -1145,7 +1145,7 @@ class AudioPlayerManager private constructor() {
     fun extractOpusMetadata(file: File): Array<Any?> = extractOpusMetadata(file, true)
 
     fun extractOpusMetadata(file: File, includeArt: Boolean): Array<Any?> {
-        val tags = arrayOfNulls<Any>(10)
+        val tags = arrayOfNulls<Any>(11)
         try {
             val fis = FileInputStream(file)
             val bos = ByteArrayOutputStream()
@@ -1230,6 +1230,8 @@ class AudioPlayerManager private constructor() {
                         tags[8] = comment.substring(comment.indexOf("=") + 1)
                     } else if (upper.startsWith("COMPOSER=")) {
                         tags[9] = comment.substring(comment.indexOf("=") + 1)
+                    } else if (upper.startsWith("COMPILATION=")) {
+                        tags[10] = comment.substring(comment.indexOf("=") + 1)
                     } else if (includeArt && upper.startsWith("METADATA_BLOCK_PICTURE=")) {
                         try {
                             val base64Data = comment.substring(23).replace("\\s".toRegex(), "")
@@ -1272,7 +1274,7 @@ class AudioPlayerManager private constructor() {
     fun extractOggVorbisMetadata(file: File): Array<Any?> = extractOggVorbisMetadata(file, true)
 
     fun extractOggVorbisMetadata(file: File, includeArt: Boolean): Array<Any?> {
-        val tags = arrayOfNulls<Any>(10)
+        val tags = arrayOfNulls<Any>(11)
         try {
             val fis = FileInputStream(file)
             val bos = ByteArrayOutputStream()
@@ -1371,6 +1373,8 @@ class AudioPlayerManager private constructor() {
                         tags[8] = comment.substring(comment.indexOf("=") + 1)
                     } else if (upper.startsWith("COMPOSER=")) {
                         tags[9] = comment.substring(comment.indexOf("=") + 1)
+                    } else if (upper.startsWith("COMPILATION=")) {
+                        tags[10] = comment.substring(comment.indexOf("=") + 1)
                     } else if (includeArt && upper.startsWith("METADATA_BLOCK_PICTURE=")) {
                         try {
                             val base64Data = comment.substring(23).replace("\\s".toRegex(), "")
@@ -1418,7 +1422,7 @@ class AudioPlayerManager private constructor() {
     fun extractFlacMetadata(file: File): Array<Any?> = extractFlacMetadata(file, true)
 
     fun extractFlacMetadata(file: File, includeArt: Boolean): Array<Any?> {
-        val tags = arrayOfNulls<Any>(10)
+        val tags = arrayOfNulls<Any>(11)
         try {
             val raf = RandomAccessFile(file, "r")
             val header = ByteArray(4)
@@ -1480,6 +1484,8 @@ class AudioPlayerManager private constructor() {
                                 tags[8] = comment.substring(comment.indexOf("=") + 1)
                             } else if (upper.startsWith("COMPOSER=")) {
                                 tags[9] = comment.substring(comment.indexOf("=") + 1)
+                            } else if (upper.startsWith("COMPILATION=")) {
+                                tags[10] = comment.substring(comment.indexOf("=") + 1)
                             }
                             i++
                         }
@@ -1511,7 +1517,7 @@ class AudioPlayerManager private constructor() {
     fun extractAlacMetadata(file: File): Array<Any?> = extractAlacMetadata(file, true)
 
     fun extractAlacMetadata(file: File, includeArt: Boolean): Array<Any?> {
-        val tags = arrayOfNulls<Any>(10)
+        val tags = arrayOfNulls<Any>(11)
         try {
             val raf = RandomAccessFile(file, "r")
             val fileSize = raf.length()
@@ -1535,7 +1541,8 @@ class AudioPlayerManager private constructor() {
 
                 if (type == "\u00A9nam" || type == "\u00A9ART" || type == "\u00A9alb" ||
                     type == "\u00A9day" || type == "\u00A9gen" || (includeArt && type == "covr") ||
-                    type == "trkn" || type == "\u00A9lyr" || type == "aART" || type == "\u00A9wrt"
+                    type == "trkn" || type == "\u00A9lyr" || type == "aART" || type == "\u00A9wrt" ||
+                    type == "cpil"
                 ) {
                     raf.seek(pos + 8)
                     val dataSize = raf.readInt()
@@ -1565,6 +1572,7 @@ class AudioPlayerManager private constructor() {
                                 "\u00A9lyr" -> tags[7] = String(data, Charsets.UTF_8)
                                 "aART" -> tags[8] = String(data, Charsets.UTF_8)
                                 "\u00A9wrt" -> tags[9] = String(data, Charsets.UTF_8)
+                                "cpil" -> tags[10] = if (data[0].toInt() != 0) "1" else "0"
                             }
                         }
                     }

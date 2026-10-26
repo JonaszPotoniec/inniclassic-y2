@@ -66,8 +66,14 @@ class CategoryListAdapter(
             val artistFilter = bc?.categoryArtistFilter ?: ""
             val isTrackArtist = bc?.categoryArtistFilterIsTrackArtist == true
             val activeLibrary = if (isAudiobook) MainActivity.audiobookLibrary else MainActivity.customLibrary
+            // The same filters as BrowserController.buildVirtualCategories: Compilations, and Artists without them.
+            val compilationsOnly = type == "ALBUM" && bc?.currentBrowserMode is BrowserMode.Compilations
+            val hideCompilationTracks = type == "ALBUM" && artistFilter.isNotEmpty() && isTrackArtist &&
+                bc?.artistsHideCompilations() == true
 
             for (song in activeLibrary) {
+                if (compilationsOnly && !song.isCompilation) continue
+                if (com.themoon.y1.models.Compilations.hiddenFromArtists(song, hideCompilationTracks)) continue
                 if (type == "GENRE_ALBUM") {
                     if (song.genre.isEmpty() || !song.genre.equals(genreFilter, ignoreCase = true)) {
                         continue
@@ -268,9 +274,12 @@ class CategoryListAdapter(
                 }
             } else {
                 val isTrackArtistMode = bc.categoryArtistFilterIsTrackArtist
+                val hideCompilationTracks = isTrackArtistMode && bc.artistsHideCompilations()
                 for (song in activeLibrary) {
                     val matchField = if (isTrackArtistMode) song.artist else song.albumArtist
-                    if (bc.categoryArtistFilter == matchField) {
+                    if (bc.categoryArtistFilter == matchField &&
+                        !com.themoon.y1.models.Compilations.hiddenFromArtists(song, hideCompilationTracks)
+                    ) {
                         allCount++
                     }
                 }
@@ -354,9 +363,12 @@ class CategoryListAdapter(
                 }
             } else {
                 val isTrack = bc.categoryArtistFilterIsTrackArtist
+                val hideCompilationTracks = isTrack && bc.artistsHideCompilations()
                 for (song in activeLibrary) {
                     val matchField = if (isTrack) song.artist else song.albumArtist
-                    if (bc.categoryArtistFilter == matchField) {
+                    if (bc.categoryArtistFilter == matchField &&
+                        !com.themoon.y1.models.Compilations.hiddenFromArtists(song, hideCompilationTracks)
+                    ) {
                         tracks.add(song.file)
                     }
                 }
@@ -548,7 +560,7 @@ class CategoryListAdapter(
                 bc.categoryArtistFilterIsTrackArtist = false
                 bc.virtualQueryAlbumArtist = bc.categoryArtistFilter
             } else {
-                bc.virtualQueryType = type
+                bc.virtualQueryType = if (bc.currentBrowserMode is BrowserMode.Compilations) "COMPILATION_ALBUM" else type
                 bc.virtualQueryValue = name
                 bc.virtualQueryAlbumArtist = albumArtist ?: ""
             }
