@@ -96,10 +96,8 @@ class SongListAdapter(
                 if (pdm.isDownloading(audioUrl)) {
                     val prog = pdm.getProgress(audioUrl)
                     displayTitle = "⏳ [$prog%] $datePrefix${song.title}"
-                    customColor = 0xFFFF8800.toInt()
                 } else if (localFile.exists() && localFile.length() > 0) {
                     displayTitle = "✔ $datePrefix${song.title}$progressText"
-                    customColor = 0xFF00FF00.toInt()
                 } else {
                     displayTitle = "$datePrefix${song.title}$progressText"
                 }

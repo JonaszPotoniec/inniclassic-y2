@@ -509,9 +509,6 @@ class FmRadioController(
                 "Save Channel",
                 if (isSaved) "★ " + localize("SAVED") else "☆ " + localize("SAVE")
             ).apply {
-                if (isSaved && childCount > 1 && getChildAt(1) is TextView) {
-                    (getChildAt(1) as TextView).setTextColor(0xFFFF8800.toInt())
-                }
                 setOnClickListener {
                     clickFeedback()
                     if (isSaved) {

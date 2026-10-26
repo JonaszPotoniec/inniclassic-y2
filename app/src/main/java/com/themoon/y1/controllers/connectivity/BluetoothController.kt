@@ -245,11 +245,6 @@ class BluetoothController(
             } catch (ignored: Exception) {}
         }
 
-        var accentColor = 0xFF00FFFF.toInt()
-        try {
-            accentColor = ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt()
-        } catch (ignored: Exception) {}
-
         var devIcon = TablerIcons.BLUETOOTH
         try {
             val btClass = device.bluetoothClass
@@ -259,8 +254,9 @@ class BluetoothController(
             }
         } catch (ignored: Exception) {}
 
+        // A check mark shows the connected device, as in the Wi-Fi list; the text keeps the theme colour.
         val btnDevice = if (isConnected) {
-            createTablerListButton(devIcon, name, null, accentColor, accentColor)
+            createTablerListButton(TablerIcons.CHECK, name, null, ThemeManager.getTextColorPrimary(), ThemeManager.getTextColorPrimary())
         } else {
             createTablerListButton(devIcon, name, null, ThemeManager.getTextColorSecondary(), ThemeManager.getTextColorPrimary())
         }

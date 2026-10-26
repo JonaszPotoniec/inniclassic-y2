@@ -132,7 +132,7 @@ class WifiController(
                     val tvRight = btnToggle.getChildAt(1) as? TextView
                     tvRight?.text = localize("Wait...")
                     if (!btnToggle.hasFocus()) {
-                        tvRight?.setTextColor(0xFFFFFF00.toInt())
+                        tvRight?.setTextColor(ThemeManager.getTextColorPrimary())
                     }
                 }
             }
@@ -199,8 +199,9 @@ class WifiController(
         val leftIcon = if (isConnected) TablerIcons.CHECK else TablerIcons.WIFI
         val rightIcon = if (isOpen) null else TablerIcons.LOCK
 
+        // The check mark shows the connected network; the text keeps the theme colour (no green).
         val btnWifi = if (isConnected) {
-            createTablerListButton(leftIcon, ssid, rightIcon, 0xFF00FF00.toInt(), 0xFF00FF00.toInt())
+            createTablerListButton(leftIcon, ssid, rightIcon, ThemeManager.getTextColorPrimary(), ThemeManager.getTextColorPrimary())
         } else {
             createTablerListButton(leftIcon, ssid, rightIcon, ThemeManager.getTextColorSecondary(), ThemeManager.getTextColorPrimary())
         }
