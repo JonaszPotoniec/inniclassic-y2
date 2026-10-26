@@ -18,6 +18,7 @@ import android.widget.Toast
 import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
+import com.themoon.y1.core.extensions.onOff
 import com.themoon.y1.managers.AudioEffectManager
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.navigation.ScreenState
@@ -100,7 +101,7 @@ class EqualizerController(
 
         val btnSoftwareEq = createSettingRow(
             "10-Band Software EQ",
-            if (isSoftwareEqEnabled) localize("ON") else localize("OFF")
+            onOff(isSoftwareEqEnabled, localize)
         )
         btnSoftwareEq.setOnClickListener {
             clickFeedback()
@@ -133,7 +134,7 @@ class EqualizerController(
         }
         containerSettingsItems.addView(rowSelect)
 
-        val steps = arrayOf("OFF", "Weak", "Normal", "Strong")
+        val steps = arrayOf("Off", "Weak", "Normal", "Strong")
         val rowBass = createSettingRow("Bass Boost", localize(steps[currentBassBoostStep % 4]))
         rowBass.setOnClickListener {
             clickFeedback()

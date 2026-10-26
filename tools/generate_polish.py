@@ -134,6 +134,7 @@ polish_dict = {
   "Repeat Mode": "Tryb powtarzania",
   "OFF": "WYŁ.",
   "ON": "WŁ.",
+  "On": "Wł.",
   "Off": "Wył.",
   "ONE": "JEDEN",
   "ALL": "WSZYSTKIE",

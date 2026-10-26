@@ -21,6 +21,7 @@ import android.widget.Toast
 import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
+import com.themoon.y1.core.extensions.onOff
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.sync.MediaSyncProvider
@@ -389,37 +390,37 @@ class JellyfinUiController(
 
         val btnRemoveDel = createWrappedSettingRow(
             localize("Remove Deleted"),
-            if (provider.isRemoveDeletedEnabled) localize("ON") else localize("OFF")
+            onOff(provider.isRemoveDeletedEnabled, localize)
         )
         btnRemoveDel.setOnClickListener {
             clickFeedback()
             val newVal = !provider.isRemoveDeletedEnabled
             provider.isRemoveDeletedEnabled = newVal
-            (btnRemoveDel.getChildAt(1) as? TextView)?.text = if (newVal) localize("ON") else localize("OFF")
+            (btnRemoveDel.getChildAt(1) as? TextView)?.text = onOff(newVal, localize)
         }
         containerSettingsItems.addView(btnRemoveDel)
 
         val btnTranscode = createWrappedSettingRow(
             localize("Transcode Video"),
-            if (provider.isTranscodeVideoEnabled) localize("ON") else localize("OFF")
+            onOff(provider.isTranscodeVideoEnabled, localize)
         )
         btnTranscode.setOnClickListener {
             clickFeedback()
             val newVal = !provider.isTranscodeVideoEnabled
             provider.isTranscodeVideoEnabled = newVal
-            (btnTranscode.getChildAt(1) as? TextView)?.text = if (newVal) localize("ON") else localize("OFF")
+            (btnTranscode.getChildAt(1) as? TextView)?.text = onOff(newVal, localize)
         }
         containerSettingsItems.addView(btnTranscode)
 
         val btnCovers = createWrappedSettingRow(
             localize("Download Covers"),
-            if (provider.isDownloadCoversEnabled) localize("ON") else localize("OFF")
+            onOff(provider.isDownloadCoversEnabled, localize)
         )
         btnCovers.setOnClickListener {
             clickFeedback()
             val newVal = !provider.isDownloadCoversEnabled
             provider.isDownloadCoversEnabled = newVal
-            (btnCovers.getChildAt(1) as? TextView)?.text = if (newVal) localize("ON") else localize("OFF")
+            (btnCovers.getChildAt(1) as? TextView)?.text = onOff(newVal, localize)
         }
         containerSettingsItems.addView(btnCovers)
 

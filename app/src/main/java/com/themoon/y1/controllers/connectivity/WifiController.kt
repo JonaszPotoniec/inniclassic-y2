@@ -16,6 +16,7 @@ import android.widget.Toast
 import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
+import com.themoon.y1.core.extensions.onOff
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.ListItemViewFactory
 import com.themoon.y1.views.RowGlyphs
@@ -103,21 +104,21 @@ class WifiController(
     fun updateWifiUI(results: List<ScanResult>?) {
         val wm = activity.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
         var isOn = false
-        var statusText = "OFF"
+        var isChanging = false
 
         if (wm != null) {
             val state = wm.wifiState
             if (state == WifiManager.WIFI_STATE_ENABLED) {
                 isOn = true
-                statusText = "ON"
             } else if (state == WifiManager.WIFI_STATE_ENABLING || state == WifiManager.WIFI_STATE_DISABLING) {
-                statusText = "Wait..."
+                isChanging = true
             }
         }
+        val statusText = if (isChanging) localize("Wait...") else onOff(isOn, localize)
 
         val existingToggle = containerWifiItems.findViewById<View>(WIFI_POWER_ROW_ID)
         if (existingToggle == null) {
-            val btnToggle = createSettingRow(localize("Wi-Fi Power"), localize(statusText))
+            val btnToggle = createSettingRow(localize("Wi-Fi Power"), statusText)
             btnToggle.id = WIFI_POWER_ROW_ID
             btnToggle.setOnClickListener {
                 clickFeedback()
@@ -144,14 +145,12 @@ class WifiController(
         } else {
             val btnToggle = existingToggle as LinearLayout
             val tvRight = btnToggle.getChildAt(1) as? TextView
-            tvRight?.text = localize(statusText)
+            tvRight?.text = statusText
             if (!btnToggle.hasFocus()) {
-                if (statusText == "ON") {
+                if (isOn || isChanging) {
                     tvRight?.setTextColor(ThemeManager.getTextColorPrimary())
-                } else if (statusText == "OFF") {
-                    tvRight?.setTextColor(ThemeManager.getTextColorSecondary())
                 } else {
-                    tvRight?.setTextColor(ThemeManager.getTextColorPrimary())
+                    tvRight?.setTextColor(ThemeManager.getTextColorSecondary())
                 }
             }
             for (i in containerWifiItems.childCount - 1 downTo 1) {

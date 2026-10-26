@@ -20,6 +20,7 @@ import android.widget.Toast
 import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
+import com.themoon.y1.core.extensions.onOff
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.ListItemViewFactory
 import com.themoon.y1.views.RowGlyphs
@@ -126,22 +127,22 @@ class BluetoothController(
 
         val ba = BluetoothAdapter.getDefaultAdapter()
         var isOn = false
-        var statusText = "OFF"
+        var isChanging = false
 
         if (ba != null) {
             val state = ba.state
             if (state == BluetoothAdapter.STATE_ON) {
                 isOn = true
-                statusText = "ON"
             } else if (state == BluetoothAdapter.STATE_TURNING_ON || state == BluetoothAdapter.STATE_TURNING_OFF) {
-                statusText = "Wait..."
+                isChanging = true
             }
         }
+        val statusText = if (isChanging) localize("Wait...") else onOff(isOn, localize)
 
         containerBtItems.removeAllViews()
 
         // Power toggle button
-        val btnToggle = createSettingRow(localize("Bluetooth Power"), localize(statusText))
+        val btnToggle = createSettingRow(localize("Bluetooth Power"), statusText)
         btnToggle.setOnClickListener {
             val now = System.currentTimeMillis()
             if (now - lastBtToggleTime < 1500) {

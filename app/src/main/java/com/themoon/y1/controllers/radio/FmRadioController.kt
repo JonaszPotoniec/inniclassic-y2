@@ -20,6 +20,7 @@ import com.themoon.y1.MainActivity
 import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
+import com.themoon.y1.core.extensions.onOff
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.managers.FmRadioManager
 import com.themoon.y1.navigation.ScreenState
@@ -498,7 +499,7 @@ class FmRadioController(
 
             val btnPower = createSettingRow(
                 "Radio Power",
-                if (fmManager.isPowerUp) localize("ON") else localize("OFF")
+                onOff(fmManager.isPowerUp, localize)
             ).apply {
                 setOnClickListener { toggleRadioPower() }
             }
