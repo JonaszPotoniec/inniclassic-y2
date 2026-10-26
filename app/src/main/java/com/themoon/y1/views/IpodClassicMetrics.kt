@@ -17,10 +17,23 @@ object IpodClassicMetrics {
     const val STATUS_TITLE_SP = 19f
     const val STATUS_PADDING_LEFT = 10
     const val STATUS_PADDING_RIGHT = 6
-    const val BATTERY_WIDTH = 39
-    const val BATTERY_HEIGHT = 20
-    const val PLAY_ICON_SIZE = 18
-    const val PLAY_ICON_GAP = 7
+    // All status bar items share one box with the capitals of the text: 14 px = the cap height of the
+    // 19 px title font (Nimbus Sans Bold, 13.85 px), so the space above and below the ink is the same
+    // for the text, the icons and the battery. The ink of each icon goes from the top row to the bottom
+    // row of the box (StatusIcons, IpodPlayStateView).
+    const val STATUS_ICON_HEIGHT = 14
+    // Round shapes (headphones, Wi-Fi, Bluetooth) look smaller than flat ones of the same height, as the
+    // round letters of a font. They go 1 px above the box (optical overshoot); the bottom stays on the box.
+    const val STATUS_ROUND_ICON_HEIGHT = STATUS_ICON_HEIGHT + 1
+    // The battery has a 2 px outline at this size (BatteryIconView.setThinOutline), so the digits stay legible.
+    // Its thin grey outline looks shorter than the bold blue icons: it goes 1 px above and below the box
+    // (optical overshoot), on the same centre line.
+    const val BATTERY_WIDTH = 30
+    const val BATTERY_OVERSHOOT = 1
+    const val BATTERY_HEIGHT = STATUS_ICON_HEIGHT + 2 * BATTERY_OVERSHOOT
+    const val PLAY_ICON_WIDTH = 12
+    // Space between the ink of two items (the iPod has 5 px between the play icon and the battery).
+    const val STATUS_ITEM_GAP = 8
 
     // Lists: 25 px rows, cap height 11, text at x = 7 on the iPod.
     const val ROW_HEIGHT = 38
@@ -68,6 +81,15 @@ object IpodClassicMetrics {
     const val TILT_RIGHT_EDGE_RATIO = 119f / 136f
     const val TILT_WIDTH_RATIO = 1f
     const val TILT_ANGLE_DEG = 18f
+
+    /**
+     * Top of the status item box. The items are centred above the 1 px line (LinearLayout gravity
+     * CENTER_VERTICAL with a bottom margin of the line), which gives this value.
+     */
+    fun statusItemTop(): Int = (STATUS_BAR_HEIGHT - STATUS_BAR_RULE - STATUS_ICON_HEIGHT) / 2
+
+    /** The centre line of all status bar items, from the top of the bar: the icons, the battery and the capitals. */
+    fun statusCentreLine(): Float = statusItemTop() + STATUS_ICON_HEIGHT / 2f
 
     /**
      * Top padding that puts the centre of the capital letters on the centre of a box of [boxHeight].

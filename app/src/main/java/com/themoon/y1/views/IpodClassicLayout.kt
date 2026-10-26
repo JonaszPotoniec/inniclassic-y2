@@ -6,6 +6,8 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
+import android.text.Editable
+import android.text.TextWatcher
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -17,6 +19,7 @@ import com.themoon.y1.MainActivity
 import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import java.util.WeakHashMap
+import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 /**
@@ -111,10 +114,12 @@ object IpodClassicLayout {
         // The 1 px line spans the full width, past the padding.
         setClipToPadding(bar, false, true)
 
-        val bodyHeight = (IpodClassicMetrics.STATUS_BAR_HEIGHT - IpodClassicMetrics.STATUS_BAR_RULE) * d
+        // The capitals are centred on the centre line of the icons and the battery.
+        val textBox = 2f * IpodClassicMetrics.statusCentreLine() * d
         val titleSize = IpodClassicMetrics.STATUS_TITLE_SP * d
+        val gap = IpodClassicMetrics.STATUS_ITEM_GAP * d
         main.findViewById<TextView>(R.id.tv_status_clock)?.let {
-            styleCentredText(it, titleSize, ThemeManager.getCustomFontBold(), bodyHeight)
+            styleCentredText(it, titleSize, ThemeManager.getCustomFontBold(), textBox)
         }
 
         val group = main.findViewById<LinearLayout>(R.id.layout_status_right_group) ?: return
@@ -127,17 +132,26 @@ object IpodClassicLayout {
                     setWidth(child, px(IpodClassicMetrics.BATTERY_WIDTH, d))
                     setHeight(child, px(IpodClassicMetrics.BATTERY_HEIGHT, d))
                     setMargins(child, 0, 0, 0, px(IpodClassicMetrics.STATUS_BAR_RULE, d))
+                    record(child, "thinOutline") { (it as BatteryIconView).setThinOutline(false) }
+                    child.setThinOutline(true)
                 }
-                // The status bar title and any clock or text added to the right group.
-                is TextView -> styleCentredText(child, titleSize, ThemeManager.getCustomFontBold(), bodyHeight)
+                // The clock or any text in the right group: the gaps are measured from the ink of the letters.
+                is TextView -> {
+                    styleCentredText(child, titleSize, ThemeManager.getCustomFontBold(), textBox)
+                    setStatusTextMargins(child, afterBattery = batteryIndex >= 0, gap = gap)
+                    watchStatusText(child, afterBattery = batteryIndex >= 0, gap = gap)
+                }
             }
         }
 
+        // The play/pause icon has the box (height, top) and the gap of the other status icons.
         if (group.findViewWithTag<View>(TAG_PLAY_ICON) == null && batteryIndex >= 0) {
-            val size = px(IpodClassicMetrics.PLAY_ICON_SIZE, d)
-            val lp = LinearLayout.LayoutParams(size, size).apply {
+            val lp = LinearLayout.LayoutParams(
+                px(IpodClassicMetrics.PLAY_ICON_WIDTH, d),
+                px(IpodClassicMetrics.STATUS_ICON_HEIGHT, d)
+            ).apply {
                 gravity = Gravity.CENTER_VERTICAL
-                rightMargin = px(IpodClassicMetrics.PLAY_ICON_GAP, d)
+                rightMargin = gap.roundToInt()
                 bottomMargin = px(IpodClassicMetrics.STATUS_BAR_RULE, d)
             }
             group.addView(IpodPlayStateView(main).apply { tag = TAG_PLAY_ICON }, batteryIndex, lp)
@@ -252,6 +266,61 @@ object IpodClassicLayout {
         path.computeBounds(bounds, true)
         return IpodClassicMetrics.capCentredPaddingTop(boxHeight, paint.fontMetricsInt.ascent, -bounds.top)
             .coerceAtLeast(0)
+    }
+
+    /**
+     * Margins of a text in the right status group, from the ink of its letters. Text after the battery (the clock,
+     * the last item, see MainActivityArt.moveStatusTextLast): [gap] to the battery, and its last letter at the
+     * right padding like the battery when the clock is off. Text before the battery: [gap] to the next item.
+     */
+    private fun setStatusTextMargins(tv: TextView, afterBattery: Boolean, gap: Float) {
+        val (left, right) = inkBearings(tv)
+        if (afterBattery) {
+            setMargins(tv, left = (gap - left).roundToInt().coerceAtLeast(0), right = -right.roundToInt())
+        } else {
+            setMargins(tv, right = (gap - right).roundToInt().coerceAtLeast(0))
+        }
+    }
+
+    private val statusTextWatchers = WeakHashMap<TextView, TextWatcher>()
+
+    /** The clock text changes each minute, and the bearings of its first and last letters with it. */
+    private fun watchStatusText(tv: TextView, afterBattery: Boolean, gap: Float) {
+        statusTextWatchers[tv]?.let { tv.removeTextChangedListener(it) }
+        val watcher = object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                if (applied && isActive) setStatusTextMargins(tv, afterBattery, gap)
+            }
+        }
+        tv.addTextChangedListener(watcher)
+        statusTextWatchers[tv] = watcher
+    }
+
+    /**
+     * Space from the left edge of [tv] (wrap_content, no padding, gravity left) to the ink of its first letter,
+     * and from the ink of its last letter to the right edge. The view is the advance of the text, rounded up.
+     * The text is drawn with the paint of the view into a small bitmap and the ink columns are read: the outline of
+     * the font (Paint.getTextPath) can be up to 1 px narrower than the drawn (hinted) letters, and the last
+     * letter was cut at the right edge of the group. Called at each text change (once a minute), not per frame.
+     */
+    private fun inkBearings(tv: TextView): Pair<Float, Float> {
+        val text = tv.text?.toString().orEmpty()
+        if (text.isEmpty()) return Pair(0f, 0f)
+        val paint = android.graphics.Paint(tv.paint)
+        val fm = paint.fontMetricsInt
+        val advance = ceil(paint.measureText(text)).toInt()
+        val pad = 4
+        val w = advance + 2 * pad
+        val h = (fm.bottom - fm.top).coerceAtLeast(1)
+        val bmp = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+        android.graphics.Canvas(bmp).drawText(text, pad.toFloat(), (-fm.top).toFloat(), paint)
+        val pixels = IntArray(w * h)
+        bmp.getPixels(pixels, 0, w, 0, 0, w, h)
+        bmp.recycle()
+        val cols = StatusSpacing.inkColumns(pixels, w) ?: return Pair(0f, 0f)
+        return Pair((cols[0] - pad).toFloat(), (pad + advance - 1 - cols[1]).toFloat())
     }
 
     internal fun horizontalGravity(tv: TextView): Int {

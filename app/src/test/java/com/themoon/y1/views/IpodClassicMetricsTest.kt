@@ -24,6 +24,34 @@ class IpodClassicMetricsTest {
     }
 
     @Test
+    fun statusItemsShareOneBox() {
+        // Play/pause: rows 7..20 of the 30 px bar, the rows of the capitals; centre line y = 14.
+        // Battery: 1 px more above and below (rows 6..21), the same centre line.
+        assertEquals(IpodClassicMetrics.BATTERY_HEIGHT, IpodClassicMetrics.STATUS_ICON_HEIGHT + 2)
+        val batteryTop = (IpodClassicMetrics.STATUS_BAR_HEIGHT - IpodClassicMetrics.BATTERY_HEIGHT) / 2 -
+            IpodClassicMetrics.STATUS_BAR_RULE
+        assertEquals(IpodClassicMetrics.statusItemTop() - 1, batteryTop)
+        assertEquals(IpodClassicMetrics.statusCentreLine(), batteryTop + IpodClassicMetrics.BATTERY_HEIGHT / 2f, 0f)
+        assertEquals(14, IpodClassicMetrics.STATUS_ICON_HEIGHT)
+        assertEquals(7, IpodClassicMetrics.statusItemTop())
+        assertEquals(14f, IpodClassicMetrics.statusCentreLine(), 0f)
+        // Same top as LinearLayout CENTER_VERTICAL with a bottom margin of the line.
+        assertEquals(
+            (IpodClassicMetrics.STATUS_BAR_HEIGHT - IpodClassicMetrics.STATUS_ICON_HEIGHT) / 2 - IpodClassicMetrics.STATUS_BAR_RULE,
+            IpodClassicMetrics.statusItemTop()
+        )
+        // Round icons: 1 px more at the top (row 6), the same bottom row (20).
+        val round = IpodClassicMetrics.STATUS_ROUND_ICON_HEIGHT
+        val roundTop = (IpodClassicMetrics.STATUS_BAR_HEIGHT - round) / 2 - IpodClassicMetrics.STATUS_BAR_RULE
+        assertEquals(6, roundTop)
+        assertEquals(IpodClassicMetrics.statusItemTop() + IpodClassicMetrics.STATUS_ICON_HEIGHT, roundTop + round)
+        // 19 px Nimbus Sans Bold: ascent -14, capitals 13.85 px (rows 7..20): the same centre line.
+        val ascent = -14
+        val top = IpodClassicMetrics.capCentredPaddingTop(2f * IpodClassicMetrics.statusCentreLine(), ascent, 13.85f)
+        assertEquals(14f, top - ascent - 13.85f / 2f, 0.5f)
+    }
+
+    @Test
     fun capCentredPaddingPutsTheCapsOnTheRowCentre() {
         // 38 px row, ascent -22, caps 16 px: baseline at 5 + 22 = 27, caps 11..27, centre 19.
         val top = IpodClassicMetrics.capCentredPaddingTop(38f, -22, 16f)

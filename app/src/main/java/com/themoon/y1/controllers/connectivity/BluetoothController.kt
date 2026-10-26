@@ -237,14 +237,16 @@ class BluetoothController(
     private fun addPairedBluetoothItemToUI(device: BluetoothDevice) {
         val name = if (!device.name.isNullOrEmpty()) device.name else "Unknown (${device.address})"
 
-        var isConnected = false
+        var proxyState: Int? = null
         if (globalA2dp != null) {
             try {
-                val state = globalA2dp!!.javaClass.getMethod("getConnectionState", BluetoothDevice::class.java)
+                proxyState = globalA2dp!!.javaClass.getMethod("getConnectionState", BluetoothDevice::class.java)
                     .invoke(globalA2dp, device) as Int
-                isConnected = (state == BluetoothProfile.STATE_CONNECTED)
             } catch (ignored: Exception) {}
         }
+        // Also the devices from the A2DP query at start and the broadcasts (the status bar uses the same state):
+        // after an app restart globalA2dp is null until Bluetooth is turned on or a device is connected here.
+        val isConnected = com.themoon.y1.managers.BluetoothAudioState.shared.listShowsConnected(device.address, proxyState)
 
         var devIcon = TablerIcons.BLUETOOTH
         try {
