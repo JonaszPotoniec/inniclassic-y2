@@ -481,14 +481,14 @@ class SettingsController(
         var isDoubleClickFavoriteEnabled = prefs.getBoolean("double_click_favorite", true)
         val btnDoubleClickFavorite = createSettingRow(
             localize("Double-Click to Favorite"),
-            if (isDoubleClickFavoriteEnabled) localize("ON") else localize("OFF")
+            com.themoon.y1.core.extensions.onOff(isDoubleClickFavoriteEnabled, localize)
         )
         btnDoubleClickFavorite.setOnClickListener {
             clickFeedback()
             isDoubleClickFavoriteEnabled = !isDoubleClickFavoriteEnabled
             prefs.edit().putBoolean("double_click_favorite", isDoubleClickFavoriteEnabled).commit()
             val tvStatus = btnDoubleClickFavorite.getChildAt(1) as? TextView
-            tvStatus?.text = if (isDoubleClickFavoriteEnabled) localize("ON") else localize("OFF")
+            tvStatus?.text = com.themoon.y1.core.extensions.onOff(isDoubleClickFavoriteEnabled, localize)
         }
         containerSettingsItems.addView(btnDoubleClickFavorite)
 
