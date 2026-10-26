@@ -310,7 +310,9 @@ object ListItemViewFactory {
         row.addView(tvTitle)
 
         val displayVal = if (ThemeManager.isClassicTheme()) value.replace("〉", "›") else value
-        val tvVal = TextView(context).apply {
+        // Shows an on/off value as a switch when Settings → Toggle Style is Switch.
+        val tvVal = SettingValueView(context).apply {
+            stateKey = title
             text = displayVal
             setTextColor(ThemeManager.getTextColorSecondary())
             setTextSize(TypedValue.COMPLEX_UNIT_PX, (if (ThemeManager.isClassicTheme()) 21f else 14f) * d)
