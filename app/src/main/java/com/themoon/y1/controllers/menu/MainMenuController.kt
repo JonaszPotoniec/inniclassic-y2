@@ -735,20 +735,7 @@ class MainMenuController(
     }
 
     private fun sortMenuElements(buttons: ArrayList<ThemeManager.MenuElement>) {
-        val savedOrder = prefs.getString("custom_menu_order_" + ThemeManager.getCurrentTheme().name, "") ?: ""
-        if (savedOrder.isNotEmpty()) {
-            val orderList = savedOrder.split(",")
-            buttons.sortWith { e1, e2 ->
-                val idx1 = orderList.indexOf(e1.id)
-                val idx2 = orderList.indexOf(e2.id)
-                if (idx1 != -1 && idx2 != -1) idx1 - idx2
-                else if (idx1 != -1) -1
-                else if (idx2 != -1) 1
-                else e1.focusIndex - e2.focusIndex
-            }
-        } else {
-            buttons.sortWith { e1, e2 -> e1.focusIndex - e2.focusIndex }
-        }
+        MenuOrder.sort(buttons, prefs)
     }
 
     private fun createDynamicLayoutParams(
