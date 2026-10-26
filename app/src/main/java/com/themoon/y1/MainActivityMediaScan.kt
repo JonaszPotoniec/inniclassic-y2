@@ -12,32 +12,61 @@ import java.util.HashSet
 import java.util.Locale
 import java.util.regex.Pattern
 
-internal fun MainActivity.loadLibraryCacheInternal(): Boolean {
+/**
+ * Reads the library cache on a worker thread (it checks that each cached file exists, which is slow
+ * on a large SD card) and applies it on the UI thread. [onLoaded] runs on the UI thread with true if
+ * the cache was applied. Calls made while a load is running wait for that load.
+ */
+internal fun MainActivity.loadLibraryCacheInternal(onLoaded: ((Boolean) -> Unit)? = null) {
+    if (onLoaded != null) libraryCacheLoadCallbacks.add(onLoaded)
+    if (isLibraryCacheLoading) return
+    isLibraryCacheLoading = true
+    val scansBeforeLoad = mediaLibraryScanCount
     val mlm = MediaLibraryManager.getInstance()
-    if (mlm.loadLibraryCache()) {
-        synchronized(MainActivity.customLibrary) {
-            MainActivity.customLibrary.clear()
-            MainActivity.customLibrary.addAll(mlm.musicLibrary)
+    Thread({
+        val cache = mlm.readLibraryCache()
+        runOnUiThread {
+            isLibraryCacheLoading = false
+            // A scan rebuilds the lists from the files and replaces them when it completes. Do not
+            // write the cache into the lists while a scan runs, or over the result of a newer scan.
+            val scanStarted = isCustomScanning || mlm.isScanning || mediaLibraryScanCount != scansBeforeLoad
+            val applied = if (cache != null && !scanStarted) {
+                applyLibraryCache(mlm, cache)
+                com.themoon.y1.navigation.NavigationManager.getInstance().activeController?.onLibraryLoaded()
+                true
+            } else {
+                false
+            }
+            val callbacks = ArrayList(libraryCacheLoadCallbacks)
+            libraryCacheLoadCallbacks.clear()
+            for (callback in callbacks) callback(applied)
         }
-        synchronized(MainActivity.audiobookLibrary) {
-            MainActivity.audiobookLibrary.clear()
-            MainActivity.audiobookLibrary.addAll(mlm.audiobookLibrary)
-        }
-        synchronized(MainActivity.trackNumberMap) {
-            MainActivity.trackNumberMap.clear()
-            MainActivity.trackNumberMap.putAll(mlm.trackNumberMap)
-        }
-        rebuildUniqueAlbumListInternal()
-        scanVideosInternal()
-        refreshNowPlayingPreview()
-        return true
+    }, "y1-library-cache").start()
+}
+
+private fun MainActivity.applyLibraryCache(mlm: MediaLibraryManager, cache: MediaLibraryManager.LibraryCache) {
+    mlm.applyLibraryCache(cache)
+    synchronized(MainActivity.customLibrary) {
+        MainActivity.customLibrary.clear()
+        MainActivity.customLibrary.addAll(mlm.musicLibrary)
     }
-    return false
+    synchronized(MainActivity.audiobookLibrary) {
+        MainActivity.audiobookLibrary.clear()
+        MainActivity.audiobookLibrary.addAll(mlm.audiobookLibrary)
+    }
+    synchronized(MainActivity.trackNumberMap) {
+        MainActivity.trackNumberMap.clear()
+        MainActivity.trackNumberMap.putAll(mlm.trackNumberMap)
+    }
+    rebuildUniqueAlbumListInternal()
+    scanVideosInternal()
+    refreshNowPlayingPreview()
 }
 
 internal fun MainActivity.startMediaLibraryScanInternal() {
     if (isCustomScanning) return
     isCustomScanning = true
+    mediaLibraryScanCount++
     pbLoadingProgress?.progress = 0
     showLoadingPopup(t("Preparing to scan...\nPlease wait."))
     val mlm = MediaLibraryManager.getInstance()

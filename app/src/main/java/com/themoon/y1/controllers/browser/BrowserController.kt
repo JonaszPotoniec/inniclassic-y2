@@ -211,6 +211,11 @@ class BrowserController(
         isAudiobookLibraryMode = false
     }
 
+    override fun onLibraryLoaded() {
+        // The Music menu itself does not change; rebuilding it would move the selection to the top
+        if (currentBrowserMode !is BrowserMode.Root) onRefreshUI()
+    }
+
     override fun onRefreshUI() {
         when (currentBrowserMode) {
             is BrowserMode.Root, is BrowserMode.Audiobooks -> buildFileBrowserUI()

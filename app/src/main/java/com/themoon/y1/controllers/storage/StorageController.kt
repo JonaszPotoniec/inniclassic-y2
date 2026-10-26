@@ -47,6 +47,10 @@ class StorageController(
         layoutStorage.visibility = View.GONE
     }
 
+    override fun onLibraryLoaded() {
+        buildStorageUI()
+    }
+
     override fun onThemeChanged() {
         buildStorageUI()
     }

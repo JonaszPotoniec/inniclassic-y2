@@ -14,6 +14,9 @@ interface ScreenController {
     fun onExit() {}
     fun onRefreshUI() {}
 
+    /** The library cache finished loading after the screen was built: show the library data again. */
+    fun onLibraryLoaded() {}
+
     /** The theme changed while this screen shows: make it again in the new theme, with the same focus. */
     fun onThemeChanged() {
         onRefreshUI()

@@ -124,6 +124,10 @@ class CoverFlowController(
         buildCoverFlowUI()
     }
 
+    override fun onLibraryLoaded() {
+        buildCoverFlowUI()
+    }
+
     override fun onThemeChanged() {
         // A rebuild takes about 1.2 s; only the card texts take theme colours
         for (card in cfViews ?: return) {
