@@ -10,6 +10,7 @@ import android.os.Looper
 import android.os.PowerManager
 import android.util.Base64
 import android.widget.Toast
+import com.google.android.exoplayer2.C
 import com.google.android.exoplayer2.DefaultRenderersFactory
 import com.google.android.exoplayer2.ExoPlaybackException
 import com.google.android.exoplayer2.MediaItem
@@ -190,6 +191,8 @@ class AudioPlayerManager private constructor() {
         renderersFactory.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
 
         exoPlayer = SimpleExoPlayer.Builder(context.applicationContext, renderersFactory).build().apply {
+            // Partial wake lock while it plays: music continues when Android turns the screen off.
+            setWakeMode(C.WAKE_MODE_LOCAL)
             val initialRepeatMode = MainActivity.instance?.prefs?.getInt("repeat_mode", 0) ?: 0
             repeatMode = when (initialRepeatMode) {
                 1 -> Player.REPEAT_MODE_ONE

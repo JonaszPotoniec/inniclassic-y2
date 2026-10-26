@@ -74,6 +74,7 @@ import com.themoon.y1.managers.FmRadioManager
 import com.themoon.y1.managers.LanguageManager
 import com.themoon.y1.managers.MediaLibraryManager
 import com.themoon.y1.managers.OtaUpdateManager
+import com.themoon.y1.managers.BacklightTimer
 import com.themoon.y1.managers.PowerBacklightManager
 import com.themoon.y1.managers.UsbMassStorageController
 import com.themoon.y1.managers.UsbStorageUiManager
@@ -184,7 +185,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     var backTargetForUtility: Int = STATE_SETTINGS
     var isPendingUpdateCheckAfterWifi: Boolean = false
     var lastSettingsFocusIndex: Int = 0
-    var currentTimeoutIndex: Int = 1
     var currentEqPresetIndex: Int = 0
     var currentEqProfile: String = "preset_0"
     var currentBassBoostStep: Int = 0
@@ -354,10 +354,12 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             }
         })
 
-        val savedBacklightIdx = prefs.getInt("backlight_timer_index", 3)
+        val savedBacklightIdx = prefs.getInt(BacklightTimer.PREF_INDEX, BacklightTimer.DEFAULT_INDEX)
         powerBacklightManager = PowerBacklightManager.getInstance(this).apply {
             backlightTimerIndex = savedBacklightIdx
+            appHoldsScreenOn = { isServerRunning }
             setTimeoutAction { turnOffScreen() }
+            applyBacklightSetting()
         }
 
         AudioPlayerManager.getInstance().initPlayer(applicationContext)
@@ -853,10 +855,9 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         isScreenSleeping = true
         updateScreenOffFeedback(false)
         powerBacklightManager?.cancelTimer()
-        val am = AudioPlayerManager.getInstance()
-        val fm = FmRadioManager.getInstance(this)
-        val isAudioActive = am.isPlaying() || fm.isPowerUp || isServerRunning
-        if (isAudioActive) {
+        // A real screen off also while music or FM radio plays: both hold a wake lock and continue.
+        // Only the web server holds the screen on (FLAG_KEEP_SCREEN_ON), so the screen is blanked for it.
+        if (BacklightTimer.useFakeScreenOff(isServerRunning)) {
             isFakeScreenOff = true
             pbLoadingProgress?.visibility = View.GONE
             tvLoadingProgress?.text = ""

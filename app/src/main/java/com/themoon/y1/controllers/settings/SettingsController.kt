@@ -104,11 +104,8 @@ class SettingsController(
     private var materialIconFont: Typeface? = null
 
     companion object {
-        val BACKLIGHT_TIMER_LABELS = arrayOf(
-            "10 Seconds", "20 Seconds", "30 Seconds", "1 Minute", "2 Minutes", "Always On"
-        )
-        val TIMEOUT_VALUES = intArrayOf(15000, 30000, 60000, 300000)
-        val TIMEOUT_NAMES = arrayOf("15 Sec", "30 Sec", "1 Min", "5 Min")
+        /** Backlight Timer is the one screen timer: it also sets Android's SCREEN_OFF_TIMEOUT (see BacklightTimer). */
+        val BACKLIGHT_TIMER_LABELS = com.themoon.y1.managers.BacklightTimer.LABELS
         val VIBE_STRENGTH_NAMES = arrayOf("Weak", "Normal (Vibe)", "Strong")
 
         // Common IANA zones covering the main UTC offsets, short enough to scroll with the wheel
@@ -706,27 +703,6 @@ class SettingsController(
         }
         containerSettingsItems.addView(btnListEdges)
 
-        var currentTimeoutIndex = prefs.getInt("timeout_idx", 1)
-        if (currentTimeoutIndex >= TIMEOUT_VALUES.size) currentTimeoutIndex = 0
-        val btnTimeout = createSettingRow(
-            localize("Screen Timeout"),
-            localize(TIMEOUT_NAMES[currentTimeoutIndex])
-        )
-        btnTimeout.setOnClickListener {
-            clickFeedback()
-            currentTimeoutIndex = (currentTimeoutIndex + 1) % TIMEOUT_VALUES.size
-            val tvStatus = btnTimeout.getChildAt(1) as? TextView
-            tvStatus?.text = localize(TIMEOUT_NAMES[currentTimeoutIndex])
-            try {
-                Settings.System.putInt(
-                    activity.contentResolver,
-                    Settings.System.SCREEN_OFF_TIMEOUT,
-                    TIMEOUT_VALUES[currentTimeoutIndex]
-                )
-            } catch (_: Exception) {}
-            prefs.edit().putInt("timeout_idx", currentTimeoutIndex).commit()
-        }
-        containerSettingsItems.addView(btnTimeout)
 
         val btnPowerOff = createSettingRow(localize("Power Off"), "〉 ")
         btnPowerOff.setOnClickListener {
