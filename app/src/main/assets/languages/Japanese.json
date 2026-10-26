@@ -686,5 +686,6 @@
   "Failed": "失敗しました",
   "Time set from the internet:": "インターネットから時刻を設定しました:",
   "Battery low": "バッテリー残量低下",
-  "Please charge": "充電してください"
+  "Please charge": "充電してください",
+  "Shuffle Songs": "曲をシャッフル"
 }

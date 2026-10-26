@@ -126,6 +126,7 @@ polish_dict = {
   "Added to Queue": "Dodano do kolejki",
   "Shuffle": "Wymieszaj",
   "Shuffle Mode": "Tryb losowy",
+  "Shuffle Songs": "Wymieszaj utwory",
   "Repeat": "Powtarzaj",
   "Repeat Mode": "Tryb powtarzania",
   "OFF": "WYŁ.",

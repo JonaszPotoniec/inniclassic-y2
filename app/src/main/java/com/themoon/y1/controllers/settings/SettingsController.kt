@@ -139,6 +139,7 @@ class SettingsController(
             arrayOf("artists", "Album Artists"),
             arrayOf("albums", "Albums"),
             arrayOf("songs", "Songs"),
+            arrayOf("shuffle_songs", "Shuffle Songs"),
             arrayOf("genres", "Genres"),
             arrayOf("composers", "Composers"),
             arrayOf("years", "Years"),

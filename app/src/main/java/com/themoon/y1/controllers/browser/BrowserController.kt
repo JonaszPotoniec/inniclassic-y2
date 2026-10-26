@@ -68,6 +68,7 @@ class BrowserController(
     private val onNavigateBackToMenu: () -> Unit,
     private val onCoverFlowRequested: () -> Unit,
     private val onPlaylistsRequested: () -> Unit,
+    private val onShuffleSongsRequested: () -> Unit,
     private val onSearchRequested: () -> Unit,
     private val onStartMediaLibraryScan: () -> Unit,
     private val showLoadingPopup: () -> Unit,
@@ -343,6 +344,16 @@ class BrowserController(
                     buildVirtualSongs()
                 }
                 containerBrowserItems.addView(btnAll)
+            }
+
+            if (!isMusicMenuItemHidden("shuffle_songs")) {
+                val btnShuffle = createListButtonWithIcon("\uE043", localize("Shuffle Songs"), null)
+                btnShuffle.setOnClickListener {
+                    clickFeedback()
+                    lastBrowserFocusText = localize("Shuffle Songs")
+                    onShuffleSongsRequested()
+                }
+                containerBrowserItems.addView(btnShuffle)
             }
 
             if (!isMusicMenuItemHidden("genres")) {
