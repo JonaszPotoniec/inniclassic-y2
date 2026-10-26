@@ -31,10 +31,8 @@ internal fun MainActivity.initViewBindings() {
         textSize = 50f
         gravity = Gravity.CENTER
         visibility = View.GONE
-        val lp = FrameLayout.LayoutParams((80 * d).toInt(), (80 * d).toInt()).apply {
-            gravity = Gravity.CENTER_VERTICAL or Gravity.RIGHT
-            rightMargin = (30 * d).toInt()
-        }
+        // The letter box of speed scrolling, in the middle of the screen (see LetterJump).
+        val lp = FrameLayout.LayoutParams((96 * d).toInt(), (96 * d).toInt(), Gravity.CENTER)
         rootContent.addView(this, lp)
     }
 

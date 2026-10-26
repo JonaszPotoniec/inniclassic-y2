@@ -37,6 +37,7 @@ import com.themoon.y1.managers.AudiobookManager
 import com.themoon.y1.managers.RecentlyPlayedManager
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.BrowserMode
+import com.themoon.y1.navigation.LetterJump
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.AlphabetIndexBar
 import com.themoon.y1.views.ClassicMenuStyle
@@ -107,6 +108,14 @@ class BrowserController(
     private val currentScrollIndexList = ArrayList<String>()
     private var browserCoverPaneSetUp: Boolean = false
     private val uiHandler = Handler(Looper.getMainLooper())
+
+    private val letterMode = LetterJump.Mode()
+    private val letterIdleTask = Runnable { endLetterJump() }
+    private var rowLettersKey: Any? = null
+    private var rowLetters: List<String?>? = null
+    /** The letter in the letter box during letter mode; null when the wheel steps row by row. */
+    var jumpLetter: String? = null
+        private set
 
     companion object {
         private const val FOLDER_ROW_CHUNK_SIZE = 25
@@ -194,6 +203,7 @@ class BrowserController(
 
     override fun onExit() {
         hideBrowserCoverPane()
+        endLetterJump()
         hzIndexScroll?.visibility = View.GONE
         isAudiobookLibraryMode = false
     }
@@ -1443,6 +1453,72 @@ class BrowserController(
         }
     }
 
+    /**
+     * Speed scrolling ([LetterJump.Mode]). In letter mode, focuses with [focusRow] the first row of the next or
+     * previous letter, shows the letter box and returns true. Else returns false, and the wheel steps one row.
+     * [from] is the focused row, [listKey] changes when the rows change, [rowTexts] gives the text of each row.
+     */
+    private fun letterJump(delta: Int, event: KeyEvent, from: Int, listKey: Any, rowTexts: () -> List<String?>, focusRow: (Int) -> Unit): Boolean {
+        if (letterMode.isIdle(event.eventTime)) endLetterJump() // the idle timer did not run yet
+        val step = letterMode.onStep(delta, event.eventTime, from) {
+            if (listKey != rowLettersKey) {
+                rowLetters = LetterJump.lettersFor(rowTexts())
+                rowLettersKey = listKey
+            }
+            rowLetters
+        }
+        if (step == LetterJump.Step.ROW) return false
+        jumpLetter = rowLetters?.getOrNull(letterMode.row) // before the focus moves: the focused row shows the letter box
+        if (step == LetterJump.Step.LETTER) {
+            focusRow(letterMode.row)
+            clickFeedback()
+        }
+        jumpLetter?.let { MainActivity.instance?.showJumpLetter(it) }
+        uiHandler.removeCallbacks(letterIdleTask)
+        uiHandler.postDelayed(letterIdleTask, LetterJump.IDLE_END_MS)
+        return true
+    }
+
+    /**
+     * Ends letter mode (idle wheel, a key, another screen). The list is already at the first row of the letter;
+     * the letter box fades out.
+     */
+    fun endLetterJump() {
+        uiHandler.removeCallbacks(letterIdleTask)
+        letterMode.end()
+        if (jumpLetter == null) return
+        jumpLetter = null
+        MainActivity.instance?.hideFastScrollLetter()
+    }
+
+    /** In letter mode, a centre press only ends it; Back and Play/Pause end it and then work as usual. */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean =
+        when (letterMode.onKey(event.keyCode, event.action == KeyEvent.ACTION_DOWN, event.repeatCount)) {
+            LetterJump.Press.PASS -> false
+            LetterJump.Press.DROP -> true
+            LetterJump.Press.END -> { endLetterJump(); true }
+            LetterJump.Press.END_AND_PASS -> { endLetterJump(); false }
+        }
+
+    /** The text of a ListView row: a category name or a song title; null for "All Songs" and other special rows. */
+    private fun listRowText(item: Any?): String? = when (item) {
+        is SongItem -> item.title
+        is String -> item.takeUnless { it.startsWith("__") }
+        else -> null
+    }
+
+    /** The text of a row of the browser LinearLayout: its first text with a letter or a digit (not the icon). */
+    private fun containerRowText(row: View?): String? {
+        if (row == null || row.visibility != View.VISIBLE || !row.isFocusable) return null
+        if (row is TextView) return row.text?.toString()
+        val group = row as? ViewGroup ?: return null
+        for (i in 0 until group.childCount) {
+            val text = (group.getChildAt(i) as? TextView)?.text?.toString() ?: continue
+            if (text.any { it.isLetterOrDigit() }) return text
+        }
+        return null
+    }
+
     override fun onWheel(delta: Int, event: KeyEvent): Boolean {
         val list = listVirtualSongs
         if (list != null && list.visibility == View.VISIBLE) {
@@ -1460,6 +1536,11 @@ class BrowserController(
             }
             if (virtualListSelectedIndex < 0) virtualListSelectedIndex = 0
             if (virtualListSelectedIndex >= totalCount) virtualListSelectedIndex = totalCount - 1
+            val adapter = list.adapter
+            if (adapter != null && letterJump(delta, event, virtualListSelectedIndex, adapter,
+                    { (0 until totalCount).map { listRowText(adapter.getItem(it)) } }, { navigateVirtualListTo(it) })) {
+                return true
+            }
 
             var targetPos = virtualListSelectedIndex
             if (delta < 0) {
@@ -1487,6 +1568,12 @@ class BrowserController(
                 .getBoolean("loop_scroll_on", true)
             val curFocus = containerBrowserItems.findFocus()
             val currentIndex = if (curFocus != null) containerBrowserItems.indexOfChild(curFocus) else -1
+            val rowCount = containerBrowserItems.childCount
+            if (currentIndex >= 0 && letterJump(delta, event, currentIndex, listOf(containerBrowserItems.getChildAt(0), rowCount),
+                    { (0 until rowCount).map { containerRowText(containerBrowserItems.getChildAt(it)) } },
+                    { containerBrowserItems.getChildAt(it)?.requestFocus() })) {
+                return true
+            }
 
             if (delta < 0) {
                 if (currentIndex > 0) {
