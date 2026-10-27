@@ -841,20 +841,6 @@ class VideoBrowserController(
             statusBar.background = ThemeManager.createStatusBarBackground()
         }
 
-        if (frame.findViewWithTag<View>("video_pane_shadow") == null) {
-            val shadow = View(activity).apply {
-                tag = "video_pane_shadow"
-                background = android.graphics.drawable.GradientDrawable(
-                    android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
-                    intArrayOf(0x50000000, 0x00000000)
-                )
-            }
-            val shadowWidth = (10 * density).toInt()
-            val shadowLp = FrameLayout.LayoutParams(shadowWidth, FrameLayout.LayoutParams.MATCH_PARENT).apply {
-                gravity = Gravity.LEFT
-            }
-            frame.addView(shadow, shadowLp)
-        }
 
         if (!coverPaneSetUp && ivVideoCover != null) {
             coverPaneSetUp = true

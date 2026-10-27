@@ -218,19 +218,6 @@ class MainMenuController(
                     canvas.addView(sv)
                     listContainers[el.id] = innerLayout
                     createdWidgetView = sv
-
-                    val listShadow = View(activity).apply {
-                        background = GradientDrawable(
-                            GradientDrawable.Orientation.LEFT_RIGHT,
-                            intArrayOf(0x50000000, 0x00000000)
-                        )
-                    }
-                    val shadowWidth = (10 * density).toInt()
-                    val shadowLp = FrameLayout.LayoutParams(shadowWidth, (el.height * density).toInt()).apply {
-                        leftMargin = ((el.x + el.width) * density).toInt()
-                        topMargin = (el.y * density).toInt() + safeTopPadding
-                    }
-                    canvas.addView(listShadow, shadowLp)
                 }
 
                 "box" -> {

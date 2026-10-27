@@ -5,6 +5,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.graphics.Canvas
+import android.graphics.LinearGradient
+import android.graphics.Paint
+import android.graphics.Shader
 import android.os.PowerManager
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -18,6 +22,8 @@ import java.util.WeakHashMap
  * off, the art stays at the centre with the zoom [ZOOM].
  *
  * The motion runs only while a pane is visible and the screen is on (not off and not blanked by FakeScreenOff).
+ *
+ * Each pane also draws the menu shadow on the left edge of the art, over the art ([drawShadow]), as on the iPod Classic.
  */
 object CoverPane {
 
@@ -34,6 +40,18 @@ object CoverPane {
      * (~5 px/s), so 21 fps is smooth.
      */
     const val FRAME_DELAY_MS = 33L
+
+    /**
+     * Menu shadow on the art, measured on the iPod Classic main menu (`records/ipod-classic-ui/scripts/shadow.py`):
+     * 16 px wide at 320 px (24 px on the 480 px Y2), black at 39 % on the first column and 31 % on the second,
+     * then linear to 0.
+     */
+    const val SHADOW_WIDTH_DP = 24f
+    private val SHADOW_COLORS = intArrayOf(0x64000000, 0x50000000, 0x00000000)
+    private val SHADOW_STOPS = floatArrayOf(0f, 1.5f / SHADOW_WIDTH_DP, 1f)
+
+    private var shadowPaint: Paint? = null
+    private var shadowWidthPx = 0f
 
     private var prefs: SharedPreferences? = null
     private var enabled = DEFAULT_ON
@@ -79,6 +97,20 @@ object CoverPane {
         if (lp == null || lp.width != ViewGroup.LayoutParams.MATCH_PARENT || lp.height != ViewGroup.LayoutParams.MATCH_PARENT) {
             image.layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         }
+    }
+
+    /**
+     * Draws the menu shadow on the left [height] px high edge of a pane, over the art. One rectangle with a
+     * shader that is made once: no cost in the frames of the motion.
+     */
+    fun drawShadow(canvas: Canvas, density: Float, height: Int) {
+        val w = SHADOW_WIDTH_DP * density
+        val paint = shadowPaint?.takeIf { shadowWidthPx == w } ?: Paint().also {
+            it.shader = LinearGradient(0f, 0f, w, 0f, SHADOW_COLORS, SHADOW_STOPS, Shader.TileMode.CLAMP)
+            shadowPaint = it
+            shadowWidthPx = w
+        }
+        canvas.drawRect(0f, 0f, w, height.toFloat(), paint)
     }
 
     internal fun register(view: CoverArtView) {

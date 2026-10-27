@@ -13,6 +13,7 @@ import android.widget.ImageView
  * The art of a split-screen pane ([CoverPane]). It fills the pane and draws the art with CENTER_CROP, a zoom and
  * an offset from [CoverMotion]. Each frame changes only the canvas transform of one bitmap draw (no new bitmap), and
  * the next frame comes only after a frame was drawn: a hidden pane or a screen that does not draw stops the motion.
+ * The menu shadow ([CoverPane.drawShadow]) is drawn last, over the art.
  */
 class CoverArtView @JvmOverloads constructor(
     context: Context,
@@ -72,6 +73,7 @@ class CoverArtView @JvmOverloads constructor(
         val h = height
         if (d == null || w <= 0 || h <= 0) {
             super.onDraw(canvas)
+            if (h > 0) CoverPane.drawShadow(canvas, resources.displayMetrics.density, h)
             return
         }
         val m = motion ?: CoverMotion().also { motion = it }
@@ -118,6 +120,8 @@ class CoverArtView @JvmOverloads constructor(
         canvas.translate(-w / 2f, -h / 2f)
         super.onDraw(canvas)
         canvas.restoreToCount(save)
+        // Over the art and outside its motion: the shadow stays at the menu edge.
+        CoverPane.drawShadow(canvas, resources.displayMetrics.density, h)
     }
 
     private fun queueFrame() {
