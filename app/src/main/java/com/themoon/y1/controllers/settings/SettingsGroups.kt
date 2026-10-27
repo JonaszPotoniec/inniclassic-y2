@@ -29,15 +29,15 @@ object SettingsGroups {
         Group("Display", listOf(
             "Display Brightness", "Backlight Timer", "Screen Timeout"
         )),
-        // What Now Playing shows (rows of the Now Playing branch; before, some were in the Now Playing menu)
+        // What Now Playing shows (rows of the Now Playing branch, before partly in the Now Playing menu; and the cover tilt)
         Group("Now Playing", listOf(
-            "Spectrum", "Total Time", "Lyrics"
+            "Spectrum", "Total Time", "Lyrics", "Album Cover Tilt"
         )),
         Group("Status Bar", listOf(
             "Time in Title", "Battery", "Battery Percentage"
         )),
         Group("Appearance", listOf(
-            "Theme", "Background", "Toggle Style", "List Edges", "Album Cover Tilt",
+            "Theme", "Background", "Toggle Style", "List Edges", "Menu Cover Motion",
             "Fill Video Screen"
         )),
         Group("Menus", listOf(
@@ -72,6 +72,8 @@ object SettingsGroups {
         "Backlight Timer" to "Backlight",
         "Reset All Settings" to "Reset Settings",
         "Time in Title" to "Clock",
+        // The tilt is only on Now Playing; the group gives the place, so "Album" is not necessary
+        "Album Cover Tilt" to "Cover Tilt",
     )
 
     const val TOP = -1

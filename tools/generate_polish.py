@@ -474,6 +474,7 @@ polish_dict = {
   "Cancel": "Anuluj",
   "Delete": "Usuń",
   "Remove": "Usuń",
+  "Cover Tilt": "Przechylenie okładki",
   "Remove Song": "Usuń utwór",
   "Removed successfully.": "Pomyślnie usunięto.",
   "Edit": "Edytuj",
