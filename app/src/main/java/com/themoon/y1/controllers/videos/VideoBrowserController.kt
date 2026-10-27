@@ -858,7 +858,7 @@ class VideoBrowserController(
 
         if (!coverPaneSetUp && ivVideoCover != null) {
             coverPaneSetUp = true
-            com.themoon.y1.views.CoverPane.attach(frame, ivVideoCover)
+            com.themoon.y1.views.CoverPane.attach(ivVideoCover)
         }
     }
 

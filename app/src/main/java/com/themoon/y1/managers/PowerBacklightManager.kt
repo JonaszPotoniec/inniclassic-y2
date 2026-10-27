@@ -30,6 +30,7 @@ class PowerBacklightManager private constructor(private val context: Context) {
     var isFakeScreenOff: Boolean = false
         set(value) {
             field = value
+            com.themoon.y1.views.CoverPane.setBlanked(value)
         }
     var wasWifiOnBeforeSleep: Boolean = false
 

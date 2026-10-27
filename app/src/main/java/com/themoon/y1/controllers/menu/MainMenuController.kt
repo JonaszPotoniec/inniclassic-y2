@@ -44,7 +44,6 @@ class MainMenuController(
     private val clickFeedback: () -> Unit,
     private val onActionTriggered: (action: String) -> Unit,
     private val onButtonFocusChanged: (element: ThemeManager.MenuElement) -> Unit,
-    private val startCoverPanAnimation: (iv: ImageView, maxDx: Int, maxDy: Int) -> Unit,
     private val onLongPressScreenOff: View.OnLongClickListener,
     private val localize: (String) -> String,
     private val onDynamicUiBuilt: (() -> Unit)? = null
@@ -424,24 +423,17 @@ class MainMenuController(
                     animContainer.layoutParams = coverLp
                     animContainer.clipChildren = true
                     animContainer.clipToPadding = true
-                    animContainer.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+                    // No software layer: the art view clips its own drawing, and a software layer would draw
+                    // the full pane again on the CPU for each frame of the pan and zoom.
                     if (widgetBg != null) animContainer.background = widgetBg
 
-                    // The same size rule as the other split screens (CoverPane)
-                    val overW = com.themoon.y1.views.CoverPane.zoomed(contW)
-                    val overH = com.themoon.y1.views.CoverPane.zoomed(contH)
-
-                    val animIv = ImageView(activity).apply {
-                        scaleType = ImageView.ScaleType.CENTER_CROP
-                        layoutParams = FrameLayout.LayoutParams(overW, overH).apply {
-                            gravity = Gravity.CENTER
-                        }
+                    // The same art view and zoom rule as the other split screens (CoverPane)
+                    val animIv = com.themoon.y1.views.CoverArtView(activity).apply {
                         setImageResource(R.drawable.default_album)
                     }
                     ivAnimatedCover = animIv
                     animContainer.addView(animIv)
-
-                    startCoverPanAnimation(animIv, overW - contW, overH - contH)
+                    com.themoon.y1.views.CoverPane.attach(animIv)
 
                     canvas.addView(animContainer)
                     createdWidgetView = animContainer
