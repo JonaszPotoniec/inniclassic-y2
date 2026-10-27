@@ -25,7 +25,7 @@ The Y2 base ROM (`y2-test`) has no `Bluetooth.apk`, so Bluetooth cannot turn on 
 | `Bluetooth.apk` | 442,761 | `064855fd299e54d30e114b4d441e1f14657e62b4325cfed5e5c7b9a652e81b37` |
 | `Bluetooth.odex` | 966,200 | `f543c2842589e70f6d4582e8992e2ccf1f2e0e1fa19b454fabf039b5f8e08fc2` |
 
-`scripts/build-rom.sh y2` checks both hashes and installs the files in `/system/app` (root:root 644); the audit fails if they are missing or different. Keep the stock `MtkBt.apk`.
+`scripts/build-rom.sh y2` checks both hashes, installs the files in `/system/app` (root:root 644), then runs [`tools/patch_bluetooth_profiles.py`](../patch_bluetooth_profiles.py) on the installed `Bluetooth.apk` (hands-free, phone book and message profiles off; only `resources.arsc` changes, as with the `framework-res.apk` patches, so the odex still matches). The files here stay stock. The audit fails if the files are missing, if the odex is different, or if the installed APK is not the patched stock APK (SHA-256 `99d8d244e6dd083266985ef473bbe86fe51026d11ab724f9a78ca677cc388013`). Keep the stock `MtkBt.apk`.
 
 ## Format notes
 

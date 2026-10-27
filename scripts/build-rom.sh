@@ -9,7 +9,8 @@
 # Type y2  — base ROM from y2-test release (Solar Y2 pack), strip Solar
 #            artefacts, install InniClassic launcher as /system/app/com.themoon.y1.apk,
 #            pin scripts/Y2.kl (wheel -> DPAD_LEFT/RIGHT), add the stock
-#            Bluetooth.apk + Bluetooth.odex from tools/rom_assets (the base has none),
+#            Bluetooth.apk + Bluetooth.odex from tools/rom_assets (the base has none) with
+#            the phone profiles (HFP, PBAP, MAP) turned off in the installed Bluetooth.apk,
 #            and turn off the SystemUI low-battery dialog (the launcher shows its own).
 #
 # Optional override:
@@ -36,6 +37,8 @@ Y2_BASE_URL="${Y2_BASE_URL:-https://github.com/ryan-specter/jj_auto/releases/dow
 # (see tools/rom_assets/README.md). The y2-test base has none, so Bluetooth cannot turn on.
 Y2_BT_APK_SHA256="064855fd299e54d30e114b4d441e1f14657e62b4325cfed5e5c7b9a652e81b37"
 Y2_BT_ODEX_SHA256="f543c2842589e70f6d4582e8992e2ccf1f2e0e1fa19b454fabf039b5f8e08fc2"
+# The installed Bluetooth.apk after tools/patch_bluetooth_profiles.py (only resources.arsc bools change).
+Y2_BT_APK_PATCHED_SHA256="99d8d244e6dd083266985ef473bbe86fe51026d11ab724f9a78ca677cc388013"
 
 usage() {
     cat >&2 <<EOF
@@ -345,9 +348,14 @@ audit_rom_contents() {
         if [ ! -f "$sys_mount/app/Bluetooth.apk" ] || [ ! -f "$sys_mount/app/Bluetooth.odex" ]; then
             echo "audit fail: /system/app/Bluetooth.apk or Bluetooth.odex missing (Bluetooth cannot turn on)" >&2
             errors=$((errors + 1))
-        elif [ "$(sha256_of "$sys_mount/app/Bluetooth.apk")" != "$Y2_BT_APK_SHA256" ] \
+        elif [ "$(sha256_of "$sys_mount/app/Bluetooth.apk")" != "$Y2_BT_APK_PATCHED_SHA256" ] \
             || [ "$(sha256_of "$sys_mount/app/Bluetooth.odex")" != "$Y2_BT_ODEX_SHA256" ]; then
-            echo "audit fail: /system/app/Bluetooth.apk or Bluetooth.odex is not the stock pair" >&2
+            echo "audit fail: /system/app/Bluetooth.apk or Bluetooth.odex is not the stock pair (APK with the profile patch)" >&2
+            errors=$((errors + 1))
+        fi
+        if [ -f "$sys_mount/app/Bluetooth.apk" ] \
+            && ! python3 -B "$REPO_ROOT/tools/patch_bluetooth_profiles.py" --check "$sys_mount/app/Bluetooth.apk" >/dev/null 2>&1; then
+            echo "audit fail: Bluetooth.apk still has the hands-free, phone book or message profile on" >&2
             errors=$((errors + 1))
         fi
 
@@ -576,6 +584,16 @@ if [ "$TYPE" = "y2" ]; then
         sudo chmod 644 "$MOUNT_SYS/app/$bt_file"
         sudo chown root:root "$MOUNT_SYS/app/$bt_file"
     done
+
+    # The Y2 has no phone: without HFP, PBAP and MAP a car asks for no phone book or messages,
+    # so Settings shows no access dialog (the click wheel cannot answer it). A2DP and AVRCP stay on.
+    # The manifest sets android:enabled of these profile components to the patched bools, so Android
+    # disables them (also the PBAP receiver, which AdapterService does not control). Only an explicit
+    # `pm enable` in /data overrides this.
+    echo "==> Turning off the hands-free, phone book and message profiles in Bluetooth.apk"
+    sudo python3 -B "$REPO_ROOT/tools/patch_bluetooth_profiles.py" "$MOUNT_SYS/app/Bluetooth.apk"
+    sudo chmod 644 "$MOUNT_SYS/app/Bluetooth.apk"
+    sudo chown root:root "$MOUNT_SYS/app/Bluetooth.apk"
 
     # Only for a re-signed MtkBt.apk (not in the repo). Bluetooth.apk and MtkBt.apk share
     # android.uid.bluetooth, so they need the same signature: the stock pair above needs
