@@ -130,6 +130,96 @@ class CoverMotionTest {
         assertEquals(CoverMotion.ZOOM_MAX, CoverMotion.zoom(2f))
     }
 
+    // Shared motion of all panes (SharedCoverMotion)
+
+    /** Pane frames from [startMs] to [endMs] with [art]; returns the last pose. */
+    private fun pane(shared: SharedCoverMotion, art: Any, startMs: Long, endMs: Long): FloatArray {
+        val p = FloatArray(3)
+        var t = startMs
+        while (t <= endMs) {
+            shared.frame(t, art, true, p)
+            t += frameMs
+        }
+        return p
+    }
+
+    @Test
+    fun sameTimeGivesTheSameTransformInEachPane() {
+        val shared = SharedCoverMotion(CoverMotion(Random(21)))
+        val art = Any()
+        val a = FloatArray(3)
+        val b = FloatArray(3)
+        var t = 0L
+        repeat(3000) {
+            shared.frame(t, art, true, a) // main menu pane
+            shared.frame(t, art, true, b) // Music pane in the same frame
+            assertEquals(a.toList(), b.toList())
+            t += frameMs
+        }
+    }
+
+    @Test
+    fun noJumpWhenSwitchingPanesWithTheSameArt() {
+        // Main menu → Music → back → Music → back, with the same art in each pane: the first frame of each pane
+        // has the pose of the last frame before the switch, and the path is the path with no switch.
+        val shared = SharedCoverMotion(CoverMotion(Random(33))) { x, y -> x == y }
+        val reference = CoverMotion(Random(33))
+        val ref = FloatArray(3)
+        val first = FloatArray(3)
+        var t = 0L
+        var motionTime = 0L
+        var refTime = 0L
+        reference.frame(0L, ref)
+        for (switch in 0 until 4) {
+            val last = pane(shared, "art", t, t + 4000)
+            motionTime += if (switch == 0) 4000 else 4000 + frameMs
+            shared.pause() // the old pane hides
+            t += 4000 + 350 // the next pane shows its first frame 350 ms later
+            // a new bitmap object with the same pixels counts as the same art
+            assertEquals(null, shared.frame(t, String("art".toCharArray()), true, first))
+            assertEquals("switch $switch", last.toList(), first.toList())
+            t += frameMs
+            while (refTime < motionTime) { refTime += frameMs; reference.frame(refTime, ref) }
+            assertEquals(ref.toList(), first.toList())
+        }
+    }
+
+    @Test
+    fun newArtAtASwitchKeepsThePose() {
+        val shared = SharedCoverMotion(CoverMotion(Random(44)))
+        val album = Any()
+        val poster = Any()
+        val last = pane(shared, album, 0L, 6000L)
+        shared.pause()
+        val first = FloatArray(3)
+        assertTrue(shared.frame(6400L, poster, true, first) === album) // the pane can fade from the album art
+        assertEquals(last.toList(), first.toList())
+        var largest = 0f
+        val before = first.copyOf()
+        val now = FloatArray(3)
+        var t = 6400L
+        repeat(2000) {
+            t += frameMs
+            shared.frame(t, poster, true, now)
+            largest = max(largest, maxStep(before, now))
+            now.copyInto(before)
+        }
+        assertTrue("largest step $largest", largest < 0.004f)
+    }
+
+    @Test
+    fun sharedMotionStopsWhenNotMoving() {
+        val shared = SharedCoverMotion(CoverMotion(Random(55)))
+        val art = Any()
+        val last = pane(shared, art, 0L, 3000L)
+        val still = FloatArray(3)
+        shared.frame(3000L + 60_000L, art, false, still) // screen off for a minute
+        assertEquals(last.toList(), still.toList())
+        val again = FloatArray(3)
+        shared.frame(3000L + 120_000L, art, true, again) // screen on again
+        assertEquals(last.toList(), again.toList())
+    }
+
     @Test
     fun movesOnlyWhenOnAndScreenShows() {
         assertTrue(CoverMotion.moves(enabled = true, screenOn = true, blanked = false))

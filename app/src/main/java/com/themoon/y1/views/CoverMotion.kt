@@ -79,7 +79,7 @@ class CoverMotion(private val random: Random = Random()) {
         restart()
     }
 
-    /** A new random start: a random pose that already moves (used when a pane comes into view). */
+    /** A new random start: a random pose that already moves (used once, when the motion is made). */
     fun restart() {
         val p0 = FloatArray(3)
         randomKey(p0)
@@ -202,4 +202,39 @@ class CoverMotion(private val random: Random = Random()) {
             if (error == 0f) return
         }
     }
+}
+
+/**
+ * One motion for all split-screen panes (main menu, Music, Audiobooks, Videos), as on the iPod Classic: the art
+ * continues on the same path when a menu opens or closes. Each pane asks for the pose at its frame time
+ * ([frame]); two panes at the same time get the same pose. The path changes ([CoverMotion.newPath], no jump)
+ * only when the art is not the same as the art of the last frame ([sameArt]). No Android code, for unit tests.
+ */
+class SharedCoverMotion(
+    private val motion: CoverMotion = CoverMotion(),
+    private val sameArt: (Any, Any) -> Boolean = { a, b -> a === b }
+) {
+    private var art: Any? = null
+
+    /**
+     * Writes the pose at [nowMs] for a pane that shows [newArt] into [out]. With [moving] false (setting off,
+     * screen off or blanked) the clock stops and [out] gets the current pose. Returns the art of the last frame
+     * when [newArt] is different art (the pane can then fade from it), else null.
+     */
+    fun frame(nowMs: Long, newArt: Any, moving: Boolean, out: FloatArray): Any? {
+        val old = art
+        val changed = old != null && old !== newArt && !sameArt(old, newArt)
+        art = newArt
+        if (moving) {
+            if (changed) motion.newPath()
+            motion.frame(nowMs, out)
+        } else {
+            motion.pause()
+            motion.current(out)
+        }
+        return if (changed) old else null
+    }
+
+    /** No pane draws now (all hidden, or the screen is off): the next [frame] continues from the current pose. */
+    fun pause() = motion.pause()
 }

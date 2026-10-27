@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.LinearGradient
 import android.graphics.Paint
@@ -21,6 +22,8 @@ import java.util.WeakHashMap
  * Menu Cover Motion ([PREF], default on) the art moves slowly ([CoverMotion]), as on the iPod Classic; with it
  * off, the art stays at the centre with the zoom [ZOOM].
  *
+ * All panes share one motion ([motion]): when a menu opens or closes, the art continues on the same path, and the
+ * same art has the same place and zoom in the next pane. New art fades in ([FADE_MS]) and does not jump.
  * The motion runs only while a pane is visible and the screen is on (not off and not blanked by FakeScreenOff).
  *
  * Each pane also draws the menu shadow on the left edge of the art, over the art ([drawShadow]), as on the iPod Classic.
@@ -40,6 +43,15 @@ object CoverPane {
      * (~5 px/s), so 21 fps is smooth.
      */
     const val FRAME_DELAY_MS = 33L
+
+    /** Cross-fade time when a pane shows different art (other menu, other song). */
+    const val FADE_MS = 300L
+
+    /** The motion of all panes. The same art is the same bitmap, or a bitmap with the same pixels. */
+    val motion = SharedCoverMotion(CoverMotion()) { a, b ->
+        a is Bitmap && b is Bitmap && !a.isRecycled && !b.isRecycled &&
+            a.width == b.width && a.height == b.height && a.sameAs(b)
+    }
 
     /**
      * Menu shadow on the art, measured on the iPod Classic main menu (`records/ipod-classic-ui/scripts/shadow.py`):
@@ -79,6 +91,9 @@ object CoverPane {
 
     /** True when the setting is on. */
     fun isEnabled(): Boolean = enabled
+
+    /** True when the screen shows the panes (on and not blanked). */
+    fun isScreenActive(): Boolean = screenOn && !blanked
 
     /** FakeScreenOff (black overlay while the screen stays on) starts or stops. */
     fun setBlanked(value: Boolean) {
