@@ -17,6 +17,7 @@ import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.adapters.SongListAdapter
 import com.themoon.y1.controllers.ScreenController
+import com.themoon.y1.managers.PlayHistoryManager
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.BrowserMode
 import com.themoon.y1.navigation.ScreenState
@@ -79,6 +80,7 @@ class PlaylistController(
                 currentM3uFile = state.m3uFile
                 buildM3uSongsUI(state.m3uFile)
             }
+            is ScreenState.SmartPlaylistSongs -> buildSmartPlaylistUI(state)
             is ScreenState.Browser -> {
                 when (state.mode) {
                     is BrowserMode.Playlists -> buildPlaylistsUI()
@@ -125,6 +127,18 @@ class PlaylistController(
 
         Collections.sort(m3uFiles) { f1: File, f2: File ->
             f1.name.compareTo(f2.name, ignoreCase = true)
+        }
+
+        // iPod smart playlists first
+        for (kind in PlayHistoryManager.Kind.values()) {
+            val label = smartPlaylistTitle(kind)
+            val btn = createListButtonWithIcon("\uE05F", label, null)
+            btn.setOnClickListener {
+                clickFeedback()
+                lastPlaylistFocusName = label
+                (activity as? com.themoon.y1.MainActivity)?.changeScreen(ScreenState.SmartPlaylistSongs(kind))
+            }
+            containerBrowserItems.addView(btn)
         }
 
         if (m3uFiles.isEmpty()) {
@@ -228,6 +242,65 @@ class PlaylistController(
         }
 
         alphabetIndexBarHelper?.build(titles)
+    }
+
+    private fun smartPlaylistTitle(kind: PlayHistoryManager.Kind): String = when (kind) {
+        PlayHistoryManager.Kind.RECENTLY_PLAYED -> localize("Recently Played")
+        PlayHistoryManager.Kind.MOST_PLAYED -> localize("Top 25 Most Played")
+    }
+
+    /**
+     * Recently Played (newest first) or Top 25 Most Played (most plays first), from [PlayHistoryManager].
+     * Rows are "title — artist". Not alphabetical, so no index bar. A song plays the list from that song.
+     */
+    fun buildSmartPlaylistUI(state: ScreenState.SmartPlaylistSongs) {
+        hzIndexScroll?.visibility = View.GONE
+        tvBrowserPath.text = smartPlaylistTitle(state.kind)
+        // Empty until the list comes from the worker thread (a few ms)
+        listVirtualSongs?.visibility = View.GONE
+        scrollViewBrowser?.visibility = View.VISIBLE
+        containerBrowserItems.removeAllViews()
+        PlayHistoryManager.getInstance(activity).loadSongs(state.kind) { files ->
+            val nav = com.themoon.y1.navigation.NavigationManager.getInstance()
+            if (nav.currentState == state) showSmartPlaylistSongs(files)
+        }
+    }
+
+    private fun showSmartPlaylistSongs(files: List<File>) {
+        val main = activity as? com.themoon.y1.MainActivity
+        if (files.isEmpty()) {
+            listVirtualSongs?.visibility = View.GONE
+            scrollViewBrowser?.visibility = View.VISIBLE
+            containerBrowserItems.removeAllViews()
+            main?.virtualSongList?.clear()
+            val row = createListButtonWithIcon("\uE405", localize("No Songs"), ThemeManager.getTextColorSecondary())
+            containerBrowserItems.addView(row)
+            row.requestFocus()
+            return
+        }
+        scrollViewBrowser?.visibility = View.GONE
+        listVirtualSongs?.visibility = View.VISIBLE
+
+        val byPath = HashMap<String, SongItem>()
+        for (song in com.themoon.y1.MainActivity.customLibrary) byPath[song.file.absolutePath] = song
+        val rows = ArrayList<SongItem>()
+        for (file in files) {
+            val song = byPath[file.absolutePath]
+            val title = song?.title?.takeIf { it.isNotBlank() } ?: file.nameWithoutExtension
+            val artist = song?.artist?.takeIf { it.isNotBlank() && !it.equals("Unknown Artist", ignoreCase = true) }
+            rows.add(SongItem(file, if (artist != null) "$title — $artist" else title, song?.artist, song?.album))
+        }
+        main?.virtualSongList?.clear()
+        main?.virtualSongList?.addAll(files)
+        main?.virtualListSelectedIndex = 0
+
+        listVirtualSongs?.adapter = SongListAdapter(rows)
+        listVirtualSongs?.setSelection(0)
+        listVirtualSongs?.post {
+            if (listVirtualSongs.childCount > 0) {
+                listVirtualSongs.getChildAt(0).requestFocus()
+            }
+        }
     }
 
     fun parseM3uFile(m3uFile: File): List<SongItem> {

@@ -81,6 +81,7 @@ class AudioPlayerManager private constructor() {
     private fun startPeriodicPositionSaver() {
         positionSaveHandler.removeCallbacks(positionSaveRunnable)
         positionSaveHandler.postDelayed(positionSaveRunnable, 5000)
+        MainActivity.instance?.let { PlayHistoryManager.getInstance(it).onPlaybackStarted() }
     }
 
     private fun stopPeriodicPositionSaver() {

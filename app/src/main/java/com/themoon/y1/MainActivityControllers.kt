@@ -631,6 +631,7 @@ internal fun MainActivity.initControllers() {
         registerController(ScreenState.CoverFlow::class.java, coverFlowController)
         registerController(ScreenState.Playlists::class.java, playlistController)
         registerController(ScreenState.M3uPlaylistSongs::class.java, playlistController)
+        registerController(ScreenState.SmartPlaylistSongs::class.java, playlistController)
         registerController(ScreenState.Podcasts::class.java, podcastController)
         registerController(ScreenState.PodcastEpisodes::class.java, podcastController)
         registerController(ScreenState.PodcastManage::class.java, podcastController)

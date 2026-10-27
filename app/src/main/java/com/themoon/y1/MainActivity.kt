@@ -529,7 +529,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                     else -> STATE_BROWSER
                 }
             }
-            is ScreenState.Playlists, is ScreenState.M3uPlaylistSongs -> STATE_BROWSER
+            is ScreenState.Playlists, is ScreenState.M3uPlaylistSongs, is ScreenState.SmartPlaylistSongs -> STATE_BROWSER
             is ScreenState.Podcasts, is ScreenState.PodcastEpisodes, is ScreenState.PodcastManage -> STATE_BROWSER
             is ScreenState.Equalizer -> STATE_EQUALIZER
             is ScreenState.FmRadio -> STATE_FM_RADIO

@@ -1,5 +1,6 @@
 package com.themoon.y1.navigation
 
+import com.themoon.y1.managers.PlayHistoryManager
 import java.io.File
 
 /**
@@ -22,6 +23,8 @@ sealed interface ScreenState {
     data object CoverFlow : ScreenState
     data object Playlists : ScreenState
     data class M3uPlaylistSongs(val m3uFile: File) : ScreenState
+    /** iPod smart playlist in Music -> Playlists: Recently Played or Top 25 Most Played. */
+    data class SmartPlaylistSongs(val kind: PlayHistoryManager.Kind) : ScreenState
     data object Podcasts : ScreenState
     data class PodcastEpisodes(val channelTitle: String, val rssUrl: String) : ScreenState
     data object PodcastManage : ScreenState

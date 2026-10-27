@@ -70,6 +70,8 @@ polish_dict = {
   "Composers": "Kompozytorzy",
   "Years": "Lata",
   "Recently Added": "Ostatnio dodane",
+  "Top 25 Most Played": "Top 25 najczęściej odtwarzanych",
+  "No Songs": "Brak utworów",
   "My Favorites": "Ulubione",
   "Added to Favorites.": "Dodano do ulubionych.",
   "Remove from Favorites": "Usuń z ulubionych",
