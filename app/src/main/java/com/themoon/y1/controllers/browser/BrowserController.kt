@@ -1146,18 +1146,7 @@ class BrowserController(
 
         if (!browserCoverPaneSetUp && ivBrowserCover != null) {
             browserCoverPaneSetUp = true
-            frame.post {
-                val contW = frame.width
-                val contH = frame.height
-                if (contW <= 0 || contH <= 0) return@post
-                val overW = (contW * 1.35f).toInt()
-                val overH = (contH * 1.35f).toInt()
-                ivBrowserCover.scaleType = ImageView.ScaleType.CENTER_CROP
-                val lp = FrameLayout.LayoutParams(overW, overH).apply {
-                    gravity = Gravity.CENTER
-                }
-                ivBrowserCover.layoutParams = lp
-            }
+            com.themoon.y1.views.CoverPane.attach(frame, ivBrowserCover)
         }
         onRefreshCoverPane?.invoke()
     }

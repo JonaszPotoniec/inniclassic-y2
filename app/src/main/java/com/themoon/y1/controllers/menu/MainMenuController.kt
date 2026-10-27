@@ -427,8 +427,9 @@ class MainMenuController(
                     animContainer.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
                     if (widgetBg != null) animContainer.background = widgetBg
 
-                    val overW = (contW * 1.35f).toInt()
-                    val overH = (contH * 1.35f).toInt()
+                    // The same size rule as the other split screens (CoverPane)
+                    val overW = com.themoon.y1.views.CoverPane.zoomed(contW)
+                    val overH = com.themoon.y1.views.CoverPane.zoomed(contH)
 
                     val animIv = ImageView(activity).apply {
                         scaleType = ImageView.ScaleType.CENTER_CROP
