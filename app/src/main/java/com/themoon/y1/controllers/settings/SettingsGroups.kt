@@ -29,6 +29,10 @@ object SettingsGroups {
         Group("Display", listOf(
             "Display Brightness", "Backlight Timer", "Screen Timeout"
         )),
+        // What Now Playing shows (rows of the Now Playing branch; before, some were in the Now Playing menu)
+        Group("Now Playing", listOf(
+            "Spectrum", "Total Time", "Lyrics"
+        )),
         Group("Status Bar", listOf(
             "Time in Title", "Battery", "Battery Percentage"
         )),

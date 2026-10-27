@@ -54,11 +54,11 @@ class SettingsGroupsTest {
     }
 
     @Test
-    fun topLevelHasAtMostElevenShortEntries() {
-        assertTrue(GROUPS.size in 6..11)
+    fun topLevelHasAtMostTwelveShortEntries() {
+        assertTrue(GROUPS.size in 6..12)
         assertEquals(
             listOf(
-                "Playback", "Display", "Status Bar", "Appearance", "Menus", "Controls", "Connectivity", "Library",
+                "Playback", "Display", "Now Playing", "Status Bar", "Appearance", "Menus", "Controls", "Connectivity", "Library",
                 "Date & Time", "General", "Developer"
             ),
             GROUPS.map { it.title }
