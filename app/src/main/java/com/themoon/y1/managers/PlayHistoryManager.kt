@@ -10,14 +10,18 @@ import java.util.concurrent.Executors
 
 /**
  * Song play history and play counts, for the iPod smart playlists Music -> Playlists -> Recently Played and
- * Top 25 Most Played. While music plays, a 1 s timer gives the player state to [PlayCountRule]; each counted
- * play goes into [PlayHistoryStore] (file `play_history.json` in the app folder) on a worker thread.
+ * Top 25 Most Played. While music plays, a 1 s timer gives the player state to [PlayCountRule], the one place
+ * that decides if a play counts. Each counted play goes to both outputs: [PlayHistoryStore] (file
+ * `play_history.json` in the app folder, on a worker thread) and [LastFmScrobbler] (`.scrobbler.log` and the
+ * Last.fm queue).
  */
 class PlayHistoryManager private constructor(context: Context) {
 
+    private val appContext = context.applicationContext
+
     enum class Kind { RECENTLY_PLAYED, MOST_PLAYED }
 
-    private val file = File(context.applicationContext.filesDir, FILE_NAME)
+    private val file = File(appContext.filesDir, FILE_NAME)
     private val worker = Executors.newSingleThreadExecutor { r -> Thread(r, "y1-play-history").apply { isDaemon = true } }
     private val mainHandler = Handler(Looper.getMainLooper())
     private val rule = PlayCountRule()
@@ -36,7 +40,7 @@ class PlayHistoryManager private constructor(context: Context) {
                 SystemClock.elapsedRealtime(),
                 apm.getCurrentSpeed()
             )
-            if (counted != null && PlayCountRule.isMusicPath(counted)) record(counted, System.currentTimeMillis())
+            if (counted != null) onPlayCounted(counted, System.currentTimeMillis())
             if (playing) {
                 mainHandler.postDelayed(this, TICK_MS)
             } else {
@@ -63,6 +67,16 @@ class PlayHistoryManager private constructor(context: Context) {
                 ticking = true
                 mainHandler.postDelayed(tick, TICK_MS)
             }
+        }
+    }
+
+    /** One counted play: to the play history (music only) and to the scrobbler (which has its own exclusions). */
+    private fun onPlayCounted(path: String, timeMs: Long) {
+        if (PlayCountRule.isMusicPath(path)) record(path, timeMs)
+        try {
+            LastFmScrobbler.getInstance(appContext).onPlayCounted(path)
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Scrobble failed", e)
         }
     }
 

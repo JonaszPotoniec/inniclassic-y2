@@ -24,6 +24,7 @@ import javax.net.ssl.X509TrustManager
 
 /**
  * Last.fm scrobbler managing local .scrobbler.log auditing and remote API queue.
+ * It does not decide when a play counts: [PlayHistoryManager] calls [onPlayCounted].
  */
 class LastFmScrobbler private constructor(context: Context) {
 
@@ -130,19 +131,16 @@ class LastFmScrobbler private constructor(context: Context) {
         curSubmitted = false
     }
 
-    fun evaluateAndMaybeSubmit(currentPositionMs: Long) {
-        if (curSubmitted || curFilePath == null) return
-        val durationSec = curDurationMs / 1000
-        if (durationSec < MIN_TRACK_LENGTH_SEC) {
-            curSubmitted = true
-            return
-        }
-
-        val halfPlayed = currentPositionMs >= curDurationMs / 2
-        val fourMinPlayed = currentPositionMs >= 4 * 60 * 1000L
-        if (!halfPlayed && !fourMinPlayed) return
-
+    /**
+     * A play of [filePath] counts ([PlayCountRule], from [PlayHistoryManager]): scrobble the current track
+     * once, if it is that file and not shorter than 30 s. The timestamp is the track start, as before.
+     */
+    fun onPlayCounted(filePath: String) {
+        if (filePath != curFilePath) return
+        val scrobble = isScrobble(curSubmitted, curDurationMs)
         curSubmitted = true
+        if (!scrobble) return
+        val durationSec = curDurationMs / 1000
         val artist = curArtist ?: "Unknown Artist"
         val album = curAlbum ?: ""
         val title = curTitle ?: ""
@@ -307,6 +305,10 @@ class LastFmScrobbler private constructor(context: Context) {
     companion object {
         private val API_KEY: String = BuildConfig.LASTFM_API_KEY
         private val API_SECRET: String = BuildConfig.LASTFM_API_SECRET
+
+        /** True if a counted play of the current track is a scrobble: not yet sent, and 30 s or longer. */
+        fun isScrobble(submitted: Boolean, durationMs: Long): Boolean =
+            !submitted && durationMs / 1000 >= MIN_TRACK_LENGTH_SEC
 
         fun tsv(list: List<String?>): String {
             val sb = StringBuilder()

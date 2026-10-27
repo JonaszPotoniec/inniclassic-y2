@@ -6,11 +6,12 @@ import java.util.Locale
  * When a song counts as played, for the play history and the play counts.
  *
  * A song counts once for each play when you listened to half of it, or to 4 minutes of a long song (the
- * Last.fm scrobble rule, also used by [LastFmScrobbler], so the two agree). It is the time you listened that
- * counts, not the position: a skip or a seek to the end does not count. Because the song counts while it
- * plays, the rule does not need an end event (a gapless queue and Repeat One give none).
+ * Last.fm scrobble rule). It is the time you listened that counts, not the position: a skip or a seek to the
+ * end does not count. Because the song counts while it plays, the rule does not need an end event (a gapless
+ * queue and Repeat One give none).
  *
- * [sample] gets the player state about once a second, from [PlayHistoryManager].
+ * [sample] gets the player state about once a second, from [PlayHistoryManager], which gives each counted
+ * play to the play history and to [LastFmScrobbler]. One rule, so the two always agree.
  */
 class PlayCountRule {
 

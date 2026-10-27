@@ -309,8 +309,6 @@ class AudioPlayerManager private constructor() {
         val main = MainActivity.instance ?: return
         main.runOnUiThread {
             try {
-                LastFmScrobbler.getInstance(main).evaluateAndMaybeSubmit(getCurrentPosition().toLong())
-
                 val repeatMode = main.prefs.getInt("repeat_mode", 0)
                 if (repeatMode == 1) {
                     if (isUsingLegacyPlayer && legacyPlayer != null) {
@@ -650,8 +648,6 @@ class AudioPlayerManager private constructor() {
     fun prepareMusicTrack(index: Int, initialSeekMs: Long = 0L, initialDurationMs: Long = 0L) {
         val main = MainActivity.instance ?: return
         if (main.currentPlaylist.isEmpty()) return
-
-        LastFmScrobbler.getInstance(main).evaluateAndMaybeSubmit(getCurrentPosition().toLong())
 
         val track = main.currentPlaylist[index]
         currentlyPlayingFilePath = track.absolutePath
