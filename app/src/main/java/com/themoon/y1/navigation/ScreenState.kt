@@ -51,7 +51,6 @@ sealed interface BrowserMode {
     data object VirtualSongs : BrowserMode
     data object Favorites : BrowserMode
     data object RecentlyAdded : BrowserMode
-    data object RecentlyPlayed : BrowserMode
     data object Audiobooks : BrowserMode
     data object Playlists : BrowserMode
     data class M3uSongs(val m3uFile: File) : BrowserMode
