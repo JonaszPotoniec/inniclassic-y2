@@ -3,6 +3,7 @@ package com.themoon.y1.migrations
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
+import com.themoon.y1.AppPrefs
 
 /**
  * Universal migration engine that manages versioned migrations across app updates.
@@ -34,6 +35,7 @@ open class MigrationManager {
         registerMigration(Migration001RestoreDeduplicatedSongs())
         registerMigration(Migration002PurgeOemDemoMedia())
         registerMigration(Migration003MigrateVideoDirectories())
+        registerMigration(Migration004MoveMisplacedPrefs())
     }
 
     /**
@@ -73,7 +75,7 @@ open class MigrationManager {
     @Synchronized
     open fun applyPendingMigrations(): Int {
         var currentVer = currentVersion
-        val settingsPrefs = context?.getSharedPreferences("Y1_SETTINGS", Context.MODE_PRIVATE) ?: prefs
+        val settingsPrefs = context?.let { AppPrefs.get(it) } ?: prefs
         val ctx = MigrationContext(context, prefs, settingsPrefs, currentVer)
         migrationContext = ctx
 

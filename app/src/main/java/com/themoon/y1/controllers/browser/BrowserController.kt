@@ -23,6 +23,7 @@ import android.widget.ListView
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import com.themoon.y1.AppPrefs
 import com.themoon.y1.MainActivity
 import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
@@ -916,10 +917,8 @@ class BrowserController(
                 b.setOnClickListener {
                     clickFeedback()
                     try {
-                        activity.getSharedPreferences("y1_settings", Activity.MODE_PRIVATE)
-                            .edit()
-                            .putString("bg_path", img.absolutePath)
-                            .commit()
+                        AppPrefs.get(activity).edit().putString("bg_path", img.absolutePath).commit()
+                        MainActivity.instance?.updateMainMenuBackground()
                     } catch (e: Exception) {
                     }
                     Toast.makeText(activity, localize("Background Applied!"), Toast.LENGTH_SHORT).show()
@@ -965,7 +964,7 @@ class BrowserController(
         val b = createListButtonWithIcon(iconCode, audio.name, null)
 
         if (isAudiobookLibraryMode || currentBrowserMode is BrowserMode.Audiobooks) {
-            val prefs = activity.getSharedPreferences("y1_settings", Activity.MODE_PRIVATE)
+            val prefs = AppPrefs.get(activity)
             val pos = prefs.getInt("book_pos_" + audio.absolutePath, 0)
             val dur = prefs.getInt("book_dur_" + audio.absolutePath, 0)
             if (pos > 0 && dur > 0) {
