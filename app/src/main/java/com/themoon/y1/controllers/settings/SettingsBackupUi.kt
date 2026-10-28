@@ -9,7 +9,6 @@ import com.themoon.y1.StoragePaths
 import com.themoon.y1.managers.AudioEffectManager
 import com.themoon.y1.managers.LanguageManager
 import com.themoon.y1.managers.SettingsBackup
-import com.themoon.y1.views.WheelDialog
 import java.io.File
 
 /** The Export Settings and Import Settings rows of the Settings screen. */
@@ -54,15 +53,14 @@ internal object SettingsBackupUi {
             Toast.makeText(activity, localize("No settings backup found."), Toast.LENGTH_SHORT).show()
             return
         }
-        WheelDialog.show(activity) {
-            title = localize("Import Settings")
-            message = localize("Replace the current settings with the backup? Music and playlists do not change.") +
-                "\n" + StoragePaths.toDisplayPath(file.absolutePath)
-            positiveButton(localize("Import"), isDestructive = true) {
-                importSettings(activity, file, localize)
-            }
-            negativeButton(localize("Cancel"))
-        }
+        // No row is selected at the start: one centre push must not replace the settings
+        ActionScreens.open(confirmScreen(
+            localize("Import Settings"),
+            localize("Replace the current settings with the backup? Music and playlists do not change.") +
+                "\n" + StoragePaths.toDisplayPath(file.absolutePath),
+            localize("Import"),
+            selectAction = false
+        ) { importSettings(activity, file, localize) })
     }
 
     private fun importSettings(activity: Activity, file: File, localize: (String) -> String) {

@@ -1,15 +1,12 @@
 package com.themoon.y1.controllers.settings
 
 import android.app.Activity
-import android.app.Dialog
 import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.Window
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
@@ -381,69 +378,19 @@ class EqualizerController(
         containerSettingsItems.addView(btnBack)
     }
 
+    /** Asks before the 10-band EQ (it uses the CPU), on an action screen; Back cancels. */
     private fun showSoftwareEqDialog() {
-        val d = activity.resources.displayMetrics.density
-        val dialog = Dialog(activity).apply {
-            requestWindowFeature(Window.FEATURE_NO_TITLE)
-            window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-        }
-
-        val root = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            val bg = GradientDrawable().apply {
-                setColor(ThemeManager.getOverlayBackgroundColor() or 0xFF000000.toInt())
-                cornerRadius = 15 * d
-                setStroke((1 * d).toInt(), 0x33FFFFFF)
-            }
-            background = bg
-            setPadding((15 * d).toInt(), (20 * d).toInt(), (15 * d).toInt(), (15 * d).toInt())
-        }
-
-        val tvTitle = TextView(activity).apply {
-            text = "⚡ " + localize("Enable 10-Band Software EQ")
-            setTextColor(0xFF00FFFF.toInt())
-            textSize = 18f
-            typeface = ThemeManager.getCustomFontBold()
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, (10 * d).toInt())
-        }
-        root.addView(tvTitle)
-
-        val tvMsg = TextView(activity).apply {
-            text = localize("Enabling 10-Band EQ processes audio via CPU. Switch to 10-band mode?")
-            setTextColor(ThemeManager.getTextColorPrimary())
-            textSize = 15f
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, (20 * d).toInt())
-            setLineSpacing(5f, 1.2f)
-        }
-        root.addView(tvMsg)
-
-        val btnEnable = createListButton("\uE876", localize("Enable 10-Band EQ")).apply {
-            setOnClickListener {
-                clickFeedback()
-                dialog.dismiss()
-                isSoftwareEqEnabled = true
-                currentEqProfile = "preset_0"
-                rebootAudioEngine()
-                Toast.makeText(activity, localize("Switched to Software 10-Band EQ"), Toast.LENGTH_SHORT).show()
-                buildEqualizerSettingsUI()
-            }
-        }
-        root.addView(btnEnable)
-
-        val btnCancel = createListButton("\uE5CD", localize("Cancel")).apply {
-            setOnClickListener {
-                clickFeedback()
-                dialog.dismiss()
-            }
-        }
-        root.addView(btnCancel)
-
-        dialog.setContentView(root)
-        dialog.window?.setLayout((300 * d).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT)
-        dialog.show()
-        btnEnable.requestFocus()
+        ActionScreens.open(confirmScreen(
+            localize("Enable 10-Band Software EQ"),
+            localize("Enabling 10-Band EQ processes audio via CPU. Switch to 10-band mode?"),
+            localize("Enable 10-Band EQ")
+        ) {
+            isSoftwareEqEnabled = true
+            currentEqProfile = "preset_0"
+            rebootAudioEngine()
+            Toast.makeText(activity, localize("Switched to Software 10-Band EQ"), Toast.LENGTH_SHORT).show()
+            buildEqualizerSettingsUI()
+        })
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {

@@ -1,7 +1,6 @@
 package com.themoon.y1.controllers.settings
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.graphics.Typeface
@@ -759,14 +758,11 @@ class SettingsController(
         val btnClearCache = createSettingRow(localize("Clear Album Art & Info"), "〉 ")
         btnClearCache.setOnClickListener {
             clickFeedback()
-            AlertDialog.Builder(activity, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                .setTitle(localize("Clear Cache & Track Info"))
-                .setMessage(localize("Delete all downloaded album covers and saved track information (Title/Artist)?"))
-                .setPositiveButton(localize("Clear")) { _, _ ->
-                    onClearCacheConfirmed()
-                }
-                .setNegativeButton(localize("Cancel"), null)
-                .show()
+            ActionScreens.open(confirmScreen(
+                localize("Clear Album Art & Info"),
+                localize("Delete all downloaded album covers and saved track information (Title/Artist)?"),
+                localize("Clear")
+            ) { onClearCacheConfirmed() })
         }
         containerSettingsItems.addView(btnClearCache)
 
@@ -798,15 +794,14 @@ class SettingsController(
         btnLastFmAccount.setOnClickListener {
             clickFeedback()
             if (scrobbler.isLoggedIn()) {
-                AlertDialog.Builder(activity, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                    .setTitle(localize("Last.fm Account"))
-                    .setMessage(localize("Log out of ") + "@" + scrobbler.getUsername() + "?")
-                    .setPositiveButton(localize("Log Out")) { _, _ ->
-                        scrobbler.logout()
-                        buildSettingsUI()
-                    }
-                    .setNegativeButton(localize("Cancel"), null)
-                    .show()
+                ActionScreens.open(confirmScreen(
+                    localize("Last.fm Account"),
+                    localize("Log out of ") + "@" + scrobbler.getUsername() + "?",
+                    localize("Log Out")
+                ) {
+                    scrobbler.logout()
+                    buildSettingsUI()
+                })
             } else {
                 onNavigateToScreen(MainActivity.STATE_WIFI_KEYBOARD)
             }
@@ -898,14 +893,11 @@ class SettingsController(
         val btnResetAll = createSettingRow(localize("Reset All Settings"), "〉 ")
         btnResetAll.setOnClickListener {
             clickFeedback()
-            AlertDialog.Builder(activity, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                .setTitle(localize("Reset All Settings"))
-                .setMessage(localize("Reset all settings to their default values? This won't delete any music or playlists."))
-                .setPositiveButton(localize("Reset")) { _, _ ->
-                    resetAllAppSettings()
-                }
-                .setNegativeButton(localize("Cancel"), null)
-                .show()
+            ActionScreens.open(confirmScreen(
+                localize("Reset All Settings"),
+                localize("Reset all settings to their default values? This won't delete any music or playlists."),
+                localize("Reset")
+            ) { resetAllAppSettings() })
         }
         containerSettingsItems.addView(btnResetAll)
 
