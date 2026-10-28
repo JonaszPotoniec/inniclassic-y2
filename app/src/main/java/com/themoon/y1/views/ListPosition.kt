@@ -51,8 +51,10 @@ class ListPosition private constructor(
             if (list.windowToken == null || list.visibility != View.VISIBLE) return@post
             if (list is AbsListView) {
                 if (list.count != rowCount || rowIndex >= list.count) return@post
-                // AbsListView.setSelectionFromTop is API 21: on Android 4.4 it stops the app (NoSuchMethodError)
-                if (list is ListView) list.setSelectionFromTop(rowIndex, rowTop) else list.setSelection(rowIndex)
+                // AbsListView.setSelectionFromTop is API 21: on Android 4.4 it stops the app (NoSuchMethodError).
+                // Only a ListView-typed call goes to ListView.setSelectionFromTop (a smart cast is not enough).
+                val listView: ListView? = list as? ListView
+                if (listView != null) listView.setSelectionFromTop(rowIndex, rowTop) else list.setSelection(rowIndex)
                 list.post { list.getChildAt(rowIndex - list.firstVisiblePosition)?.requestFocus() }
             } else {
                 if (list.childCount != rowCount || rowIndex >= list.childCount) return@post
