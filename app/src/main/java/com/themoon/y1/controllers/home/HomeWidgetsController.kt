@@ -327,9 +327,7 @@ class HomeWidgetsController(
 
     private fun resolveAudiobookCover(): Bitmap? {
         val main = MainActivity.instance
-        val bookPrefs = context.getSharedPreferences("Y1_AUDIOBOOK_BOOKMARKS", Context.MODE_PRIVATE)
         val savedPath = main?.prefs?.getString("last_played_audiobook_path", null)
-            ?: bookPrefs.getString("LAST_AUDIOBOOK_PATH", null)
             ?: if (main?.prefs?.getBoolean("last_played_is_audiobook", false) == true) {
                 main.prefs.getString("last_played_song_path", null)
             } else null

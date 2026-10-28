@@ -36,6 +36,7 @@ open class MigrationManager {
         registerMigration(Migration002PurgeOemDemoMedia())
         registerMigration(Migration003MigrateVideoDirectories())
         registerMigration(Migration004MoveMisplacedPrefs())
+        registerMigration(Migration005MergeAudiobookBookmarks())
     }
 
     /**

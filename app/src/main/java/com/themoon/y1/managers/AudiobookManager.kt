@@ -2,6 +2,7 @@ package com.themoon.y1.managers
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.themoon.y1.AppPrefs
 import com.themoon.y1.StoragePaths
 import java.io.File
 import java.util.ArrayList
@@ -12,8 +13,8 @@ import java.util.Collections
  */
 class AudiobookManager private constructor(context: Context) {
 
-    private val bookPrefs: SharedPreferences =
-        context.getSharedPreferences("Y1_AUDIOBOOK_BOOKMARKS", Context.MODE_PRIVATE)
+    /** Positions are in AppPrefs as book_pos_<path> (AudioPlayerManager writes them). */
+    private val appPrefs: SharedPreferences = AppPrefs.get(context)
     private val audiobookRoot: File = StoragePaths.getAudiobooksDir()
 
     private val currentBookChapters: MutableList<File> = ArrayList()
@@ -28,23 +29,11 @@ class AudiobookManager private constructor(context: Context) {
     fun getRootFolder(): File = audiobookRoot
 
     /**
-     * Saves playback bookmark for an audiobook file.
-     */
-    fun saveBookmark(filePath: String?, positionMs: Int, chapterIdx: Int) {
-        if (filePath.isNullOrEmpty()) return
-        bookPrefs.edit()
-            .putInt("POS_$filePath", positionMs)
-            .putInt("CHAP_$filePath", chapterIdx)
-            .putString("LAST_AUDIOBOOK_PATH", filePath)
-            .apply()
-    }
-
-    /**
      * Returns saved bookmark position in milliseconds.
      */
     fun getSavedPosition(filePath: String?): Int {
         if (filePath.isNullOrEmpty()) return 0
-        return bookPrefs.getInt("POS_$filePath", 0)
+        return appPrefs.getInt("book_pos_$filePath", 0)
     }
 
     /**
