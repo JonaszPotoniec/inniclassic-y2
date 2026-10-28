@@ -4,6 +4,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.AbsListView
 import android.widget.LinearLayout
+import android.widget.ListView
 import android.widget.ScrollView
 
 /**
@@ -50,7 +51,8 @@ class ListPosition private constructor(
             if (list.windowToken == null || list.visibility != View.VISIBLE) return@post
             if (list is AbsListView) {
                 if (list.count != rowCount || rowIndex >= list.count) return@post
-                list.setSelectionFromTop(rowIndex, rowTop)
+                // AbsListView.setSelectionFromTop is API 21: on Android 4.4 it stops the app (NoSuchMethodError)
+                if (list is ListView) list.setSelectionFromTop(rowIndex, rowTop) else list.setSelection(rowIndex)
                 list.post { list.getChildAt(rowIndex - list.firstVisiblePosition)?.requestFocus() }
             } else {
                 if (list.childCount != rowCount || rowIndex >= list.childCount) return@post
