@@ -74,6 +74,8 @@ sealed interface SettingsSubMode {
     data object RadioSavedChannels : SettingsSubMode
     /** Restart and Power Off (Settings → General → Power, or a long press of the Power button) */
     data object Power : SettingsSubMode
+    /** A screen in place of an Android dialog (controllers/settings/ActionScreen.kt), by the key of its content */
+    data class Action(val key: Int) : SettingsSubMode
 }
 
 /**

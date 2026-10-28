@@ -92,8 +92,9 @@ class SettingsController(
     var lastSettingsFocusIndex: Int = 0
     var settingsSubMode: Int = 0
     private var isUiActive = false
-    /** The Power screen (Restart, Power Off) is open: Back goes to the screen before it. */
-    private var isPowerScreen = false
+    /** The open action screen (Power, or a screen in place of a dialog: ActionScreen.kt), or null. Back goes to the screen before it. */
+    private var actionPage: SettingsSubMode? = null
+    private val isActionScreen: Boolean get() = actionPage != null
 
     // Temporary variables for Date/Time picker
     var dtYear: Int = 2026
@@ -162,9 +163,10 @@ class SettingsController(
     private val groupPages = SettingsGroupPages()
 
     override fun onEnter(state: ScreenState) {
-        if ((state as? ScreenState.Settings)?.subMode == SettingsSubMode.Power) {
-            buildPowerUI()
-            return
+        when (val sub = (state as? ScreenState.Settings)?.subMode) {
+            is SettingsSubMode.Power -> { buildPowerUI(); return }
+            is SettingsSubMode.Action -> { buildActionUI(sub, ActionScreens.spec(sub.key)); return }
+            else -> {}
         }
         // From the main menu: start at the top level. From a row's screen (Bluetooth, Equalizer...): stay in its group.
         if (mainActivity?.backTargetForUtility == MainActivity.STATE_MENU) groupPages.close()?.let { lastSettingsFocusIndex = it }
@@ -180,11 +182,14 @@ class SettingsController(
             }
         }
         isUiActive = false
+        actionPage = null
+        containerSettingsItems.isFocusable = false
     }
 
     override fun onRefreshUI() {
-        if (isPowerScreen) {
-            buildPowerUI()
+        val shownAction = actionPage
+        if (shownAction != null) {
+            onEnter(ScreenState.Settings(shownAction))
         } else if (currentSettingsDepth == 0) {
             buildSettingsUI()
         }
@@ -203,8 +208,9 @@ class SettingsController(
     }
 
     override fun onBackPressed(): Boolean {
-        if (isPowerScreen) {
-            onNavigateBack()
+        if (isActionScreen) {
+            clickFeedback()
+            ActionScreens.cancel((actionPage as? SettingsSubMode.Action)?.let { ActionScreens.spec(it.key) }) { onNavigateBack() }
             return true
         }
         if (isMenuReorderMode) {
@@ -368,7 +374,7 @@ class SettingsController(
     }
 
     fun buildSettingsUI() {
-        isPowerScreen = false
+        actionPage = null
         currentSettingsDepth = 0
         settingsSubMode = 0
 
@@ -933,14 +939,8 @@ class SettingsController(
 
     /** The Power screen: Restart and Power Off. The centre button does the action at once; Back closes the screen. */
     private fun buildPowerUI() {
-        isPowerScreen = true
-        settingsSubMode = 0
-        currentSettingsDepth = 1
-        containerSettingsItems.removeAllViews()
-        for (action in PowerMenu.Action.values()) {
-            val row = createSettingRow(localize(action.label), "")
-            row.setOnClickListener {
-                clickFeedback()
+        val spec = ActionScreens.Spec(localize("Power"), actions = PowerMenu.Action.values().map { action ->
+            ActionScreens.Action(localize(action.label)) {
                 PowerMenu.run(activity, action) {
                     Toast.makeText(
                         activity,
@@ -949,11 +949,43 @@ class SettingsController(
                     ).show()
                 }
             }
-            containerSettingsItems.addView(row)
+        })
+        buildActionUI(SettingsSubMode.Power, spec)
+    }
+
+    /**
+     * An action screen (ActionScreen.kt): the title in the status bar, grey info rows, one row for each action.
+     * A row closes the screen (Back), then does its action. A screen whose content is gone (an old entry) closes.
+     */
+    private fun buildActionUI(page: SettingsSubMode, spec: ActionScreens.Spec?) {
+        actionPage = page
+        settingsSubMode = 0
+        currentSettingsDepth = 1
+        containerSettingsItems.removeAllViews()
+        if (spec == null) {
+            containerSettingsItems.post { if (actionPage == page) onNavigateBack() }
+            return
         }
-        groupPages.showTitle(mainActivity?.tvStatusBarTitle, containerSettingsItems, localize("Power"))
+        for (line in spec.info) containerSettingsItems.addView(ActionScreens.infoRow(activity, line))
+        var firstAction: View? = null
+        for (action in spec.actions) {
+            val row = createSettingRow(action.label, "")
+            row.setOnClickListener {
+                clickFeedback()
+                ActionScreens.choose(action) { onNavigateBack() }
+            }
+            containerSettingsItems.addView(row)
+            if (firstAction == null) firstAction = row
+        }
+        groupPages.showTitle(mainActivity?.tvStatusBarTitle, containerSettingsItems, spec.title)
         (containerSettingsItems.parent as? ScrollView)?.scrollTo(0, 0)
-        containerSettingsItems.getChildAt(0)?.let { first -> first.post { first.requestFocus() } }
+        if (spec.selectAction && firstAction != null) {
+            firstAction.post { firstAction.requestFocus() }
+        } else {
+            // No row selected: the list itself has the focus, and the first wheel step selects the first action
+            containerSettingsItems.isFocusable = true
+            containerSettingsItems.post { containerSettingsItems.requestFocus() }
+        }
     }
 
     private fun buildLanguageSelectorUI() {
