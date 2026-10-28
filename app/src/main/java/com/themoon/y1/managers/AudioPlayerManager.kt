@@ -493,7 +493,6 @@ class AudioPlayerManager private constructor() {
                 main.tvPlayerArtist.text = channelName
                 main.tvPlayerAlbum.text = ""
                 main.ivAlbumArt.setImageResource(R.drawable.default_album)
-                main.ivPlayerBgBlur.setImageResource(0)
                 main.updatePlayerUI()
             }
 
@@ -508,8 +507,6 @@ class AudioPlayerManager private constructor() {
                         if (bmp != null) {
                             main.runOnUiThread {
                                 main.ivAlbumArt.setImageBitmap(bmp)
-                                val blurredBg = main.applyGaussianBlur(bmp)
-                                main.ivPlayerBgBlur.setImageBitmap(blurredBg)
                                 main.currentAlbumColor = (bmp.getPixel(bmp.width / 2, (bmp.height * 0.8).toInt()) or 0xFF000000.toInt())
                                 main.updateMainMenuBackground()
                             }
@@ -718,7 +715,6 @@ class AudioPlayerManager private constructor() {
         main.tvPlayerArtist.text = "Loading..."
         main.tvPlayerAlbum.text = ""
         main.ivAlbumArt.setImageResource(R.drawable.default_album)
-        main.ivPlayerBgBlur.setImageResource(0)
         val isAudiobookOrPodcast = main.isAudiobookLibraryMode ||
                 StoragePaths.isUnderAudiobooks(track.absolutePath) ||
                 track.absolutePath.contains("/Audiobooks", ignoreCase = true) ||
@@ -872,12 +868,6 @@ class AudioPlayerManager private constructor() {
                         main.updateMainMenuBackground()
                         main.refreshNowPlayingPreview()
 
-                        val optsBg = android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 }
-                        val sourceBg = android.graphics.BitmapFactory.decodeByteArray(main.lastAlbumArtBytes, 0, main.lastAlbumArtBytes!!.size, optsBg)
-                        val blurredBg = main.applyGaussianBlur(sourceBg)
-                        main.ivPlayerBgBlur.setImageBitmap(blurredBg)
-                        if (sourceBg != blurredBg) sourceBg?.recycle()
-
                         try {
                             val centerX = bmpCenter.width / 2
                             val centerY = (bmpCenter.height * 0.8).toInt()
@@ -907,9 +897,6 @@ class AudioPlayerManager private constructor() {
                         if (bmp != null) {
                             main.ivAlbumArt.setImageBitmap(bmp)
 
-                            val blurredBg = main.applyGaussianBlur(bmp)
-                            main.ivPlayerBgBlur.setImageBitmap(blurredBg)
-
                             try {
                                 val centerX = bmp.width / 2
                                 val centerY = (bmp.height * 0.8).toInt()
@@ -937,7 +924,6 @@ class AudioPlayerManager private constructor() {
                     } else {
                         main.ivAlbumArt.setImageResource(R.drawable.default_album)
                         main.currentAlbumColor = ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt()
-                        main.ivPlayerBgBlur.setImageResource(0)
                         main.updateMainMenuBackground()
                         main.refreshNowPlayingPreview()
 

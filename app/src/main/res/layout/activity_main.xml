@@ -377,7 +377,6 @@
         android:layout_height="match_parent"
         android:background="#FFFFFFFF"
         android:visibility="gone">
-        <ImageView android:id="@+id/iv_player_bg_blur" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="centerCrop" android:src="#111111" android:visibility="gone"/>
 
         <RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="top" android:paddingTop="6dp" android:paddingLeft="15dp" android:paddingRight="15dp">
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_centerHorizontal="true" android:text="Now Playing" android:textColor="#3C3C43" android:textSize="14sp" android:textStyle="bold" android:visibility="gone" />

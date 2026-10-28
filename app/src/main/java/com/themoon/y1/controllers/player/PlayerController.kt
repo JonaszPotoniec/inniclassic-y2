@@ -64,7 +64,6 @@ class PlayerController(
     private val frameAlbumArt: FrameLayout? = rootView.findViewById(R.id.frame_album_art)
     private val frameAlbumReflection: FrameLayout? = rootView.findViewById(R.id.frame_album_reflection)
     private val ivPauseOverlay: ImageView? = rootView.findViewById(R.id.iv_pause_overlay)
-    private val ivPlayerBgBlur: ImageView? = rootView.findViewById(R.id.iv_player_bg_blur)
 
     private val ivPlayerShuffleStatus: ImageView? = rootView.findViewById(R.id.iv_player_shuffle_status)
     private val ivPlayerRepeatStatus: ImageView? = rootView.findViewById(R.id.iv_player_repeat_status)

@@ -76,12 +76,6 @@ internal fun MainActivity.applyCachedCoverArtInternal(imagePath: String) {
             ThemeManager.getListButtonFocusedBg() or 0xFF000000.toInt()
         }
 
-        val optsBg = BitmapFactory.Options().apply { inSampleSize = 4 }
-        val sourceBg = BitmapFactory.decodeFile(imagePath, optsBg)
-        val blurred = applyGaussianBlur(sourceBg)
-        ivPlayerBgBlur.setImageBitmap(blurred)
-        if (sourceBg != blurred) sourceBg?.recycle()
-
         val file = File(imagePath)
         val bytes = ByteArray(file.length().toInt())
         val buf = BufferedInputStream(FileInputStream(file))
