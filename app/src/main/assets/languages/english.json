@@ -319,6 +319,8 @@
   "Cut": "Cut",
   "Fade": "Fade",
   "Power Off": "Power Off",
+  "Power": "Power",
+  "Restart": "Restart",
   "Do you want to shut down the device?": "Do you want to shut down the device?",
   "Shut Down": "Shut Down",
   "Radio Settings": "Radio Settings",

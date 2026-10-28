@@ -74,6 +74,8 @@ object SettingsGroups {
         "Time in Title" to "Clock",
         // The tilt is only on Now Playing; the group gives the place, so "Album" is not necessary
         "Album Cover Tilt" to "Cover Tilt",
+        // The row opens the Power screen (Restart, Power Off), as a long press of the Power button does
+        "Power Off" to "Power",
     )
 
     const val TOP = -1
@@ -207,7 +209,7 @@ class SettingsGroupPages {
     }
 
     /** Now, and again after changeScreen() and the screen-change listener, which write "Settings". */
-    private fun showTitle(title: TextView?, container: LinearLayout, text: String) {
+    fun showTitle(title: TextView?, container: LinearLayout, text: String) {
         val generation = ++titleGeneration
         title?.text = text
         title?.post { if (generation == titleGeneration && container.isShown) title.text = text }

@@ -72,6 +72,8 @@ sealed interface SettingsSubMode {
     data class Jellyfin(val depth: Int = 0) : SettingsSubMode
     data object Radio : SettingsSubMode
     data object RadioSavedChannels : SettingsSubMode
+    /** Restart and Power Off (Settings → General → Power, or a long press of the Power button) */
+    data object Power : SettingsSubMode
 }
 
 /**

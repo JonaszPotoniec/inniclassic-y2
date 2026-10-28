@@ -458,6 +458,8 @@ polish_dict = {
   "Reset to Default": "Przywróć domyślne",
   "All settings have been reset.": "Wszystkie ustawienia zostały zresetowane.",
   "Power Off": "Wyłącz urządzenie",
+  "Power": "Zasilanie",
+  "Restart": "Uruchom ponownie",
   "Do you want to shut down the device?": "Czy chcesz wyłączyć urządzenie?",
   "System security prevents powering off directly from the app.": "Zabezpieczenia systemu uniemożliwiają wyłączenie z poziomu aplikacji.",
   "Network & Connections": "Sieć i połączenia",

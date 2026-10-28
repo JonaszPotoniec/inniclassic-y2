@@ -32,8 +32,10 @@ import com.themoon.y1.managers.AutoThemeManager
 import com.themoon.y1.managers.FmRadioManager
 import com.themoon.y1.managers.LanguageManager
 import com.themoon.y1.managers.LastFmScrobbler
+import com.themoon.y1.managers.PowerMenu
 import com.themoon.y1.models.AlbumKey
 import com.themoon.y1.navigation.ScreenState
+import com.themoon.y1.navigation.SettingsSubMode
 import com.themoon.y1.sync.jellyfin.JellyfinSyncProvider
 import com.themoon.y1.views.ListEdges
 import com.themoon.y1.views.TablerIcons
@@ -90,6 +92,8 @@ class SettingsController(
     var lastSettingsFocusIndex: Int = 0
     var settingsSubMode: Int = 0
     private var isUiActive = false
+    /** The Power screen (Restart, Power Off) is open: Back goes to the screen before it. */
+    private var isPowerScreen = false
 
     // Temporary variables for Date/Time picker
     var dtYear: Int = 2026
@@ -158,6 +162,10 @@ class SettingsController(
     private val groupPages = SettingsGroupPages()
 
     override fun onEnter(state: ScreenState) {
+        if ((state as? ScreenState.Settings)?.subMode == SettingsSubMode.Power) {
+            buildPowerUI()
+            return
+        }
         // From the main menu: start at the top level. From a row's screen (Bluetooth, Equalizer...): stay in its group.
         if (mainActivity?.backTargetForUtility == MainActivity.STATE_MENU) groupPages.close()?.let { lastSettingsFocusIndex = it }
         buildSettingsUI()
@@ -175,7 +183,9 @@ class SettingsController(
     }
 
     override fun onRefreshUI() {
-        if (currentSettingsDepth == 0) {
+        if (isPowerScreen) {
+            buildPowerUI()
+        } else if (currentSettingsDepth == 0) {
             buildSettingsUI()
         }
     }
@@ -193,6 +203,10 @@ class SettingsController(
     }
 
     override fun onBackPressed(): Boolean {
+        if (isPowerScreen) {
+            onNavigateBack()
+            return true
+        }
         if (isMenuReorderMode) {
             toggleMenuReorderMode()
             return true
@@ -354,6 +368,7 @@ class SettingsController(
     }
 
     fun buildSettingsUI() {
+        isPowerScreen = false
         currentSettingsDepth = 0
         settingsSubMode = 0
 
@@ -707,30 +722,7 @@ class SettingsController(
         val btnPowerOff = createSettingRow(localize("Power Off"), "〉 ")
         btnPowerOff.setOnClickListener {
             clickFeedback()
-            AlertDialog.Builder(activity, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                .setTitle(localize("Power Off"))
-                .setMessage(localize("Do you want to shut down the device?"))
-                .setPositiveButton(localize("Shut Down")) { _, _ ->
-                    try {
-                        val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", "reboot -p"))
-                        proc.waitFor()
-                    } catch (_: Exception) {
-                        try {
-                            val intent = Intent("android.intent.action.ACTION_REQUEST_SHUTDOWN")
-                            intent.putExtra("android.intent.extra.KEY_CONFIRM", false)
-                            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                            activity.startActivity(intent)
-                        } catch (_: Exception) {
-                            Toast.makeText(
-                                activity,
-                                localize("System security prevents powering off directly from the app."),
-                                Toast.LENGTH_LONG
-                            ).show()
-                        }
-                    }
-                }
-                .setNegativeButton(localize("Cancel"), null)
-                .show()
+            mainActivity?.showPowerMenu()
         }
         containerSettingsItems.addView(btnPowerOff)
 
@@ -937,6 +929,31 @@ class SettingsController(
             }
             isUiActive = true
         }
+    }
+
+    /** The Power screen: Restart and Power Off. The centre button does the action at once; Back closes the screen. */
+    private fun buildPowerUI() {
+        isPowerScreen = true
+        settingsSubMode = 0
+        currentSettingsDepth = 1
+        containerSettingsItems.removeAllViews()
+        for (action in PowerMenu.Action.values()) {
+            val row = createSettingRow(localize(action.label), "")
+            row.setOnClickListener {
+                clickFeedback()
+                PowerMenu.run(activity, action) {
+                    Toast.makeText(
+                        activity,
+                        localize("System security prevents powering off directly from the app."),
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+            containerSettingsItems.addView(row)
+        }
+        groupPages.showTitle(mainActivity?.tvStatusBarTitle, containerSettingsItems, localize("Power"))
+        (containerSettingsItems.parent as? ScrollView)?.scrollTo(0, 0)
+        containerSettingsItems.getChildAt(0)?.let { first -> first.post { first.requestFocus() } }
     }
 
     private fun buildLanguageSelectorUI() {
