@@ -260,186 +260,16 @@ class BrowserController(
             updateHeaderTitle(localize("Music"))
             showBrowserCoverPane()
 
-            if (!isMusicMenuItemHidden("coverflow")) {
-                val btnCoverFlow = createListButtonWithIcon("\uE3B6", localize("Cover Flow"), null)
-                btnCoverFlow.setOnClickListener {
+            for (item in MusicMenuItems.ITEMS) {
+                if (isMusicMenuItemHidden(item.id)) continue
+                val label = localize(item.label)
+                val btn = createListButtonWithIcon(item.icon, label, null)
+                btn.setOnClickListener {
                     clickFeedback()
-                    lastBrowserFocusText = localize("Cover Flow")
-                    onCoverFlowRequested()
+                    lastBrowserFocusText = label
+                    openMusicMenuItem(item.id)
                 }
-                containerBrowserItems.addView(btnCoverFlow)
-            }
-
-            if (!isMusicMenuItemHidden("playlists")) {
-                val btnM3u = createListButtonWithIcon("\uE05F", localize("Playlists"), null)
-                btnM3u.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Playlists")
-                    onPlaylistsRequested()
-                }
-                containerBrowserItems.addView(btnM3u)
-            }
-
-            if (!isMusicMenuItemHidden("track_artists")) {
-                val btnTrackArtist = createListButtonWithIcon("\uE7FD", localize("Artists"), null)
-                btnTrackArtist.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Artists")
-                    currentBrowserMode = BrowserMode.TrackArtists
-                    virtualQueryValue = ""
-                    categoryArtistFilter = ""
-                    categoryArtistFilterIsTrackArtist = false
-                    buildVirtualCategories("TRACK_ARTIST")
-                }
-                containerBrowserItems.addView(btnTrackArtist)
-            }
-
-            if (!isMusicMenuItemHidden("artists")) {
-                val btnArtist = createListButtonWithIcon("\uE7FD", localize("Album Artists"), null)
-                btnArtist.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Album Artists")
-                    currentBrowserMode = BrowserMode.Artists
-                    virtualQueryValue = ""
-                    categoryArtistFilter = ""
-                    categoryArtistFilterIsTrackArtist = false
-                    buildVirtualCategories("ARTIST")
-                }
-                containerBrowserItems.addView(btnArtist)
-            }
-
-            if (!isMusicMenuItemHidden("albums")) {
-                val btnAlbum = createListButtonWithIcon("\uE019", localize("Albums"), null)
-                btnAlbum.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Albums")
-                    currentBrowserMode = BrowserMode.Albums()
-                    virtualQueryValue = ""
-                    categoryArtistFilter = ""
-                    categoryArtistFilterIsTrackArtist = false
-                    buildVirtualCategories("ALBUM")
-                }
-                containerBrowserItems.addView(btnAlbum)
-            }
-
-            if (!isMusicMenuItemHidden("compilations")) {
-                val btnCompilations = createListButtonWithIcon("\uE019", localize("Compilations"), null)
-                btnCompilations.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Compilations")
-                    currentBrowserMode = BrowserMode.Compilations
-                    virtualQueryValue = ""
-                    categoryArtistFilter = ""
-                    categoryArtistFilterIsTrackArtist = false
-                    buildVirtualCategories("ALBUM")
-                }
-                containerBrowserItems.addView(btnCompilations)
-            }
-
-            if (!isMusicMenuItemHidden("songs")) {
-                val btnAll = createListButtonWithIcon("\uE03D", localize("Songs"), null)
-                btnAll.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Songs")
-                    currentBrowserMode = BrowserMode.VirtualSongs
-                    virtualQueryType = "ALL"
-                    buildVirtualSongs()
-                }
-                containerBrowserItems.addView(btnAll)
-            }
-
-            if (!isMusicMenuItemHidden("shuffle_songs")) {
-                val btnShuffle = createListButtonWithIcon("\uE043", localize("Shuffle Songs"), null)
-                btnShuffle.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Shuffle Songs")
-                    onShuffleSongsRequested()
-                }
-                containerBrowserItems.addView(btnShuffle)
-            }
-
-            if (!isMusicMenuItemHidden("genres")) {
-                val btnGenre = createListButtonWithIcon("\uE030", localize("Genres"), null)
-                btnGenre.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Genres")
-                    currentBrowserMode = BrowserMode.Genres
-                    virtualQueryValue = ""
-                    categoryGenreFilter = ""
-                    categoryArtistFilter = ""
-                    categoryArtistFilterIsTrackArtist = false
-                    buildVirtualCategories("GENRE")
-                }
-                containerBrowserItems.addView(btnGenre)
-            }
-
-            if (!isMusicMenuItemHidden("composers")) {
-                val btnComposer = createListButtonWithIcon("\uE7FD", localize("Composers"), null)
-                btnComposer.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Composers")
-                    currentBrowserMode = BrowserMode.Composers
-                    virtualQueryValue = ""
-                    buildVirtualCategories("COMPOSER")
-                }
-                containerBrowserItems.addView(btnComposer)
-            }
-
-            if (!isMusicMenuItemHidden("years")) {
-                val btnYears = createListButtonWithIcon("\uE8B6", localize("Years"), null)
-                btnYears.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Years")
-                    currentBrowserMode = BrowserMode.Years
-                    virtualQueryValue = ""
-                    buildVirtualCategories("YEAR")
-                }
-                containerBrowserItems.addView(btnYears)
-            }
-
-            if (!isMusicMenuItemHidden("recently_added")) {
-                val btnRecent = createListButtonWithIcon("\uE8B6", localize("Recently Added"), null)
-                btnRecent.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Recently Added")
-                    currentBrowserMode = BrowserMode.RecentlyAdded
-                    virtualQueryType = "RECENT"
-                    buildVirtualSongs()
-                }
-                containerBrowserItems.addView(btnRecent)
-            }
-
-            if (!isMusicMenuItemHidden("favorites")) {
-                val btnFav = createListButtonWithIcon("\uE8B6", localize("My Favorites"), null)
-                btnFav.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("My Favorites")
-                    currentBrowserMode = BrowserMode.Favorites
-                    buildVirtualSongsForFavorites()
-                }
-                containerBrowserItems.addView(btnFav)
-            }
-
-            if (!isMusicMenuItemHidden("folders")) {
-                val btnFolders = createListButtonWithIcon("\uE8B6", localize("Folders"), null)
-                btnFolders.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Folders")
-                    currentBrowserMode = BrowserMode.Folder(StoragePaths.getPrimaryRoot())
-                    currentFolder = StoragePaths.getPrimaryRoot()
-                    buildFileBrowserUI()
-                }
-                containerBrowserItems.addView(btnFolders)
-            }
-
-            if (!isMusicMenuItemHidden("search")) {
-                val btnSearch = createListButtonWithIcon("\uE8B6", localize("Search"), null)
-                btnSearch.setOnClickListener {
-                    clickFeedback()
-                    lastBrowserFocusText = localize("Search")
-                    onSearchRequested()
-                }
-                containerBrowserItems.addView(btnSearch)
+                containerBrowserItems.addView(btn)
             }
         } else {
             updateHeaderTitle(localize("Audiobooks"))
@@ -1245,6 +1075,62 @@ class BrowserController(
         } catch (e: Exception) {
             Toast.makeText(activity, "Install failed: ${e.message}", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    /** The action of a Music menu item (MusicMenuItems.ITEMS). */
+    private fun openMusicMenuItem(id: String) {
+        when (id) {
+            "coverflow" -> onCoverFlowRequested()
+            "playlists" -> onPlaylistsRequested()
+            "track_artists" -> openMusicCategory(BrowserMode.TrackArtists, "TRACK_ARTIST")
+            "artists" -> openMusicCategory(BrowserMode.Artists, "ARTIST")
+            "albums" -> openMusicCategory(BrowserMode.Albums(), "ALBUM")
+            "compilations" -> openMusicCategory(BrowserMode.Compilations, "ALBUM")
+            "songs" -> {
+                currentBrowserMode = BrowserMode.VirtualSongs
+                virtualQueryType = "ALL"
+                buildVirtualSongs()
+            }
+            "shuffle_songs" -> onShuffleSongsRequested()
+            "genres" -> {
+                categoryGenreFilter = ""
+                openMusicCategory(BrowserMode.Genres, "GENRE")
+            }
+            "composers" -> {
+                currentBrowserMode = BrowserMode.Composers
+                virtualQueryValue = ""
+                buildVirtualCategories("COMPOSER")
+            }
+            "years" -> {
+                currentBrowserMode = BrowserMode.Years
+                virtualQueryValue = ""
+                buildVirtualCategories("YEAR")
+            }
+            "recently_added" -> {
+                currentBrowserMode = BrowserMode.RecentlyAdded
+                virtualQueryType = "RECENT"
+                buildVirtualSongs()
+            }
+            "favorites" -> {
+                currentBrowserMode = BrowserMode.Favorites
+                buildVirtualSongsForFavorites()
+            }
+            "folders" -> {
+                currentBrowserMode = BrowserMode.Folder(StoragePaths.getPrimaryRoot())
+                currentFolder = StoragePaths.getPrimaryRoot()
+                buildFileBrowserUI()
+            }
+            "search" -> onSearchRequested()
+        }
+    }
+
+    /** A category list of the Music menu, with no artist filter from an earlier list. */
+    private fun openMusicCategory(mode: BrowserMode, type: String) {
+        currentBrowserMode = mode
+        virtualQueryValue = ""
+        categoryArtistFilter = ""
+        categoryArtistFilterIsTrackArtist = false
+        buildVirtualCategories(type)
     }
 
     private fun isMusicMenuItemHidden(id: String): Boolean {
