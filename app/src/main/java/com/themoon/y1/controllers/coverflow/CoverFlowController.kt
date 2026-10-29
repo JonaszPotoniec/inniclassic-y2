@@ -222,7 +222,8 @@ class CoverFlowController(
         val tvArtist = card.findViewById<TextView>(ARTIST_VIEW_ID)
 
         tvTitle?.text = item.album
-        tvArtist?.text = item.artist
+        // The album artist, as on the iPod ("Various Artists" for a compilation), not the artist of the first track.
+        tvArtist?.text = CoverFlowOrder.artistOf(item)
 
         val albumKey = AlbumCoverManager.getAlbumKey(item.file, item.album)
         ivCover?.tag = albumKey

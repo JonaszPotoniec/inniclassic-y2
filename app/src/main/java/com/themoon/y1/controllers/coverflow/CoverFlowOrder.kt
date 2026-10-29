@@ -24,6 +24,7 @@ object CoverFlowOrder {
         }
     }
 
-    private fun artistOf(song: SongItem): String =
+    /** The artist that Cover Flow sorts by: the album artist, or the track artist when the album artist is empty. */
+    fun artistOf(song: SongItem): String =
         if (song.albumArtist.isNotBlank()) song.albumArtist else song.artist
 }
