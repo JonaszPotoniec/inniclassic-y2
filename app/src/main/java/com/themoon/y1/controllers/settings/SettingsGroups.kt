@@ -59,7 +59,7 @@ object SettingsGroups {
             "Reset All Settings", "Power Off"
         )),
         Group("Developer", listOf(
-            "Wireless ADB"
+            "Wireless ADB", "Save Log"
         )),
     )
 
