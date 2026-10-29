@@ -145,11 +145,9 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     val currentPlaylist: ArrayList<File> = ArrayList()
     val originalPlaylist: ArrayList<File> = ArrayList()
     var currentIndex: Int = -1
-    var lastTrackChangeTime: Long = 0L
     var isPausedByHand: Boolean = false
     var consecutiveErrorCount: Int = 0
     var lastAlbumArtBytes: ByteArray? = null
-    var currentAlbumColor: Int = 0xFF555555.toInt()
 
     var isAudiobookLibraryMode: Boolean = false
     var isShuffleMode: Boolean = false
@@ -176,29 +174,15 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
     var currentVirtualVolume: Int = -1
     var lastTargetVolume: Int = -1
-    var lastTargetVolumeTime: Long = 0L
-    var lastKnownSystemVolume: Int = -1
     var isScreenSleeping: Boolean = false
-    var lastScreenOnTime: Long = 0L
     var isLongPressConsumed: Boolean = false
     var isMediaLongPressConsumed: Boolean = false
-    var lastJellyfinLongClickTime: Long = 0L
-    var isRadioUIShowing: Boolean = false
     var activePlayer: Int = 0
 
     var isFakeScreenOff: Boolean = false
-    var isPlaylistOpenedFromLibrary: Boolean = false
-    var isPodcastOpenedFromLibrary: Boolean = false
-    var backTargetForPlayer: Int = STATE_BROWSER
     var backTargetForUtility: Int = STATE_SETTINGS
     var isPendingUpdateCheckAfterWifi: Boolean = false
-    var isPendingJellyfinSyncAfterWifi: Boolean = false
-    var isPendingJellyfinTestAfterWifi: Boolean = false
-    var isPendingJellyfinFetchLibrariesAfterWifi: Boolean = false
-    var isPendingJellyfinQuickConnectAfterWifi: Boolean = false
-    var currentSettingsDepth: Int = 0
     var lastSettingsFocusIndex: Int = 0
-    var lastMainMenuFocusIndex: Int = 0
     var currentTimeoutIndex: Int = 1
     var currentSystemBrightness: Int = 255
     var currentEqPresetIndex: Int = 0
@@ -671,7 +655,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         VirtualVolumeManager.getInstance().setMasterGain(gain)
         val sysTarget = VirtualVolumeManager.virtualToSystemVolume(targetVirtualVol, sysMaxVol)
         lastTargetVolume = sysTarget
-        lastTargetVolumeTime = System.currentTimeMillis()
         try {
             audioManager.setStreamVolume(stream, sysTarget, 0)
         } catch (_: Exception) {}
@@ -902,7 +885,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         if (!isFakeScreenOff) return
         isFakeScreenOff = false
         isScreenSleeping = false
-        lastScreenOnTime = System.currentTimeMillis()
         powerBacklightManager?.wakeFromFakeScreenOff(window, layoutLoadingOverlay, currentSystemBrightness) { sleep ->
             autoManageWifiPower(sleep)
         }
