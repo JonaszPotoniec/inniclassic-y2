@@ -1,5 +1,6 @@
 package com.themoon.y1.managers
 
+import com.themoon.y1.io.SafeFiles
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -66,15 +67,9 @@ class PlayHistoryStore(private val maxSongs: Int = MAX_SONGS) {
         return JSONObject().put("version", VERSION).put("songs", songs).toString()
     }
 
-    /** Writes the store to [file] through a temporary file, so a crash cannot leave half a file. */
+    /** Writes the store to [file] through a synced temporary file (SafeFiles), so a crash cannot leave half a file. */
     fun writeTo(file: File) {
-        file.parentFile?.mkdirs()
-        val tmp = File(file.path + ".tmp")
-        tmp.writeText(toJson(), Charsets.UTF_8)
-        if (!tmp.renameTo(file)) {
-            file.delete()
-            if (!tmp.renameTo(file)) throw java.io.IOException("Cannot write $file")
-        }
+        if (!SafeFiles.writeStringToFile(file, toJson())) throw java.io.IOException("Cannot write $file")
     }
 
     companion object {

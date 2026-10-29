@@ -107,7 +107,7 @@ class PlayHistoryStoreTest {
         store.writeTo(file)
         store.record("/m/c.flac", 3000L)
         store.writeTo(file) // replaces the old file
-        assertFalse(tmp.root.resolve("sub/play_history.json.tmp").exists())
+        assertEquals(listOf("play_history.json"), tmp.root.resolve("sub").list()?.toList()) // no temporary file
 
         val read = PlayHistoryStore.readFrom(file)
         assertEquals(2, read.get("/m/a b/ä.mp3")?.count)
