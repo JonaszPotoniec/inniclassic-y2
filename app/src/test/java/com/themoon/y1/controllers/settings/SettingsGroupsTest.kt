@@ -79,7 +79,7 @@ class SettingsGroupsTest {
         assertEquals(listOf("Shuffle Mode", "Repeat Mode", "Equalizer & Audio Effects"), GROUPS[0].rows.take(3))
         assertEquals("About", GROUPS.first { it.title == "General" }.rows.first())
         assertEquals("Power Off", GROUPS.first { it.title == "General" }.rows.last())
-        assertEquals(listOf("Wireless ADB"), GROUPS.last().rows)
+        assertEquals(listOf("Wireless ADB", "Save Log"), GROUPS.last().rows)
     }
 
     @Test
