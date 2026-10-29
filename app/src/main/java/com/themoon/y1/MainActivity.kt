@@ -184,7 +184,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     var isPendingUpdateCheckAfterWifi: Boolean = false
     var lastSettingsFocusIndex: Int = 0
     var currentTimeoutIndex: Int = 1
-    var currentSystemBrightness: Int = 255
     var currentEqPresetIndex: Int = 0
     var currentEqProfile: String = "preset_0"
     var currentBassBoostStep: Int = 0
@@ -885,7 +884,11 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         if (!isFakeScreenOff) return
         isFakeScreenOff = false
         isScreenSleeping = false
-        powerBacklightManager?.wakeFromFakeScreenOff(window, layoutLoadingOverlay, currentSystemBrightness) { sleep ->
+        // The Brightness screen writes the system value, so restore that one.
+        val brightness = try {
+            Settings.System.getInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS, 255)
+        } catch (_: Exception) { 255 }
+        powerBacklightManager?.wakeFromFakeScreenOff(window, layoutLoadingOverlay, brightness) { sleep ->
             autoManageWifiPower(sleep)
         }
         powerBacklightManager?.resetTimer()
