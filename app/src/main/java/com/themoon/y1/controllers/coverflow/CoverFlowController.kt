@@ -2,7 +2,10 @@ package com.themoon.y1.controllers.coverflow
 
 import android.app.Activity
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.util.TypedValue
 import android.view.Gravity
@@ -19,6 +22,7 @@ import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.managers.AlbumCoverManager
 import com.themoon.y1.models.SongItem
+import com.themoon.y1.navigation.NavigationManager
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.CoverFlowLayout
 import com.themoon.y1.views.SmoothEdgeImageView
@@ -117,15 +121,9 @@ class CoverFlowController(
         }
 
         val d = activity.resources.displayMetrics.density
-        val cfLayout = coverFlowContainer ?: CoverFlowLayout(activity).apply {
-            clipChildren = false
-            clipToPadding = false
-            // The cover top is at the iPod position for the space below the status bar.
-            childTopForHeight = { height -> (CoverFlowGeometry.coverTop((height / d).toInt()) * d).toInt() }
-            // Changes in a card do not lay out the full window.
-            isLayoutBoundary = true
-        }
-        coverFlowContainer = cfLayout
+        val kept = cfViews != null
+        ensureCards()
+        val cfLayout = coverFlowContainer ?: return
         (cfLayout.parent as? ViewGroup)?.removeView(cfLayout)
         containerBrowserItems.clipChildren = false
         containerBrowserItems.clipToPadding = false
@@ -141,21 +139,108 @@ class CoverFlowController(
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         )
 
-        val kept = cfViews
-        if (kept != null) {
+        if (kept) {
             // The theme can have changed since the cards were made.
-            kept.forEach { card -> (card?.tag as? CardState)?.let { styleCardTexts(it, d) } }
-        } else {
-            val views = arrayOfNulls<View>(visibleCoversCount)
-            for (i in 0 until visibleCoversCount) {
-                val card = createSingleCoverView()
-                views[i] = card
-                cfLayout.addView(card)
-            }
-            cfViews = views
+            cfViews?.forEach { card -> (card?.tag as? CardState)?.let { styleCardTexts(it, d) } }
         }
 
         initCoverFlowPositions()
+    }
+
+    /** The Cover Flow layout and its cards: made one time and kept. */
+    private fun ensureCards(): Array<View?> {
+        cfViews?.let { return it }
+        val d = activity.resources.displayMetrics.density
+        val cfLayout = coverFlowContainer ?: CoverFlowLayout(activity).apply {
+            clipChildren = false
+            clipToPadding = false
+            // The cover top is at the iPod position for the space below the status bar.
+            childTopForHeight = { height -> (CoverFlowGeometry.coverTop((height / d).toInt()) * d).toInt() }
+            // Changes in a card do not lay out the full window.
+            isLayoutBoundary = true
+        }
+        coverFlowContainer = cfLayout
+        val views = arrayOfNulls<View>(visibleCoversCount)
+        for (i in 0 until visibleCoversCount) {
+            val card = createSingleCoverView()
+            views[i] = card
+            cfLayout.addView(card)
+        }
+        cfViews = views
+        return views
+    }
+
+    /** The album index that card [slot] shows (the centre card shows the current album). */
+    private fun cardIndex(slot: Int): Int {
+        val total = uniqueAlbumList.size
+        return (currentCoverFlowIndex + slot - visibleCoversCount / 2 + total * 10) % total
+    }
+
+    // --- preparing the first entry ---
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val prepareTask = Runnable { prepareCovers() }
+    private var scratch: Bitmap? = null
+
+    /**
+     * Does the slow work of the first entry before the user opens Cover Flow, so that the first entry after an app
+     * start or a library change is as fast as the next ones (Y2: before, up to 2.5 s with no frame). That work: the
+     * thumbnail check of all albums (when the album list changed), the covers around the current album, and the
+     * cards with their art bitmaps. On Android 4.4 a bitmap allocation often starts a full garbage collection
+     * (~60 ms, all threads stop). Call it after each library load, from any thread: it starts [PREPARE_DELAY_MS]
+     * later, and prepares one card for each main-thread message, so keys still go through.
+     */
+    fun prepareSoon() {
+        mainHandler.removeCallbacks(prepareTask)
+        mainHandler.postDelayed(prepareTask, PREPARE_DELAY_MS)
+    }
+
+    private fun isOpen() = NavigationManager.getInstance().currentState is ScreenState.CoverFlow
+
+    private fun prepareCovers() {
+        if (uniqueAlbumList.isEmpty() || isOpen()) return
+        if (currentCoverFlowIndex >= uniqueAlbumList.size) currentCoverFlowIndex = 0
+        val manager = AlbumCoverManager.getInstance()
+        manager.pregenerateThumbnailsIfChanged(uniqueAlbumList)
+        // The covers first (worker thread), then the cards with them (no placeholder art to draw first).
+        val items = (0 until visibleCoversCount).map { uniqueAlbumList[cardIndex(it)] }.filter { it.file != null }
+        var waiting = items.size
+        if (waiting == 0) {
+            prepareCard(0)
+            return
+        }
+        for (item in items) {
+            manager.loadCoverAsync(item, object : AlbumCoverManager.CoverCallback {
+                override fun onCoverLoaded(albumKey: String, cover: Bitmap?, reflection: Bitmap?) {
+                    if (--waiting == 0) prepareCard(0)
+                }
+            })
+        }
+    }
+
+    /**
+     * Binds card [slot], and measures, lays out and draws it off screen: this makes its text layouts and the art
+     * bitmaps of its [SmoothEdgeImageView]s now, at their Cover Flow sizes. The entry then only binds the same bitmaps.
+     */
+    private fun prepareCard(slot: Int) {
+        if (uniqueAlbumList.isEmpty() || isOpen()) {
+            scratch = null
+            return
+        }
+        val views = ensureCards()
+        val card = views[slot] ?: return
+        bindCoverData(card, cardIndex(slot))
+        card.measure(
+            View.MeasureSpec.makeMeasureSpec(card.layoutParams.width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        )
+        card.layout(0, 0, card.measuredWidth, card.measuredHeight)
+        // A canvas of the card size (one byte a pixel), so that no child is outside the clip and skipped.
+        val bmp = scratch?.takeIf { it.width >= card.measuredWidth && it.height >= card.measuredHeight }
+            ?: Bitmap.createBitmap(card.measuredWidth.coerceAtLeast(1), card.measuredHeight.coerceAtLeast(1), Bitmap.Config.ALPHA_8)
+        scratch = bmp
+        card.draw(Canvas(bmp))
+        if (slot + 1 < views.size) mainHandler.post { prepareCard(slot + 1) } else scratch = null
     }
 
     private fun initCoverFlowPositions() {
@@ -166,9 +251,7 @@ class CoverFlowController(
         val centerIdx = visibleCoversCount / 2
 
         for (i in 0 until visibleCoversCount) {
-            val offsetFromCenter = i - centerIdx
-            val targetIdx = (currentCoverFlowIndex + offsetFromCenter + total * 10) % total
-            views[i]?.let { bindCoverData(it, targetIdx) }
+            views[i]?.let { bindCoverData(it, cardIndex(i)) }
         }
 
         val d = activity.resources.displayMetrics.density
@@ -575,6 +658,8 @@ class CoverFlowController(
     }
 
     companion object {
+        // After a library load: the start-up work and the main menu first
+        private const val PREPARE_DELAY_MS = 3000L
         private const val COVER_VIEW_ID = 1001
         private val TITLE_VIEW_ID = R.id.coverflow_title
         private val ARTIST_VIEW_ID = R.id.coverflow_artist

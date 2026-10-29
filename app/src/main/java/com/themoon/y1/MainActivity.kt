@@ -277,6 +277,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     fun isBrowserControllerInitialized(): Boolean = ::browserController.isInitialized
     lateinit var playlistController: PlaylistController
     lateinit var coverFlowController: CoverFlowController
+    fun isCoverFlowControllerInitialized(): Boolean = ::coverFlowController.isInitialized
     lateinit var playerController: PlayerController
     lateinit var equalizerController: EqualizerController
     lateinit var fmRadioController: FmRadioController
