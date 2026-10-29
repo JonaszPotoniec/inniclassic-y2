@@ -1,11 +1,9 @@
 package com.themoon.y1.core.extensions
 
-import org.json.JSONObject
+import com.themoon.y1.LanguageFiles
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
 
 /**
  * On/off setting values: the same "On"/"Off" text on every row, its mark, and a translation in every language file.
@@ -43,15 +41,6 @@ class OnOffTest {
 
     @Test
     fun everyLanguageFileTranslatesOnAndOff() {
-        val dir = listOf(File("src/main/assets/languages"), File("app/src/main/assets/languages"))
-            .first { it.isDirectory }
-        val files = dir.listFiles { f -> f.name.endsWith(".json") }!!.sortedBy { it.name }
-        assertTrue("no language files in $dir", files.isNotEmpty())
-        for (file in files) {
-            val json = JSONObject(file.readText(Charsets.UTF_8))
-            for (key in listOf(onOffKey(true), onOffKey(false))) {
-                assertTrue("${file.name} has no \"$key\"", json.optString(key).isNotBlank())
-            }
-        }
+        LanguageFiles.assertEachFileTranslates(listOf(onOffKey(true), onOffKey(false)))
     }
 }

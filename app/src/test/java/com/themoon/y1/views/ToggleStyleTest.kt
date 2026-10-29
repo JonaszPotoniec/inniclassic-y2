@@ -1,15 +1,14 @@
 package com.themoon.y1.views
 
+import com.themoon.y1.LanguageFiles
 import com.themoon.y1.core.extensions.onOff
 import com.themoon.y1.core.extensions.onOffState
-import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
 
 class ToggleStyleTest {
 
@@ -181,18 +180,10 @@ class ToggleStyleTest {
 
     @Test
     fun everyLanguageFileTranslatesTheSetting() {
-        val dir = listOf(File("src/main/assets/languages"), File("app/src/main/assets/languages"))
-            .first { it.isDirectory }
-        val files = dir.listFiles { f -> f.name.endsWith(".json") }!!.sortedBy { it.name }
-        assertTrue("no language files in $dir", files.isNotEmpty())
-        val keys = listOf("Toggle Style", ToggleStyle.labelKey(false), ToggleStyle.labelKey(true))
-        for (file in files) {
-            val json = JSONObject(file.readText(Charsets.UTF_8))
-            for (key in keys) {
-                assertTrue("${file.name} has no \"$key\"", json.optString(key).isNotBlank())
-            }
-        }
-        val english = JSONObject(File(dir, "english.json").readText(Charsets.UTF_8))
+        LanguageFiles.assertEachFileTranslates(
+            listOf("Toggle Style", ToggleStyle.labelKey(false), ToggleStyle.labelKey(true))
+        )
+        val english = LanguageFiles.all().getValue("english.json")
         assertEquals("Text", english.getString(ToggleStyle.labelKey(false)))
         assertEquals("Switch", english.getString(ToggleStyle.labelKey(true)))
     }
