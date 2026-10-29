@@ -22,29 +22,17 @@ class IpodPlayStateView(context: Context) : View(context) {
     }
     private val path = Path()
 
-    // Playback changes come from many places, so the view polls the player while it is attached.
-    private val poll = object : Runnable {
-        override fun run() {
-            refresh()
-            postDelayed(this, POLL_MS)
-        }
-    }
-
     init {
         visibility = GONE
     }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        post(poll)
+        refresh()
     }
 
-    override fun onDetachedFromWindow() {
-        removeCallbacks(poll)
-        super.onDetachedFromWindow()
-    }
-
-    private fun refresh() {
+    /** Reads the player state again. MainActivity.updatePlayerUI calls it at each player change. */
+    fun refresh() {
         val s = currentState()
         val vis = if (s == STATE_NONE || !IpodClassicLayout.isActive) GONE else VISIBLE
         if (visibility != vis) visibility = vis
@@ -96,7 +84,6 @@ class IpodPlayStateView(context: Context) : View(context) {
         const val STATE_NONE = 0
         const val STATE_PLAYING = 1
         const val STATE_PAUSED = 2
-        const val POLL_MS = 500L
         // 4 px bars with a 4 px space in the 12 px wide icon (6 and 5 at 17 px).
         const val PAUSE_BAR_RATIO = 0.35f
     }

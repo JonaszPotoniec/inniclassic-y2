@@ -170,6 +170,12 @@ object IpodClassicLayout {
         }
     }
 
+    /** Shows the current play state in the status bar play icon, if the status bar has it. */
+    fun refreshPlayIcon(main: MainActivity) {
+        val bar = main.findViewById<View>(R.id.layout_status_bar) ?: return
+        (bar.findViewWithTag<View>(TAG_PLAY_ICON) as? IpodPlayStateView)?.refresh()
+    }
+
     private fun removeAddedViews(main: MainActivity) {
         for (tag in arrayOf(TAG_PLAY_ICON, TAG_STATUS_RULE)) {
             val bar = main.findViewById<View>(R.id.layout_status_bar) ?: continue
