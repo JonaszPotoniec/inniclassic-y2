@@ -19,15 +19,15 @@ object SettingsGroups {
     class Group(val title: String, val rows: List<String>, val direct: Boolean = false)
 
     /**
-     * Rows that are in a build only with a feature or a branch are in the list too (Click Volume), and rows that a
-     * branch removes stay in it (Screen Timeout): a missing row is skipped.
+     * Rows that are in a build only with a feature or a branch are in the list too (Click Volume):
+     * a missing row is skipped.
      */
     val GROUPS: List<Group> = listOf(
         Group("Playback", listOf(
             "Shuffle Mode", "Repeat Mode", "Equalizer & Audio Effects", "Sound Check", "Volume Limit", "Playback Speed"
         )),
         Group("Display", listOf(
-            "Display Brightness", "Backlight Timer", "Screen Timeout"
+            "Display Brightness", "Backlight Timer"
         )),
         // What Now Playing shows (rows of the Now Playing branch, before partly in the Now Playing menu; and the cover tilt)
         Group("Now Playing", listOf(

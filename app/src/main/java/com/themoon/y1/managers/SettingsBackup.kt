@@ -3,6 +3,7 @@ package com.themoon.y1.managers
 import android.content.Context
 import android.content.SharedPreferences
 import com.themoon.y1.StoragePaths
+import com.themoon.y1.io.SafeFiles
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -186,12 +187,8 @@ object SettingsBackup {
 
     fun export(context: Context, appVersion: String): File {
         val file = exportFile()
-        file.parentFile?.mkdirs()
-        val tmp = File(file.parentFile, "$FILE_NAME.tmp")
-        tmp.writeText(toJson(openPrefs(context), appVersion).toString(2), Charsets.UTF_8)
-        if (!tmp.renameTo(file)) {
-            file.delete()
-            if (!tmp.renameTo(file)) throw java.io.IOException("Cannot write ${file.absolutePath}")
+        if (!SafeFiles.writeStringToFile(file, toJson(openPrefs(context), appVersion).toString(2))) {
+            throw java.io.IOException("Cannot write ${file.absolutePath}")
         }
         return file
     }
