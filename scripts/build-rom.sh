@@ -534,6 +534,11 @@ fi
 # BT operations (power-on, connect, unpair) fail with "No such file or directory".
 setprop ctl.start mtkbt
 
+# USB device name: init never sets it, so computers show the kernel default "MediaTek MT65xx Android Phone".
+# Use the maker and the model instead (as AOSP init.usb.rc does). It shows at the next USB connection.
+echo -n Innioasis > /sys/class/android_usb/android0/iManufacturer
+echo -n "$(getprop ro.product.model)" > /sys/class/android_usb/android0/iProduct
+
 # Prevent Bluetooth from auto-enabling on every boot / com.android.bluetooth restart.
 # The MTK firmware persists BT state in persist.bluetooth.on; clearing it means the user's
 # explicit OFF choice is respected after reboot rather than being overridden by the stack.
