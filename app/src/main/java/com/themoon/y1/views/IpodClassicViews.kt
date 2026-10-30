@@ -9,6 +9,7 @@ import android.view.ViewTreeObserver
 import com.themoon.y1.MainActivity
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.managers.AudioPlayerManager
+import com.themoon.y1.managers.FmRadioManager
 import kotlin.math.roundToInt
 
 /** The iPod's blue play (▶) or pause (‖) state icon, shown left of the battery. Hidden when nothing is loaded. */
@@ -43,7 +44,8 @@ class IpodPlayStateView(context: Context) : View(context) {
     }
 
     private fun currentState(): Int {
-        if (AudioPlayerManager.getInstance().isPlaying()) return STATE_PLAYING
+        // The FM radio also plays: it stays on after you leave its screen
+        if (AudioPlayerManager.getInstance().isPlaying() || FmRadioManager.getInstance()?.isPowerUp == true) return STATE_PLAYING
         val main = MainActivity.instance ?: return STATE_NONE
         return if (main.currentIndex in main.currentPlaylist.indices) STATE_PAUSED else STATE_NONE
     }
