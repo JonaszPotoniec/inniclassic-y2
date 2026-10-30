@@ -16,10 +16,14 @@ object LanguageFiles {
         return files.associate { it.name to JSONObject(it.readText(Charsets.UTF_8)) }
     }
 
-    /** Fails when a language file has no text for one of the [keys]. */
+    /**
+     * Fails when a language file has no text for one of the [keys].
+     * english.json needs an entry only when its text differs from the key: LanguageManager.t() gives the key back.
+     */
     fun assertEachFileTranslates(keys: List<String>) {
         for ((name, json) in all()) {
             for (key in keys) {
+                if (name == "english.json" && !json.has(key)) continue
                 assertTrue("$name has no \"$key\"", json.optString(key).isNotBlank())
             }
         }
