@@ -89,19 +89,17 @@ class CoverFlowController(
     private val slotScale = FloatArray(visibleCoversCount)
     private val slotAlpha = FloatArray(visibleCoversCount)
 
-    /** An album was opened from Cover Flow, when [songAtAlbumOpen] was in Now Playing. */
-    private var backFromAlbum = false
-    private var songAtAlbumOpen: SongItem? = null
+    /** The song list of the album that was opened from Cover Flow, or null. */
+    private var albumListState: ScreenState? = null
     /** The random start album that [prepareCovers] chose and prepared, or -1. */
     private var preparedRandomStart = -1
 
     override fun onEnter(state: ScreenState) {
         if (uniqueAlbumList.isEmpty()) onRebuildUniqueAlbumList?.invoke()
-        // Back from the songs of an album shows that album again, unless another song started since.
-        val keep = backFromAlbum && nowPlayingSong() === songAtAlbumOpen
-        backFromAlbum = false
-        songAtAlbumOpen = null
-        if (!keep) currentCoverFlowIndex = startIndex()
+        // Only Back from the song list of the album that Cover Flow opened keeps that album.
+        val back = albumListState
+        albumListState = null
+        if (back == null || NavigationManager.getInstance().previousScreen != back) currentCoverFlowIndex = startIndex()
         buildCoverFlowUI()
     }
 
@@ -118,9 +116,8 @@ class CoverFlowController(
     }
 
     private fun openAlbum(album: SongItem) {
-        backFromAlbum = true
-        songAtAlbumOpen = nowPlayingSong()
         onAlbumSelected(album)
+        albumListState = NavigationManager.getInstance().currentState
     }
 
     override fun onRefreshUI() {
@@ -264,7 +261,7 @@ class CoverFlowController(
 
     private fun prepareCovers() {
         if (uniqueAlbumList.isEmpty() || isOpen()) return
-        if (!backFromAlbum) {
+        if (albumListState == null) {
             // The album that the next entry opens at.
             val playing = CoverFlowStart.albumIndex(uniqueAlbumList, nowPlayingSong())
             preparedRandomStart = if (playing >= 0) -1 else CoverFlowStart.startIndex(uniqueAlbumList, null)

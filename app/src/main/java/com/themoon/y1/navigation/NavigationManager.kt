@@ -17,6 +17,10 @@ class NavigationManager private constructor() {
     var currentState: ScreenState? = null
         private set
 
+    /** The screen that the last change left (the screen before [currentState]), or null. */
+    var previousScreen: ScreenState? = null
+        private set
+
     var activeController: ScreenController? = null
 
     interface StateChangeListener {
@@ -48,6 +52,7 @@ class NavigationManager private constructor() {
 
         activeController?.onExit()
 
+        previousScreen = previous
         currentState = newState
         val controller = findControllerForState(newState)
         activeController = controller
@@ -100,6 +105,7 @@ class NavigationManager private constructor() {
     fun reset() {
         backStack.clear()
         currentState = null
+        previousScreen = null
         activeController = null
         controllerMap.clear()
         transitionListener = null
