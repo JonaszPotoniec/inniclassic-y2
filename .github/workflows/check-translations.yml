@@ -1,0 +1,32 @@
+name: Translation Consistency Check
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - 'app/src/main/java/**'
+      - 'app/src/main/assets/languages/**'
+      - 'scripts/check_translations.py'
+      - '.github/workflows/check-translations.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-translations:
+    name: Check Translations
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run translation check
+        run: python3 scripts/check_translations.py --strict
