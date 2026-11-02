@@ -22,17 +22,14 @@ from pathlib import Path
 
 
 def unescape_kotlin_str(s: str) -> str:
-    """Decode string escape sequences from Kotlin/Java source code."""
-    try:
-        return bytes(s, "utf-8").decode("unicode_escape")
-    except Exception:
-        return (
-            s.replace(r"\n", "\n")
-            .replace(r"\t", "\t")
-            .replace(r"\r", "\r")
-            .replace(r'\"', '"')
-            .replace(r"\\", "\\")
-        )
+    """Decode the escape sequences of a Kotlin/Java string literal; other characters (also non-ASCII, e.g. "…") stay."""
+    simple = {"n": "\n", "t": "\t", "r": "\r", "b": "\b", '"': '"', "'": "'", "\\": "\\", "$": "$"}
+
+    def decode(m: re.Match) -> str:
+        e = m.group(1)
+        return chr(int(e[1:], 16)) if e[0] == "u" else simple[e]
+
+    return re.sub(r'\\(u[0-9a-fA-F]{4}|[ntrb"\'\\$])', decode, s)
 
 
 def find_code_keys(java_dir: Path) -> dict[str, list[tuple[str, int]]]:
