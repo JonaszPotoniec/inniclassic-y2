@@ -671,5 +671,11 @@
   "Unable to launch app.": "アプリを起動できません。",
   "Update Now": "今すぐ更新",
   "Upload": "アップロード",
-  "iPod": "iPod"
+  "iPod": "iPod",
+  "Sync Time Now": "今すぐ時刻を同期",
+  "Syncing…": "同期中…",
+  "Requires Wi-Fi": "Wi-Fiが必要です",
+  "Set to": "設定済み:",
+  "Failed": "失敗しました",
+  "Time set from the internet:": "インターネットから時刻を設定しました:"
 }

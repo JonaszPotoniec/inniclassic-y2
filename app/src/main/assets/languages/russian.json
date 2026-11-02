@@ -671,5 +671,11 @@
   "Unable to launch app.": "Не удалось запустить приложение.",
   "Update Now": "Обновить сейчас",
   "Upload": "Загрузка",
-  "iPod": "iPod"
+  "iPod": "iPod",
+  "Sync Time Now": "Синхронизировать время",
+  "Syncing…": "Синхронизация…",
+  "Requires Wi-Fi": "Нужен Wi-Fi",
+  "Set to": "Установлено:",
+  "Failed": "Ошибка",
+  "Time set from the internet:": "Время получено из интернета:"
 }

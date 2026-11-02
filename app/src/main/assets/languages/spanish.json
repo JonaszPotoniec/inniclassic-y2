@@ -671,5 +671,11 @@
   "Unable to launch app.": "No se pudo iniciar la aplicación.",
   "Update Now": "Actualizar ahora",
   "Upload": "Subir",
-  "iPod": "iPod"
+  "iPod": "iPod",
+  "Sync Time Now": "Sincronizar hora ahora",
+  "Syncing…": "Sincronizando…",
+  "Requires Wi-Fi": "Requiere Wi-Fi",
+  "Set to": "Ajustada a las",
+  "Failed": "Error",
+  "Time set from the internet:": "Hora ajustada desde internet:"
 }

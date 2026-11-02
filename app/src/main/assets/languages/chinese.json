@@ -671,5 +671,11 @@
   "Unable to launch app.": "无法启动应用。",
   "Update Now": "立即更新",
   "Upload": "上传",
-  "iPod": "iPod"
+  "iPod": "iPod",
+  "Sync Time Now": "立即同步时间",
+  "Syncing…": "正在同步…",
+  "Requires Wi-Fi": "需要 Wi-Fi",
+  "Set to": "已设为",
+  "Failed": "失败",
+  "Time set from the internet:": "已从网络设置时间："
 }

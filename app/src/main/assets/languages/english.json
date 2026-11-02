@@ -671,5 +671,11 @@
   "Unable to launch app.": "Unable to launch app.",
   "Update Now": "Update Now",
   "Upload": "Upload",
-  "iPod": "iPod"
+  "iPod": "iPod",
+  "Sync Time Now": "Sync Time Now",
+  "Syncing…": "Syncing…",
+  "Requires Wi-Fi": "Requires Wi-Fi",
+  "Set to": "Set to",
+  "Failed": "Failed",
+  "Time set from the internet:": "Time set from the internet:"
 }
