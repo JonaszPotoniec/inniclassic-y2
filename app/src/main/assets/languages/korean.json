@@ -681,5 +681,7 @@
   "Requires Wi-Fi": "와이파이 필요",
   "Set to": "설정됨:",
   "Failed": "실패",
-  "Time set from the internet:": "인터넷에서 시간을 설정했습니다:"
+  "Time set from the internet:": "인터넷에서 시간을 설정했습니다:",
+  "Battery low": "배터리 부족",
+  "Please charge": "충전하세요"
 }

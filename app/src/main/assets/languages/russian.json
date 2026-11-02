@@ -681,5 +681,7 @@
   "Requires Wi-Fi": "Нужен Wi-Fi",
   "Set to": "Установлено:",
   "Failed": "Ошибка",
-  "Time set from the internet:": "Время получено из интернета:"
+  "Time set from the internet:": "Время получено из интернета:",
+  "Battery low": "Низкий заряд",
+  "Please charge": "Зарядите устройство"
 }

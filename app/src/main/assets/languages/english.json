@@ -681,5 +681,7 @@
   "Requires Wi-Fi": "Requires Wi-Fi",
   "Set to": "Set to",
   "Failed": "Failed",
-  "Time set from the internet:": "Time set from the internet:"
+  "Time set from the internet:": "Time set from the internet:",
+  "Battery low": "Battery low",
+  "Please charge": "Please charge"
 }

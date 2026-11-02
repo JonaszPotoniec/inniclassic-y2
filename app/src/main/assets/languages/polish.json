@@ -681,5 +681,7 @@
   "Requires Wi-Fi": "Wymaga Wi-Fi",
   "Set to": "Ustawiono na",
   "Failed": "Nie udało się",
-  "Time set from the internet:": "Czas ustawiony z internetu:"
+  "Time set from the internet:": "Czas ustawiony z internetu:",
+  "Battery low": "Słaba bateria",
+  "Please charge": "Naładuj urządzenie"
 }

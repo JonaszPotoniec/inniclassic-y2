@@ -681,5 +681,7 @@
   "Requires Wi-Fi": "需要 Wi-Fi",
   "Set to": "已设为",
   "Failed": "失败",
-  "Time set from the internet:": "已从网络设置时间："
+  "Time set from the internet:": "已从网络设置时间：",
+  "Battery low": "电量低",
+  "Please charge": "请充电"
 }
