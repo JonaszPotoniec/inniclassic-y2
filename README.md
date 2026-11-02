@@ -12,12 +12,12 @@ InniClassic is an iPod Classic-style launcher and media player for Innioasis Y1 
 
 ## Screenshots
 
-| Main Menu | Now Playing | Music |
-|---|---|---|
+| Main Menu                                    | Now Playing                                      | Music                                          |
+| -------------------------------------------- | ------------------------------------------------ | ---------------------------------------------- |
 | ![Main Menu](docs/screenshots/main-menu.png) | ![Now Playing](docs/screenshots/now-playing.png) | ![Music Menu](docs/screenshots/music-menu.png) |
 
-| Artists | Album View | Cover Flow |
-|---|---|---|
+| Artists                                  | Album View                                     | Cover Flow                                     |
+| ---------------------------------------- | ---------------------------------------------- | ---------------------------------------------- |
 | ![Artists](docs/screenshots/artists.png) | ![Album View](docs/screenshots/album-view.png) | ![Cover Flow](docs/screenshots/cover-flow.png) |
 
 ---
@@ -25,6 +25,7 @@ InniClassic is an iPod Classic-style launcher and media player for Innioasis Y1 
 ## Features
 
 ### The iPod Classic experience
+
 - Bundled iPod Classic theme in light and dark variants: plain text menu lists, system-matched typography, authentic spacing, and a status bar showing the active screen name rather than a clock.
 - Two-pane Main Menu and Music menu sharing the same layout: menu list on the left and a slowly panning album cover on the right extending behind the status bar.
 - Redesigned Now Playing screen with a large angled album cover, an optional mirror reflection below it (controlled by Album Cover Tilt), a glass progress and volume bar, and marquee scrolling for longer titles.
@@ -37,6 +38,7 @@ InniClassic is an iPod Classic-style launcher and media player for Innioasis Y1 
 - Rebuilt iPod Music Quiz in endless survival mode using tracks from your local library, featuring six questions per round, non-linear timer scaling, persistent top-10 leaderboards, and a between-rounds heart shop.
 
 ### Music library
+
 - Library browsing by Artists, Album Artists, Albums, Songs, Genres, Composers, Playlists, and Favorites. The Artists view splits by individual track artist tags so guest features appear distinctly, while Album Artists groups releases by main artist.
 - Recently played albums shelf tracking playback history with direct full-album navigation.
 - Audio format support covering MP3, FLAC, WAV, OGG Vorbis, Opus (including Opus audio inside `.ogg` containers), ALAC/M4A, and AAC.
@@ -46,6 +48,7 @@ InniClassic is an iPod Classic-style launcher and media player for Innioasis Y1 
 - Built-in Last.fm scrobbling. Tracks played past the midpoint or four minutes are logged to `.scrobbler.log` on the SD card root in Audioscrobbler 1.1 format. To upload scrobbles directly to Last.fm, enable Settings > Sync Scrobbles to Last.fm and authenticate via Settings > Last.fm Account. The device displays a QR code and URL to open on a phone or computer, queuing scrobbles locally until a network connection is available.
 
 ### Beyond music
+
 - Jellyfin music synchronization client with QuickConnect pairing, remote library browsing, offline track caching, and automatic library scanning.
 - Podcast manager supporting feed subscriptions, direct streaming, and episode downloads for offline listening.
 - Built-in FM radio communicating directly with the internal tuner chip.
@@ -54,6 +57,7 @@ InniClassic is an iPod Classic-style launcher and media player for Innioasis Y1 
 - Wireless music transfer through an embedded local web server accessible over Wi-Fi.
 
 ### Innioasis Y2 support
+
 - Dual storage library scanning that indexes music, audiobooks, and videos across internal storage (`/storage/sdcard0`) and external microSD cards (`/storage/sdcard1`).
 - MicroSD watchdog monitor that detects unmounted or degraded FAT and exFAT partitions, applies filesystem repairs, remounts `fuse_sdcard1`, and triggers a library refresh once ready.
 - Hardware FM radio integration on Android 4.4.2 that clears Airplane Mode tuner lockouts (`ensureAirplaneModeOff()`), synchronizes MediaTek audio streams, and uses a wake lock to keep radio audio playing when the screen sleeps.
@@ -73,10 +77,12 @@ Two installation methods are available depending on whether you want a full ROM 
 ### Method 1: Innioasis Updater (recommended)
 
 Prebuilt firmware packages with InniClassic preinstalled as the default system launcher are available on [Releases](https://github.com/JonaszPotoniec/inniclassic-y2/releases):
+
 - Innioasis Y2: `rom_y2.zip` (Android 4.4.2 KitKat)
 - Innioasis Y1: `rom_y1_type_a.zip` or `rom_y1_type_b.zip` depending on hardware revision
 
 To flash via the updater:
+
 1. Download the archive matching your device from [Releases](https://github.com/JonaszPotoniec/inniclassic-y2/releases) and ensure it is named `rom.zip` (required by the updater tool).
 2. Open the [Innioasis Updater](https://www.innioasis.com/pages/download), choose `rom.zip` as the local firmware package, and follow the on-screen steps.
 3. Once the flashing process completes and the player restarts, InniClassic starts automatically.
@@ -142,3 +148,23 @@ Last.fm API credentials are not included in this repository. To compile with scr
 - Distributed under upstream's license terms; see [LICENSE](LICENSE) for personal and educational use guidelines.
 
 Version history is documented on [GitHub Releases](https://github.com/JonaszPotoniec/inniclassic-y2/releases).
+
+## Contributors
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://potoniec.eu/"><img src="https://avatars.githubusercontent.com/u/32539363?v=4?s=100" width="100px;" alt="Jonasz Potoniec"/><br /><sub><b>Jonasz Potoniec</b></sub></a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/ferrolho"><img src="https://avatars.githubusercontent.com/u/4166093?v=4?s=100" width="100px;" alt="Henrique Ferrolho"/><br /><sub><b>Henrique Ferrolho</b></sub></a></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+<!-- ALL-CONTRIBUTORS-LIST:END -->
+
+This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
