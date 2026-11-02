@@ -60,7 +60,7 @@ Apply the [blader/humanizer](https://github.com/blader/humanizer/raw/refs/heads/
 
 ## Workflow for Updating a New Release
 
-Note: Pushing to `main` triggers [release.yml](../../../.github/workflows/release.yml), which publishes an automated GitHub Release using a static template that still contains the legacy `Flashing Instructions` block unless overwritten. After a release is published (or when preparing release notes):
+Note: Triggering the **Build & Release** workflow manually from GitHub Actions (or pushing a release tag) publishes an automated GitHub Release using a static template that still contains the legacy `Flashing Instructions` block unless overwritten. Merging to `main` no longer deploys a release automatically. After a release is published (or when preparing release notes):
 
 1. **List releases and find the tag range**:
    ```bash
