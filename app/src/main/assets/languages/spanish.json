@@ -698,5 +698,6 @@
   "Failed": "Error",
   "Time set from the internet:": "Hora ajustada desde internet:",
   "Battery low": "Batería baja",
-  "Please charge": "Carga el dispositivo"
+  "Please charge": "Carga el dispositivo",
+  "Battery": "Batería"
 }
