@@ -186,10 +186,22 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     var currentVirtualVolume: Int = -1
     var lastTargetVolume: Int = -1
     var isScreenSleeping: Boolean = false
+        set(value) {
+            field = value
+            refreshVisualizerCapture()
+        }
     var isLongPressConsumed: Boolean = false
     var isMediaLongPressConsumed: Boolean = false
 
     var isFakeScreenOff: Boolean = false
+
+    /** True from onResume to onStop: no other app or activity covers the screen. */
+    private var isActivityVisible: Boolean = false
+
+    /** The user can see this activity: it is not behind another one, and the screen is not off or blanked. */
+    val isOnScreen: Boolean
+        get() = isActivityVisible && !isScreenSleeping
+
     var backTargetForUtility: Int = STATE_SETTINGS
     var isPendingUpdateCheckAfterWifi: Boolean = false
     var lastSettingsFocusIndex: Int = 0
@@ -214,7 +226,12 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     var displayedPlayerPath: String? = null
     var nowPlayingBottomState: Int = 0
     var pendingSeekChanged: Boolean = false
-    var isVisualizerShowing: Boolean = false
+    /** Spectrum in place of the album art on Now Playing (Settings → Spectrum), kept in AppPrefs. */
+    var isVisualizerShowing: Boolean
+        get() = ::prefs.isInitialized && prefs.getBoolean(com.themoon.y1.controllers.player.NowPlayingSpectrum.PREF, false)
+        set(value) {
+            prefs.edit().putBoolean(com.themoon.y1.controllers.player.NowPlayingSpectrum.PREF, value).apply()
+        }
     var audioVisualizer: Visualizer? = null
     var equalizer: Equalizer? = null
     var bassBoost: BassBoost? = null
@@ -475,6 +492,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
     override fun onResume() {
         super.onResume()
+        isActivityVisible = true
         isScreenSleeping = false
         powerBacklightManager?.resetTimer()
         updateScreenOffFeedback(true)
@@ -489,6 +507,8 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
     override fun onStop() {
         super.onStop()
+        isActivityVisible = false
+        refreshVisualizerCapture()
         AudioPlayerManager.getInstance().savePlaybackState(sync = true)
     }
 
@@ -877,7 +897,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     fun sendBluetoothMetaToCar() {
         if (currentPlaylist.isNotEmpty() && currentIndex in currentPlaylist.indices) {
             val file = currentPlaylist[currentIndex]
-            val song = customLibrary.firstOrNull { it.file.absolutePath == file.absolutePath }
+            val song = com.themoon.y1.managers.LibrarySongs.songByPath(file.absolutePath)
             val title = song?.title ?: file.nameWithoutExtension
             val artist = song?.artist ?: t("Unknown Artist")
             val album = song?.album ?: t("Unknown Album")
@@ -908,6 +928,9 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     fun fetchRandomIdleCoverAsync() = fetchRandomIdleCoverAsyncInternal()
     fun setupVisualizer() = setupVisualizerInternal()
     fun toggleVisualizer() = toggleVisualizerInternal()
+    fun refreshVisualizerCapture() {
+        if (::playerController.isInitialized) playerController.refreshVisualizerCapture()
+    }
     fun rebootAudioEngine() = rebootAudioEngineInternal()
     fun loadLibraryCache(onLoaded: ((Boolean) -> Unit)? = null) = loadLibraryCacheInternal(onLoaded)
     fun startMediaLibraryScan() = startMediaLibraryScanInternal()

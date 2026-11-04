@@ -119,7 +119,6 @@
   "Add to On-The-Go": "Добавить в On-The-Go",
   "Browse Artist": "Перейти к исполнителю",
   "Browse Album": "Перейти к альбому",
-  "Toggle Visualizer": "Вкл./выкл. визуализацию",
   "Years": "По годам",
   "Genres": "Жанры",
   "Composers": "Композиторы",
@@ -720,5 +719,9 @@
   "Pairing failed: device not found. Put it in pairing mode": "Сопряжение не удалось: устройство не найдено. Переведите его в режим сопряжения",
   "Pairing failed: a scan was running. Try again": "Сопряжение не удалось: шло сканирование. Повторите попытку",
   "Pairing failed: no answer (timeout)": "Сопряжение не удалось: нет ответа (тайм-аут)",
-  "Pairing failed: too many attempts. Wait, then try again": "Сопряжение не удалось: слишком много попыток. Подождите и повторите"
+  "Pairing failed: too many attempts. Wait, then try again": "Сопряжение не удалось: слишком много попыток. Подождите и повторите",
+  "Add to Playlist": "Добавить в плейлист",
+  "Spectrum": "Спектр",
+  "Total Time": "Общее время",
+  "Lyrics Keep Screen On": "Экран вкл. при тексте песни"
 }

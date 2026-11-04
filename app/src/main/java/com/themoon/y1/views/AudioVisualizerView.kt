@@ -15,13 +15,16 @@ class AudioVisualizerView @JvmOverloads constructor(
     private var fftData: ByteArray? = null
     private val barCount = 40
     private val currentHeights = FloatArray(barCount)
+    private var compensation = 1f
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
         strokeCap = Paint.Cap.ROUND
     }
 
-    fun updateVisualizer(fft: ByteArray?, color: Int) {
+    /** [compensation]: factor for the magnitudes at the current volume ([SpectrumLevel.gainCompensation]). */
+    fun updateVisualizer(fft: ByteArray?, color: Int, compensation: Float = 1f) {
         this.fftData = fft
+        this.compensation = compensation
         paint.color = color
     }
 
@@ -40,17 +43,17 @@ class AudioVisualizerView @JvmOverloads constructor(
                     val rfk = data[i * 2 + 2].toDouble()
                     val ifk = data[i * 2 + 3].toDouble()
                     val magnitude = Math.hypot(rfk, ifk).toFloat()
-
-                    // Cap bar height to 85% of view height
-                    val targetHeight = minOf(h * 0.85f, (magnitude * h) / 100f)
-                    currentHeights[i] += (targetHeight - currentHeights[i]) * 0.15f
+                    currentHeights[i] = SpectrumLevel.barHeight(currentHeights[i], magnitude, compensation, h)
                 }
             }
         }
 
+        // A bar is at least one dot (a round cap on the bottom edge), so the spectrum also shows in silence
+        // (paused, or volume 0). 0.5 px more: a line of length 0 may draw nothing.
+        val cap = paint.strokeWidth / 2f
         for (i in 0 until barCount) {
             val x = i * barWidth + (barWidth / 2f)
-            canvas.drawLine(x, h, x, h - currentHeights[i], paint)
+            canvas.drawLine(x, h - cap, x, h - maxOf(currentHeights[i], cap) - 0.5f, paint)
         }
 
         if (visibility == View.VISIBLE) {

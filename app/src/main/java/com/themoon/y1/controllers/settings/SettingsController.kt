@@ -19,6 +19,9 @@ import android.widget.TextView
 import android.widget.Toast
 import com.themoon.y1.ClockSettings
 import com.themoon.y1.MainActivity
+import com.themoon.y1.controllers.player.LyricsKeepScreenOn
+import com.themoon.y1.controllers.player.NowPlayingTime
+import com.themoon.y1.core.extensions.onOff
 import com.themoon.y1.R
 import com.themoon.y1.changeTheme
 import com.themoon.y1.StoragePaths
@@ -439,6 +442,37 @@ class SettingsController(
             ).show()
         }
         containerSettingsItems.addView(btnSpeed)
+
+        // Now Playing display options (before: in the Now Playing menu)
+        val btnSpectrum = createSettingRow(localize("Spectrum"), onOff(mainActivity?.isVisualizerShowing == true, localize))
+        btnSpectrum.setOnClickListener {
+            clickFeedback()
+            mainActivity?.toggleVisualizer()
+            (btnSpectrum.getChildAt(1) as? TextView)?.text = onOff(mainActivity?.isVisualizerShowing == true, localize)
+        }
+        containerSettingsItems.addView(btnSpectrum)
+
+        val btnTotalTime = createSettingRow(localize("Total Time"), onOff(prefs.getBoolean(NowPlayingTime.PREF_SHOW_TOTAL_TIME, false), localize))
+        btnTotalTime.setOnClickListener {
+            clickFeedback()
+            val show = !prefs.getBoolean(NowPlayingTime.PREF_SHOW_TOTAL_TIME, false)
+            prefs.edit().putBoolean(NowPlayingTime.PREF_SHOW_TOTAL_TIME, show).commit()
+            (btnTotalTime.getChildAt(1) as? TextView)?.text = onOff(show, localize)
+        }
+        containerSettingsItems.addView(btnTotalTime)
+
+        // The screen stays on while the lyrics show on Now Playing and music plays (LyricsKeepScreenOn)
+        val btnLyricsScreenOn = createSettingRow(
+            localize("Lyrics Keep Screen On"),
+            onOff(prefs.getBoolean(LyricsKeepScreenOn.PREF, LyricsKeepScreenOn.DEFAULT), localize)
+        )
+        btnLyricsScreenOn.setOnClickListener {
+            clickFeedback()
+            val on = !prefs.getBoolean(LyricsKeepScreenOn.PREF, LyricsKeepScreenOn.DEFAULT)
+            prefs.edit().putBoolean(LyricsKeepScreenOn.PREF, on).commit()
+            (btnLyricsScreenOn.getChildAt(1) as? TextView)?.text = onOff(on, localize)
+        }
+        containerSettingsItems.addView(btnLyricsScreenOn)
 
         var isSoundEffectEnabled = prefs.getBoolean("sound", true)
         val btnSound = createSettingRow(
@@ -1613,6 +1647,9 @@ class SettingsController(
                 .remove("sound_check_enabled")
                 .remove("video_stretch_fill")
                 .remove("album_tilt_enabled")
+                .remove(LyricsKeepScreenOn.PREF)
+                .remove("show_total_time")
+                .remove(com.themoon.y1.controllers.player.NowPlayingSpectrum.PREF)
                 .remove("backlight_timer_index")
                 .remove(com.themoon.y1.managers.ClickVolume.PREF)
                 .remove("screen_off_control")

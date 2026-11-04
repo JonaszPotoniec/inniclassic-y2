@@ -73,23 +73,40 @@ class HomeWidgetsController(
 
     var lastAlbumArtBytes: ByteArray? = null
         set(value) {
+            // The same cover again (a refresh with no track change) keeps its bitmap: no second decode
+            if (value != null && value === field && cachedAlbumArtBitmap != null) return
             field = value
-            cachedAlbumArtBitmap = if (value != null && value.isNotEmpty()) {
-                try {
-                    decodeAlbumArtSmart(value)
-                } catch (_: Exception) {
-                    null
-                }
-            } else {
-                null
-            }
+            cachedAlbumArtBitmap = if (value != null && value.isNotEmpty()) decodedArt(value) else null
         }
     private var cachedAlbumArtBitmap: Bitmap? = null
+
+    // A bitmap of a cover that is already decoded (the one that Now Playing shows), and its bytes
+    private var offeredBytes: ByteArray? = null
+    private var offeredBitmap: Bitmap? = null
+
+    /** The widgets use [bitmap] when they get [bytes], in place of a decode on the main thread. */
+    fun offerDecodedArt(bytes: ByteArray, bitmap: Bitmap) {
+        offeredBytes = bytes
+        offeredBitmap = bitmap
+    }
+
+    /** The widget bitmap of [bytes], decoded on another thread with [decodeAlbumArtSmart], if they are still the cover. */
+    fun setDecodedArt(bytes: ByteArray, bitmap: Bitmap) {
+        if (bytes !== lastAlbumArtBytes) return
+        if (cachedBookCoverBitmap != null && cachedBookCoverBitmap === cachedAlbumArtBitmap) cachedBookCoverBitmap = bitmap
+        cachedAlbumArtBitmap = bitmap
+        if (bytes === offeredBytes) offeredBitmap = bitmap
+        refreshWidgets()
+    }
+
+    private fun decodedArt(bytes: ByteArray): Bitmap? =
+        if (bytes === offeredBytes) offeredBitmap else decodeAlbumArtSmart(bytes)
+
     var cachedBookCoverBitmap: Bitmap? = null
 
     fun setAudiobookCoverBytes(bytes: ByteArray?) {
         if (bytes != null && bytes.isNotEmpty()) {
-            cachedBookCoverBitmap = try { decodeAlbumArtSmart(bytes) } catch (_: Exception) { null }
+            cachedBookCoverBitmap = decodedArt(bytes)
         }
     }
 
@@ -284,26 +301,6 @@ class HomeWidgetsController(
         }
     }
 
-    private fun decodeAlbumArtSmart(data: ByteArray): Bitmap? {
-        val opts = BitmapFactory.Options().apply {
-            inJustDecodeBounds = true
-        }
-        BitmapFactory.decodeByteArray(data, 0, data.size, opts)
-
-        var sample = 1
-        var w = opts.outWidth
-        var h = opts.outHeight
-        while (w > 512 || h > 512) {
-            sample *= 2
-            w /= 2
-            h /= 2
-        }
-
-        opts.inJustDecodeBounds = false
-        opts.inSampleSize = sample
-        return BitmapFactory.decodeByteArray(data, 0, data.size, opts)
-    }
-
     @Volatile
     private var isFetchingAudiobookCover = false
 
@@ -455,5 +452,29 @@ class HomeWidgetsController(
             }
         }
     }
-}
 
+    companion object {
+        /** The widget bitmap of a cover (at most 512 px), or null. Any thread. */
+        fun decodeAlbumArtSmart(data: ByteArray): Bitmap? = try {
+            val opts = BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
+            BitmapFactory.decodeByteArray(data, 0, data.size, opts)
+
+            var sample = 1
+            var w = opts.outWidth
+            var h = opts.outHeight
+            while (w > 512 || h > 512) {
+                sample *= 2
+                w /= 2
+                h /= 2
+            }
+
+            opts.inJustDecodeBounds = false
+            opts.inSampleSize = sample
+            BitmapFactory.decodeByteArray(data, 0, data.size, opts)
+        } catch (_: Exception) {
+            null
+        }
+    }
+}

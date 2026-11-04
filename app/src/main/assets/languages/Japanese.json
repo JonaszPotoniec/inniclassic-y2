@@ -119,7 +119,6 @@
   "Add to On-The-Go": "On-The-Goに追加",
   "Browse Artist": "アーティストを表示",
   "Browse Album": "アルバムを表示",
-  "Toggle Visualizer": "ビジュアライザー切り替え",
   "Years": "年代別",
   "Genres": "ジャンル",
   "Composers": "作曲者",
@@ -720,5 +719,9 @@
   "Pairing failed: device not found. Put it in pairing mode": "ペアリング失敗: デバイスが見つかりません。ペアリングモードにしてください",
   "Pairing failed: a scan was running. Try again": "ペアリング失敗: スキャン中でした。もう一度お試しください",
   "Pairing failed: no answer (timeout)": "ペアリング失敗: 応答がありません (タイムアウト)",
-  "Pairing failed: too many attempts. Wait, then try again": "ペアリング失敗: 試行回数が多すぎます。しばらく待ってからもう一度お試しください"
+  "Pairing failed: too many attempts. Wait, then try again": "ペアリング失敗: 試行回数が多すぎます。しばらく待ってからもう一度お試しください",
+  "Add to Playlist": "プレイリストに追加",
+  "Spectrum": "スペクトラム",
+  "Total Time": "合計時間",
+  "Lyrics Keep Screen On": "歌詞表示中は画面をオン"
 }

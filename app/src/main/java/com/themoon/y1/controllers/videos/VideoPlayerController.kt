@@ -12,11 +12,11 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import com.themoon.y1.R
 import com.themoon.y1.controllers.ScreenController
+import com.themoon.y1.core.TimeFormat
 import com.themoon.y1.managers.VideoPlayerManager
 import com.themoon.y1.managers.VirtualVolumeManager
 import com.themoon.y1.navigation.ScreenState
 import java.io.File
-import java.util.Locale
 
 /**
  * Controller for fullscreen video playback using LibVLC (VideoPlayerManager),
@@ -202,9 +202,6 @@ class VideoPlayerController(
     }
 
     private fun formatTime(ms: Int): String {
-        val totalSec = ms / 1000
-        val min = totalSec / 60
-        val sec = totalSec % 60
-        return String.format(Locale.US, "%d:%02d", min, sec)
+        return TimeFormat.format(ms)
     }
 }

@@ -16,6 +16,7 @@ import android.widget.TextView
 import com.themoon.y1.MainActivity
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
+import com.themoon.y1.core.TimeFormat
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.podcasts.PodcastDownloadManager
@@ -87,9 +88,7 @@ class SongListAdapter(
 
                 var progressText = ""
                 if (savedPos > 0) {
-                    val min = (savedPos / 1000) / 60
-                    val sec = (savedPos / 1000) % 60
-                    progressText = String.format(" [⏱ %02d:%02d]", min, sec)
+                    progressText = " [⏱ " + TimeFormat.format(savedPos) + "]"
                 }
 
                 val pdm = PodcastDownloadManager.getInstance()

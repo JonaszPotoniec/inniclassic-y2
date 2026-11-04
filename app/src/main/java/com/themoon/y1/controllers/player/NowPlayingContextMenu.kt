@@ -6,12 +6,13 @@ import com.themoon.y1.views.WheelDialog
 import java.io.File
 
 /**
- * Context menu displayed on long pressing center or play/pause button in Now Playing screen.
+ * Context menu displayed on long pressing the center button in Now Playing screen.
  * Replicates iPod Classic context actions:
  * - Add/Remove from Favorites
  * - Add to On-The-Go playlist
+ * - Add to Playlist
  * - Browse Album / Browse Artist
- * - Toggle Audio Visualizer
+ * Only actions on the current song: the display options (Spectrum, Total Time) are in Settings.
  */
 object NowPlayingContextMenu {
 
@@ -22,9 +23,9 @@ object NowPlayingContextMenu {
         isFavorite: Boolean,
         onToggleFavorite: () -> Unit,
         onAddToOnTheGo: (file: File) -> Unit,
+        onAddToPlaylist: (file: File) -> Unit,
         onBrowseAlbum: (albumName: String) -> Unit,
         onBrowseArtist: (artistName: String) -> Unit,
-        onToggleVisualizer: () -> Unit,
         localize: (String) -> String
     ) {
         WheelDialog.show(activity) {
@@ -42,6 +43,13 @@ object NowPlayingContextMenu {
                 icon = null
             ) {
                 onAddToOnTheGo(songFile)
+            }
+
+            addButton(
+                text = localize("Add to Playlist"),
+                icon = null
+            ) {
+                onAddToPlaylist(songFile)
             }
 
             if (songItem != null) {
@@ -63,13 +71,6 @@ object NowPlayingContextMenu {
                         onBrowseArtist(artist)
                     }
                 }
-            }
-
-            addButton(
-                text = localize("Toggle Visualizer"),
-                icon = null
-            ) {
-                onToggleVisualizer()
             }
 
             negativeButton(localize("Cancel"))

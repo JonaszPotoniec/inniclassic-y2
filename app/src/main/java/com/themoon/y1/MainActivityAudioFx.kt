@@ -1,28 +1,43 @@
 package com.themoon.y1
 
 import android.media.audiofx.Visualizer
+import com.themoon.y1.controllers.player.PlayerController
 import com.themoon.y1.managers.AudioPlayerManager
+
+// The audio session of audioVisualizer: the player keeps its session from track to track
+private var visualizerSession = 0
 
 internal fun MainActivity.setupVisualizerInternal() {
     try {
-        audioVisualizer?.apply {
+        val session = AudioPlayerManager.getInstance().getAudioSessionId()
+        val current = audioVisualizer
+        if (current != null && session != 0 && session == visualizerSession) {
+            // Same session (a track change): keep the visualizer, as a new one is a slow call to the audio server
+            refreshVisualizerCapture()
+            return
+        }
+        current?.apply {
             setEnabled(false)
             release()
         }
-        audioVisualizer = Visualizer(AudioPlayerManager.getInstance().getAudioSessionId()).apply {
+        audioVisualizer = null
+        visualizerSession = session
+        audioVisualizer = Visualizer(session).apply {
             captureSize = Visualizer.getCaptureSizeRange()[1]
             setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
                 override fun onWaveFormDataCapture(v: Visualizer?, waveform: ByteArray?, samplingRate: Int) {}
-                override fun onFftDataCapture(v: Visualizer?, fft: ByteArray?, samplingRate: Int) {}
+                override fun onFftDataCapture(v: Visualizer?, fft: ByteArray?, samplingRate: Int) {
+                    (getActiveScreenController() as? PlayerController)?.updateVisualizer(fft)
+                }
             }, Visualizer.getMaxCaptureRate() / 2, false, true)
-            if (isVisualizerShowing) setEnabled(true)
         }
+        refreshVisualizerCapture()
     } catch (_: Exception) {}
 }
 
 internal fun MainActivity.toggleVisualizerInternal() {
     isVisualizerShowing = !isVisualizerShowing
-    audioVisualizer?.setEnabled(isVisualizerShowing)
+    playerController.refreshVisualizerState()
 }
 
 internal fun MainActivity.rebootAudioEngineInternal() {

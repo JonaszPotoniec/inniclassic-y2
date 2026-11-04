@@ -77,6 +77,7 @@ dependencies {
     androidTestImplementation libs.espresso.core
     implementation libs.kotlinx.coroutines.core
     implementation libs.kotlinx.coroutines.android
+    implementation libs.palette
     implementation 'com.google.android.exoplayer:exoplayer-core:2.13.3'
     implementation files('libs/extension-opus-release.aar')
     implementation files('libs/extension-flac-release.aar')

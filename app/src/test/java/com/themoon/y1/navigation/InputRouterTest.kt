@@ -138,6 +138,86 @@ class InputRouterTest {
     }
 
     @Test
+    fun testSkipKeys_shortPressIsNotAHold() {
+        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_NEXT, 0, 0L)
+        assertFalse("A first key down must not count as a hold", inputRouter.isSkipKeyHeld)
+
+        val upEvent = KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_NEXT)
+        assertTrue("Next key release should be consumed",
+            inputRouter.onKeyUp(KeyEvent.KEYCODE_MEDIA_NEXT, upEvent, mainMenuController))
+    }
+
+    @Test
+    fun testSkipKeys_holdSeeksAndNextPressResets() {
+        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 0, 0L)
+        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 1, 500L)
+        assertTrue("An auto-repeat must mark the key as held", inputRouter.isSkipKeyHeld)
+        assertFalse("Releasing after a seek must not skip the track",
+            inputRouter.onSkipKeyUp(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 100L))
+
+        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 0, 0L)
+        assertFalse("A new press must clear the held state", inputRouter.isSkipKeyHeld)
+        assertTrue("A short press must skip the track on release",
+            inputRouter.onSkipKeyUp(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 100L))
+    }
+
+    @Test
+    fun testSkipKeys_longPressDoesNotSkipWhenRepeatsWereConsumedElsewhere() {
+        // e.g. the FM radio screen consumes the repeats for station seek, so only the first key down arrives
+        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_NEXT, 0, 0L)
+        assertFalse(inputRouter.isSkipKeyHeld)
+        assertFalse("A long press must not skip the track on release",
+            inputRouter.onSkipKeyUp(KeyEvent.KEYCODE_MEDIA_NEXT, 1500L))
+    }
+
+    @Test
+    fun testSkipKeys_seekSpeedGrowsSmoothlyFrom4xTo120x() {
+        assertEquals(4.0, InputRouter.seekSpeed(0L), 1e-9)
+        assertEquals(4.0 * Math.sqrt(30.0), InputRouter.seekSpeed(3_500L), 1e-9)
+        assertEquals(120.0, InputRouter.seekSpeed(7_000L), 1e-9)
+        assertEquals(120.0, InputRouter.seekSpeed(60_000L), 1e-9)
+        for (t in 0L until 7_000L step 100L) {
+            val ratio = InputRouter.seekSpeed(t + 100L) / InputRouter.seekSpeed(t)
+            assertTrue("Speed must grow by less than 6% per tick at $t ms", ratio > 1.0 && ratio < 1.06)
+        }
+
+        assertEquals(400, InputRouter.seekStepMs(0L, 100L))
+        assertEquals(12_000, InputRouter.seekStepMs(7_000L, 100L))
+        assertEquals(0, InputRouter.seekStepMs(0L, -5L))
+    }
+
+    @Test
+    fun testSkipKeys_holdSeeksOnTimerTicksUntilRelease() {
+        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 0, 0L)
+        assertFalse(inputRouter.isSeeking)
+        assertEquals("The first repeat seeks one tick at 4x",
+            -400, inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 1, 500L))
+        assertTrue(inputRouter.isSeeking)
+        assertEquals("Later repeats only keep the seek alive",
+            0, inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 2, 550L))
+
+        assertEquals(-InputRouter.seekStepMs(100L, 100L), inputRouter.onSeekTick(600L))
+        assertEquals(-InputRouter.seekStepMs(300L, 200L), inputRouter.onSeekTick(800L))
+
+        assertFalse(inputRouter.onSkipKeyUp(KeyEvent.KEYCODE_MEDIA_PREVIOUS, 900L))
+        assertFalse("Release must stop the seek", inputRouter.isSeeking)
+        assertEquals(0, inputRouter.onSeekTick(1_000L))
+
+        // A new hold starts slow again, and Next seeks forward
+        inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_NEXT, 0, 5_000L)
+        assertEquals(400, inputRouter.onSkipKeyDown(KeyEvent.KEYCODE_MEDIA_NEXT, 1, 5_500L))
+        inputRouter.onSkipKeyUp(KeyEvent.KEYCODE_MEDIA_NEXT, 600L)
+    }
+
+    @Test
+    fun testSkipKeys_forwardSeekStopsBeforeTrackEnd() {
+        assertEquals("Unknown duration seeks the full step", 30_000, InputRouter.forwardSeekMs(10_000, 0, 30_000))
+        assertEquals(15_000, InputRouter.forwardSeekMs(10_000, 180_000, 15_000))
+        assertEquals("Stops 1 s before the end", 9_000, InputRouter.forwardSeekMs(170_000, 180_000, 15_000))
+        assertEquals("Never seeks backwards near the end", 0, InputRouter.forwardSeekMs(179_500, 180_000, 15_000))
+    }
+
+    @Test
     fun testSuppressBackUntilRelease_blocksBackEventsUntilUp() {
         navManager.navigateTo(ScreenState.MainMenu)
         navManager.navigateTo(ScreenState.CoverFlow)
