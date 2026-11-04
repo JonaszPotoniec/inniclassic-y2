@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  minSdk is 19 (Android 4.4 on the Y1 and Y2). A call to a newer API compiles, but on the device it stops the app
+  (NoSuchMethodError). "fatal" makes lintVitalRelease, which assembleRelease already runs, stop the build on it.
+  Check all API issues with: ./gradlew lintDebug
+-->
+<lint>
+    <issue id="NewApi" severity="fatal">
+        <!-- Hidden (@hide) method on Android 4.4, public API only since 33 -->
+        <ignore regexp="BluetoothClass#doesClassMatch" />
+    </issue>
+    <issue id="Override" severity="fatal" />
+    <issue id="InlinedApi" severity="error" />
+</lint>
