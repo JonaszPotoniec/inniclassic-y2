@@ -517,7 +517,12 @@ class JellyfinClient(rawUrl: String?, deviceId: String?) {
 
         val genresArr = o.optJSONArray("Genres")
         if (genresArr != null && genresArr.length() > 0) {
-            item.genre = genresArr.optString(0, "Unknown Genre")
+            val list = mutableListOf<String>()
+            for (i in 0 until genresArr.length()) {
+                val g = genresArr.optString(i, "").trim()
+                if (g.isNotEmpty()) list.add(g)
+            }
+            item.genre = if (list.isNotEmpty()) list.joinToString("; ") else "Unknown Genre"
         } else {
             item.genre = "Unknown Genre"
         }

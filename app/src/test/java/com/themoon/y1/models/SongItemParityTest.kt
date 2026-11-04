@@ -434,4 +434,44 @@ class SongItemParityTest {
         val song8ArgsValid = SongItem(testFile, "Title", "Artist", "Album", "2020", "Rock", "AA", "Hans Zimmer")
         assertEquals("Hans Zimmer", song8ArgsValid.composer)
     }
+
+    // =========================================================================
+    // 6. Multi-genre handling & caching
+    // =========================================================================
+
+    @Test
+    fun getGenres_returnsParsedGenreList() {
+        val song = SongItem(testFile, "Title", "Artist", "Album", "2020", "Ambient; Techno")
+        assertEquals(listOf("Ambient", "Techno"), song.getGenres())
+
+        val songSingle = SongItem(testFile, "Title", "Artist", "Album", "2020", "Rock")
+        assertEquals(listOf("Rock"), songSingle.getGenres())
+
+        val songDefault = SongItem(testFile, "Title", "Artist", "Album")
+        assertEquals(listOf("Unknown Genre"), songDefault.getGenres())
+    }
+
+    @Test
+    fun matchesGenre_matchesAnyParsedGenreCaseInsensitively() {
+        val song = SongItem(testFile, "Title", "Artist", "Album", "2020", "Ambient; Techno")
+        assertTrue(song.matchesGenre("Ambient"))
+        assertTrue(song.matchesGenre("ambient"))
+        assertTrue(song.matchesGenre("Techno"))
+        assertTrue(song.matchesGenre("techno"))
+        assertFalse(song.matchesGenre("Rock"))
+        assertFalse(song.matchesGenre(null))
+        assertFalse(song.matchesGenre(""))
+    }
+
+    @Test
+    fun genreSetter_invalidatesCachedGenres() {
+        val song = SongItem(testFile, "Title", "Artist", "Album", "2020", "Ambient; Techno")
+        assertEquals(listOf("Ambient", "Techno"), song.getGenres())
+
+        song.genre = "Progressive Rock / Psychedelic Rock"
+        assertEquals(listOf("Progressive Rock", "Psychedelic Rock"), song.getGenres())
+        assertTrue(song.matchesGenre("Progressive Rock"))
+        assertFalse(song.matchesGenre("Ambient"))
+    }
 }
+

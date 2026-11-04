@@ -49,6 +49,19 @@ def first_tag(tags, *keys):
     return ""
 
 
+def all_tags(tags, *keys):
+    if not tags:
+        return ""
+    for key in keys:
+        val = tags.get(key)
+        if val:
+            if isinstance(val, list):
+                parts = [str(v).strip() for v in val if str(v).strip()]
+                return "; ".join(parts)
+            return str(val).strip()
+    return ""
+
+
 def extract_track_number(raw):
     if not raw:
         return 0
@@ -105,7 +118,7 @@ def scan_folder(local_root: Path, device_root: str):
                     artist = first_tag(tags, "artist")
                     album = first_tag(tags, "album")
                     year = first_tag(tags, "date", "year", "originaldate")[:4]
-                    genre = first_tag(tags, "genre")
+                    genre = all_tags(tags, "genre")
                     album_artist = first_tag(tags, "albumartist", "album artist")
                     composer = first_tag(tags, "composer")
                     track_num = extract_track_number(first_tag(tags, "tracknumber", "track"))

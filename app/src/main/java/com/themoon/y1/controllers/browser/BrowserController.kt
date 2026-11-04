@@ -449,9 +449,9 @@ class BrowserController(
                 val matchField = if (categoryArtistFilterIsTrackArtist) song.artist else song.albumArtist
                 if (categoryArtistFilter != matchField) continue
             } else if (type == "GENRE_ARTIST") {
-                if (song.genre.isEmpty() || !song.genre.equals(categoryGenreFilter, ignoreCase = true)) continue
+                if (!song.matchesGenre(categoryGenreFilter)) continue
             } else if (type == "GENRE_ALBUM") {
-                if (song.genre.isEmpty() || !song.genre.equals(categoryGenreFilter, ignoreCase = true)) continue
+                if (!song.matchesGenre(categoryGenreFilter)) continue
                 if (categoryArtistFilter.isNotEmpty()) {
                     val matchField = if (categoryArtistFilterIsTrackArtist) song.artist else song.albumArtist
                     if (!categoryArtistFilter.equals(matchField, ignoreCase = true)) continue
@@ -462,11 +462,14 @@ class BrowserController(
                 albumSongs.add(song)
                 continue
             }
+            if (type == "GENRE") {
+                uniqueCategories.addAll(song.getGenres())
+                continue
+            }
             val v = when (type) {
                 "ARTIST" -> song.albumArtist
                 "TRACK_ARTIST", "GENRE_ARTIST" -> song.artist
                 "YEAR" -> song.year
-                "GENRE" -> song.genre
                 "COMPOSER" -> song.composer
                 else -> "Unknown"
             }
@@ -584,16 +587,16 @@ class BrowserController(
                     }
                     virtualQueryType == "COVER_FLOW_ALBUM" && AlbumKey.matches(song, virtualQueryValue, virtualQueryAlbumArtist) -> isMatch = true
                     virtualQueryType == "YEAR" && song.year == virtualQueryValue -> isMatch = true
-                    virtualQueryType == "GENRE" && song.genre.equals(virtualQueryValue, ignoreCase = true) -> isMatch = true
+                    virtualQueryType == "GENRE" && song.matchesGenre(virtualQueryValue) -> isMatch = true
                     virtualQueryType == "GENRE_ARTIST_SONGS" -> {
                         val matchField = if (categoryArtistFilterIsTrackArtist) song.artist else song.albumArtist
-                        isMatch = song.genre.equals(categoryGenreFilter, ignoreCase = true) &&
+                        isMatch = song.matchesGenre(categoryGenreFilter) &&
                             (categoryArtistFilter.isEmpty() || categoryArtistFilter.equals(matchField, ignoreCase = true))
                     }
                     virtualQueryType == "GENRE_ALBUM_SONGS" -> {
                         val matchField = if (categoryArtistFilterIsTrackArtist) song.artist else song.albumArtist
                         isMatch = AlbumKey.matches(song, virtualQueryValue, virtualQueryAlbumArtist) &&
-                            song.genre.equals(categoryGenreFilter, ignoreCase = true) &&
+                            song.matchesGenre(categoryGenreFilter) &&
                             (categoryArtistFilter.isEmpty() || categoryArtistFilter.equals(matchField, ignoreCase = true))
                     }
                     virtualQueryType == "COMPOSER" && song.composer == virtualQueryValue -> isMatch = true

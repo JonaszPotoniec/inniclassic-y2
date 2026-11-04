@@ -70,7 +70,7 @@ class CategoryListAdapter(
                 if (compilationsOnly && !song.isCompilation) continue
                 if (com.themoon.y1.models.Compilations.hiddenFromArtists(song, hideCompilationTracks)) continue
                 if (type == "GENRE_ALBUM") {
-                    if (song.genre.isEmpty() || !song.genre.equals(genreFilter, ignoreCase = true)) {
+                    if (!song.matchesGenre(genreFilter)) {
                         continue
                     }
                     if (artistFilter.isNotEmpty()) {
@@ -251,14 +251,14 @@ class CategoryListAdapter(
             val activeLibrary = if (isAudiobook) MainActivity.audiobookLibrary else MainActivity.customLibrary
             if (type == "GENRE_ARTIST") {
                 for (song in activeLibrary) {
-                    if (song.genre.isNotEmpty() && song.genre.equals(bc.categoryGenreFilter, ignoreCase = true)) {
+                    if (song.matchesGenre(bc.categoryGenreFilter)) {
                         allCount++
                     }
                 }
             } else if (type == "GENRE_ALBUM") {
                 val isTrack = bc.categoryArtistFilterIsTrackArtist
                 for (song in activeLibrary) {
-                    if (song.genre.isNotEmpty() && song.genre.equals(bc.categoryGenreFilter, ignoreCase = true)) {
+                    if (song.matchesGenre(bc.categoryGenreFilter)) {
                         val matchField = if (isTrack) song.artist else song.albumArtist
                         if (bc.categoryArtistFilter.equals(matchField, ignoreCase = true)) {
                             allCount++
@@ -340,14 +340,14 @@ class CategoryListAdapter(
             val activeLibrary = if (isAudiobook) MainActivity.audiobookLibrary else MainActivity.customLibrary
             if (type == "GENRE_ARTIST") {
                 for (song in activeLibrary) {
-                    if (song.genre.isNotEmpty() && song.genre.equals(bc.categoryGenreFilter, ignoreCase = true)) {
+                    if (song.matchesGenre(bc.categoryGenreFilter)) {
                         tracks.add(song.file)
                     }
                 }
             } else if (type == "GENRE_ALBUM") {
                 val isTrack = bc.categoryArtistFilterIsTrackArtist
                 for (song in activeLibrary) {
-                    if (song.genre.isNotEmpty() && song.genre.equals(bc.categoryGenreFilter, ignoreCase = true)) {
+                    if (song.matchesGenre(bc.categoryGenreFilter)) {
                         val matchField = if (isTrack) song.artist else song.albumArtist
                         if (bc.categoryArtistFilter.equals(matchField, ignoreCase = true)) {
                             tracks.add(song.file)

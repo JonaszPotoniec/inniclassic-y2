@@ -8,7 +8,29 @@ class SongItem {
     var artist: String
     var album: String
     var year: String
-    var genre: String
+    var genre: String = "Unknown Genre"
+        set(value) {
+            field = safe(value, "Unknown Genre")
+            cachedGenres = null
+        }
+
+    private var cachedGenres: List<String>? = null
+
+    fun getGenres(): List<String> {
+        var g = cachedGenres
+        if (g == null) {
+            g = GenreHelper.parseGenres(genre)
+            cachedGenres = g
+        }
+        return g
+    }
+
+    fun matchesGenre(targetGenre: String?): Boolean {
+        if (targetGenre.isNullOrBlank()) return false
+        val target = targetGenre.trim()
+        return getGenres().any { it.equals(target, ignoreCase = true) }
+    }
+
     var albumArtist: String
     var composer: String
 

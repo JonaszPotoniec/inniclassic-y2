@@ -1421,7 +1421,11 @@ class AudioPlayerManager private constructor() {
                     } else if (upper.startsWith("DATE=") || upper.startsWith("YEAR=")) {
                         tags[3] = comment.substring(comment.indexOf("=") + 1)
                     } else if (upper.startsWith("GENRE=")) {
-                        tags[4] = comment.substring(6)
+                        val g = comment.substring(6).trim()
+                        if (g.isNotEmpty()) {
+                            val existing = tags[4] as? String
+                            tags[4] = if (existing.isNullOrBlank()) g else "$existing; $g"
+                        }
                     } else if (upper.startsWith("TRACKNUMBER=") || upper.startsWith("TRACKNUM=")) {
                         tags[6] = comment.substring(comment.indexOf("=") + 1)
                     } else if (upper.startsWith("ALBUMARTIST=") || upper.startsWith("ALBUM_ARTIST=")) {
@@ -1564,7 +1568,11 @@ class AudioPlayerManager private constructor() {
                     } else if (upper.startsWith("DATE=") || upper.startsWith("YEAR=")) {
                         tags[3] = comment.substring(comment.indexOf("=") + 1)
                     } else if (upper.startsWith("GENRE=")) {
-                        tags[4] = comment.substring(6)
+                        val g = comment.substring(6).trim()
+                        if (g.isNotEmpty()) {
+                            val existing = tags[4] as? String
+                            tags[4] = if (existing.isNullOrBlank()) g else "$existing; $g"
+                        }
                     } else if (upper.startsWith("TRACKNUMBER=") || upper.startsWith("TRACKNUM=")) {
                         tags[6] = comment.substring(comment.indexOf("=") + 1)
                     } else if (upper.startsWith("ALBUMARTIST=") || upper.startsWith("ALBUM_ARTIST=")) {
@@ -1673,7 +1681,11 @@ class AudioPlayerManager private constructor() {
                             } else if (upper.startsWith("DATE=") || upper.startsWith("YEAR=")) {
                                 tags[3] = comment.substring(comment.indexOf("=") + 1)
                             } else if (upper.startsWith("GENRE=")) {
-                                tags[4] = comment.substring(6)
+                                val g = comment.substring(6).trim()
+                                if (g.isNotEmpty()) {
+                                    val existing = tags[4] as? String
+                                    tags[4] = if (existing.isNullOrBlank()) g else "$existing; $g"
+                                }
                             } else if (upper.startsWith("TRACKNUMBER=") || upper.startsWith("TRACKNUM=")) {
                                 tags[6] = comment.substring(comment.indexOf("=") + 1)
                             } else if (upper.startsWith("LYRICS=")) {
@@ -1760,7 +1772,13 @@ class AudioPlayerManager private constructor() {
                                 "\u00A9ART" -> tags[1] = String(data, Charsets.UTF_8)
                                 "\u00A9alb" -> tags[2] = String(data, Charsets.UTF_8)
                                 "\u00A9day" -> tags[3] = String(data, Charsets.UTF_8)
-                                "\u00A9gen" -> tags[4] = String(data, Charsets.UTF_8)
+                                "\u00A9gen" -> {
+                                    val g = String(data, Charsets.UTF_8).trim()
+                                    if (g.isNotEmpty()) {
+                                        val existing = tags[4] as? String
+                                        tags[4] = if (existing.isNullOrBlank()) g else "$existing; $g"
+                                    }
+                                }
                                 "covr" -> tags[5] = data
                                 "trkn" -> {
                                     if (actualDataSize >= 4) {
