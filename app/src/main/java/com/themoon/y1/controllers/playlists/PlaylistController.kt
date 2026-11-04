@@ -2,7 +2,6 @@ package com.themoon.y1.controllers.playlists
 
 import android.app.Activity
 import android.os.Build
-import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
@@ -52,7 +51,6 @@ class PlaylistController(
     private val createListButtonWithIcon: (icon: String, text: String, color: Int?) -> View,
     private val clickFeedback: () -> Unit,
     private val onPlaylistSelected: (m3uFile: File) -> Unit,
-    private val onNavigateBack: () -> Unit,
     private val localize: (String) -> String
 ) : ScreenController {
 
@@ -490,33 +488,4 @@ class PlaylistController(
         }
     }
 
-    override fun onBackPressed(): Boolean {
-        onNavigateBack()
-        return true
-    }
-
-    override fun onWheel(delta: Int, event: KeyEvent): Boolean {
-        val list = listVirtualSongs
-        if (list != null && list.visibility == View.VISIBLE) {
-            val totalCount = list.count
-            if (totalCount <= 0) return true
-            val curFocused = list.findFocus()
-            val currentIdx = if (curFocused != null) list.getPositionForView(curFocused) else 0
-            val targetPos = currentIdx + (if (delta < 0) -1 else 1)
-            if (targetPos in 0 until totalCount) {
-                if (com.themoon.y1.views.ListEdges.focusRow(list, targetPos)) {
-                    clickFeedback()
-                    return true
-                }
-                list.setSelection(targetPos)
-                val visiblePos = targetPos - list.firstVisiblePosition
-                if (visiblePos in 0 until list.childCount) {
-                    list.getChildAt(visiblePos)?.requestFocus()
-                }
-                clickFeedback()
-            }
-            return true
-        }
-        return false
-    }
 }

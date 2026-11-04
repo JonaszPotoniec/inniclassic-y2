@@ -19,8 +19,7 @@ import com.themoon.y1.navigation.ScreenState
 class BrightnessController(
     private val activity: Activity,
     override val rootView: ViewGroup,
-    private val clickFeedback: () -> Unit,
-    private val onNavigateBack: () -> Unit
+    private val clickFeedback: () -> Unit
 ) : ScreenController {
 
     private val pbBrightness: ProgressBar = rootView.findViewById(R.id.pb_brightness)
@@ -34,11 +33,6 @@ class BrightnessController(
 
     override fun onRefreshUI() {
         loadBrightnessUI()
-    }
-
-    override fun onBackPressed(): Boolean {
-        onNavigateBack()
-        return true
     }
 
     override fun onWheel(delta: Int, event: KeyEvent): Boolean {

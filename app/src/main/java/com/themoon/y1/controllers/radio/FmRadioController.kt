@@ -677,6 +677,8 @@ class FmRadioController(
                 containerSettingsItems.addView(btnFreq)
             }
         }
+        // Focus goes to the first channel (not to the category header).
+        containerSettingsItems.requestFocus()
     }
 
     override fun onWheel(delta: Int, event: KeyEvent): Boolean {
@@ -765,7 +767,6 @@ class FmRadioController(
         if (isRadioSettingsMode) {
             isRadioSettingsMode = false
             buildRadioUI()
-            clickFeedback()
             return true
         }
         onExitRadio()

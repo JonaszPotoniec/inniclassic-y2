@@ -335,7 +335,7 @@ class NavigationAndRouterParityTest {
     }
 
     @Test
-    fun testOnKeyDown_backKeyDelegatesToActiveControllerOnBackPressed() {
+    fun testOnKeyRelease_backKeyDelegatesToActiveControllerOnBackPressed() {
         navManager.navigateTo(ScreenState.MainMenu)
         navManager.navigateTo(ScreenState.CoverFlow)
         assertEquals(ScreenState.CoverFlow, navManager.currentState)
@@ -345,6 +345,8 @@ class NavigationAndRouterParityTest {
         // Controller consumes back press internally (e.g. closes modal/overlay)
         coverFlowController.handleBackResult = true
         val handled = inputRouter.onKeyDown(KeyEvent.KEYCODE_BACK, backEvent, coverFlowController)
+        assertFalse("Back must not act on press", coverFlowController.backPressed)
+        inputRouter.onKeyUp(KeyEvent.KEYCODE_BACK, KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_BACK), coverFlowController)
 
         assertTrue("onKeyDown must return true when activeController handles back", handled)
         assertTrue("Controller's onBackPressed must be invoked", coverFlowController.backPressed)
@@ -352,7 +354,7 @@ class NavigationAndRouterParityTest {
     }
 
     @Test
-    fun testOnKeyDown_backKeyPopsBackStackWhenControllerDoesNotHandle() {
+    fun testOnKeyRelease_backKeyPopsBackStackWhenControllerDoesNotHandle() {
         navManager.navigateTo(ScreenState.MainMenu)
         navManager.navigateTo(ScreenState.CoverFlow)
         assertEquals(ScreenState.CoverFlow, navManager.currentState)
@@ -365,13 +367,17 @@ class NavigationAndRouterParityTest {
 
         val handled = inputRouter.onKeyDown(KeyEvent.KEYCODE_BACK, backEvent, coverFlowController)
 
+        assertFalse("Back must not act on press", coverFlowController.backPressed)
+
+        inputRouter.onKeyUp(KeyEvent.KEYCODE_BACK, KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_BACK), coverFlowController)
+
         assertTrue("onKeyDown must return true when backstack is popped", handled)
         assertTrue("Controller's onBackPressed should have been queried first", coverFlowController.backPressed)
         assertEquals("Backstack must be popped to MainMenu", ScreenState.MainMenu, navManager.currentState)
     }
 
     @Test
-    fun testOnKeyDown_dpadUpPopsBackStackWhenControllerDoesNotHandle() {
+    fun testOnKeyRelease_dpadUpPopsBackStackWhenControllerDoesNotHandle() {
         navManager.navigateTo(ScreenState.MainMenu)
         navManager.navigateTo(ScreenState.Player)
         assertEquals(ScreenState.Player, navManager.currentState)
@@ -382,6 +388,10 @@ class NavigationAndRouterParityTest {
         playerController.backPressed = false
 
         val handled = inputRouter.onKeyDown(19, upEvent, playerController)
+
+        assertFalse("Back must not act on press", playerController.backPressed)
+
+        inputRouter.onKeyUp(19, KeyEvent(KeyEvent.ACTION_UP, 19), playerController)
 
         assertTrue("onKeyDown with key 19 must return true", handled)
         assertTrue("Controller's onBackPressed should be queried", playerController.backPressed)

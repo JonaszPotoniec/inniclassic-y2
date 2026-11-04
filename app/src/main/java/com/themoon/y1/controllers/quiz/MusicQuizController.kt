@@ -1,5 +1,6 @@
 package com.themoon.y1.controllers.quiz
 
+import com.themoon.y1.navigation.RowFocus
 import android.app.Activity
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -539,55 +540,19 @@ class MusicQuizController(
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == 21) {
-            val current = activity.currentFocus
-            val container = (current?.parent as? ViewGroup) ?: containerQuizItems
-            val idx = container.indexOfChild(current)
-            for (i in idx - 1 downTo 0) {
-                val next = container.getChildAt(i)
-                if (next != null && next.visibility == View.VISIBLE && next.isFocusable) {
-                    next.requestFocus()
-                    clickFeedback()
-                    break
-                }
-            }
-            return true
-        }
-
-        if (keyCode == 22) {
-            val current = activity.currentFocus
-            val container = (current?.parent as? ViewGroup) ?: containerQuizItems
-            val idx = container.indexOfChild(current)
-            for (i in idx + 1 until container.childCount) {
-                val next = container.getChildAt(i)
-                if (next != null && next.visibility == View.VISIBLE && next.isFocusable) {
-                    next.requestFocus()
-                    clickFeedback()
-                    break
-                }
-            }
+        if (keyCode == 21 || keyCode == 22) {
+            val list = (activity.currentFocus?.parent as? ViewGroup) ?: containerQuizItems
+            if (RowFocus.step(list, if (keyCode == 22) 1 else -1) != null) clickFeedback()
             return true
         }
 
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
-            val current = activity.currentFocus
-            current?.performClick()
+            // The focused button clicks on release. A click here also came with each key repeat of a hold.
             return true
         }
 
         if (keyCode == KeyEvent.KEYCODE_BACK) {
-            when (currentScreenMode) {
-                MODE_LEADERBOARD -> {
-                    showStartHub()
-                }
-                MODE_GAME -> {
-                    exitQuiz()
-                }
-                else -> {
-                    exitQuiz()
-                }
-            }
-            return true
+            return false // Back on release: the router calls onBackPressed
         }
 
         return true

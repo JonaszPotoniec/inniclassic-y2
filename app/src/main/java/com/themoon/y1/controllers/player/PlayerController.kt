@@ -459,10 +459,6 @@ class PlayerController(
                 updatePlayerUI()
                 return true
             }
-            KeyEvent.KEYCODE_BACK, 4 -> {
-                onBackPressed()
-                return true
-            }
         }
         return false
     }
@@ -520,7 +516,6 @@ class PlayerController(
     }
 
     override fun onBackPressed(): Boolean {
-        clickFeedback()
         if (lyricsOverlayController.hasLyrics && lyricsOverlayController.lyricScrollView.visibility == View.VISIBLE) {
             lyricsOverlayController.hide()
             return true

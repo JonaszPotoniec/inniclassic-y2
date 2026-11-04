@@ -13,7 +13,7 @@ sealed interface ScreenState {
     data class Settings(val subMode: SettingsSubMode = SettingsSubMode.Root) : ScreenState
     data object Bluetooth : ScreenState
     data object Wifi : ScreenState
-    data class WifiKeyboard(val ssid: String) : ScreenState
+    data class WifiKeyboard(val target: KeyboardTarget) : ScreenState
     data object Brightness : ScreenState
     data object Storage : ScreenState
     data object WebServer : ScreenState

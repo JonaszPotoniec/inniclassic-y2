@@ -1,5 +1,6 @@
 package com.themoon.y1.controllers.browser
 
+import com.themoon.y1.navigation.RowFocus
 import android.app.Activity
 import android.content.Context
 import android.graphics.Color
@@ -1165,7 +1166,6 @@ class BrowserController(
     }
 
     override fun onBackPressed(): Boolean {
-        clickFeedback()
         val mode = currentBrowserMode
         when (mode) {
             is BrowserMode.Root, is BrowserMode.Audiobooks -> {
@@ -1466,8 +1466,6 @@ class BrowserController(
         }
 
         if (containerBrowserItems.childCount > 0) {
-            val isLoopScrollOn = activity.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
-                .getBoolean("loop_scroll_on", true)
             val curFocus = containerBrowserItems.findFocus()
             val currentIndex = if (curFocus != null) containerBrowserItems.indexOfChild(curFocus) else -1
             val rowCount = containerBrowserItems.childCount
@@ -1476,70 +1474,7 @@ class BrowserController(
                     { containerBrowserItems.getChildAt(it)?.requestFocus() })) {
                 return true
             }
-
-            if (delta < 0) {
-                if (currentIndex > 0) {
-                    for (i in currentIndex - 1 downTo 0) {
-                        val child = containerBrowserItems.getChildAt(i)
-                        if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                            child.requestFocus()
-                            clickFeedback()
-                            return true
-                        }
-                    }
-                }
-                if (isLoopScrollOn && currentIndex >= 0) {
-                    for (i in containerBrowserItems.childCount - 1 downTo currentIndex + 1) {
-                        val child = containerBrowserItems.getChildAt(i)
-                        if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                            child.requestFocus()
-                            clickFeedback()
-                            return true
-                        }
-                    }
-                }
-                if (currentIndex == -1) {
-                    for (i in 0 until containerBrowserItems.childCount) {
-                        val child = containerBrowserItems.getChildAt(i)
-                        if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                            child.requestFocus()
-                            clickFeedback()
-                            return true
-                        }
-                    }
-                }
-            } else {
-                if (currentIndex in 0 until containerBrowserItems.childCount - 1) {
-                    for (i in currentIndex + 1 until containerBrowserItems.childCount) {
-                        val child = containerBrowserItems.getChildAt(i)
-                        if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                            child.requestFocus()
-                            clickFeedback()
-                            return true
-                        }
-                    }
-                }
-                if (isLoopScrollOn && currentIndex >= 0) {
-                    for (i in 0 until currentIndex) {
-                        val child = containerBrowserItems.getChildAt(i)
-                        if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                            child.requestFocus()
-                            clickFeedback()
-                            return true
-                        }
-                    }
-                }
-                if (currentIndex == -1) {
-                    for (i in 0 until containerBrowserItems.childCount) {
-                        val child = containerBrowserItems.getChildAt(i)
-                        if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                            child.requestFocus()
-                            clickFeedback()
-                            return true
-                        }
-                    }
-                }
-            }
+            if (RowFocus.step(containerBrowserItems, delta) != null) clickFeedback()
             return true
         }
 

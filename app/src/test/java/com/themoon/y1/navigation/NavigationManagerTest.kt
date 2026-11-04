@@ -199,9 +199,9 @@ class NavigationManagerTest {
         assertEquals(fakeJellyfin, navManager.activeController)
 
         // Open keyboard
-        navManager.navigateTo(ScreenState.WifiKeyboard(""))
+        navManager.navigateTo(ScreenState.WifiKeyboard(KeyboardTarget.LibrarySearch))
         assertEquals(fakeKeyboard, navManager.activeController)
-        assertEquals(ScreenState.WifiKeyboard(""), navManager.currentState)
+        assertEquals(ScreenState.WifiKeyboard(KeyboardTarget.LibrarySearch), navManager.currentState)
 
         // Cancel / exit keyboard pops back to Jellyfin
         assertTrue(navManager.popBackStack())

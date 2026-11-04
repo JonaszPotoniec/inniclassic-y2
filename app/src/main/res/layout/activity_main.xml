@@ -318,22 +318,6 @@
         android:visibility="gone">
         <TextView android:id="@+id/tv_keyboard_ssid" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Target: My_Home_Wifi" android:textColor="#BBFFFFFF" android:textSize="15sp" android:textStyle="bold"/>
         <TextView android:id="@+id/tv_keyboard_input" android:layout_width="match_parent" android:layout_height="34dp" android:text="" android:textColor="#FFFFFF" android:textSize="18sp" android:textStyle="bold" android:gravity="center" android:background="#222222" android:layout_marginTop="4dp" android:layout_marginBottom="6dp"/>
-        
-        <!-- Original Linear Scrollwheel Strip -->
-        <LinearLayout
-            android:id="@+id/layout_keyboard_original"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center"
-            android:layout_marginTop="24dp"
-            android:visibility="gone">
-            <TextView android:id="@+id/tv_key_pprev" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="a" android:textColor="#555555" android:textSize="14sp" android:layout_marginRight="12dp"/>
-            <TextView android:id="@+id/tv_key_prev" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="b" android:textColor="#AAAAAA" android:textSize="20sp" android:layout_marginRight="12dp"/>
-            <TextView android:id="@+id/tv_key_current" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="c" android:textColor="#FFFFFF" android:textSize="36sp" android:textStyle="bold"/>
-            <TextView android:id="@+id/tv_key_next" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="d" android:textColor="#AAAAAA" android:textSize="20sp" android:layout_marginLeft="12dp"/>
-            <TextView android:id="@+id/tv_key_nnext" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="e" android:textColor="#555555" android:textSize="14sp" android:layout_marginLeft="12dp"/>
-        </LinearLayout>
 
         <!-- Standard QWERTY Grid Keyboard -->
         <com.themoon.y1.views.QwertyKeyboardView

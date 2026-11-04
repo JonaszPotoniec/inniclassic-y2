@@ -147,7 +147,7 @@ class VideoPlayerController(
         }
 
         if (keyCode == KeyEvent.KEYCODE_BACK) {
-            if (action == KeyEvent.ACTION_DOWN) {
+            if (action == KeyEvent.ACTION_UP && !event.isCanceled) {
                 clickFeedback()
                 stop()
                 onExitRequested()
@@ -191,12 +191,6 @@ class VideoPlayerController(
             return true
         }
 
-        if (keyCode == KeyEvent.KEYCODE_BACK) {
-            clickFeedback()
-            stop()
-            onExitRequested()
-            return true
-        }
 
         return false
     }

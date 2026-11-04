@@ -1,5 +1,6 @@
 package com.themoon.y1.controllers.connectivity
 
+import com.themoon.y1.navigation.RowFocus
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.bluetooth.BluetoothAdapter
@@ -36,7 +37,6 @@ class BluetoothController(
     private val createSettingRow: (title: String, value: String) -> LinearLayout,
     private val createTablerListButton: (iconPaths: Array<String>?, text: String, rightIconPaths: Array<String>?, iconColor: Int, textColor: Int) -> View,
     private val clickFeedback: () -> Unit,
-    private val onNavigateBack: () -> Unit,
     private val localize: (String) -> String
 ) : ScreenController {
 
@@ -567,70 +567,15 @@ class BluetoothController(
     }
 
     override fun onWheel(delta: Int, event: KeyEvent): Boolean {
-        val curFocus = activity.currentFocus
-        if (curFocus == btnScanBt) {
-            if (delta > 0 && containerBtItems.childCount > 0) {
-                for (i in 0 until containerBtItems.childCount) {
-                    val child = containerBtItems.getChildAt(i)
-                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                        child.requestFocus()
-                        clickFeedback()
-                        return true
-                    }
-                }
-            }
-            return false
+        // The scan button is above the list: down from it selects the first row, up from the first row selects it
+        val scanAbove = btnScanBt.visibility == View.VISIBLE
+        if (scanAbove && activity.currentFocus == btnScanBt && delta < 0) return false
+        val toScan = scanAbove && delta < 0 && containerBtItems.hasFocus()
+        if (RowFocus.step(containerBtItems, delta, !toScan && RowFocus.isLoopOn(activity)) == null) {
+            if (!toScan) return false
+            btnScanBt.requestFocus()
         }
-        val currentIndex = if (curFocus != null) containerBtItems.indexOfChild(curFocus) else -1
-        if (delta < 0) {
-            if (currentIndex > 0) {
-                for (i in currentIndex - 1 downTo 0) {
-                    val child = containerBtItems.getChildAt(i)
-                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                        child.requestFocus()
-                        clickFeedback()
-                        return true
-                    }
-                }
-            } else if (currentIndex == 0 && btnScanBt.visibility == View.VISIBLE) {
-                btnScanBt.requestFocus()
-                clickFeedback()
-                return true
-            }
-        } else {
-            if (currentIndex in 0 until containerBtItems.childCount - 1) {
-                for (i in currentIndex + 1 until containerBtItems.childCount) {
-                    val child = containerBtItems.getChildAt(i)
-                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                        child.requestFocus()
-                        clickFeedback()
-                        return true
-                    }
-                }
-            }
-        }
-        if (currentIndex == -1 && containerBtItems.childCount > 0) {
-            for (i in 0 until containerBtItems.childCount) {
-                val child = containerBtItems.getChildAt(i)
-                if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                    child.requestFocus()
-                    clickFeedback()
-                    return true
-                }
-            }
-        }
-        return false
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == 21 || keyCode == 22) {
-            return onWheel(if (keyCode == 22) 1 else -1, event)
-        }
-        return false
-    }
-
-    override fun onBackPressed(): Boolean {
-        onNavigateBack()
+        clickFeedback()
         return true
     }
 }

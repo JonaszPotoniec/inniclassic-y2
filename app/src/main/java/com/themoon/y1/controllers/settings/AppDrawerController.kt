@@ -25,7 +25,6 @@ class AppDrawerController(
     override val rootView: ViewGroup,
     private val createListButton: (text: String) -> Button,
     private val clickFeedback: () -> Unit,
-    private val onNavigateBack: () -> Unit,
     private val localize: (String) -> String
 ) : ScreenController {
 
@@ -87,10 +86,5 @@ class AppDrawerController(
                 containerSettingsItems.getChildAt(0).requestFocus()
             }
         }
-    }
-
-    override fun onBackPressed(): Boolean {
-        onNavigateBack()
-        return true
     }
 }

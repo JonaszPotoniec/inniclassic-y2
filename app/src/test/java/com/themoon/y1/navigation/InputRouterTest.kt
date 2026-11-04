@@ -55,12 +55,14 @@ class InputRouterTest {
     }
 
     @Test
-    fun testOnKeyDown_backKeyConsumedByActiveController() {
+    fun testOnKeyRelease_backKeyConsumedByActiveController() {
         navManager.navigateTo(ScreenState.CoverFlow)
         subController.handleBackResult = true
 
         val event = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK)
         val handled = inputRouter.onKeyDown(KeyEvent.KEYCODE_BACK, event, subController)
+        assertFalse("Back must not act on press", subController.backPressed)
+        inputRouter.onKeyUp(KeyEvent.KEYCODE_BACK, KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_BACK), subController)
 
         assertTrue("Back key should be consumed by activeController", handled)
         assertTrue(subController.backPressed)
@@ -68,13 +70,16 @@ class InputRouterTest {
     }
 
     @Test
-    fun testOnKeyDown_backKeyPopsBackStackWhenControllerDoesNotHandle() {
+    fun testOnKeyRelease_backKeyPopsBackStackWhenControllerDoesNotHandle() {
         navManager.navigateTo(ScreenState.MainMenu)
         navManager.navigateTo(ScreenState.CoverFlow)
         subController.handleBackResult = false
 
         val event = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK)
         val handled = inputRouter.onKeyDown(KeyEvent.KEYCODE_BACK, event, subController)
+        assertFalse("Back must not act on press", subController.backPressed)
+        assertEquals("A held Back press must stay on Cover Flow", ScreenState.CoverFlow, navManager.currentState)
+        inputRouter.onKeyUp(KeyEvent.KEYCODE_BACK, KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_BACK), subController)
 
         assertTrue("Back key should pop backstack and return true", handled)
         assertEquals(ScreenState.MainMenu, navManager.currentState)

@@ -1,5 +1,6 @@
 package com.themoon.y1.controllers.connectivity
 
+import com.themoon.y1.navigation.RowFocus
 import android.app.Activity
 import android.content.Context
 import android.net.wifi.ScanResult
@@ -33,7 +34,6 @@ class WifiController(
     private val clickFeedback: () -> Unit,
     private val onConnectToSavedNetwork: (ssid: String, netId: Int) -> Unit,
     private val onOpenWifiKeyboard: (ssid: String, isOpen: Boolean) -> Unit,
-    private val onNavigateBack: () -> Unit,
     private val localize: (String) -> String
 ) : ScreenController {
 
@@ -243,60 +243,8 @@ class WifiController(
     }
 
     override fun onWheel(delta: Int, event: KeyEvent): Boolean {
-        if (containerWifiItems.childCount == 0) return false
-        var currentIndex = -1
-        for (i in 0 until containerWifiItems.childCount) {
-            if (containerWifiItems.getChildAt(i).hasFocus()) {
-                currentIndex = i
-                break
-            }
-        }
-        if (delta < 0) {
-            if (currentIndex > 0) {
-                for (i in currentIndex - 1 downTo 0) {
-                    val child = containerWifiItems.getChildAt(i)
-                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                        child.requestFocus()
-                        clickFeedback()
-                        return true
-                    }
-                }
-            }
-        } else {
-            if (currentIndex in 0 until containerWifiItems.childCount - 1) {
-                for (i in currentIndex + 1 until containerWifiItems.childCount) {
-                    val child = containerWifiItems.getChildAt(i)
-                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                        child.requestFocus()
-                        clickFeedback()
-                        return true
-                    }
-                }
-            }
-        }
-        if (currentIndex == -1 && containerWifiItems.childCount > 0) {
-            for (i in 0 until containerWifiItems.childCount) {
-                val child = containerWifiItems.getChildAt(i)
-                if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                    child.requestFocus()
-                    clickFeedback()
-                    return true
-                }
-            }
-        }
-        return false
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == 21 || keyCode == 22 || keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-            val delta = if (keyCode == 22 || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) 1 else -1
-            return onWheel(delta, event)
-        }
-        return false
-    }
-
-    override fun onBackPressed(): Boolean {
-        onNavigateBack()
+        RowFocus.step(containerWifiItems, delta) ?: return false
+        clickFeedback()
         return true
     }
 

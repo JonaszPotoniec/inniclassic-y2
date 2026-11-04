@@ -45,7 +45,7 @@ object SettingsGroups {
         )),
         Group("Controls", listOf(
             "Button Sound", "Click Volume", "Button Vibration", "Vibration Strength", "Wheel Loop Scroll", "Screen-Off Control",
-            "Double-Click to Favorite", "Keyboard Layout"
+            "Double-Click to Favorite"
         )),
         Group("Connectivity", listOf(
             "Bluetooth", "Wi-Fi", "Cell Radio", "Web Server", "Ask on USB Connect"

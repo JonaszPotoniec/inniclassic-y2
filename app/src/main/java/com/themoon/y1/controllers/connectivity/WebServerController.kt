@@ -30,7 +30,6 @@ class WebServerController(
     private val onServerStateChanged: (isRunning: Boolean) -> Unit,
     private val onScanMediaRequested: () -> Unit,
     private val clickFeedback: () -> Unit,
-    private val onNavigateBack: () -> Unit,
     private val localize: (String) -> String
 ) : ScreenController {
 
@@ -45,6 +44,14 @@ class WebServerController(
     private var webServer: Y1WebServer? = null
     private var serverWakeLock: PowerManager.WakeLock? = null
     private var serverWifiLock: WifiManager.WifiLock? = null
+
+    init {
+        // The focused button takes the centre press itself, so it must do the toggle
+        btnServerToggle?.setOnClickListener {
+            clickFeedback()
+            toggleServer()
+        }
+    }
 
     override fun onEnter(state: ScreenState) {
         layoutWebServer.visibility = View.VISIBLE
@@ -131,22 +138,19 @@ class WebServerController(
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
-            clickFeedback()
-            toggleServer()
-            return true
-        }
-
-        if (keyCode == KeyEvent.KEYCODE_BACK) {
-            clickFeedback()
-            onNavigateBack()
+            // Toggle on release (onKeyUp or the button click); a hold sent repeats that toggled again and again
             return true
         }
 
         return false
     }
 
-    override fun onBackPressed(): Boolean {
-        onNavigateBack()
-        return true
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+            clickFeedback()
+            toggleServer()
+            return true
+        }
+        return false
     }
 }

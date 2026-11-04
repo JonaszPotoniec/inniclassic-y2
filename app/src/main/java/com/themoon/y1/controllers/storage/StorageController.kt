@@ -3,7 +3,6 @@ package com.themoon.y1.controllers.storage
 import android.app.Activity
 import android.os.Build
 import android.os.StatFs
-import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
@@ -31,7 +30,6 @@ class StorageController(
     private val videosProvider: () -> List<File>,
     private val createSettingRow: (title: String, value: String) -> LinearLayout,
     private val clickFeedback: () -> Unit,
-    private val onNavigateBack: () -> Unit,
     private val localize: (String) -> String
 ) : ScreenController {
 
@@ -156,19 +154,6 @@ class StorageController(
                 containerStorageItems.getChildAt(0).requestFocus()
             }
         }
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_BACK) {
-            onNavigateBack()
-            return true
-        }
-        return false
-    }
-
-    override fun onBackPressed(): Boolean {
-        onNavigateBack()
-        return true
     }
 
     private fun formatSize(bytes: Long): String {

@@ -105,7 +105,7 @@ class SettingsGroupsTest {
         assertEquals(
             listOf(
                 "Button Sound", "Click Volume", "Button Vibration", "Vibration Strength", "Wheel Loop Scroll",
-                "Screen-Off Control", "Double-Click to Favorite", "Keyboard Layout"
+                "Screen-Off Control", "Double-Click to Favorite"
             ),
             controls.rows
         )

@@ -21,7 +21,6 @@ class ScreenRecorderController(
     override val rootView: ViewGroup,
     private val createSettingRow: (title: String, value: String) -> LinearLayout,
     private val clickFeedback: () -> Unit,
-    private val onNavigateBack: () -> Unit,
     private val localize: (String) -> String
 ) : ScreenController {
 
@@ -111,10 +110,5 @@ class ScreenRecorderController(
         if (containerSettingsItems.childCount > 0) {
             containerSettingsItems.getChildAt(0).requestFocus()
         }
-    }
-
-    override fun onBackPressed(): Boolean {
-        onNavigateBack()
-        return true
     }
 }

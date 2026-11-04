@@ -39,6 +39,7 @@ import com.themoon.y1.managers.MediaLibraryManager
 import com.themoon.y1.managers.OtaUpdateManager
 import com.themoon.y1.models.AlbumKey
 import com.themoon.y1.navigation.BrowserMode
+import com.themoon.y1.navigation.KeyboardTarget
 import com.themoon.y1.navigation.NavigationManager
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.navigation.VideoMode
@@ -144,8 +145,7 @@ internal fun MainActivity.initControllers() {
             shuffleAllSongs()
         },
         onSearchRequested = {
-            wifiKeyboardController.currentKeyboardMode = 3
-            changeScreen(MainActivity.STATE_WIFI_KEYBOARD)
+            changeScreen(ScreenState.WifiKeyboard(KeyboardTarget.LibrarySearch))
         },
         onStartMediaLibraryScan = {
             startMediaLibraryScan()
@@ -181,7 +181,6 @@ internal fun MainActivity.initControllers() {
         onPlaylistSelected = { file ->
             changeScreen(ScreenState.M3uPlaylistSongs(file))
         },
-        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         localize = { t(it) }
     )
 
@@ -197,7 +196,6 @@ internal fun MainActivity.initControllers() {
             browserController.virtualQueryAlbumArtist = AlbumKey.artistOf(album)
             changeScreen(ScreenState.Browser(BrowserMode.VirtualSongs))
         },
-        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         onRebuildUniqueAlbumList = { rebuildUniqueAlbumListInternal() },
         nowPlayingSong = {
             // While the FM radio is on, the radio plays, not the song of the queue.
@@ -283,8 +281,7 @@ internal fun MainActivity.initControllers() {
         repository = PodcastRepository.getInstance(),
         downloadManager = PodcastDownloadManager.getInstance(),
         onRequestSearch = {
-            wifiKeyboardController.currentKeyboardMode = 1
-            changeScreen(MainActivity.STATE_WIFI_KEYBOARD)
+            changeScreen(ScreenState.WifiKeyboard(KeyboardTarget.PodcastSearch))
         },
         onNavigateToPlayer = { changeScreen(MainActivity.STATE_PLAYER) },
         createListButton = { icon, text, color -> createListButton(text, icon, color) },
@@ -326,7 +323,6 @@ internal fun MainActivity.initControllers() {
         onNavigateToMode = { mode ->
             changeScreen(ScreenState.Videos(mode))
         },
-        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         clickFeedback = { clickFeedback() },
         localize = { t(it) },
         updateHeaderTitle = { title ->
@@ -358,7 +354,6 @@ internal fun MainActivity.initControllers() {
             )
         },
         clickFeedback = { clickFeedback() },
-        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         localize = { t(it) }
     )
 
@@ -379,12 +374,8 @@ internal fun MainActivity.initControllers() {
         clickFeedback = { clickFeedback() },
         onConnectToSavedNetwork = { _, _ -> },
         onOpenWifiKeyboard = { ssid, isOpen ->
-            wifiKeyboardController.targetWifiSsid = ssid
-            wifiKeyboardController.isTargetWifiOpen = isOpen
-            wifiKeyboardController.currentKeyboardMode = 0
-            changeScreen(ScreenState.WifiKeyboard(ssid))
+            changeScreen(ScreenState.WifiKeyboard(KeyboardTarget.WifiPassword(ssid, isOpen)))
         },
-        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         localize = { t(it) }
     )
 
@@ -450,6 +441,16 @@ internal fun MainActivity.initControllers() {
             }
             NavigationManager.getInstance().popBackStack()
         },
+        initialText = { target ->
+            val provider = com.themoon.y1.sync.jellyfin.JellyfinSyncProvider.getInstance(this)
+            when (target) {
+                KeyboardTarget.JellyfinServerUrl -> provider.serverUrl
+                KeyboardTarget.JellyfinUsername -> provider.username
+                is KeyboardTarget.JellyfinPassword -> provider.password
+                KeyboardTarget.JellyfinToken -> provider.accessToken
+                else -> ""
+            }
+        },
         localize = { t(it) }
     )
 
@@ -463,7 +464,6 @@ internal fun MainActivity.initControllers() {
         },
         onScanMediaRequested = { startMediaLibraryScan() },
         clickFeedback = { clickFeedback() },
-        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         localize = { t(it) }
     )
 
@@ -474,15 +474,13 @@ internal fun MainActivity.initControllers() {
         videosProvider = { videoFiles },
         createSettingRow = { title, value -> ListItemViewFactory.createSettingRow(this, title, value) },
         clickFeedback = { clickFeedback() },
-        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         localize = { t(it) }
     )
 
     brightnessController = BrightnessController(
         activity = this,
         rootView = layoutBrightnessMode as ViewGroup,
-        clickFeedback = { clickFeedback() },
-        onNavigateBack = { NavigationManager.getInstance().popBackStack() }
+        clickFeedback = { clickFeedback() }
     )
 
     jellyfinUiController = JellyfinUiController(
@@ -498,10 +496,8 @@ internal fun MainActivity.initControllers() {
         },
         createDialogButton = { text -> ListItemViewFactory.createDialogButton(this, text) },
         clickFeedback = { clickFeedback() },
-        onOpenKeyboard = { mode, currentVal ->
-            wifiKeyboardController.currentKeyboardMode = mode
-            wifiKeyboardController.typedText = currentVal
-            changeScreen(MainActivity.STATE_WIFI_KEYBOARD)
+        onOpenKeyboard = { target ->
+            changeScreen(ScreenState.WifiKeyboard(target))
         },
         onRequestWifi = { _ -> changeScreen(MainActivity.STATE_WIFI) },
         isNetworkConnected = {
@@ -553,7 +549,12 @@ internal fun MainActivity.initControllers() {
         onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         onNavigateToScreen = { screenId ->
             backTargetForUtility = MainActivity.STATE_SETTINGS
-            changeScreen(screenId)
+            if (screenId == MainActivity.STATE_WIFI_KEYBOARD) {
+                // Settings opens the keyboard only from the Last.fm Account row
+                changeScreen(ScreenState.WifiKeyboard(KeyboardTarget.LastFmUsername))
+            } else {
+                changeScreen(screenId)
+            }
         },
         onOpenEqualizer = { changeScreen(ScreenState.Equalizer) },
         onOpenJellyfin = { changeScreen(ScreenState.Jellyfin) },
@@ -612,7 +613,6 @@ internal fun MainActivity.initControllers() {
         rootView = layoutSettingsMode as ViewGroup,
         createListButton = { text -> ListItemViewFactory.createListButtonSimple(this, text) },
         clickFeedback = { clickFeedback() },
-        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         localize = { t(it) }
     )
 
@@ -621,7 +621,6 @@ internal fun MainActivity.initControllers() {
         rootView = layoutSettingsMode as ViewGroup,
         createSettingRow = { title, value -> ListItemViewFactory.createSettingRow(this, title, value) },
         clickFeedback = { clickFeedback() },
-        onNavigateBack = { NavigationManager.getInstance().popBackStack() },
         localize = { t(it) }
     )
 

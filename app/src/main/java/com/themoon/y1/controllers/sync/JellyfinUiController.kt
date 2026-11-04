@@ -23,6 +23,7 @@ import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.core.extensions.onOff
 import com.themoon.y1.models.SongItem
+import com.themoon.y1.navigation.KeyboardTarget
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.sync.MediaSyncProvider
 import com.themoon.y1.sync.SyncManager
@@ -47,7 +48,7 @@ class JellyfinUiController(
     private val createTablerButton: (icon: Array<String>, text: String) -> View,
     private val createDialogButton: (text: String) -> View,
     private val clickFeedback: () -> Unit,
-    private val onOpenKeyboard: (mode: Int, currentVal: String) -> Unit,
+    private val onOpenKeyboard: (target: KeyboardTarget) -> Unit,
     private val onRequestWifi: (action: Int) -> Unit,
     private val isNetworkConnected: () -> Boolean,
     private val onSyncFinished: () -> Unit,
@@ -242,7 +243,7 @@ class JellyfinUiController(
         val rowUrl = createWrappedSettingRow(localize("Server URL"), if (rawUrl.isEmpty()) localize("Not Configured") else rawUrl)
         rowUrl.setOnClickListener {
             clickFeedback()
-            onOpenKeyboard(5, provider.serverUrl)
+            onOpenKeyboard(KeyboardTarget.JellyfinServerUrl)
         }
         containerSettingsItems.addView(rowUrl)
 
@@ -286,7 +287,7 @@ class JellyfinUiController(
             val rowToken = createWrappedSettingRow(localize("API Token"), if (token.isEmpty()) localize("Not Configured") else "••••••••")
             rowToken.setOnClickListener {
                 clickFeedback()
-                onOpenKeyboard(8, provider.accessToken)
+                onOpenKeyboard(KeyboardTarget.JellyfinToken)
             }
             containerSettingsItems.addView(rowToken)
         } else {
@@ -294,7 +295,7 @@ class JellyfinUiController(
             val rowUser = createWrappedSettingRow(localize("Username"), if (user.isEmpty()) localize("Not Configured") else user)
             rowUser.setOnClickListener {
                 clickFeedback()
-                onOpenKeyboard(6, provider.username)
+                onOpenKeyboard(KeyboardTarget.JellyfinUsername)
             }
             containerSettingsItems.addView(rowUser)
 
@@ -302,7 +303,7 @@ class JellyfinUiController(
             val rowPass = createWrappedSettingRow(localize("Password"), if (pass.isEmpty()) localize("Not Configured") else "••••••••")
             rowPass.setOnClickListener {
                 clickFeedback()
-                onOpenKeyboard(7, provider.password)
+                onOpenKeyboard(KeyboardTarget.JellyfinPassword(provider.username))
             }
             containerSettingsItems.addView(rowPass)
         }

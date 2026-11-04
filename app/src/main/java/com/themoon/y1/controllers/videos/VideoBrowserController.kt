@@ -7,7 +7,6 @@ import android.media.MediaMetadataRetriever
 import android.util.LruCache
 import android.util.TypedValue
 import android.view.Gravity
-import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -47,7 +46,6 @@ class VideoBrowserController(
     private val allVideosProvider: () -> List<File>,
     private val onVideoSelected: (file: File) -> Unit,
     private val onNavigateToMode: (VideoMode) -> Unit,
-    private val onNavigateBack: () -> Unit,
     private val clickFeedback: () -> Unit,
     private val localize: (String) -> String,
     private val updateHeaderTitle: (String) -> Unit
@@ -1021,22 +1019,5 @@ class VideoBrowserController(
                 }
             }
         }.start()
-    }
-
-    // ------------------------------------------------------------------------
-    // Navigation / Key Handling
-    // ------------------------------------------------------------------------
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_BACK) {
-            onNavigateBack()
-            return true
-        }
-        return false
-    }
-
-    override fun onBackPressed(): Boolean {
-        onNavigateBack()
-        return true
     }
 }

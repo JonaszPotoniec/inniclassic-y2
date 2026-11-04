@@ -489,6 +489,26 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         AudioPlayerManager.getInstance().savePlaybackState(sync = true)
     }
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        // After a boot the window is in touch mode until the first key, so requestFocus() does nothing
+        // and the first screen shows no selected row. Leave touch mode before the first layout.
+        val decor = window.decorView
+        if (decor.isInTouchMode) decor.requestFocusFromTouch()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // At a device boot the window can get focus in touch mode again (after onAttachedToWindow), which
+        // clears the selected row. Then leave touch mode and let the screen select its row again.
+        // Only in touch mode with no focus, so a row that the user selected keeps the focus.
+        val decor = window.decorView
+        if (hasFocus && decor.isInTouchMode && currentFocus == null) {
+            decor.requestFocusFromTouch()
+            getActiveScreenController()?.onRefreshUI()
+        }
+    }
+
     fun t(key: String): String = LanguageManager.getInstance(this).t(key)
 
     fun clickFeedback() {
@@ -502,7 +522,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             return
         }
         if (isVibrationEnabled) {
-            vibrator.vibrate((vibrationStrengthLevel * 15).toLong())
+            com.themoon.y1.managers.ButtonVibration.vibrate(vibrator, vibrationStrengthLevel)
         }
         if (isSoundEffectEnabled) {
             // Settings → Click Volume: a level of its own, not the music volume (see ClickVolume).
@@ -523,7 +543,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             STATE_SETTINGS -> ScreenState.Settings()
             STATE_BLUETOOTH -> ScreenState.Bluetooth
             STATE_WIFI -> ScreenState.Wifi
-            STATE_WIFI_KEYBOARD -> ScreenState.WifiKeyboard("")
             STATE_BRIGHTNESS -> ScreenState.Brightness
             STATE_STORAGE -> ScreenState.Storage
             STATE_WEBSERVER -> ScreenState.WebServer
@@ -643,15 +662,8 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
-        val active = getActiveScreenController()
-        if (active?.onBackPressed() == true) {
-            return
-        }
-        if (NavigationManager.getInstance().navigateBack()) {
-            return
-        }
-        clickFeedback()
-        // Never call super.onBackPressed() because MainActivity is the HOME launcher.
+        // The router acts on Back; never call super.onBackPressed() because MainActivity is the HOME launcher.
+        InputRouter.getInstance().goBack(getActiveScreenController())
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
@@ -1078,7 +1090,9 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                 Settings.System.putInt(
                     contentResolver,
                     Settings.System.HAPTIC_FEEDBACK_ENABLED,
-                    if (isVibrationEnabled) 1 else 0
+                    // Always off: else Android also vibrates on each key press, before our vibration on the
+                    // release. Our vibration (clickFeedback) does not read this setting.
+                    0
                 )
             } else {
                 if (!isScreenOffControlEnabled) {
@@ -1478,14 +1492,20 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             if (!isScreenOn) {
                 val isScreenOffCtrl = instance?.isScreenOffControlEnabled
                     ?: AppPrefs.get(context).getBoolean("screen_off_control", false)
-                if (!isScreenOffCtrl) {
+                // Media keys from a remote (car, Bluetooth headphones, wired headset) always act
+                val keys = com.themoon.y1.navigation.RemoteMediaKeys
+                val device = keys.deviceName(event)
+                android.util.Log.w("MediaButton", KeyEvent.keyCodeToString(event.keyCode) + " from " + (device ?: "unknown device") +
+                    " with the screen off: " + keys.screenOffDecision(event.keyCode, device, isScreenOffCtrl))
+                if (!keys.actsWithScreenOff(event.keyCode, device, isScreenOffCtrl)) {
                     return
                 }
             }
 
             val am = AudioPlayerManager.getInstance()
             when (event.keyCode) {
-                KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, 85 -> {
+                KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, 85,
+                KeyEvent.KEYCODE_HEADSETHOOK -> {
                     com.themoon.y1.managers.AudioSources.app.playPauseKey()
                 }
                 KeyEvent.KEYCODE_MEDIA_NEXT, 87 -> {

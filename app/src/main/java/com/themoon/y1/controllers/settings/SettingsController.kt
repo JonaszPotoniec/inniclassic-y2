@@ -1,5 +1,6 @@
 package com.themoon.y1.controllers.settings
 
+import com.themoon.y1.navigation.RowFocus
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -110,7 +111,7 @@ class SettingsController(
     companion object {
         /** Backlight Timer is the one screen timer: it also sets Android's SCREEN_OFF_TIMEOUT (see BacklightTimer). */
         val BACKLIGHT_TIMER_LABELS = com.themoon.y1.managers.BacklightTimer.LABELS
-        val VIBE_STRENGTH_NAMES = arrayOf("Weak", "Normal (Vibe)", "Strong")
+        val VIBE_STRENGTH_NAMES = com.themoon.y1.managers.ButtonVibration.LABELS
 
         // Common IANA zones covering the main UTC offsets, short enough to scroll with the wheel
         val TIME_ZONE_IDS = arrayOf(
@@ -208,7 +209,6 @@ class SettingsController(
 
     override fun onBackPressed(): Boolean {
         if (isActionScreen) {
-            clickFeedback()
             ActionScreens.cancel((actionPage as? SettingsSubMode.Action)?.let { ActionScreens.spec(it.key) }) { onNavigateBack() }
             return true
         }
@@ -219,7 +219,6 @@ class SettingsController(
         if (currentSettingsDepth == 0 && groupPages.isOpen) {
             lastSettingsFocusIndex = groupPages.close() ?: 0
             buildSettingsUI()
-            clickFeedback()
             return true
         }
         if (currentSettingsDepth == 0) {
@@ -227,15 +226,12 @@ class SettingsController(
             return true
         } else if (currentSettingsDepth == 1) {
             buildSettingsUI()
-            clickFeedback()
             return true
         } else if (currentSettingsDepth == 2) {
             buildDateTimeUI()
-            clickFeedback()
             return true
         }
         buildSettingsUI()
-        clickFeedback()
         return true
     }
 
@@ -268,92 +264,16 @@ class SettingsController(
             return true
         }
 
-        if (containerSettingsItems.childCount == 0) return false
-        val isLoopScrollOn = prefs.getBoolean("loop_scroll_on", true)
-        val curFocus = containerSettingsItems.findFocus()
-        val currentIndex = if (curFocus != null) containerSettingsItems.indexOfChild(curFocus) else -1
-
-        if (delta < 0) {
-            if (currentIndex > 0) {
-                for (i in currentIndex - 1 downTo 0) {
-                    val child = containerSettingsItems.getChildAt(i)
-                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                        child.requestFocus()
-                        if (currentSettingsDepth == 0) lastSettingsFocusIndex = i
-                        clickFeedback()
-                        return true
-                    }
-                }
-            }
-            if (isLoopScrollOn && currentIndex >= 0) {
-                for (i in containerSettingsItems.childCount - 1 downTo currentIndex + 1) {
-                    val child = containerSettingsItems.getChildAt(i)
-                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                        child.requestFocus()
-                        if (currentSettingsDepth == 0) lastSettingsFocusIndex = i
-                        clickFeedback()
-                        return true
-                    }
-                }
-            }
-            if (currentIndex == -1) {
-                for (i in 0 until containerSettingsItems.childCount) {
-                    val child = containerSettingsItems.getChildAt(i)
-                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                        child.requestFocus()
-                        if (currentSettingsDepth == 0) lastSettingsFocusIndex = i
-                        clickFeedback()
-                        return true
-                    }
-                }
-            }
-        } else {
-            if (currentIndex in 0 until containerSettingsItems.childCount - 1) {
-                for (i in currentIndex + 1 until containerSettingsItems.childCount) {
-                    val child = containerSettingsItems.getChildAt(i)
-                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                        child.requestFocus()
-                        if (currentSettingsDepth == 0) lastSettingsFocusIndex = i
-                        clickFeedback()
-                        return true
-                    }
-                }
-            }
-            if (isLoopScrollOn && currentIndex >= 0) {
-                for (i in 0 until currentIndex) {
-                    val child = containerSettingsItems.getChildAt(i)
-                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                        child.requestFocus()
-                        if (currentSettingsDepth == 0) lastSettingsFocusIndex = i
-                        clickFeedback()
-                        return true
-                    }
-                }
-            }
-            if (currentIndex == -1) {
-                for (i in 0 until containerSettingsItems.childCount) {
-                    val child = containerSettingsItems.getChildAt(i)
-                    if (child != null && child.visibility == View.VISIBLE && child.isFocusable) {
-                        child.requestFocus()
-                        if (currentSettingsDepth == 0) lastSettingsFocusIndex = i
-                        clickFeedback()
-                        return true
-                    }
-                }
-            }
-        }
-        return false
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == 21 || keyCode == 22) {
-            return onWheel(if (keyCode == 22) 1 else -1, event)
-        }
-        return false
+        val i = RowFocus.step(containerSettingsItems, delta) ?: return false
+        if (currentSettingsDepth == 0) lastSettingsFocusIndex = i
+        clickFeedback()
+        return true
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
-        if (isMenuReorderMode && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
+        if (isMenuReorderMode && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) &&
+            (event.flags and KeyEvent.FLAG_CANCELED_LONG_PRESS) == 0
+        ) {
             toggleMenuReorderMode()
             clickFeedback()
             return true
@@ -576,7 +496,7 @@ class SettingsController(
                 Settings.System.putInt(
                     activity.contentResolver,
                     Settings.System.HAPTIC_FEEDBACK_ENABLED,
-                    if (isVibrationEnabled) 1 else 0
+                    0 // always off, as in MainActivity: else Android also vibrates on each key press
                 )
             } catch (_: Exception) {}
         }
@@ -637,21 +557,6 @@ class SettingsController(
             tvStatus?.text = onOff(isUsbPromptEnabled, localize)
         }
         containerSettingsItems.addView(btnUsbPrompt)
-
-        val currentKb = prefs.getString("keyboard_layout", "qwerty") ?: "qwerty"
-        val btnKeyboard = createSettingRow(
-            localize("Keyboard Layout"),
-            if (currentKb == "original") localize("Original") else localize("QWERTY")
-        )
-        btnKeyboard.setOnClickListener {
-            clickFeedback()
-            val cur = prefs.getString("keyboard_layout", "qwerty") ?: "qwerty"
-            val next = if (cur == "qwerty") "original" else "qwerty"
-            prefs.edit().putString("keyboard_layout", next).commit()
-            val tvStatus = btnKeyboard.getChildAt(1) as? TextView
-            tvStatus?.text = if (next == "original") localize("Original") else localize("QWERTY")
-        }
-        containerSettingsItems.addView(btnKeyboard)
 
         var backlightTimerIndex = prefs.getInt("backlight_timer_index", 3)
         if (backlightTimerIndex >= BACKLIGHT_TIMER_LABELS.size) backlightTimerIndex = 0
@@ -1568,6 +1473,7 @@ class SettingsController(
             }
             containerSettingsItems.addView(row)
         }
+        containerSettingsItems.getChildAt(0)?.requestFocus()
     }
 
     private fun buildMusicMenuVisibilitySettingsUI() {
@@ -1625,6 +1531,7 @@ class SettingsController(
             }
             containerSettingsItems.addView(row)
         }
+        containerSettingsItems.getChildAt(0)?.requestFocus()
     }
 
     private fun sortMenuElements(buttons: ArrayList<ThemeManager.MenuElement>) {
