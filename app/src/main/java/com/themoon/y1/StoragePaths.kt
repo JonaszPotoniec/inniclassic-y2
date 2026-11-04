@@ -13,6 +13,7 @@ object StoragePaths {
 
     const val PRIMARY_PATH: String = "/storage/sdcard0"
     const val SECONDARY_PATH: String = "/storage/sdcard1"
+    const val STORAGE_DIR: String = "/storage"
 
     @Volatile
     private var cachedPrimary: File? = null
@@ -99,6 +100,34 @@ object StoragePaths {
     /** Folder-browser / mkdir default - always primary. */
     fun getMusicDir(): File = primaryMediaDir("Music")
 
+    /** Folder-browser default: prefers readable secondary Music if it has files, else primary. */
+    fun getDefaultMusicDir(): File {
+        if (hasSecondaryStorage()) {
+            val secMusic = File(SECONDARY_PATH, "Music")
+            try {
+                if (secMusic.exists() && (secMusic.listFiles()?.isNotEmpty() == true)) {
+                    return secMusic
+                }
+            } catch (_: Exception) {
+            }
+        }
+        val primMusic = getMusicDir()
+        try {
+            if (primMusic.exists() && (primMusic.listFiles()?.isNotEmpty() == true)) {
+                return primMusic
+            }
+        } catch (_: Exception) {
+        }
+        if (hasSecondaryStorage()) {
+            val secMusic = File(SECONDARY_PATH, "Music")
+            try {
+                if (secMusic.exists()) return secMusic
+            } catch (_: Exception) {
+            }
+        }
+        return primMusic
+    }
+
     /** All Music folders to scan (primary + readable secondary). */
     fun getMusicDirs(): List<File> = mediaDirs("Music")
 
@@ -162,6 +191,28 @@ object StoragePaths {
 
     fun isAnyStorageRoot(file: File?): Boolean =
         file != null && isAnyStorageRoot(file.absolutePath)
+
+    /** Top storage root directory (/storage) containing volumes like sdcard0, sdcard1. */
+    fun getTopStorageRoot(): File {
+        val storage = File(STORAGE_DIR)
+        return if (storage.exists()) storage else getPrimaryRoot()
+    }
+
+    /**
+     * True if the given folder represents the top-most boundary of storage browsing.
+     * On device, /storage is the top root. On systems without /storage, falls back to isAnyStorageRoot.
+     */
+    fun isTopStorageRoot(dir: File?): Boolean {
+        if (dir == null) return true
+        val path = dir.absolutePath
+        if (path == STORAGE_DIR) return true
+        if (dir.parentFile == null) return true
+        if (!File(STORAGE_DIR).exists() && isAnyStorageRoot(path)) return true
+        return false
+    }
+
+    fun isTopStorageRoot(absolutePath: String?): Boolean =
+        if (absolutePath == null) true else isTopStorageRoot(File(absolutePath))
 
     fun isVideosRoot(absolutePath: String?): Boolean {
         if (absolutePath == null) return false

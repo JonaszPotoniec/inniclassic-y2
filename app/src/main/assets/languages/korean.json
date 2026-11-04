@@ -600,6 +600,8 @@
   "Start Web Server": "웹 서버 시작",
   "Data & Storage": "데이터 및 저장소",
   "Internal Flash": "내장 플래시 메모리",
+  "Internal Storage": "내부 저장소",
+  "USB Drive": "USB 드라이브",
   "MicroSD Card": "MicroSD 카드",
   "SD Card Mounting / Not Detected": "SD 카드 마운트 중 / 감지되지 않음",
   "Storage is mounting or inaccessible. Library preserved.": "저장소가 마운트 중이거나 접근할 수 없습니다. 라이브러리가 유지됩니다.",

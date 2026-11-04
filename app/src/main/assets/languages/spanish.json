@@ -600,6 +600,8 @@
   "Start Web Server": "Iniciar Servidor Web",
   "Data & Storage": "Datos y almacenamiento",
   "Internal Flash": "Memoria interna",
+  "Internal Storage": "Almacenamiento interno",
+  "USB Drive": "Unidad USB",
   "MicroSD Card": "Tarjeta MicroSD",
   "SD Card Mounting / Not Detected": "Montando tarjeta SD / No detectada",
   "Storage is mounting or inaccessible. Library preserved.": "El almacenamiento se está montando o no es accesible. Biblioteca conservada.",

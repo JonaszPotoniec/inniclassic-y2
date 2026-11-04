@@ -462,6 +462,8 @@
   "Start Web Server": "ウェブサーバーを起動",
   "Data & Storage": "データとストレージ",
   "Internal Flash": "内部ストレージ",
+  "Internal Storage": "内部ストレージ",
+  "USB Drive": "USBドライブ",
   "MicroSD Card": "microSDカード",
   "SD Card Mounting / Not Detected": "SDカードのマウント中 / 未検出",
   "Storage is mounting or inaccessible. Library preserved.": "ストレージのマウント中またはアクセス不能です。ライブラリは保持されました。",

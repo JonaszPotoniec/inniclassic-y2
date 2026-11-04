@@ -361,6 +361,8 @@
   "Free Space": "Wolne miejsce",
   "Storage Error: Failed to calculate space.": "Błąd pamięci: Nie udało się obliczyć miejsca.",
   "Internal Flash": "Pamięć wewnętrzna",
+  "Internal Storage": "Pamięć wewnętrzna",
+  "USB Drive": "Dysk USB",
   "MicroSD Card": "Karta MicroSD",
   "SD Card Mounting / Not Detected": "Montowanie karty SD / Nie wykryto",
   "Storage is mounting or inaccessible. Library preserved.": "Pamięć jest montowana lub niedostępna. Biblioteka zachowana.",

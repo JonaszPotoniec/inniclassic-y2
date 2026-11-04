@@ -462,6 +462,8 @@
   "Start Web Server": "Запустить веб-сервер",
   "Data & Storage": "Память и данные",
   "Internal Flash": "Внутренняя память",
+  "Internal Storage": "Внутренняя память",
+  "USB Drive": "USB-накопитель",
   "MicroSD Card": "Карта MicroSD",
   "SD Card Mounting / Not Detected": "Монтирование карты SD / Не обнаружена",
   "Storage is mounting or inaccessible. Library preserved.": "Накопитель монтируется или недоступен. Медиатека сохранена.",
