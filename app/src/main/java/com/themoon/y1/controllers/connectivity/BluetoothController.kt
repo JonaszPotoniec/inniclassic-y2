@@ -10,7 +10,11 @@ import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.os.Build
 import android.os.Handler
+import android.graphics.Path
+import android.graphics.RectF
 import android.os.Looper
+import android.util.TypedValue
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
@@ -20,6 +24,10 @@ import android.widget.TextView
 import android.widget.Toast
 import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
+import com.themoon.y1.managers.BluetoothDiscoverableLogic
+import com.themoon.y1.managers.AudioOutputLossManager
+import com.themoon.y1.managers.BluetoothDiscoverableManager
+import com.themoon.y1.managers.BluetoothPairingAgent
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.core.extensions.onOff
 import com.themoon.y1.navigation.ScreenState
@@ -56,8 +64,31 @@ class BluetoothController(
         private set
     var isBtConnectingState = false
 
+    /** Device that the Y2 asked to pair with (Connect on an available device); null after its bond. */
+    private var bondRequestedAddress: String? = null
+
+    /** True once for the device that the Y2 asked to pair with: then the Y2 connects its audio. */
+    fun takeY2BondRequest(device: BluetoothDevice): Boolean {
+        if (bondRequestedAddress != device.address) return false
+        bondRequestedAddress = null
+        return true
+    }
+
     // Bluetooth proxy reference
     private var globalA2dp: BluetoothProfile? = null
+
+    // Discoverable row: On/Off value (a switch with Toggle Style = Switch) and the time left on its left.
+    // Both update each second while the screen shows.
+    private var discoverableValue: TextView? = null
+    private var discoverableTime: TextView? = null
+    private var discoverableShown: Boolean? = null
+    private val tickHandler = Handler(Looper.getMainLooper())
+    private val tick = object : Runnable {
+        override fun run() {
+            updateDiscoverableValue()
+            tickHandler.postDelayed(this, 1000)
+        }
+    }
 
     private fun updateScanButtonFocus(hasFocus: Boolean) {
         if (hasFocus) {
@@ -78,19 +109,26 @@ class BluetoothController(
         }
         btnScanBt.setOnClickListener {
             clickFeedback()
-            startBluetoothScan()
+            startBluetoothScan(userAction = true)
         }
+        BluetoothDiscoverableManager.init(activity)
+        AudioOutputLossManager.init(activity)
     }
 
     override fun onEnter(state: ScreenState) {
         layoutBluetoothMode.visibility = View.VISIBLE
         updateScanButtonFocus(btnScanBt.hasFocus())
         startBluetoothScan()
+        BluetoothDiscoverableManager.listener = { updateDiscoverableValue() }
+        tickHandler.removeCallbacks(tick)
+        tickHandler.post(tick)
     }
 
     override fun onExit() {
         layoutBluetoothMode.visibility = View.GONE
         cancelDiscovery()
+        tickHandler.removeCallbacks(tick)
+        BluetoothDiscoverableManager.listener = null
     }
 
     override fun onRefreshUI() {
@@ -114,8 +152,12 @@ class BluetoothController(
         } catch (ignored: Exception) {}
     }
 
+    /**
+     * Rebuild the device list and start a device scan. A scan that the user did not ask for does not
+     * start while a pairing runs or a car connects after a bond (see [BluetoothPairingAgent.scanAllowed]).
+     */
     @SuppressLint("MissingPermission")
-    fun startBluetoothScan() {
+    fun startBluetoothScan(userAction: Boolean = false) {
         var currentFocusIndex = 0
         for (i in 0 until containerBtItems.childCount) {
             if (containerBtItems.getChildAt(i).hasFocus()) {
@@ -182,6 +224,14 @@ class BluetoothController(
             return
         }
 
+        addDiscoverableRow()
+
+        // Scan status (and Retry) above the device lists, as in the Wi-Fi screen: easy to reach in a long list.
+        btnScanBt.text = localize("Scanning...")
+        foundBtDevices.clear()
+        (btnScanBt.parent as? ViewGroup)?.removeView(btnScanBt)
+        containerBtItems.addView(btnScanBt)
+
         // Paired devices header
         val tvPaired = TextView(activity).apply {
             text = "━ " + localize("PAIRED DEVICES") + " ━"
@@ -218,20 +268,86 @@ class BluetoothController(
         }
         containerBtItems.addView(tvAvailable)
 
-        btnScanBt.text = localize("Scanning...")
-        foundBtDevices.clear()
-
-        (btnScanBt.parent as? ViewGroup)?.removeView(btnScanBt)
-        containerBtItems.addView(btnScanBt)
-
-        if (ba.isDiscovering) {
+        if (!userAction && !BluetoothPairingAgent.scanAllowed()) {
+            if (ba.isDiscovering) ba.cancelDiscovery()
+            btnScanBt.text = localize("Scan Complete (Retry)")
+        } else if (ba.isDiscovering) {
             ba.cancelDiscovery()
-            Handler(Looper.getMainLooper()).postDelayed({ ba.startDiscovery() }, 500)
+            Handler(Looper.getMainLooper()).postDelayed({
+                if (userAction || BluetoothPairingAgent.scanAllowed()) ba.startDiscovery()
+            }, 500)
         } else {
             ba.startDiscovery()
         }
 
         restoreBluetoothFocus(targetFocusIndex)
+    }
+
+    /** Discoverable row (On for a limited time, so a car can find the Y2), below Bluetooth Power. */
+    private fun addDiscoverableRow() {
+        val discoverable = BluetoothDiscoverableManager.isDiscoverable()
+        val row = createSettingRow(localize("Discoverable"), onOff(discoverable, localize))
+        val value = row.getChildAt(1) as? TextView
+        // The time left goes on the left of the value (of the switch), in the same text style.
+        val time = TextView(activity).apply {
+            if (value != null) {
+                setTextSize(TypedValue.COMPLEX_UNIT_PX, value.textSize)
+                typeface = value.typeface
+                setTextColor(value.currentTextColor)
+            }
+            includeFontPadding = false
+            val padRight = (8 * activity.resources.displayMetrics.density).toInt()
+            val rowHeight = row.layoutParams?.height ?: 0
+            if (rowHeight > 0) {
+                // Put the centre of the digits on the centre line of the row, like the row title and the switch,
+                // in all themes: full row height, gravity TOP, and a top padding from the font (cap height of "H").
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                gravity = Gravity.TOP or Gravity.END
+                val path = Path()
+                paint.getTextPath("H", 0, 1, 0f, 0f, path)
+                val bounds = RectF()
+                path.computeBounds(bounds, true)
+                val top = BluetoothDiscoverableLogic.capCentredPaddingTop(rowHeight, paint.fontMetricsInt.ascent, -bounds.top)
+                setPadding(0, top, padRight, 0)
+            } else {
+                setPadding(0, 0, padRight, 0)
+            }
+            visibility = View.GONE
+        }
+        row.addView(time, 1)
+        // The row changes the value colour when it gets or loses the focus: give the same colour to the time.
+        val rowFocusListener = row.onFocusChangeListener
+        row.setOnFocusChangeListener { v, hasFocus ->
+            rowFocusListener?.onFocusChange(v, hasFocus)
+            if (value != null) time.setTextColor(value.currentTextColor)
+        }
+        row.setOnClickListener {
+            clickFeedback()
+            val on = !BluetoothDiscoverableManager.isDiscoverable()
+            if (!BluetoothDiscoverableManager.setDiscoverable(on)) {
+                Toast.makeText(activity, localize("Cannot change Discoverable mode."), Toast.LENGTH_SHORT).show()
+            }
+            updateDiscoverableValue()
+        }
+        discoverableValue = value
+        discoverableTime = time
+        discoverableShown = discoverable
+        containerBtItems.addView(row)
+        updateDiscoverableValue()
+    }
+
+    private fun updateDiscoverableValue() {
+        val value = discoverableValue ?: return
+        val time = discoverableTime ?: return
+        if (value.parent?.parent != containerBtItems) return
+        val discoverable = BluetoothDiscoverableManager.isDiscoverable()
+        if (discoverable != discoverableShown) {
+            value.text = onOff(discoverable, localize)
+            discoverableShown = discoverable
+        }
+        val left = BluetoothDiscoverableLogic.timeLeftText(discoverable, BluetoothDiscoverableManager.remainingMs())
+        time.visibility = if (left == null) View.GONE else View.VISIBLE
+        if (left != null && time.text.toString() != left) time.text = left
     }
 
     @SuppressLint("MissingPermission")
@@ -281,7 +397,7 @@ class BluetoothController(
         }
         btnConnect.visibility = View.GONE
 
-        val btnUnpair = createTablerListButton(TablerIcons.TRASH, localize("Delete Device"), null, 0xFFFF5555.toInt(), 0xFFFF5555.toInt()).apply {
+        val btnUnpair = createTablerListButton(TablerIcons.TRASH, localize("Forget Device"), null, 0xFFFF5555.toInt(), 0xFFFF5555.toInt()).apply {
             visibility = View.GONE
             setOnClickListener {
                 clickFeedback()
@@ -350,8 +466,7 @@ class BluetoothController(
             connectBluetoothAudio(device)
         }
 
-        val insertIndex = Math.max(0, containerBtItems.childCount - 1)
-        containerBtItems.addView(btnDevice, insertIndex)
+        containerBtItems.addView(btnDevice)
     }
 
     private fun createDeviceRow(name: String, devIcon: Array<String>, isConnected: Boolean): View =
@@ -376,6 +491,7 @@ class BluetoothController(
 
         if (targetDevice.bondState != BluetoothDevice.BOND_BONDED) {
             Toast.makeText(activity, localize("Pairing with ") + targetDevice.name + "...", Toast.LENGTH_SHORT).show()
+            bondRequestedAddress = targetDevice.address
             try {
                 targetDevice.javaClass.getMethod("createBond").invoke(targetDevice)
             } catch (ignored: Exception) {}
@@ -567,8 +683,9 @@ class BluetoothController(
     }
 
     override fun onWheel(delta: Int, event: KeyEvent): Boolean {
-        // The scan button is above the list: down from it selects the first row, up from the first row selects it
-        val scanAbove = btnScanBt.visibility == View.VISIBLE
+        // The scan button is above the list: down from it selects the first row, up from the first row selects it.
+        // When it is a row of the list (above the devices), the general step moves from it.
+        val scanAbove = btnScanBt.visibility == View.VISIBLE && btnScanBt.parent != containerBtItems
         if (scanAbove && activity.currentFocus == btnScanBt && delta < 0) return false
         val toScan = scanAbove && delta < 0 && containerBtItems.hasFocus()
         if (RowFocus.step(containerBtItems, delta, !toScan && RowFocus.isLoopOn(activity)) == null) {

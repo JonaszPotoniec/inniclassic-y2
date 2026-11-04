@@ -48,7 +48,7 @@ object SettingsGroups {
             "Double-Click to Favorite"
         )),
         Group("Connectivity", listOf(
-            "Bluetooth", "Wi-Fi", "Cell Radio", "Web Server", "Ask on USB Connect"
+            "Bluetooth", "Wi-Fi", "Web Server", "Ask on USB Connect"
         )),
         Group("Library", listOf(
             "Clear Album Art & Info", "Jellyfin Sync", "Sync Scrobbles to Last.fm", "Last.fm Account"

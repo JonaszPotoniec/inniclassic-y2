@@ -201,9 +201,10 @@ class FmRadioManager private constructor(context: Context) {
                     "[ ! -c /dev/fm ] && mknod /dev/fm c 193 0 2>/dev/null; " +
                     "chmod 666 /dev/fm 2>/dev/null; " +
                     "chmod 666 /dev/FM50AF 2>/dev/null; " +
-                    "chown system:media /dev/fm 2>/dev/null; " +
-                    "setprop persist.radio.airplane_mode_on 0 2>/dev/null; " +
-                    "setprop ril.flightmode 0 2>/dev/null"
+                    "chown system:media /dev/fm 2>/dev/null" +
+                    (if (CellRadioManager.airplaneModeSparesFm(context)) "" else
+                        "; setprop persist.radio.airplane_mode_on 0 2>/dev/null" +
+                        "; setprop ril.flightmode 0 2>/dev/null")
 
         runSuQuiet(unblockCmd)
     }
@@ -307,7 +308,9 @@ class FmRadioManager private constructor(context: Context) {
         }
         AudioSources.app.radioStarts()
         try {
-            if (!ensureAirplaneModeOff()) {
+            if (CellRadioManager.airplaneModeSparesFm(context)) {
+                Log.i(TAG, "Airplane mode affects only the cell radio; FM keeps it")
+            } else if (!ensureAirplaneModeOff()) {
                 Log.w(TAG, "Continuing FM powerUp despite airplane-mode clear uncertainty")
             }
 
@@ -476,7 +479,7 @@ class FmRadioManager private constructor(context: Context) {
             return instance
         }
 
-        private fun runSuQuiet(cmd: String): Boolean {
+        internal fun runSuQuiet(cmd: String): Boolean {
             val suCandidates = arrayOf("su", "/system/xbin/su", "/system/bin/su")
             for (suBin in suCandidates) {
                 var p: Process? = null
