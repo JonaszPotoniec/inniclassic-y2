@@ -209,16 +209,27 @@ class UsbStorageUiManager(
 
     fun startUsbStorage() {
         if (usbStorageBusy) return
+        if (MediaLibraryManager.getInstance().isScanning) {
+            // The scan keeps files open; vold would kill this app to unmount the volume.
+            Toast.makeText(activity, localize("Wait for the library scan to finish, then try again."), Toast.LENGTH_LONG).show()
+            return
+        }
         usbStorageBusy = true
         pauseAllPlaybackForUsb()
         getExternalSdMountMonitor()?.setSuspended(true)
         Thread({
+            UsbMassStorageController.ensureMassStorageFunction()
             val ok = UsbMassStorageController.setEnabled(true)
+            if (!ok) {
+                UsbMassStorageController.restoreUsbFunction()
+            }
             activity.runOnUiThread {
                 usbStorageBusy = false
                 if (ok) {
                     showUsbStorageOverlay()
                 } else {
+                    // The function switch reconnects USB; do not ask again at once.
+                    lastUsbDialogShownMs = System.currentTimeMillis()
                     getExternalSdMountMonitor()?.setSuspended(false)
                     Toast.makeText(activity, localize("Couldn't connect as USB storage."), Toast.LENGTH_LONG).show()
                 }
@@ -231,12 +242,17 @@ class UsbStorageUiManager(
         usbStorageBusy = true
         Thread({
             val stillOn = UsbMassStorageController.setEnabled(false)
+            if (!stillOn) {
+                UsbMassStorageController.restoreUsbFunction()
+            }
             activity.runOnUiThread {
                 usbStorageBusy = false
                 if (stillOn) {
                     Toast.makeText(activity, localize("Couldn't eject USB storage."), Toast.LENGTH_LONG).show()
                     return@runOnUiThread
                 }
+                // The function switch reconnects USB; do not ask again at once.
+                lastUsbDialogShownMs = System.currentTimeMillis()
                 hideUsbStorageOverlay()
                 getExternalSdMountMonitor()?.setSuspended(false)
             }

@@ -529,6 +529,7 @@
   "Connect as Storage": "Connect as Storage",
   "Charge Only": "Charge Only",
   "Couldn't connect as USB storage.": "Couldn't connect as USB storage.",
+  "Wait for the library scan to finish, then try again.": "Wait for the library scan to finish, then try again.",
   "Couldn't eject USB storage.": "Couldn't eject USB storage.",
   "Connected": "Connected",
   "Eject before disconnecting.": "Eject before disconnecting.",

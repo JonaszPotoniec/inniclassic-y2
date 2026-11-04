@@ -527,6 +527,7 @@
   "Connect as Storage": "Подключить как накопитель",
   "Charge Only": "Только зарядка",
   "Couldn't connect as USB storage.": "Не удалось подключить как USB-накопитель.",
+  "Wait for the library scan to finish, then try again.": "Дождитесь окончания сканирования медиатеки и попробуйте снова.",
   "Couldn't eject USB storage.": "Не удалось извлечь USB-накопитель.",
   "Connected": "Подключено",
   "Eject before disconnecting.": "Извлеките перед отключением.",

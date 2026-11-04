@@ -338,6 +338,7 @@
   "Connect as Storage": "Conectar como almacenamiento",
   "Charge Only": "Solo cargar",
   "Couldn't connect as USB storage.": "No se pudo conectar como almacenamiento USB.",
+  "Wait for the library scan to finish, then try again.": "Espere a que termine el escaneo de la biblioteca y vuelva a intentarlo.",
   "Couldn't eject USB storage.": "No se pudo expulsar el almacenamiento USB.",
   "Connected": "Conectado",
   "Eject before disconnecting.": "Expulsar antes de desconectar.",

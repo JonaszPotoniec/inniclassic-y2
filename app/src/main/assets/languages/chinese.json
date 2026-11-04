@@ -338,6 +338,7 @@
   "Connect as Storage": "连接为存储设备",
   "Charge Only": "仅充电",
   "Couldn't connect as USB storage.": "无法连接为 USB 存储设备。",
+  "Wait for the library scan to finish, then try again.": "请等待媒体库扫描完成，然后重试。",
   "Couldn't eject USB storage.": "无法弹出 USB 存储设备。",
   "Connected": "已连接",
   "Eject before disconnecting.": "断开连接前请先弹出。",

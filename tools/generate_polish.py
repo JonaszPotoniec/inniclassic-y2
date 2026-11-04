@@ -529,6 +529,7 @@ polish_dict = {
   "Connect as Storage": "Podłącz jako pamięć",
   "Charge Only": "Tylko ładowanie",
   "Couldn't connect as USB storage.": "Nie udało się połączyć jako pamięć USB.",
+  "Wait for the library scan to finish, then try again.": "Poczekaj na koniec skanowania biblioteki i spróbuj ponownie.",
   "Couldn't eject USB storage.": "Nie udało się odmontować pamięci USB.",
   "Connected": "Połączono",
   "Eject before disconnecting.": "Wysuń przed odłączeniem.",

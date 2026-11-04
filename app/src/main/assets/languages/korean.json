@@ -338,6 +338,7 @@
   "Connect as Storage": "저장소로 연결",
   "Charge Only": "충전만",
   "Couldn't connect as USB storage.": "USB 저장소로 연결할 수 없습니다.",
+  "Wait for the library scan to finish, then try again.": "라이브러리 스캔이 완료될 때까지 기다린 후 다시 시도하세요.",
   "Couldn't eject USB storage.": "USB 저장소를 꺼낼 수 없습니다.",
   "Connected": "연결됨",
   "Eject before disconnecting.": "연결을 해제하기 전에 꺼내기를 누르세요.",

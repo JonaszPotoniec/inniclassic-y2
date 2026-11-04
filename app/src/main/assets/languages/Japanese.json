@@ -527,6 +527,7 @@
   "Connect as Storage": "ストレージとして接続",
   "Charge Only": "充電のみ",
   "Couldn't connect as USB storage.": "USBストレージとして接続できませんでした。",
+  "Wait for the library scan to finish, then try again.": "ライブラリのスキャンが完了するまで待ってから、もう一度お試しください。",
   "Couldn't eject USB storage.": "USBストレージを取り出せませんでした。",
   "Connected": "接続済み",
   "Eject before disconnecting.": "取り外す前に取り出しを行ってください。",
