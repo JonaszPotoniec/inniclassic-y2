@@ -30,6 +30,7 @@ class MigrationContext(
      */
     fun requestMediaRescan() {
         isMediaRescanRequested = true
+        migrationPrefs?.edit()?.putBoolean(MigrationManager.KEY_PENDING_MEDIA_RESCAN, true)?.commit()
     }
 
     /**

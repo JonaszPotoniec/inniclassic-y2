@@ -106,6 +106,19 @@ class AlbumCoverManager private constructor() {
         return File(StoragePaths.getThumbsCacheDir(), getHashKey(albumKey) + NO_ART_SUFFIX)
     }
 
+    /** Invalidates all cached thumbnail entries (memory and disk) for an album so it is freshly searched. */
+    fun invalidateAlbum(albumKey: String) {
+        if (albumKey.isBlank()) return
+        memoryCache.remove(albumKey)
+        noArtKeys.remove(albumKey)
+        try {
+            getDiskThumbFile(albumKey).delete()
+        } catch (_: Throwable) {}
+        try {
+            getNoArtMarkerFile(albumKey).delete()
+        } catch (_: Throwable) {}
+    }
+
     /** True when the album is known to have no art (memory only, no file access). */
     fun hasNoArt(albumKey: String?): Boolean {
         return albumKey != null && noArtKeys.contains(albumKey)
@@ -529,7 +542,7 @@ class AlbumCoverManager private constructor() {
             return inst!!
         }
         fun getAlbumKey(file: File?, album: String?): String {
-            val parent = if (file?.parentFile != null) file.parentFile.absolutePath else ""
+            val parent = file?.parentFile?.absolutePath ?: ""
             val safeAlbum = album ?: "Unknown Album"
             return "$parent - $safeAlbum"
         }

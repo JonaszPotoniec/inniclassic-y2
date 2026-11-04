@@ -40,6 +40,12 @@ class SongItem {
     /** True if the song is on a compilation album. [Compilations.mark] sets it for all tracks of the album. */
     var isCompilation: Boolean = false
 
+    /** Last modification time of the file in milliseconds for incremental change detection. */
+    var dateModified: Long = 0L
+
+    /** Size of the file in bytes for change detection. */
+    var fileSize: Long = 0L
+
     constructor(file: File, title: String, artist: String?, album: String?) {
         this.file = file
         this.title = title

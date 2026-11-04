@@ -110,14 +110,20 @@ class MediaLibraryManager private constructor() {
                 deduplicateLibrary(musicLibrary)
                 deduplicateLibrary(audiobookLibrary)
 
-                val existingMusic = HashSet<String>()
+                val existingMusic = HashMap<String, SongItem>()
                 synchronized(musicLibrary) {
-                    for (item in musicLibrary) existingMusic.add(normalizePathKey(item.file))
+                    for (item in musicLibrary) {
+                        existingMusic[normalizePathKey(item.file)] = item
+                        existingMusic[item.file.absolutePath.lowercase(java.util.Locale.US)] = item
+                    }
                 }
 
-                val existingBooks = HashSet<String>()
+                val existingBooks = HashMap<String, SongItem>()
                 synchronized(audiobookLibrary) {
-                    for (item in audiobookLibrary) existingBooks.add(normalizePathKey(item.file))
+                    for (item in audiobookLibrary) {
+                        existingBooks[normalizePathKey(item.file)] = item
+                        existingBooks[item.file.absolutePath.lowercase(java.util.Locale.US)] = item
+                    }
                 }
 
                 StoragePaths.invalidate()
@@ -140,6 +146,10 @@ class MediaLibraryManager private constructor() {
                 saveLibraryCache()
                 rebuildUniqueAlbumList()
                 AlbumCoverManager.getInstance().pregenerateThumbnails(uniqueAlbumList)
+
+                try {
+                    com.themoon.y1.migrations.MigrationManager.getInstance(context).clearPendingMediaRescan()
+                } catch (_: Throwable) {}
 
                 listener?.onComplete(musicLibrary.size, audiobookLibrary.size)
             } catch (t: Throwable) {
@@ -173,10 +183,168 @@ class MediaLibraryManager private constructor() {
         }
     }
 
-    private fun scanDirectory(
+    internal data class ExtractedAudioMetadata(
+        val title: String,
+        val artist: String,
+        val album: String,
+        val year: String,
+        val genre: String,
+        val albumArtist: String,
+        val composer: String,
+        val compilationTag: Boolean,
+        val trackNum: Int
+    )
+
+    internal fun extractAudioMetadata(f: File, isAudiobook: Boolean): ExtractedAudioMetadata {
+        var title = f.name
+        val dot = title.lastIndexOf(".")
+        if (dot > 0) title = title.substring(0, dot)
+
+        var artist = if (isAudiobook) "Unknown Author" else "Unknown Artist"
+        var album = if (isAudiobook) "Unknown Book" else "Unknown Album"
+        var year = "Unknown Year"
+        var genre = "Unknown Genre"
+        var albumArtist: String? = null
+        var composer: String? = null
+        var compilation = false
+        var trackNum = 0
+
+        try {
+            val lower = f.name.lowercase(java.util.Locale.US)
+            var t: String? = null
+            var a: String? = null
+            var al: String? = null
+            var y: String? = null
+            var g: String? = null
+            var aa: String? = null
+            var cp: String? = null
+            var cpl: String? = null
+            var trackStr: String? = null
+
+            val apm = AudioPlayerManager.getInstance()
+            if (lower.endsWith(".opus")) {
+                val tags = apm.extractOpusMetadata(f, false)
+                if (tags[0] != null) t = tags[0] as? String
+                if (tags[1] != null) a = tags[1] as? String
+                if (tags[2] != null) al = tags[2] as? String
+                if (tags[3] != null) y = tags[3] as? String
+                if (tags[4] != null) g = tags[4] as? String
+                if (tags.size > 6 && tags[6] != null) trackStr = tags[6] as? String
+                if (tags.size > 8 && tags[8] != null) aa = tags[8] as? String
+                if (tags.size > 9 && tags[9] != null) cp = tags[9] as? String
+                if (tags.size > 10 && tags[10] != null) cpl = tags[10] as? String
+            } else if (lower.endsWith(".flac")) {
+                val tags = apm.extractFlacMetadata(f, false)
+                if (tags[0] != null) t = tags[0] as? String
+                if (tags[1] != null) a = tags[1] as? String
+                if (tags[2] != null) al = tags[2] as? String
+                if (tags[3] != null) y = tags[3] as? String
+                if (tags[4] != null) g = tags[4] as? String
+                if (tags.size > 6 && tags[6] != null) trackStr = tags[6] as? String
+                if (tags.size > 8 && tags[8] != null) aa = tags[8] as? String
+                if (tags.size > 9 && tags[9] != null) cp = tags[9] as? String
+                if (tags.size > 10 && tags[10] != null) cpl = tags[10] as? String
+            } else if (lower.endsWith(".m4a") || lower.endsWith(".m4b")) {
+                val tags = apm.extractAlacMetadata(f, false)
+                if (tags[0] != null) t = tags[0] as? String
+                if (tags[1] != null) a = tags[1] as? String
+                if (tags[2] != null) al = tags[2] as? String
+                if (tags[3] != null) y = tags[3] as? String
+                if (tags[4] != null) g = tags[4] as? String
+                if (tags.size > 6 && tags[6] != null) trackStr = tags[6] as? String
+                if (tags.size > 8 && tags[8] != null) aa = tags[8] as? String
+                if (tags.size > 9 && tags[9] != null) cp = tags[9] as? String
+                if (tags.size > 10 && tags[10] != null) cpl = tags[10] as? String
+            } else if (lower.endsWith(".ogg")) {
+                val tags = apm.extractOggVorbisMetadata(f, false)
+                if (tags[0] != null) t = tags[0] as? String
+                if (tags[1] != null) a = tags[1] as? String
+                if (tags[2] != null) al = tags[2] as? String
+                if (tags[3] != null) y = tags[3] as? String
+                if (tags[4] != null) g = tags[4] as? String
+                if (tags.size > 6 && tags[6] != null) trackStr = tags[6] as? String
+                if (tags.size > 8 && tags[8] != null) aa = tags[8] as? String
+                if (tags.size > 9 && tags[9] != null) cp = tags[9] as? String
+                if (tags.size > 10 && tags[10] != null) cpl = tags[10] as? String
+            } else {
+                var mmr: android.media.MediaMetadataRetriever? = null
+                var fis: java.io.FileInputStream? = null
+                try {
+                    mmr = android.media.MediaMetadataRetriever()
+                    fis = java.io.FileInputStream(f)
+                    mmr.setDataSource(fis.fd)
+                    t = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_TITLE)
+                    a = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ARTIST)
+                    if (a.isNullOrEmpty()) a = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_AUTHOR)
+                    al = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ALBUM)
+                    trackStr = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER)
+                    y = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DATE)
+                    g = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_GENRE)
+                    aa = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST)
+                    cp = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_COMPOSER)
+                    cpl = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_COMPILATION)
+                } catch (_: Throwable) {
+                } finally {
+                    try { fis?.close() } catch (_: Throwable) {}
+                    try { mmr?.release() } catch (_: Throwable) {}
+                }
+            }
+
+            if (!t.isNullOrBlank()) title = t
+            if (!a.isNullOrBlank()) {
+                artist = a
+            } else {
+                try {
+                    val parentName = f.parentFile?.parentFile?.name
+                    val folderName = f.parentFile?.name
+                    if (!parentName.isNullOrEmpty() && !parentName.equals("Music", ignoreCase = true) && !parentName.equals("Audiobooks", ignoreCase = true) && !StoragePaths.isStorageVolumeName(parentName)) {
+                        artist = parentName
+                    } else if (!folderName.isNullOrEmpty() && !folderName.equals("Music", ignoreCase = true) && !folderName.equals("Audiobooks", ignoreCase = true) && !StoragePaths.isStorageVolumeName(folderName)) {
+                        artist = folderName
+                    }
+                } catch (_: Exception) {}
+            }
+
+            if (!al.isNullOrBlank()) {
+                album = al
+            } else {
+                val folderName = f.parentFile?.name
+                if (!folderName.isNullOrEmpty() && !folderName.equals("Music", ignoreCase = true) && !folderName.equals("Audiobooks", ignoreCase = true) && !StoragePaths.isStorageVolumeName(folderName)) {
+                    album = folderName
+                }
+            }
+
+            if (!y.isNullOrBlank()) year = y
+            if (!g.isNullOrBlank()) genre = g
+            albumArtist = if (!aa.isNullOrBlank()) aa else artist
+            if (!cp.isNullOrBlank()) composer = cp
+            compilation = com.themoon.y1.models.Compilations.parseFlag(cpl)
+
+            if (!trackStr.isNullOrEmpty()) {
+                trackNum = try {
+                    if (trackStr.contains("/")) trackStr.split("/")[0].trim().toInt()
+                    else trackStr.trim().toInt()
+                } catch (_: Exception) { 0 }
+            }
+        } catch (_: Throwable) {}
+
+        return ExtractedAudioMetadata(
+            title = title,
+            artist = artist,
+            album = album,
+            year = year,
+            genre = genre,
+            albumArtist = albumArtist ?: artist,
+            composer = composer ?: "Unknown Composer",
+            compilationTag = compilation,
+            trackNum = trackNum
+        )
+    }
+
+    internal fun scanDirectory(
         folder: File,
         targetList: MutableList<SongItem>,
-        existingPaths: MutableSet<String>,
+        existingMap: MutableMap<String, SongItem>,
         blacklist: Set<String>,
         startScanned: Int,
         total: Int,
@@ -189,7 +357,7 @@ class MediaLibraryManager private constructor() {
 
         for (f in files) {
             if (f.isDirectory) {
-                scanned = scanDirectory(f, targetList, existingPaths, blacklist, scanned, total, isAudiobook, listener)
+                scanned = scanDirectory(f, targetList, existingMap, blacklist, scanned, total, isAudiobook, listener)
             } else if (isAudioFile(f)) {
                 if (f.length() < 1024L) {
                     android.util.Log.w("MediaLibraryManager", "Skipping empty/corrupted file (< 1024 bytes): ${f.absolutePath}")
@@ -198,7 +366,17 @@ class MediaLibraryManager private constructor() {
                 if (blacklist.contains(f.absolutePath)) continue
 
                 val fileKey = normalizePathKey(f)
-                if (existingPaths.contains(fileKey) || existingPaths.contains(f.absolutePath)) {
+                val absKey = f.absolutePath.lowercase(java.util.Locale.US)
+                val existingItem = existingMap[fileKey] ?: existingMap[absKey]
+
+                val currentModified = f.lastModified()
+                val currentSize = f.length()
+
+                if (existingItem != null &&
+                    existingItem.dateModified > 0L &&
+                    Math.abs(existingItem.dateModified - currentModified) <= 2000L &&
+                    existingItem.fileSize == currentSize
+                ) {
                     scanned++
                     if (total > 0 && scanned % 10 == 0) {
                         listener?.onProgress(scanned, total)
@@ -206,144 +384,47 @@ class MediaLibraryManager private constructor() {
                     continue
                 }
 
-                var title = f.name
-                val dot = title.lastIndexOf(".")
-                if (dot > 0) title = title.substring(0, dot)
+                val meta = extractAudioMetadata(f, isAudiobook)
 
-                var artist = if (isAudiobook) "Unknown Author" else "Unknown Artist"
-                var album = if (isAudiobook) "Unknown Book" else "Unknown Album"
-                var year = "Unknown Year"
-                var genre = "Unknown Genre"
-                var albumArtist: String? = null
-                var composer: String? = null
-                var compilation = false
-                var trackNum = 0
+                if (existingItem != null) {
+                    val oldAlbum = existingItem.album
+                    val oldPath = existingItem.file.absolutePath
+                    val oldModified = existingItem.dateModified
+                    existingItem.file = f
+                    existingItem.title = meta.title
+                    existingItem.artist = meta.artist
+                    existingItem.album = meta.album
+                    existingItem.year = meta.year
+                    existingItem.genre = meta.genre
+                    existingItem.albumArtist = meta.albumArtist
+                    existingItem.composer = meta.composer
+                    existingItem.compilationTag = meta.compilationTag
+                    existingItem.dateModified = currentModified
+                    existingItem.fileSize = currentSize
 
-                try {
-                    val lower = f.name.lowercase(java.util.Locale.US)
-                    var t: String? = null
-                    var a: String? = null
-                    var al: String? = null
-                    var y: String? = null
-                    var g: String? = null
-                    var aa: String? = null
-                    var cp: String? = null
-                    var cpl: String? = null
-                    var trackStr: String? = null
+                    if (oldPath != f.absolutePath) {
+                        trackNumberMap.remove(oldPath)
+                    }
+                    trackNumberMap[f.absolutePath] = meta.trackNum
 
-                    val apm = AudioPlayerManager.getInstance()
-                    if (lower.endsWith(".opus")) {
-                        val tags = apm.extractOpusMetadata(f, false)
-                        if (tags[0] != null) t = tags[0] as? String
-                        if (tags[1] != null) a = tags[1] as? String
-                        if (tags[2] != null) al = tags[2] as? String
-                        if (tags[3] != null) y = tags[3] as? String
-                        if (tags[4] != null) g = tags[4] as? String
-                        if (tags.size > 6 && tags[6] != null) trackStr = tags[6] as? String
-                        if (tags.size > 8 && tags[8] != null) aa = tags[8] as? String
-                        if (tags.size > 9 && tags[9] != null) cp = tags[9] as? String
-                        if (tags.size > 10 && tags[10] != null) cpl = tags[10] as? String
-                    } else if (lower.endsWith(".flac")) {
-                        val tags = apm.extractFlacMetadata(f, false)
-                        if (tags[0] != null) t = tags[0] as? String
-                        if (tags[1] != null) a = tags[1] as? String
-                        if (tags[2] != null) al = tags[2] as? String
-                        if (tags[3] != null) y = tags[3] as? String
-                        if (tags[4] != null) g = tags[4] as? String
-                        if (tags.size > 6 && tags[6] != null) trackStr = tags[6] as? String
-                        if (tags.size > 8 && tags[8] != null) aa = tags[8] as? String
-                        if (tags.size > 9 && tags[9] != null) cp = tags[9] as? String
-                        if (tags.size > 10 && tags[10] != null) cpl = tags[10] as? String
-                    } else if (lower.endsWith(".m4a") || lower.endsWith(".m4b")) {
-                        val tags = apm.extractAlacMetadata(f, false)
-                        if (tags[0] != null) t = tags[0] as? String
-                        if (tags[1] != null) a = tags[1] as? String
-                        if (tags[2] != null) al = tags[2] as? String
-                        if (tags[3] != null) y = tags[3] as? String
-                        if (tags[4] != null) g = tags[4] as? String
-                        if (tags.size > 6 && tags[6] != null) trackStr = tags[6] as? String
-                        if (tags.size > 8 && tags[8] != null) aa = tags[8] as? String
-                        if (tags.size > 9 && tags[9] != null) cp = tags[9] as? String
-                        if (tags.size > 10 && tags[10] != null) cpl = tags[10] as? String
-                    } else if (lower.endsWith(".ogg")) {
-                        val tags = apm.extractOggVorbisMetadata(f, false)
-                        if (tags[0] != null) t = tags[0] as? String
-                        if (tags[1] != null) a = tags[1] as? String
-                        if (tags[2] != null) al = tags[2] as? String
-                        if (tags[3] != null) y = tags[3] as? String
-                        if (tags[4] != null) g = tags[4] as? String
-                        if (tags.size > 6 && tags[6] != null) trackStr = tags[6] as? String
-                        if (tags.size > 8 && tags[8] != null) aa = tags[8] as? String
-                        if (tags.size > 9 && tags[9] != null) cp = tags[9] as? String
-                        if (tags.size > 10 && tags[10] != null) cpl = tags[10] as? String
-                    } else {
-                        var mmr: android.media.MediaMetadataRetriever? = null
-                        var fis: java.io.FileInputStream? = null
-                        try {
-                            mmr = android.media.MediaMetadataRetriever()
-                            fis = java.io.FileInputStream(f)
-                            mmr.setDataSource(fis.fd)
-                            t = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_TITLE)
-                            a = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ARTIST)
-                            if (a.isNullOrEmpty()) a = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_AUTHOR)
-                            al = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ALBUM)
-                            trackStr = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER)
-                            y = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DATE)
-                            g = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_GENRE)
-                            aa = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST)
-                            cp = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_COMPOSER)
-                            cpl = mmr.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_COMPILATION)
-                        } catch (_: Throwable) {
-                        } finally {
-                            try { fis?.close() } catch (_: Throwable) {}
-                            try { mmr?.release() } catch (_: Throwable) {}
+                    if (oldModified > 0L) {
+                        val oldAlbumKey = AlbumCoverManager.getAlbumKey(f, oldAlbum)
+                        AlbumCoverManager.getInstance().invalidateAlbum(oldAlbumKey)
+                        if (oldAlbum != meta.album) {
+                            val newAlbumKey = AlbumCoverManager.getAlbumKey(f, meta.album)
+                            AlbumCoverManager.getInstance().invalidateAlbum(newAlbumKey)
                         }
                     }
-
-                    if (!t.isNullOrBlank()) title = t
-                    if (!a.isNullOrBlank()) {
-                        artist = a
-                    } else {
-                        try {
-                            val parentName = f.parentFile?.parentFile?.name
-                            val folderName = f.parentFile?.name
-                            if (!parentName.isNullOrEmpty() && !parentName.equals("Music", ignoreCase = true) && !parentName.equals("Audiobooks", ignoreCase = true) && !StoragePaths.isStorageVolumeName(parentName)) {
-                                artist = parentName
-                            } else if (!folderName.isNullOrEmpty() && !folderName.equals("Music", ignoreCase = true) && !folderName.equals("Audiobooks", ignoreCase = true) && !StoragePaths.isStorageVolumeName(folderName)) {
-                                artist = folderName
-                            }
-                        } catch (_: Exception) {}
-                    }
-
-                    if (!al.isNullOrBlank()) {
-                        album = al
-                    } else {
-                        val folderName = f.parentFile?.name
-                        if (!folderName.isNullOrEmpty() && !folderName.equals("Music", ignoreCase = true) && !folderName.equals("Audiobooks", ignoreCase = true) && !StoragePaths.isStorageVolumeName(folderName)) {
-                            album = folderName
-                        }
-                    }
-
-                    if (!y.isNullOrBlank()) year = y
-                    if (!g.isNullOrBlank()) genre = g
-                    albumArtist = if (!aa.isNullOrBlank()) aa else artist
-                    if (!cp.isNullOrBlank()) composer = cp
-                    compilation = com.themoon.y1.models.Compilations.parseFlag(cpl)
-
-                    if (!trackStr.isNullOrEmpty()) {
-                        trackNum = try {
-                            if (trackStr.contains("/")) trackStr.split("/")[0].trim().toInt()
-                            else trackStr.trim().toInt()
-                        } catch (_: Exception) { 0 }
-                    }
-                } catch (_: Throwable) {}
-
-                val song = SongItem(f, title, artist, album, year, genre, albumArtist, composer)
-                song.compilationTag = compilation
-                targetList.add(song)
-                existingPaths.add(fileKey)
-                existingPaths.add(f.absolutePath)
-                trackNumberMap[f.absolutePath] = trackNum
+                } else {
+                    val song = SongItem(f, meta.title, meta.artist, meta.album, meta.year, meta.genre, meta.albumArtist, meta.composer)
+                    song.compilationTag = meta.compilationTag
+                    song.dateModified = currentModified
+                    song.fileSize = currentSize
+                    targetList.add(song)
+                    existingMap[fileKey] = song
+                    existingMap[absKey] = song
+                    trackNumberMap[f.absolutePath] = meta.trackNum
+                }
 
                 scanned++
                 if (scanned % 500 == 0) {
@@ -394,7 +475,7 @@ class MediaLibraryManager private constructor() {
         }
     }
 
-    private fun writeSongListJson(w: Writer, list: List<SongItem>) {
+    internal fun writeSongListJson(w: Writer, list: List<SongItem>) {
         var first = true
         synchronized(list) {
             for (song in list) {
@@ -420,6 +501,14 @@ class MediaLibraryManager private constructor() {
                 val trackNum = trackNumberMap[song.file.absolutePath] ?: 0
                 w.write(",\"trackNum\":")
                 w.write(trackNum.toString())
+                if (song.dateModified > 0L) {
+                    w.write(",\"dateModified\":")
+                    w.write(song.dateModified.toString())
+                }
+                if (song.fileSize > 0L) {
+                    w.write(",\"fileSize\":")
+                    w.write(song.fileSize.toString())
+                }
                 // Only for compilation tracks: a missing field reads as false (also in caches from before).
                 if (song.compilationTag) w.write(",\"compilation\":true")
                 w.write("}")
@@ -521,6 +610,8 @@ class MediaLibraryManager private constructor() {
                     o.optString("composer", "")
                 )
                 song.compilationTag = o.optBoolean("compilation", false)
+                song.dateModified = o.optLong("dateModified", o.optLong("modified", 0L))
+                song.fileSize = o.optLong("fileSize", o.optLong("size", 0L))
                 target.add(song)
                 trackNumbers[f.absolutePath] = o.optInt("trackNum", 0)
             } catch (ignored: Throwable) {}

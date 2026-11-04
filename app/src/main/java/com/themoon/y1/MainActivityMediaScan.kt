@@ -82,6 +82,7 @@ internal fun MainActivity.startMediaLibraryScanInternal() {
             }
         }
         override fun onComplete(musicCount: Int, booksCount: Int) {
+            com.themoon.y1.migrations.MigrationManager.getInstance(this@startMediaLibraryScanInternal).clearPendingMediaRescan()
             runOnUiThread {
                 MainActivity.customLibrary.clear()
                 MainActivity.customLibrary.addAll(mlm.musicLibrary)

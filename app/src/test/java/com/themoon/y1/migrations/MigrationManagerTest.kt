@@ -135,6 +135,34 @@ class MigrationManagerTest {
         assertTrue(context.isMediaRescanRequested)
     }
 
+    @Test
+    fun testMigration006PopulateTrackTimestampsRegistersAndRequestsRescan() {
+        val m6 = Migration006PopulateTrackTimestamps()
+        assertEquals(6, m6.version)
+        assertEquals("006_populate_track_timestamps", m6.id)
+
+        val context = MigrationContext(null, mockPrefs, mockPrefs, 0)
+        assertFalse(context.isMediaRescanRequested)
+        assertFalse(mockPrefs.getBoolean(MigrationManager.KEY_PENDING_MEDIA_RESCAN, false))
+        m6.migrate(context)
+        assertTrue(context.isMediaRescanRequested)
+        assertTrue(mockPrefs.getBoolean(MigrationManager.KEY_PENDING_MEDIA_RESCAN, false))
+    }
+
+    @Test
+    fun testPendingMediaRescanFlagCanBeSetAndCleared() {
+        val manager = MigrationManager(null, mockPrefs)
+        assertFalse(manager.isPendingMediaRescan())
+
+        manager.setPendingMediaRescan(true)
+        assertTrue(manager.isPendingMediaRescan())
+        assertTrue(mockPrefs.getBoolean(MigrationManager.KEY_PENDING_MEDIA_RESCAN, false))
+
+        manager.clearPendingMediaRescan()
+        assertFalse(manager.isPendingMediaRescan())
+        assertFalse(mockPrefs.getBoolean(MigrationManager.KEY_PENDING_MEDIA_RESCAN, false))
+    }
+
     // In-memory SharedPreferences for isolated JVM testing
     private class MockSharedPreferences : SharedPreferences {
         private val map = mutableMapOf<String, Any?>()

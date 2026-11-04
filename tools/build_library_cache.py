@@ -126,6 +126,14 @@ def scan_folder(local_root: Path, device_root: str):
             except Exception as e:
                 print(f"  ! couldn't read tags from {local_path}: {e}", file=sys.stderr)
 
+            try:
+                st = local_path.stat()
+                date_modified = int(st.st_mtime) * 1000
+                file_size = st.st_size
+            except Exception:
+                date_modified = 0
+                file_size = 0
+
             entry = {
                 "path": device_path,
                 "title": title,
@@ -137,6 +145,10 @@ def scan_folder(local_root: Path, device_root: str):
                 "composer": composer,
                 "trackNum": track_num,
             }
+            if date_modified > 0:
+                entry["dateModified"] = date_modified
+            if file_size > 0:
+                entry["fileSize"] = file_size
             # As the app writes it: only for compilation tracks; a missing field reads as false.
             if compilation:
                 entry["compilation"] = True

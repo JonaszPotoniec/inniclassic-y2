@@ -37,6 +37,7 @@ open class MigrationManager {
         registerMigration(Migration003MigrateVideoDirectories())
         registerMigration(Migration004MoveMisplacedPrefs())
         registerMigration(Migration005MergeAudiobookBookmarks())
+        registerMigration(Migration006PopulateTrackTimestamps())
     }
 
     /**
@@ -114,12 +115,24 @@ open class MigrationManager {
         return appliedCount
     }
 
+    fun isPendingMediaRescan(): Boolean =
+        prefs.getBoolean(KEY_PENDING_MEDIA_RESCAN, false)
+
+    fun setPendingMediaRescan(pending: Boolean) {
+        prefs.edit().putBoolean(KEY_PENDING_MEDIA_RESCAN, pending).commit()
+    }
+
+    fun clearPendingMediaRescan() {
+        setPendingMediaRescan(false)
+    }
+
     companion object {
         private const val TAG = "MigrationManager"
         const val PREFS_NAME: String = "Y1_MIGRATIONS"
         const val KEY_CURRENT_VERSION: String = "current_version"
         const val PREFIX_APPLIED: String = "applied_"
         const val PREFIX_APPLIED_TIME: String = "applied_time_"
+        const val KEY_PENDING_MEDIA_RESCAN: String = "pending_media_rescan"
 
         @Volatile
         private var instance: MigrationManager? = null
