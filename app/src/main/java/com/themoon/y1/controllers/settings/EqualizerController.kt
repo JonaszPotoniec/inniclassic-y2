@@ -17,6 +17,7 @@ import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.core.extensions.onOff
 import com.themoon.y1.managers.AudioEffectManager
+import com.themoon.y1.managers.AudioEffectPlan
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.EqSliderView
@@ -31,7 +32,6 @@ import com.themoon.y1.views.TablerIcons
 class EqualizerController(
     private val activity: Activity,
     override val rootView: ViewGroup,
-    private val customBandLevels: IntArray,
     private val eqPresetNames: List<String>,
     private val createSettingRow: (title: String, value: String) -> LinearLayout,
     private val createCategoryHeader: (title: String) -> Unit,
@@ -70,6 +70,8 @@ class EqualizerController(
         set(value) = prefs.edit().putInt("crossfeed_step", value).apply()
 
     private var currentAdjustingBand: Short = -1
+    /** The sliders of the open Graphic Equalizer, one for each band. */
+    private val bandSliders = ArrayList<EqSliderView>()
     private var isGraphicEqOpen = false
     private var isProfileSelectorOpen = false
 
@@ -196,11 +198,7 @@ class EqualizerController(
             prefs.edit().putString("custom_eq_list", listStr).apply()
             currentEqProfile = "custom_$newName"
 
-            for (i in customBandLevels.indices) {
-                customBandLevels[i] = 0
-            }
-            AudioEffectManager.getInstance().saveCustomEqProfile(newName)
-            AudioEffectManager.getInstance().exportEqProfileToFile(newName)
+            AudioEffectManager.getInstance().resetCustomEqProfile(newName)
             AudioEffectManager.getInstance().applyEqProfile()
             buildGraphicEqualizerUI()
         }
@@ -255,12 +253,14 @@ class EqualizerController(
             intArrayOf(60000, 230000, 910000, 3600000, 14000000)
         }
 
-        val levels = customBandLevels
+        // The saved levels are the levels that play (AudioEffectManager reads the same prefs)
+        val profileName = currentEqProfile.removePrefix("custom_")
+        bandSliders.clear()
 
         for (i in 0 until bands) {
             val bandIdx = i.toShort()
             val freq = centerFreqs[i.toInt()] / 1000
-            val currentLevel = if (i < levels.size) levels[i.toInt()] else 0
+            val currentLevel = prefs.getInt(AudioEffectPlan.bandLevelKey(profileName, i), 0)
 
             val bandLayout = LinearLayout(activity).apply {
                 orientation = LinearLayout.VERTICAL
@@ -277,6 +277,7 @@ class EqualizerController(
                 setLevel(currentLevel)
                 layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1.0f)
             }
+            bandSliders.add(slider)
 
             val tvFreq = TextView(activity).apply {
                 text = if (freq >= 1000) "${freq / 1000}k" else "$freq"
@@ -393,29 +394,23 @@ class EqualizerController(
         })
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (isGraphicEqOpen && currentAdjustingBand >= 0) {
-            val delta = when (keyCode) {
-                21 -> 100 // CCW / Up
-                22 -> -100 // CW / Down
-                else -> 0
-            }
-            if (delta != 0) {
-                val levels = customBandLevels
-                val idx = currentAdjustingBand.toInt()
-                if (idx in levels.indices) {
-                    var newL = levels[idx] + delta
-                    if (newL > 1500) newL = 1500
-                    if (newL < -1500) newL = -1500
-                    levels[idx] = newL
-                    AudioEffectManager.getInstance().applyEqProfile()
-                    buildGraphicEqualizerUI()
-                }
-                clickFeedback()
-                return true
-            }
+    // The band edit is a wheel step (onWheel), so a general wheel step of the router does not take it first
+    override fun onWheel(delta: Int, event: KeyEvent): Boolean {
+        if (!isGraphicEqOpen || currentAdjustingBand < 0) return false
+        val idx = currentAdjustingBand.toInt()
+        if (idx in bandSliders.indices) {
+            val name = currentEqProfile.removePrefix("custom_")
+            // CCW (up) raises the band, CW (down) lowers it
+            val level = AudioEffectPlan.stepBandLevel(prefs.getInt(AudioEffectPlan.bandLevelKey(name, idx), 0), -100 * delta)
+            AudioEffectManager.getInstance().setCustomBandLevel(name, idx, level)
+            // Update the slider in place: a rebuild would end the band edit and move the focus to the first band
+            bandSliders[idx].setLevel(level)
         }
+        clickFeedback()
+        return true
+    }
 
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             if (isGraphicEqOpen || isProfileSelectorOpen) {
                 buildEqualizerSettingsUI()

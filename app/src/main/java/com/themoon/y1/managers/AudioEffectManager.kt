@@ -1,11 +1,11 @@
 package com.themoon.y1.managers
 
 import android.content.SharedPreferences
+import android.media.audiofx.AudioEffect
 import android.media.audiofx.BassBoost
 import android.media.audiofx.Equalizer
 import android.media.audiofx.LoudnessEnhancer
 import android.media.audiofx.Virtualizer
-import android.os.Build
 import android.widget.Toast
 import com.themoon.y1.MainActivity
 import com.themoon.y1.StoragePaths
@@ -22,118 +22,155 @@ import java.util.ArrayList
  */
 class AudioEffectManager private constructor() {
 
-    fun ensureAudioEffectsReady() {
+    /** Makes, sets up or releases the effects for the current audio session. Same as [syncAudioEffects]. */
+    fun ensureAudioEffectsReady() = syncAudioEffects()
+
+    fun applyAudioEffects() = syncAudioEffects()
+
+    fun applySoundCheck() = syncAudioEffects()
+
+    fun applyEqProfile() = syncAudioEffects()
+
+    /**
+     * Reads the sound settings, and runs only the effects that change the sound ([AudioEffectPlan]).
+     * An effect with a neutral setting is released, so the effect bundle does no work for it.
+     * Call this when a setting changes and when the audio session changes.
+     */
+    fun syncAudioEffects() {
         val main = MainActivity.instance ?: return
-        try {
-            val sessionId = AudioPlayerManager.getInstance().getAudioSessionId()
-            if (main.equalizer == null || main.currentAudioSessionId != sessionId) {
-                main.equalizer?.release()
-                main.equalizer = Equalizer(0, sessionId).apply { setEnabled(true) }
+        val player = AudioPlayerManager.getInstance()
+        val settings = readSettings(main.prefs)
+        val plan = AudioEffectPlan.from(settings)
+
+        main.isSoftwareEqEnabled = settings.softwareEq
+        main.isSoundCheckEnabled = settings.soundCheck
+
+        // Software DSP (ExoPlayer): with a neutral setting it only copies the buffer.
+        if (plan.softwareEq) {
+            for (i in 0 until AudioEffectPlan.SOFTWARE_EQ_BANDS) {
+                player.customEqProcessor.setBandLevel(i, settings.eqBandLevels.getOrElse(i) { 0 } / 100.0f)
             }
-            if (main.bassBoost == null || main.currentAudioSessionId != sessionId) {
-                main.bassBoost?.release()
-                main.bassBoost = BassBoost(0, sessionId).apply { setEnabled(true) }
-            }
-            if (main.virtualizer == null || main.currentAudioSessionId != sessionId) {
-                main.virtualizer?.release()
-                main.virtualizer = Virtualizer(0, sessionId).apply { setEnabled(true) }
-            }
-            if (Build.VERSION.SDK_INT >= 19 && (main.loudnessEnhancer == null || main.currentAudioSessionId != sessionId)) {
-                main.loudnessEnhancer?.release()
-                main.loudnessEnhancer = LoudnessEnhancer(sessionId)
-            }
+        }
+        player.customEqProcessor.setEnabled(plan.softwareEq)
+        player.crossfeedProcessor.setIntensity(if (plan.crossfeed) settings.crossfeedStep else 0)
+
+        val sessionId = player.getAudioSessionId()
+        if (sessionId != main.currentAudioSessionId) {
+            releaseSessionEffects(main)
             main.currentAudioSessionId = sessionId
-        } catch (ignored: Exception) {}
-    }
+        }
+        // Session 0 is the global output mix: never attach effects to it.
+        if (sessionId <= 0) {
+            releaseSessionEffects(main)
+            return
+        }
 
-    fun applyAudioEffects() {
-        val main = MainActivity.instance ?: return
-        ensureAudioEffectsReady()
-
-        AudioPlayerManager.getInstance().crossfeedProcessor.setIntensity(main.currentCrossfeedStep)
-
-        val bb = main.bassBoost ?: return
-        val virt = main.virtualizer ?: return
-        try {
-            var bassStrength = (main.currentBassBoostStep * 333).toShort()
-            if (main.currentBassBoostStep == 3) bassStrength = 1000
-            if (bb.strengthSupported) bb.setStrength(bassStrength)
-
-            var virtStrength = (main.currentVirtualizerStep * 333).toShort()
-            if (main.currentVirtualizerStep == 3) virtStrength = 1000
-            if (virt.strengthSupported) virt.setStrength(virtStrength)
-        } catch (ignored: Exception) {}
-
-        applySoundCheck()
-    }
-
-    fun applySoundCheck() {
-        val main = MainActivity.instance
-        if (Build.VERSION.SDK_INT < 19 || main == null || main.loudnessEnhancer == null) return
-        try {
-            if (main.isSoundCheckEnabled) {
-                main.loudnessEnhancer?.setTargetGain(500)
-                main.loudnessEnhancer?.setEnabled(true)
+        main.equalizer = keepEffect(main.equalizer, plan.hardwareEq, { Equalizer(0, sessionId) }) { eq ->
+            val preset = AudioEffectPlan.presetIndex(settings.eqProfile)
+            if (preset != null) {
+                if (preset >= eq.numberOfPresets) return@keepEffect false
+                eq.usePreset(preset.toShort())
             } else {
-                main.loudnessEnhancer?.setEnabled(false)
+                val bands = minOf(eq.numberOfBands.toInt(), settings.eqBandLevels.size)
+                for (i in 0 until bands) eq.setBandLevel(i.toShort(), settings.eqBandLevels[i].toShort())
             }
-        } catch (ignored: Exception) {}
+            true
+        }
+        main.bassBoost = keepEffect(main.bassBoost, plan.bassBoost, { BassBoost(0, sessionId) }) { bb ->
+            if (bb.strengthSupported) bb.setStrength(AudioEffectPlan.strengthForStep(settings.bassBoostStep))
+            true
+        }
+        main.virtualizer = keepEffect(main.virtualizer, plan.virtualizer, { Virtualizer(0, sessionId) }) { virt ->
+            if (virt.strengthSupported) virt.setStrength(AudioEffectPlan.strengthForStep(settings.virtualizerStep))
+            true
+        }
+        main.loudnessEnhancer = keepEffect(main.loudnessEnhancer, plan.loudnessEnhancer, { LoudnessEnhancer(sessionId) }) { le ->
+            le.setTargetGain(SOUND_CHECK_GAIN_MB)
+            true
+        }
     }
 
-    fun applyEqProfile() {
-        val main = MainActivity.instance ?: return
-        ensureAudioEffectsReady()
+    private fun readSettings(prefs: SharedPreferences): AudioEffectSettings {
+        val softwareEq = prefs.getBoolean("software_eq_enabled", false)
+        val profile = prefs.getString("eq_profile_id", "preset_0") ?: "preset_0"
+        val name = AudioEffectPlan.levelsName(profile, softwareEq)
+        val levels = if (name == null) IntArray(0) else IntArray(AudioEffectPlan.bandCount(softwareEq)) {
+            prefs.getInt(AudioEffectPlan.bandLevelKey(name, it), 0)
+        }
+        return AudioEffectSettings(
+            softwareEq = softwareEq,
+            eqProfile = profile,
+            eqBandLevels = levels,
+            bassBoostStep = prefs.getInt("bass_boost_step", 0),
+            virtualizerStep = prefs.getInt("virtualizer_step", 0),
+            crossfeedStep = prefs.getInt("crossfeed_step", 0),
+            soundCheck = prefs.getBoolean("sound_check_enabled", false)
+        )
+    }
 
+    /**
+     * Returns the effect, set up and enabled, when [needed]; makes it first if [effect] is null.
+     * Otherwise (or when [configure] returns false or fails) releases it and returns null.
+     */
+    private inline fun <T : AudioEffect> keepEffect(effect: T?, needed: Boolean, create: () -> T, configure: (T) -> Boolean): T? {
+        if (!needed) {
+            release(effect)
+            return null
+        }
+        var e: T? = effect
         try {
-            if (main.isSoftwareEqEnabled) {
-                main.equalizer?.setEnabled(false)
-                AudioPlayerManager.getInstance().customEqProcessor.setEnabled(true)
-
-                var name = main.currentEqProfile.replace("custom_", "")
-                if (main.currentEqProfile.startsWith("preset_")) name = "Flat"
-
-                for (i in 0 until 10) {
-                    val level = main.prefs.getInt("eq_custom_" + name + "_band_" + i, 0)
-                    main.customBandLevels[i] = level
-                    AudioPlayerManager.getInstance().customEqProcessor.setBandLevel(i, level / 100.0f)
-                }
-                main.prefs.edit().putString("eq_profile_id", main.currentEqProfile).commit()
-            } else {
-                AudioPlayerManager.getInstance().customEqProcessor.setEnabled(false)
-                val eq = main.equalizer ?: return
-                eq.setEnabled(true)
-
-                if (main.currentEqProfile.startsWith("preset_")) {
-                    val pIdx = main.currentEqProfile.replace("preset_", "").toInt()
-                    if (pIdx < eq.numberOfPresets) {
-                        eq.usePreset(pIdx.toShort())
-                        main.currentEqPresetIndex = pIdx
-                        main.prefs.edit().putInt("eq_preset", main.currentEqPresetIndex)
-                            .putString("eq_profile_id", main.currentEqProfile).commit()
-                    }
-                } else {
-                    val name = main.currentEqProfile.replace("custom_", "")
-                    val bands = eq.numberOfBands
-                    for (i in 0 until bands) {
-                        val level = main.prefs.getInt("eq_custom_" + name + "_band_" + i, 0)
-                        main.customBandLevels[i] = level
-                        eq.setBandLevel(i.toShort(), level.toShort())
-                    }
-                    main.prefs.edit().putString("eq_profile_id", main.currentEqProfile).commit()
-                }
+            if (e == null) e = create()
+            if (!configure(e)) {
+                release(e)
+                return null
             }
-        } catch (ignored: Exception) {}
+            if (!e.enabled) e.setEnabled(true)
+            return e
+        } catch (ignored: Exception) {
+            release(e)
+            return null
+        }
     }
 
-    fun saveCustomEqProfile(name: String) {
+    private fun release(effect: AudioEffect?) {
+        try { effect?.release() } catch (ignored: Exception) {}
+    }
+
+    private fun releaseSessionEffects(main: MainActivity) {
+        release(main.equalizer)
+        release(main.bassBoost)
+        release(main.virtualizer)
+        release(main.loudnessEnhancer)
+        main.equalizer = null
+        main.bassBoost = null
+        main.virtualizer = null
+        main.loudnessEnhancer = null
+    }
+
+    /**
+     * Saves one band level of the custom profile [name] in the prefs (the levels that [syncAudioEffects] reads)
+     * and in the profile file, then applies it.
+     */
+    fun setCustomBandLevel(name: String, band: Int, level: Int) {
         val main = MainActivity.instance ?: return
-        val eq = main.equalizer ?: return
-        val bands = eq.numberOfBands
+        main.prefs.edit().putInt(AudioEffectPlan.bandLevelKey(name, band), level).apply()
+        exportEqProfileToFile(name)
+        syncAudioEffects()
+    }
+
+    /** Save Current Configuration: writes the levels of the custom profile [name] (in the prefs) to its file. */
+    fun saveCustomEqProfile(name: String) = exportEqProfileToFile(name)
+
+    /** Sets all band levels of the custom profile [name] to 0 (flat), in the prefs and in the profile file. */
+    fun resetCustomEqProfile(name: String) {
+        val main = MainActivity.instance ?: return
+        val bands = AudioEffectPlan.bandCount(main.prefs.getBoolean("software_eq_enabled", false))
         val editor = main.prefs.edit()
         for (i in 0 until bands) {
-            editor.putInt("eq_custom_" + name + "_band_" + i, main.customBandLevels[i])
+            editor.putInt(AudioEffectPlan.bandLevelKey(name, i), 0)
         }
         editor.commit()
+        exportEqProfileToFile(name)
     }
 
     fun deleteCustomEqProfile(name: String) {
@@ -161,13 +198,17 @@ class AudioEffectManager private constructor() {
         editor.putString("custom_eq_list", sb.toString())
 
         for (i in 0 until 32) {
-            editor.remove("eq_custom_" + name + "_band_" + i)
+            editor.remove(AudioEffectPlan.bandLevelKey(name, i))
         }
         editor.commit()
 
         Toast.makeText(main, "Profile Deleted Completely.", Toast.LENGTH_SHORT).show()
     }
 
+    /**
+     * Writes the levels of the custom profile [name] from the prefs to its file in the EQ folder.
+     * [loadAndSyncExternalEqProfiles] reads the files back into the prefs, so each change must also go to the file.
+     */
     fun exportEqProfileToFile(name: String) {
         val main = MainActivity.instance ?: return
         try {
@@ -179,9 +220,9 @@ class AudioEffectManager private constructor() {
             json.put("profile_name", name)
 
             val bandsArray = JSONArray()
-            val bands = main.equalizer?.numberOfBands?.toInt() ?: 5
+            val bands = AudioEffectPlan.bandCount(main.prefs.getBoolean("software_eq_enabled", false))
             for (i in 0 until bands) {
-                bandsArray.put(main.prefs.getInt("eq_custom_" + name + "_band_" + i, 0))
+                bandsArray.put(main.prefs.getInt(AudioEffectPlan.bandLevelKey(name, i), 0))
             }
             json.put("bands", bandsArray)
 
@@ -220,7 +261,7 @@ class AudioEffectManager private constructor() {
 
                             if (bandsArray != null) {
                                 for (i in 0 until bandsArray.length()) {
-                                    editor.putInt("eq_custom_" + name + "_band_" + i, bandsArray.getInt(i))
+                                    editor.putInt(AudioEffectPlan.bandLevelKey(name, i), bandsArray.getInt(i))
                                 }
                                 if (!validCustomList.contains(name)) {
                                     validCustomList.add(name)
@@ -246,6 +287,9 @@ class AudioEffectManager private constructor() {
     }
 
     companion object {
+        /** Sound Check gain of the LoudnessEnhancer, in millibels. */
+        private const val SOUND_CHECK_GAIN_MB = 500
+
         @Volatile
         private var instance: AudioEffectManager? = null
         @Synchronized

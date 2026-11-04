@@ -27,9 +27,16 @@ class Y1EqAudioProcessor : AudioProcessor {
     private val filters = Array(2) { Array(10) { BiquadFilter() } }
     private val currentGains = FloatArray(10)
 
+    // True when a band has a gain other than 0 dB. With all bands at 0 dB the filters do not change the sound.
+    @Volatile
+    private var hasGain = false
+    // True while the last buffer went through the filters.
+    private var filtersInUse = false
+
     fun setBandLevel(bandIndex: Int, dbGain: Float) {
         if (bandIndex < 0 || bandIndex >= 10) return
         currentGains[bandIndex] = dbGain
+        hasGain = currentGains.any { it != 0f }
 
         if (outputAudioFormat.sampleRate > 0) {
             val fs = outputAudioFormat.sampleRate.toFloat()
@@ -47,6 +54,7 @@ class Y1EqAudioProcessor : AudioProcessor {
     }
 
     fun setEnabled(enabled: Boolean) {
+        if (enabled == isEnabledFlag) return
         this.isEnabledFlag = enabled
         flush()
     }
@@ -71,13 +79,20 @@ class Y1EqAudioProcessor : AudioProcessor {
             buffer.clear()
         }
 
-        if (!isEnabledFlag || !isFormatSupported) {
+        // Off, or a flat curve: copy the buffer, with no work for each sample.
+        if (!isEnabledFlag || !isFormatSupported || !hasGain) {
+            filtersInUse = false
             if (inputBuffer.hasRemaining()) {
                 buffer.put(inputBuffer)
             }
             buffer.flip()
             outputBuffer = buffer
             return
+        }
+        if (!filtersInUse) {
+            // The filter state is from before the bypass: start again from silence.
+            resetFilterStates()
+            filtersInUse = true
         }
 
         val channelCount = outputAudioFormat.channelCount
@@ -127,15 +142,19 @@ class Y1EqAudioProcessor : AudioProcessor {
         inputEnded = false
         outputAudioFormat = pendingAudioFormat
 
-        for (ch in 0 until 2) {
-            for (band in 0 until 10) {
-                filters[ch][band].reset()
-            }
-        }
+        resetFilterStates()
 
         if (outputAudioFormat.sampleRate > 0) {
             for (band in 0 until 10) {
                 setBandLevel(band, currentGains[band])
+            }
+        }
+    }
+
+    private fun resetFilterStates() {
+        for (ch in 0 until 2) {
+            for (band in 0 until 10) {
+                filters[ch][band].reset()
             }
         }
     }

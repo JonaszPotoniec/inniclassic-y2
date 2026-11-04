@@ -527,4 +527,37 @@ class Y1EqAudioProcessorParityTest {
         processor.flush()
         assertFalse("isEnded should be false after flush", processor.isEnded)
     }
+
+    @Test
+    fun testQueueInput_flatCurveWhenEnabledIsBitExactPassthrough() {
+        processor.configure(AudioFormat(44100, 2, C.ENCODING_PCM_16BIT))
+        processor.setEnabled(true)
+        for (i in 0 until 10) processor.setBandLevel(i, 0.0f)
+
+        val input = createPcm16Buffer(200) { i -> (i * 157 - 15000).toShort() }
+        val expected = ByteArray(input.remaining())
+        input.duplicate().get(expected)
+
+        processor.queueInput(input)
+        val output = processor.output
+        val actual = ByteArray(output.remaining())
+        output.get(actual)
+        assertArrayEquals("A flat curve must not change the samples", expected, actual)
+
+        val filter0 = getFilters()[0][0]!!
+        assertEquals("A flat curve must not run the filters", 0f, getFilterCoeff(filter0, "x1"), 0f)
+    }
+
+    @Test
+    fun testQueueInput_gainAfterFlatCurveRunsFilters() {
+        processor.configure(AudioFormat(44100, 2, C.ENCODING_PCM_16BIT))
+        processor.setEnabled(true)
+        processor.queueInput(createPcm16Buffer(8) { 1000.toShort() })
+        processor.output
+
+        processor.setBandLevel(5, 6.0f)
+        processor.queueInput(createPcm16Buffer(8) { 1000.toShort() })
+        processor.output
+        assertTrue("A band gain must run the filters", getFilterCoeff(getFilters()[0][5]!!, "x1") != 0f)
+    }
 }

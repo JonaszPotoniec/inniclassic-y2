@@ -34,7 +34,8 @@ class VideoPlayerManager private constructor() {
     fun applyMasterVolume() {
         val player = mediaPlayer ?: return
         try {
-            val percent = Math.round(currentMasterVolume * 100.0f)
+            // LibVLC volume is in whole percents: keep 1 % (-40 dB) for a quiet step, so only step 0 mutes.
+            val percent = if (currentMasterVolume > 0f) Math.round(currentMasterVolume * 100.0f).coerceAtLeast(1) else 0
             player.volume = percent
         } catch (ignored: Throwable) {}
     }
@@ -51,6 +52,7 @@ class VideoPlayerManager private constructor() {
     }
 
     fun playVideo(context: Context, videoFile: File, surfaceView: SurfaceView) {
+        AudioSources.app.videoStarts()
         ensurePlayer(context)
 
         val player = mediaPlayer ?: return

@@ -23,12 +23,16 @@ class Y1CrossfeedAudioProcessor : AudioProcessor {
     private var buffer: ByteBuffer = EMPTY_BUFFER
     private var inputEnded = false
 
+    private var intensity = 0
     private var crossfeedLevel = 0.0f
     private var alpha = 0.0f
     private var lastL = 0.0f
     private var lastR = 0.0f
 
     fun setIntensity(level: Int) {
+        // Same level again (each track start applies the settings): keep the filter state, no flush.
+        if (level == intensity) return
+        intensity = level
         if (level == 0) {
             isActiveFlag = false
             crossfeedLevel = 0.0f

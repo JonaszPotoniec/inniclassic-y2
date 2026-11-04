@@ -700,5 +700,9 @@
   "Please charge": "充電してください",
   "Shuffle Songs": "曲をシャッフル",
   "On": "オン",
-  "Battery": "バッテリー"
+  "Battery": "バッテリー",
+  "Click Volume": "操作音の音量",
+  "Low": "小",
+  "Medium": "中",
+  "High": "大"
 }

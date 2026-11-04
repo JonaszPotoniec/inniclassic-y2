@@ -428,4 +428,19 @@ class Y1CrossfeedAudioProcessorParityTest {
         // Once output is drained, isEnded should be true
         assertTrue("isEnded should be true when end of stream queued and output drained", processor.isEnded)
     }
+
+    @Test
+    fun testSetIntensitySameLevel_keepsFilterState() {
+        processor.configure(AudioFormat(44100, 2, C.ENCODING_PCM_16BIT))
+        processor.setIntensity(2)
+        val input = ByteBuffer.allocateDirect(8).order(ByteOrder.nativeOrder())
+        input.putShort(16000).putShort(0).putShort(16000).putShort(0)
+        input.flip()
+        processor.queueInput(input)
+        val lastL = getLastL()
+        assertTrue(lastL > 0.0f)
+
+        processor.setIntensity(2)
+        assertEquals("The same level again must not flush", lastL, getLastL(), 0.0f)
+    }
 }

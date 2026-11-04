@@ -3,6 +3,7 @@ package com.themoon.y1.quiz
 import android.content.Context
 import android.media.AudioManager
 import android.media.MediaPlayer
+import com.themoon.y1.managers.AudioSources
 import com.themoon.y1.managers.VirtualVolumeManager
 import com.themoon.y1.models.SongItem
 import java.io.File
@@ -377,6 +378,7 @@ class MusicQuizEngine(private val context: Context? = null, private val random: 
 
     private fun startPreview(file: File) {
         stopPreview()
+        AudioSources.app.musicStarts()
         try {
             val mp = MediaPlayer()
             previewPlayer = mp

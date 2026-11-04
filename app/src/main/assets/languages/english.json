@@ -700,5 +700,9 @@
   "Time set from the internet:": "Time set from the internet:",
   "Battery low": "Battery low",
   "Please charge": "Please charge",
-  "Battery": "Battery"
+  "Battery": "Battery",
+  "Click Volume": "Click Volume",
+  "Low": "Low",
+  "Medium": "Medium",
+  "High": "High"
 }

@@ -700,5 +700,9 @@
   "Time set from the internet:": "Czas ustawiony z internetu:",
   "Battery low": "Słaba bateria",
   "Please charge": "Naładuj urządzenie",
-  "Battery": "Bateria"
+  "Battery": "Bateria",
+  "Click Volume": "Głośność przycisków",
+  "Low": "Niska",
+  "Medium": "Średnia",
+  "High": "Wysoka"
 }

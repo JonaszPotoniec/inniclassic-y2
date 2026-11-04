@@ -32,6 +32,15 @@ class FmRadioManager private constructor(context: Context) {
     private var radioWakeLock: PowerManager.WakeLock? = null
     private var currentMasterVolume: Float = 1.0f
 
+    /**
+     * Called (main thread) before the FM audio starts, with the start as argument. MainActivity sets the volume for
+     * FM (the index does the attenuation) and runs the start when the index is down. Null = start at once.
+     */
+    var volumeGate: ((Runnable) -> Unit)? = null
+
+    /** Called after FM powers down (MainActivity sets the music volume again). */
+    var onPoweredDown: (() -> Unit)? = null
+
     init {
         try {
             fmNativeClass = Class.forName("com.mediatek.FMRadio.FMRadioNative")
@@ -254,12 +263,21 @@ class FmRadioManager private constructor(context: Context) {
             } catch (ignored: Exception) {}
 
             player.setAudioStreamType(streamFm)
-            VirtualVolumeManager.getInstance().registerMediaPlayer(player)
+            // VirtualVolumeManager gives each later gain change through setMasterVolume
+            setMasterVolume(VirtualVolumeManager.getInstance().getMasterGain())
             player.prepare()
-            player.start()
-            applyMasterVolume()
-
-            routeFmAudio()
+            val start = Runnable {
+                if (fmPlayer !== player || !isPowerUp) return@Runnable
+                try {
+                    player.start()
+                    applyMasterVolume()
+                    routeFmAudio()
+                } catch (t: Throwable) {
+                    lastError = "Audio Routing Failed: " + t.message
+                }
+            }
+            val gate = volumeGate
+            if (gate != null) gate(start) else start.run()
         } catch (t: Throwable) {
             lastError = "Audio Routing Failed: " + t.message
         }
@@ -274,7 +292,6 @@ class FmRadioManager private constructor(context: Context) {
 
         val player = fmPlayer
         if (player != null) {
-            VirtualVolumeManager.getInstance().unregisterMediaPlayer(player)
             try {
                 if (player.isPlaying) player.stop()
                 player.release()
@@ -288,6 +305,7 @@ class FmRadioManager private constructor(context: Context) {
             if (lastError.isEmpty()) lastError = "Driver class is null."
             return false
         }
+        AudioSources.app.radioStarts()
         try {
             if (!ensureAirplaneModeOff()) {
                 Log.w(TAG, "Continuing FM powerUp despite airplane-mode clear uncertainty")
@@ -374,6 +392,7 @@ class FmRadioManager private constructor(context: Context) {
             isPowerUp = false
             isDeviceOpen = false
         } catch (ignored: Throwable) {}
+        if (!isPowerUp) onPoweredDown?.invoke()
     }
 
     fun tune(freq: Float): Boolean {

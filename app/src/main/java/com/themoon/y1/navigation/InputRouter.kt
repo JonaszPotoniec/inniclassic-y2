@@ -9,6 +9,7 @@ import android.widget.LinearLayout
 import com.themoon.y1.MainActivity
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.managers.AudioPlayerManager
+import com.themoon.y1.managers.AudioSources
 
 /**
  * Handles global key intercepts (wake logic, volume overlay, UMS blocking)
@@ -101,9 +102,9 @@ class InputRouter private constructor() {
             if (isMediaKey) {
                 if (action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
                     when (keyCode) {
-                        KeyEvent.KEYCODE_MEDIA_NEXT, 87 -> com.themoon.y1.managers.AudioPlayerManager.getInstance().nextTrack()
-                        KeyEvent.KEYCODE_MEDIA_PREVIOUS, 88 -> com.themoon.y1.managers.AudioPlayerManager.getInstance().prevTrack()
-                        else -> com.themoon.y1.managers.AudioPlayerManager.getInstance().playOrPauseMusic()
+                        KeyEvent.KEYCODE_MEDIA_NEXT, 87 -> com.themoon.y1.managers.AudioSources.app.skipKey(true)
+                        KeyEvent.KEYCODE_MEDIA_PREVIOUS, 88 -> com.themoon.y1.managers.AudioSources.app.skipKey(false)
+                        else -> com.themoon.y1.managers.AudioSources.app.playPauseKey()
                     }
                 }
                 return true
@@ -191,15 +192,15 @@ class InputRouter private constructor() {
             return true
         }
         if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY || keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE || keyCode == 85) {
-            AudioPlayerManager.getInstance().playOrPauseMusic()
+            AudioSources.app.playPauseKey()
             return true
         }
         if (keyCode == KeyEvent.KEYCODE_MEDIA_NEXT || keyCode == 87) {
-            AudioPlayerManager.getInstance().nextTrack()
+            AudioSources.app.skipKey(true)
             return true
         }
         if (keyCode == KeyEvent.KEYCODE_MEDIA_PREVIOUS || keyCode == 88) {
-            AudioPlayerManager.getInstance().prevTrack()
+            AudioSources.app.skipKey(false)
             return true
         }
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == 23 || keyCode == KeyEvent.KEYCODE_ENTER) {

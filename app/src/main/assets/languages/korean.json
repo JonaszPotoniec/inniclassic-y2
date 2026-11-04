@@ -700,5 +700,9 @@
   "Time set from the internet:": "인터넷에서 시간을 설정했습니다:",
   "Battery low": "배터리 부족",
   "Please charge": "충전하세요",
-  "Battery": "배터리"
+  "Battery": "배터리",
+  "Click Volume": "버튼 음량",
+  "Low": "낮음",
+  "Medium": "중간",
+  "High": "높음"
 }

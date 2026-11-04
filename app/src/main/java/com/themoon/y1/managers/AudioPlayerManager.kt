@@ -202,6 +202,7 @@ class AudioPlayerManager private constructor() {
             addListener(object : Player.EventListener {
                 override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
                     isPlayingActive = playWhenReady && (playbackState == Player.STATE_READY || playbackState == Player.STATE_BUFFERING)
+                    if (isPlayingActive) AudioSources.app.musicStarts()
                     if (playbackState == Player.STATE_READY && !isUsingLegacyPlayer) {
                         if (playWhenReady) {
                             startPeriodicPositionSaver()
@@ -566,6 +567,7 @@ class AudioPlayerManager private constructor() {
                 MainActivity.instance?.isPausedByHand = true
                 savePlaybackState(sync = true)
             } else {
+                AudioSources.app.musicStarts()
                 isPlayingActive = true
                 player.start()
                 startPeriodicPositionSaver()
@@ -915,6 +917,7 @@ class AudioPlayerManager private constructor() {
                 }
 
                 if (!main.isPausedByHand) {
+                    AudioSources.app.musicStarts()
                     player.start()
                     startPeriodicPositionSaver()
                 } else {
