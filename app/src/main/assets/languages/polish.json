@@ -725,5 +725,6 @@
   "Pairing failed: device not found. Put it in pairing mode": "Parowanie nieudane: nie znaleziono urządzenia. Włącz w nim tryb parowania",
   "Pairing failed: a scan was running. Try again": "Parowanie nieudane: trwało skanowanie. Spróbuj ponownie",
   "Pairing failed: no answer (timeout)": "Parowanie nieudane: brak odpowiedzi (przekroczono czas)",
-  "Pairing failed: too many attempts. Wait, then try again": "Parowanie nieudane: zbyt wiele prób. Odczekaj i spróbuj ponownie"
+  "Pairing failed: too many attempts. Wait, then try again": "Parowanie nieudane: zbyt wiele prób. Odczekaj i spróbuj ponownie",
+  "Battery empty": "Bateria rozładowana"
 }

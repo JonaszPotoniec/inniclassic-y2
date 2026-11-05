@@ -18,6 +18,7 @@ class InniClassicApplication : MultiDexApplication() {
     override fun onCreate() {
         super.onCreate()
         installConscrypt()
+        com.themoon.y1.battery.BatteryGuard.start(this)
         stopStaleProcesses()
     }
 

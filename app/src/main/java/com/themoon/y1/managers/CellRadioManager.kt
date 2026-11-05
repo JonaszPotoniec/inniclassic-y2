@@ -8,6 +8,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
+import com.themoon.y1.DeviceModel
 
 /**
  * Keeps the cell (mobile) radio off on the Y2: it has no SIM card, so the modem only searches for a network.
@@ -20,7 +21,6 @@ import android.util.Log
 object CellRadioManager {
     private const val TAG = "Y1CellRadio"
     private const val CELL = "cell"
-    private const val Y2_MODEL = "Y2"
 
     /** Android's default list when `airplane_mode_radios` is not set. */
     private const val DEFAULT_RADIOS = "cell,bluetooth,wifi,nfc,wimax"
@@ -58,7 +58,7 @@ object CellRadioManager {
         !airplaneModeOn || CELL !in parseRadios(radios)
 
     /** True on a device where we know that airplane mode powers the modem off and that FM, Wi-Fi and Bluetooth stay on. */
-    fun keepsCellRadioOff(model: String?): Boolean = model?.trim() == Y2_MODEL
+    fun keepsCellRadioOff(model: String?): Boolean = DeviceModel.isY2(model)
 
     internal enum class Action { NONE, TURN_OFF, STOP }
 

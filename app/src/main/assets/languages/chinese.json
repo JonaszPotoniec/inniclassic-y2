@@ -725,5 +725,6 @@
   "Pairing failed: device not found. Put it in pairing mode": "配对失败: 未找到设备。请将其置于配对模式",
   "Pairing failed: a scan was running. Try again": "配对失败: 正在扫描。请重试",
   "Pairing failed: no answer (timeout)": "配对失败: 无响应 (超时)",
-  "Pairing failed: too many attempts. Wait, then try again": "配对失败: 尝试次数过多。请稍候再试"
+  "Pairing failed: too many attempts. Wait, then try again": "配对失败: 尝试次数过多。请稍候再试",
+  "Battery empty": "电量耗尽"
 }

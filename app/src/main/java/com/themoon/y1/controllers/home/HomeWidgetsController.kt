@@ -171,7 +171,7 @@ class HomeWidgetsController(
                     val isCharging = (status == BatteryManager.BATTERY_STATUS_CHARGING ||
                             status == BatteryManager.BATTERY_STATUS_FULL)
                     if (level != -1 && scale != -1) {
-                        batteryBar.setBatteryLevel(((level / scale.toFloat()) * 100).toInt(), isCharging)
+                        batteryBar.setBatteryLevel(com.themoon.y1.battery.BatteryGuard.percent(batteryIntent), isCharging)
                     }
                 }
             }
@@ -285,7 +285,7 @@ class HomeWidgetsController(
                     val isCharging = (status == BatteryManager.BATTERY_STATUS_CHARGING ||
                             status == BatteryManager.BATTERY_STATUS_FULL)
                     if (level != -1 && scale != -1) {
-                        circularBattery.setBatteryLevel(((level / scale.toFloat()) * 100).toInt(), isCharging)
+                        circularBattery.setBatteryLevel(com.themoon.y1.battery.BatteryGuard.percent(batteryIntent), isCharging)
                     }
                 }
             }

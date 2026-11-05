@@ -725,5 +725,6 @@
   "Pairing failed: device not found. Put it in pairing mode": "Pairing failed: device not found. Put it in pairing mode",
   "Pairing failed: a scan was running. Try again": "Pairing failed: a scan was running. Try again",
   "Pairing failed: no answer (timeout)": "Pairing failed: no answer (timeout)",
-  "Pairing failed: too many attempts. Wait, then try again": "Pairing failed: too many attempts. Wait, then try again"
+  "Pairing failed: too many attempts. Wait, then try again": "Pairing failed: too many attempts. Wait, then try again",
+  "Battery empty": "Battery empty"
 }

@@ -725,5 +725,6 @@
   "Pairing failed: device not found. Put it in pairing mode": "Vinculación fallida: dispositivo no encontrado. Póngalo en modo de vinculación",
   "Pairing failed: a scan was running. Try again": "Vinculación fallida: había un escaneo en curso. Inténtelo de nuevo",
   "Pairing failed: no answer (timeout)": "Vinculación fallida: sin respuesta (tiempo agotado)",
-  "Pairing failed: too many attempts. Wait, then try again": "Vinculación fallida: demasiados intentos. Espere e inténtelo de nuevo"
+  "Pairing failed: too many attempts. Wait, then try again": "Vinculación fallida: demasiados intentos. Espere e inténtelo de nuevo",
+  "Battery empty": "Batería agotada"
 }
