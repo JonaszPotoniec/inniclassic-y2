@@ -80,7 +80,7 @@ private inline fun step(name: String, block: () -> Unit) {
 
 /** What the main menu background shows: a change of it needs a new decode. */
 private fun MainActivity.themeBackgroundKey(): String {
-    val path = prefs.getString("bg_path", null)
+    val path = prefs.getString(Prefs.BACKGROUND.key, null)
     if (path != "THEME_DEFAULT") return "path:$path"
     val theme = ThemeManager.getCurrentTheme()
     val names = listOf(theme.bgImage, "background.png", "bg.png").filter { it.isNotEmpty() }

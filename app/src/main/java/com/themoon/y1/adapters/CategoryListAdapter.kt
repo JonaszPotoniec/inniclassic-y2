@@ -2,13 +2,9 @@ package com.themoon.y1.adapters
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Typeface
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
-import android.text.TextUtils
 import android.util.LruCache
-import android.util.TypedValue
-import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.AbsListView
@@ -21,12 +17,15 @@ import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.browser.BrowserController
+import com.themoon.y1.lists.ArtRow
+import com.themoon.y1.lists.RowTexts
 import com.themoon.y1.managers.AlbumCoverManager
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.models.AlbumKey
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.BrowserMode
 import com.themoon.y1.views.ClassicMenuStyle
+import com.themoon.y1.views.ListItemViewFactory
 import java.io.File
 import java.io.FileInputStream
 import java.util.Collections
@@ -39,7 +38,7 @@ class CategoryListAdapter(
     } ?: false,
     /** Album artist of each album row in [items], so albums with the same title stay apart. */
     private val albumArtists: List<String>? = null
-) : BaseAdapter() {
+) : BaseAdapter(), RowTexts {
 
     private var albumSongCounts: MutableMap<String, Int>? = null
     private var albumFilesMap: MutableMap<String, MutableList<File>>? = null
@@ -121,6 +120,9 @@ class CategoryListAdapter(
 
     override fun getItem(position: Int): Any = items[position]
 
+    /** The name of the row for the letter jump; none for the "All Songs" row. */
+    override fun rowText(position: Int): String? = items[position].takeUnless { it == BrowserController.ALL_SONGS_SENTINEL }
+
     override fun getItemId(position: Int): Long = position.toLong()
 
     override fun getViewTypeCount(): Int = 3
@@ -137,114 +139,16 @@ class CategoryListAdapter(
     override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
         val name = items[position]
         return when {
-            BrowserController.ALL_SONGS_SENTINEL == name -> getAllSongsRowView(position, convertView)
-            type == "ALBUM" || type == "GENRE_ALBUM" -> getAlbumRowView(position, convertView, name, position)
-            else -> getSimpleRowView(position, convertView, name)
+            BrowserController.ALL_SONGS_SENTINEL == name -> getAllSongsRowView(convertView)
+            type == "ALBUM" || type == "GENRE_ALBUM" -> getAlbumRowView(position, convertView, name)
+            else -> getSimpleRowView(convertView, name)
         }
     }
 
-    private fun getAllSongsRowView(position: Int, convertView: View?): View {
+    private fun getAllSongsRowView(convertView: View?): View {
         val main = MainActivity.instance ?: return View(convertView?.context)
-        val d = main.resources.displayMetrics.density
-        val coverSize = (52f * d).toInt()
-
-        val isAllSongsValid = convertView is LinearLayout &&
-            "all_songs_row" == convertView.tag &&
-            convertView.childCount > 2 &&
-            convertView.getChildAt(0) is ImageView
-
-        val row: LinearLayout
-        val ivCover: ImageView
-        val textStack: LinearLayout
-        val tvTitle: TextView
-        val tvSubtitle: TextView
-        val tvArrow: TextView
-
-        if (isAllSongsValid && convertView != null) {
-            row = convertView as LinearLayout
-            ivCover = row.getChildAt(0) as ImageView
-            textStack = row.getChildAt(1) as LinearLayout
-            tvTitle = textStack.getChildAt(0) as TextView
-            tvSubtitle = textStack.getChildAt(1) as TextView
-            tvArrow = row.getChildAt(2) as TextView
-        } else {
-            row = LinearLayout(main).apply {
-                tag = "all_songs_row"
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                isFocusable = true
-                isClickable = true
-                isSoundEffectsEnabled = false
-                setPadding((8f * d).toInt(), (6f * d).toInt(), (10f * d).toInt(), (6f * d).toInt())
-                background = main.createButtonBackground(ThemeManager.getListButtonNormalBg())
-                layoutParams = AbsListView.LayoutParams(
-                    AbsListView.LayoutParams.MATCH_PARENT,
-                    AbsListView.LayoutParams.WRAP_CONTENT
-                )
-            }
-
-            ivCover = ImageView(main).apply {
-                scaleType = ImageView.ScaleType.CENTER_CROP
-                layoutParams = LinearLayout.LayoutParams(coverSize, coverSize)
-            }
-            row.addView(ivCover)
-
-            textStack = LinearLayout(main).apply {
-                orientation = LinearLayout.VERTICAL
-                val textLp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                    leftMargin = (10f * d).toInt()
-                }
-                layoutParams = textLp
-            }
-
-            tvTitle = TextView(main).apply {
-                setTextSize(TypedValue.COMPLEX_UNIT_PX, ThemeManager.getListTextSize() * d)
-                typeface = ThemeManager.getCustomFontBold()
-                isSingleLine = true
-                ellipsize = TextUtils.TruncateAt.MARQUEE
-                marqueeRepeatLimit = -1
-                isHorizontalFadingEdgeEnabled = true
-            }
-            textStack.addView(tvTitle)
-
-            tvSubtitle = TextView(main).apply {
-                setTextSize(TypedValue.COMPLEX_UNIT_PX, 15f * d)
-                setTypeface(ThemeManager.getCustomFont(), Typeface.NORMAL)
-                isSingleLine = true
-                ellipsize = TextUtils.TruncateAt.END
-                val subLp = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    topMargin = (1f * d).toInt()
-                }
-                layoutParams = subLp
-            }
-            textStack.addView(tvSubtitle)
-            row.addView(textStack)
-
-            tvArrow = TextView(main).apply {
-                text = "〉"
-                setTextSize(TypedValue.COMPLEX_UNIT_PX, 18f * d)
-                visibility = View.GONE
-                val lpArrow = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    leftMargin = (6f * d).toInt()
-                }
-                layoutParams = lpArrow
-            }
-            row.addView(tvArrow)
-        }
-
-        tvArrow.setTextColor(0xFFFFFFFF.toInt())
-        tvArrow.visibility = if (row.isFocused) View.VISIBLE else View.GONE
-        ClassicMenuStyle.apply(row, tvTitle, tvArrow, 64)
-
-        tvTitle.text = if (isAudiobook) main.t("All Audiobooks") else main.t("All Songs")
-        ivCover.setImageResource(if (isAudiobook) R.drawable.book else R.drawable.icon_all_songs)
-
+        val art = ArtRow.of(convertView, main)
+        art.image.setImageResource(if (isAudiobook) R.drawable.book else R.drawable.icon_all_songs)
         if (cachedAllSongsCount < 0) {
             var allCount = 0
             val bc = main.browserController
@@ -281,38 +185,15 @@ class CategoryListAdapter(
         }
 
         val allCount = cachedAllSongsCount
-        tvSubtitle.text = if (isAudiobook) {
+        art.bind(if (isAudiobook) main.t("All Audiobooks") else main.t("All Songs"), if (isAudiobook) {
             if (allCount == 1) t1File() else "$allCount ${tFiles()}"
         } else {
             if (allCount == 1) t1Song() else "$allCount ${tSongs()}"
-        }
-
-        val focusedNow = row.isFocused
-        row.background = if (focusedNow) main.createFocusedButtonBackground() else main.createButtonBackground(ThemeManager.getListButtonNormalBg())
-        tvTitle.setTextColor(if (focusedNow) ThemeManager.getListButtonFocusedTextColor() else ThemeManager.getTextColorPrimary())
-        tvSubtitle.setTextColor(if (focusedNow) ThemeManager.getListButtonFocusedTextColor() else ThemeManager.getTextColorSecondary())
-        tvTitle.isSelected = focusedNow
-
-        row.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                main.virtualListSelectedIndex = position
-                row.background = main.createFocusedButtonBackground()
-                tvTitle.setTextColor(ThemeManager.getListButtonFocusedTextColor())
-                tvSubtitle.setTextColor(ThemeManager.getListButtonFocusedTextColor())
-                tvArrow.visibility = View.VISIBLE
-                tvTitle.isSelected = true
-            } else {
-                row.background = main.createButtonBackground(ThemeManager.getListButtonNormalBg())
-                tvTitle.setTextColor(ThemeManager.getTextColorPrimary())
-                tvSubtitle.setTextColor(ThemeManager.getTextColorSecondary())
-                tvArrow.visibility = View.GONE
-                tvTitle.isSelected = false
-            }
-        }
+        })
+        val row = art.view
 
         row.setOnClickListener {
             val bc = main.browserController
-            bc.virtualListSelectedIndex = position
             main.clickFeedback()
             when (type) {
                 "GENRE_ARTIST" -> bc.openSongs("GENRE", bc.categoryGenreFilter)
@@ -366,125 +247,25 @@ class CategoryListAdapter(
         return row
     }
 
-    private fun getAlbumRowView(position: Int, convertView: View?, name: String, itemIndex: Int = position): View {
+    private fun getAlbumRowView(position: Int, convertView: View?, name: String): View {
         val main = MainActivity.instance ?: return View(convertView?.context)
-        val d = main.resources.displayMetrics.density
-        val coverSize = (52f * d).toInt()
+        val art = ArtRow.of(convertView, main)
+        val row = art.view
+        val ivCover = art.image
 
-        val isAlbumRowValid = convertView is LinearLayout &&
-            "album_row" == convertView.tag &&
-            convertView.childCount > 2 &&
-            convertView.getChildAt(0) is ImageView
-
-        val row: LinearLayout
-        val ivCover: ImageView
-        val textStack: LinearLayout
-        val tvTitle: TextView
-        val tvSubtitle: TextView
-        val tvArrow: TextView
-
-        if (isAlbumRowValid && convertView != null) {
-            row = convertView as LinearLayout
-            ivCover = row.getChildAt(0) as ImageView
-            textStack = row.getChildAt(1) as LinearLayout
-            tvTitle = textStack.getChildAt(0) as TextView
-            tvSubtitle = textStack.getChildAt(1) as TextView
-            tvArrow = row.getChildAt(2) as TextView
-        } else {
-            row = LinearLayout(main).apply {
-                tag = "album_row"
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                isFocusable = true
-                isClickable = true
-                isSoundEffectsEnabled = false
-                setPadding((8f * d).toInt(), (6f * d).toInt(), (10f * d).toInt(), (6f * d).toInt())
-                background = main.createButtonBackground(ThemeManager.getListButtonNormalBg())
-                layoutParams = AbsListView.LayoutParams(
-                    AbsListView.LayoutParams.MATCH_PARENT,
-                    AbsListView.LayoutParams.WRAP_CONTENT
-                )
-            }
-
-            ivCover = ImageView(main).apply {
-                scaleType = ImageView.ScaleType.CENTER_CROP
-                layoutParams = LinearLayout.LayoutParams(coverSize, coverSize)
-            }
-            row.addView(ivCover)
-
-            textStack = LinearLayout(main).apply {
-                orientation = LinearLayout.VERTICAL
-                val textLp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                    leftMargin = (10f * d).toInt()
-                }
-                layoutParams = textLp
-            }
-
-            tvTitle = TextView(main).apply {
-                setTextSize(TypedValue.COMPLEX_UNIT_PX, ThemeManager.getListTextSize() * d)
-                typeface = ThemeManager.getCustomFontBold()
-                isSingleLine = true
-                ellipsize = TextUtils.TruncateAt.MARQUEE
-                marqueeRepeatLimit = -1
-                isHorizontalFadingEdgeEnabled = true
-            }
-            textStack.addView(tvTitle)
-
-            tvSubtitle = TextView(main).apply {
-                setTextSize(TypedValue.COMPLEX_UNIT_PX, 15f * d)
-                setTypeface(ThemeManager.getCustomFont(), Typeface.NORMAL)
-                isSingleLine = true
-                ellipsize = TextUtils.TruncateAt.END
-                val subLp = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    topMargin = (1f * d).toInt()
-                }
-                layoutParams = subLp
-            }
-            textStack.addView(tvSubtitle)
-            row.addView(textStack)
-
-            tvArrow = TextView(main).apply {
-                text = "〉"
-                setTextSize(TypedValue.COMPLEX_UNIT_PX, 18f * d)
-                visibility = View.GONE
-                val lpArrow = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    leftMargin = (6f * d).toInt()
-                }
-                layoutParams = lpArrow
-            }
-            row.addView(tvArrow)
-        }
-
-        val albumArtist = albumArtists?.getOrNull(itemIndex)
+        val albumArtist = albumArtists?.getOrNull(position)
         val lookupKey = albumArtist?.let { AlbumKey.of(name, it) } ?: name
         val displayName = name
-
-        tvArrow.setTextColor(0xFFFFFFFF.toInt())
-        tvArrow.visibility = if (row.isFocused) View.VISIBLE else View.GONE
-
-        ClassicMenuStyle.apply(row, tvTitle, tvArrow, 64)
         ivCover.tag = lookupKey
-        row.background = if (row.isFocused) main.createFocusedButtonBackground() else main.createButtonBackground(ThemeManager.getListButtonNormalBg())
-        tvTitle.isSelected = row.isFocused
-
-        tvTitle.text = displayName
-        tvTitle.setTextColor(if (row.isFocused) ThemeManager.getListButtonFocusedTextColor() else ThemeManager.getTextColorPrimary())
         val songCount = albumSongCounts?.get(lookupKey) ?: albumSongCounts?.get(name) ?: 0
         val artist = albumArtist ?: albumArtistsMap?.get(name)
-        tvSubtitle.text = if (isAudiobook) {
+        art.bind(displayName, if (isAudiobook) {
             if (songCount == 1) t1File() else "$songCount ${tFiles()}"
         } else if (showAlbumArtist && !artist.isNullOrBlank() && !artist.equals("Unknown Artist", ignoreCase = true)) {
             "$artist • " + (if (songCount == 1) t1Song() else "$songCount ${tSongs()}")
         } else {
             if (songCount == 1) t1Song() else "$songCount ${tSongs()}"
-        }
-        tvSubtitle.setTextColor(if (row.isFocused) ThemeManager.getListButtonFocusedTextColor() else ThemeManager.getTextColorSecondary())
+        })
 
         val cached = coverCache?.get(lookupKey)
         if (cached != null) {
@@ -506,27 +287,8 @@ class CategoryListAdapter(
             }
         }
 
-        row.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                main.virtualListSelectedIndex = position
-                row.background = main.createFocusedButtonBackground()
-                tvTitle.setTextColor(ThemeManager.getListButtonFocusedTextColor())
-                tvSubtitle.setTextColor(ThemeManager.getListButtonFocusedTextColor())
-                tvArrow.visibility = View.VISIBLE
-                main.showFastScrollLetter(name)
-                tvTitle.isSelected = true
-            } else {
-                row.background = main.createButtonBackground(ThemeManager.getListButtonNormalBg())
-                tvTitle.setTextColor(ThemeManager.getTextColorPrimary())
-                tvSubtitle.setTextColor(ThemeManager.getTextColorSecondary())
-                tvArrow.visibility = View.GONE
-                tvTitle.isSelected = false
-            }
-        }
-
         row.setOnClickListener {
             val bc = main.browserController
-            bc.virtualListSelectedIndex = position
             main.clickFeedback()
             val query = when {
                 type == "GENRE_ALBUM" -> "GENRE_ALBUM_SONGS"
@@ -569,94 +331,24 @@ class CategoryListAdapter(
         })
     }
 
-    private fun getSimpleRowView(position: Int, convertView: View?, name: String): View {
+    /** A name row: the MENU row of the list factory (the same row as the song rows). */
+    private fun getSimpleRowView(convertView: View?, name: String): View {
         val main = MainActivity.instance ?: return View(convertView?.context)
-        val row: LinearLayout
-        val tvMain: TextView
-        val tvArrow: TextView
-
-        val isSimpleRowValid = convertView is LinearLayout &&
-            "simple_row" == convertView.tag &&
-            convertView.childCount > 1 &&
-            convertView.getChildAt(0) is TextView
-
-        if (isSimpleRowValid && convertView != null) {
-            row = convertView as LinearLayout
-            tvMain = row.getChildAt(0) as TextView
-            tvArrow = row.getChildAt(1) as TextView
+        val row: View
+        if (convertView != null && SIMPLE_ROW == convertView.tag) {
+            row = convertView
+            ((row as LinearLayout).getChildAt(1) as TextView).text = name
         } else {
-            val d = main.resources.displayMetrics.density
-
-            row = LinearLayout(main).apply {
-                tag = "simple_row"
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                isFocusable = true
-                isClickable = true
-                isSoundEffectsEnabled = false
-                setPadding((8f * d).toInt(), (6f * d).toInt(), (10f * d).toInt(), (6f * d).toInt())
-                layoutParams = AbsListView.LayoutParams(
-                    AbsListView.LayoutParams.MATCH_PARENT,
-                    AbsListView.LayoutParams.WRAP_CONTENT
-                )
-            }
-
-            tvMain = TextView(main).apply {
-                isSingleLine = true
-                ellipsize = TextUtils.TruncateAt.MARQUEE
-                marqueeRepeatLimit = -1
-                isHorizontalFadingEdgeEnabled = true
-                typeface = ThemeManager.getCustomFontBold()
-                setTextSize(TypedValue.COMPLEX_UNIT_PX, ThemeManager.getListTextSize() * d)
-                val lpMain = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                layoutParams = lpMain
-            }
-            row.addView(tvMain)
-
-            tvArrow = TextView(main).apply {
-                text = "〉"
-                setTextSize(TypedValue.COMPLEX_UNIT_PX, 18f * d)
-                visibility = View.GONE
-                val lpArrow = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    leftMargin = (6f * d).toInt()
-                }
-                layoutParams = lpArrow
-            }
-            row.addView(tvArrow)
-        }
-
-        ClassicMenuStyle.apply(row, tvMain, tvArrow, ClassicMenuStyle.ROW_HEIGHT_DP)
-        tvMain.isSelected = row.isFocused
-        tvMain.text = name
-
-        val isFocusedNow = row.isFocused
-        row.background = if (isFocusedNow) main.createFocusedButtonBackground() else main.createButtonBackground(ThemeManager.getListButtonNormalBg())
-        tvMain.setTextColor(if (isFocusedNow) ThemeManager.getListButtonFocusedTextColor() else ThemeManager.getTextColorPrimary())
-        tvArrow.setTextColor(0xFFFFFFFF.toInt())
-        tvArrow.visibility = if (isFocusedNow) View.VISIBLE else View.GONE
-
-        row.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                main.virtualListSelectedIndex = position
-                row.background = main.createFocusedButtonBackground()
-                tvMain.setTextColor(ThemeManager.getListButtonFocusedTextColor())
-                tvArrow.visibility = View.VISIBLE
-                main.showFastScrollLetter(name)
-                tvMain.isSelected = true
-            } else {
-                row.background = main.createButtonBackground(ThemeManager.getListButtonNormalBg())
-                tvMain.setTextColor(ThemeManager.getTextColorPrimary())
-                tvArrow.visibility = View.GONE
-                tvMain.isSelected = false
+            row = ListItemViewFactory.createListButtonWithIcon(main, "", name).apply {
+                tag = SIMPLE_ROW
+                val d = main.resources.displayMetrics.density
+                val height = if (ThemeManager.isClassicTheme()) (ClassicMenuStyle.ROW_HEIGHT_DP * d).toInt() else AbsListView.LayoutParams.WRAP_CONTENT
+                layoutParams = AbsListView.LayoutParams(AbsListView.LayoutParams.MATCH_PARENT, height)
             }
         }
 
         row.setOnClickListener {
             val bc = main.browserController
-            bc.virtualListSelectedIndex = position
             main.clickFeedback()
             when (type) {
                 "GENRE" -> bc.openList(BrowserMode.GenreArtists(name))
@@ -678,6 +370,7 @@ class CategoryListAdapter(
     private fun tFiles(): String = MainActivity.instance?.t("Files") ?: "Files"
 
     companion object {
+        private const val SIMPLE_ROW = "simple_row"
         private var coverCache: LruCache<String, Drawable>? = null
     }
 }

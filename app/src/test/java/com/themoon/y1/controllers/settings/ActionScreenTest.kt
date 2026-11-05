@@ -1,5 +1,7 @@
 package com.themoon.y1.controllers.settings
 
+import com.themoon.y1.lists.Focus
+import com.themoon.y1.lists.RowLook
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.navigation.SettingsSubMode
 import org.junit.Assert.assertEquals
@@ -72,5 +74,33 @@ class ActionScreenTest {
         assertSame(action, ActionScreens.spec(key)?.actions?.single())
         ActionScreens.forget(key)
         assertFalse(ActionScreens.setInfo(key, listOf("100 %")))
+    }
+
+    @Test
+    fun aSpecIsAListOfInfoRowsThenActionRows() {
+        val steps = mutableListOf<String>()
+        val spec = ActionScreens.Spec(
+            "Power",
+            info = listOf("Battery 50 %"),
+            actions = listOf(
+                ActionScreens.Action("Restart") { steps.add("restart") },
+                ActionScreens.Action("Power Off") { steps.add("off") }
+            )
+        )
+        val list = ActionScreens.list(spec) { steps.add("close") }
+        assertEquals("Power", list.title)
+        assertEquals(listOf(RowLook.INFO, RowLook.VALUE, RowLook.VALUE), list.rows.map { it.look })
+        assertEquals(listOf("Restart", "Power Off"), list.rows.drop(1).map { it.label })
+        assertEquals(Focus.FIRST, list.focus)
+        list.rows[2].onClick!!()
+        assertEquals(listOf("close", "off"), steps)
+    }
+
+    @Test
+    fun aScreenThatSelectsNoActionIsAListWithNoFirstRow() {
+        val spec = confirmScreen("Reset All Settings", "All settings go back to their defaults.", "Reset", selectAction = false) {}
+        assertEquals(Focus.NONE, ActionScreens.list(spec) {}.focus)
+        // A message: info rows only
+        assertTrue(ActionScreens.list(ActionScreens.Spec("Bluetooth Pairing", listOf("Code", "123456"))) {}.rows.all { it.look == RowLook.INFO })
     }
 }

@@ -1,5 +1,7 @@
 package com.themoon.y1.managers
 
+import com.themoon.y1.AppPrefs
+import com.themoon.y1.Prefs
 import android.content.Context
 import android.content.SharedPreferences
 import com.themoon.y1.StoragePaths
@@ -22,18 +24,8 @@ object SettingsBackup {
     const val DIR_NAME = "Inniclassic"
 
     /** Preference files in the backup. Y1_LASTFM, Y1_RECENTLY_PLAYED and Y1_MIGRATIONS are not in it. */
-    val FILES = listOf("AppPrefs", "y1_settings", "Y1_SETTINGS", "Y1_AUDIOBOOK_BOOKMARKS", "Y1_JELLYFIN")
+    val FILES = listOf(AppPrefs.NAME, "y1_settings", "Y1_SETTINGS", "Y1_AUDIOBOOK_BOOKMARKS", "Y1_JELLYFIN")
 
-    /** Keys that are not in the backup and that an import does not change. */
-    private val EXCLUDED_KEYS = setOf(
-        // Last.fm login (AppPrefs)
-        "lastfm_username", "lastfm_password",
-        // Playback state: it goes with last_playback_*.txt in the app folder, which is not in the backup
-        "has_saved_playback_state",
-        // Install and one-time state
-        "last_lang_version", "last_installed_theme_version", "reboot_to_theme"
-    )
-    private val EXCLUDED_PREFIXES = listOf("last_played_", "album_art_")
     private val SECRET_WORDS = listOf("password", "token", "session", "secret", "api_key")
 
     /** Y1_JELLYFIN: only the sync options. Server, login, token, device id and library cache stay out. */
@@ -41,8 +33,10 @@ object SettingsBackup {
 
     fun isExcluded(file: String, key: String): Boolean {
         if (file == "Y1_JELLYFIN") return key !in JELLYFIN_KEYS
-        if (key in EXCLUDED_KEYS) return true
-        if (EXCLUDED_PREFIXES.any { key.startsWith(it) }) return true
+        // Keys that are not in the backup and that an import does not change (inBackup = false in Prefs): the Last.fm
+        // login, playback state (it goes with last_playback_*.txt in the app folder, which is not in the backup),
+        // install and one-time state, the cover path cache
+        if (Prefs.isOutOfBackup(key)) return true
         // Keys with a file path (ratings, positions) can have any word in the path.
         if (key.contains('/')) return false
         val lower = key.lowercase(java.util.Locale.US)

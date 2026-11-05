@@ -8,7 +8,6 @@ import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
@@ -21,6 +20,10 @@ import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.core.extensions.onOff
+import com.themoon.y1.lists.ListScreen
+import com.themoon.y1.lists.ListSpec
+import com.themoon.y1.lists.RowLook
+import com.themoon.y1.lists.RowSpec
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.managers.FmRadioManager
 import com.themoon.y1.navigation.NavigationManager
@@ -42,10 +45,6 @@ import java.util.Locale
 class FmRadioController(
     private val activity: Activity,
     override val rootView: ViewGroup,
-    private val createSettingRow: (title: String, value: String) -> LinearLayout,
-    private val createCategoryHeader: (title: String) -> Unit,
-    private val createListButton: (text: String) -> Button,
-    private val createListButtonWithIcon: (icon: String, text: String) -> View,
     private val clickFeedback: () -> Unit,
     private val updateGlobalStatusPlayIcon: () -> Unit,
     private val onExitRadio: () -> Unit,
@@ -59,6 +58,7 @@ class FmRadioController(
     enum class Page { TUNER, MENU, SAVED }
 
     private val containerSettingsItems: LinearLayout = rootView.findViewById(R.id.container_settings_items)
+    private val screen = ListScreen(containerSettingsItems, clickFeedback = clickFeedback)
     private val prefs = activity.getSharedPreferences("Y1_SETTINGS", Context.MODE_PRIVATE)
     private val fmManager = FmRadioManager.getInstance(activity)
 
@@ -91,13 +91,18 @@ class FmRadioController(
                 // After the slide: the power-up takes some time on the main thread
                 if (opened) containerSettingsItems.postDelayed({ onRadioOpened() }, START_DELAY_MS)
             }
-            Page.MENU -> buildMenuUI(0)
-            Page.SAVED -> buildSavedUI(-1)
+            Page.MENU -> screen.show(menuSpec())
+            Page.SAVED -> {
+                // The channel that is tuned is selected (else the first)
+                screen.show(savedSpec())
+                screen.select(channelKey(fmManager.currentFreq))
+            }
         }
     }
 
     override fun onExit() {
         isRadioUIShowing = false
+        screen.clear()
     }
 
     override fun onRefreshUI() {
@@ -105,15 +110,15 @@ class FmRadioController(
     }
 
     /** The status bar title of the screen that shows. */
-    fun title(): String = localize(if (isRadioUIShowing && page == Page.SAVED) "Saved Channels" else "Radio")
+    override fun title(): String = screen.title.takeIf { isRadioUIShowing && page != Page.TUNER } ?: localize("Radio")
 
     /** Shows the radio state again on the screen that shows; a list keeps its selected row. */
     fun refresh() {
         if (!isRadioUIShowing) return
         when (page) {
             Page.TUNER -> updateRadioMainPlayerUI()
-            Page.MENU -> buildMenuUI(focusedRow())
-            Page.SAVED -> buildSavedUI(focusedRow())
+            Page.MENU -> screen.update(menuSpec())
+            Page.SAVED -> screen.update(savedSpec())
         }
     }
 
@@ -202,13 +207,14 @@ class FmRadioController(
         saveLastRadioFreq(clean)
     }
 
-    fun toggleRadioPower() {
+    /** [feedback] false: the caller gave the click feedback (a list row). */
+    fun toggleRadioPower(feedback: Boolean = true) {
         val now = System.currentTimeMillis()
         if (now - lastRadioPowerToggleTime < 800) {
             return
         }
         lastRadioPowerToggleTime = now
-        clickFeedback()
+        if (feedback) clickFeedback()
 
         if (fmManager.isPowerUp) {
             fmManager.powerDown()
@@ -357,7 +363,7 @@ class FmRadioController(
 
     /** The tuner: the frequency, the radio state and the saved channels. */
     fun buildTunerUI() {
-        containerSettingsItems.removeAllViews()
+        screen.clear()
         layoutRadioCandyContainer = null
 
         val density = activity.resources.displayMetrics.density
@@ -513,56 +519,33 @@ class FmRadioController(
         updateGlobalStatusPlayIcon()
     }
 
-    /** The Radio menu. [focus]: the row to select (a list that opens going down selects its first row). */
-    private fun buildMenuUI(focus: Int) {
-        containerSettingsItems.removeAllViews()
+    /** The Radio menu. */
+    private fun menuSpec(): ListSpec {
         val freq = fmManager.currentFreq
-        addRow("Tuner", String.format(Locale.US, "%.1f MHz", freq) + " 〉") {
-            clickFeedback()
-            (activity as? MainActivity)?.changeScreen(ScreenState.FmRadio)
-        }
-        addRow("Radio Power", onOff(fmManager.isPowerUp, localize)) { toggleRadioPower() }
-        addRow("Save Channel", if (isSaved(freq)) "★ " + localize("SAVED") else "☆ " + localize("SAVE")) {
-            clickFeedback()
-            toggleSavedChannel()
-        }
-        addRow("Saved Channels", "${savedRadioStations.size} 〉") {
-            clickFeedback()
-            (activity as? MainActivity)?.changeScreen(ScreenState.FmRadioSaved)
-        }
-        addRow("Auto Scan All", localize("Start") + " 〉") {
-            clickFeedback()
-            startRadioAutoScan()
-        }
         if (fmManager.isPowerUp) {
             activity.volumeControlStream = fmManager.getFmStreamType()
         }
-        showList(focus)
+        return ListSpec(localize("Radio"), listOf(
+            row("Tuner", String.format(Locale.US, "%.1f MHz", freq) + " 〉") {
+                (activity as? MainActivity)?.changeScreen(ScreenState.FmRadio)
+            },
+            row("Radio Power", onOff(fmManager.isPowerUp, localize)) { toggleRadioPower(feedback = false) },
+            row("Save Channel", if (isSaved(freq)) "★ " + localize("SAVED") else "☆ " + localize("SAVE")) { toggleSavedChannel() },
+            row("Saved Channels", "${savedRadioStations.size} 〉") {
+                (activity as? MainActivity)?.changeScreen(ScreenState.FmRadioSaved)
+            },
+            row("Auto Scan All", localize("Start") + " 〉") { startRadioAutoScan() }
+        ))
     }
 
-    private fun addRow(title: String, value: String, onClick: () -> Unit) {
-        val row = createSettingRow(localize(title), value)
-        row.setOnClickListener { onClick() }
-        containerSettingsItems.addView(row)
-    }
+    private fun row(title: String, value: String, onClick: () -> Unit) =
+        RowSpec(localize(title), RowLook.VALUE, value = value, key = title, onClick = onClick)
 
-    /** The saved channels. [focus]: the row to select; -1 = the channel that is tuned (else the first). */
-    private fun buildSavedUI(focus: Int) {
-        containerSettingsItems.removeAllViews()
-        if (savedRadioStations.isEmpty()) {
-            containerSettingsItems.addView(ActionScreens.infoRow(activity, localize("No saved channels.")))
-            return
-        }
-        var tuned = 0
-        for (i in savedRadioStations.indices) {
-            val freq = savedRadioStations[i]
-            if (Math.abs(freq - fmManager.currentFreq) < 0.05f) tuned = i
-            val label = "CH ${i + 1} :  " + String.format(Locale.US, "%.1f MHz", freq)
-            val btnFreq = createListButtonWithIcon("", label)
-            btnFreq.setOnClickListener { playSavedChannel(freq) }
-            btnFreq.setOnLongClickListener {
-                clickFeedback()
-                (activity as? MainActivity)?.isLongPressConsumed = true
+    /** The saved channels: the centre button plays a channel, a held centre button deletes it. */
+    private fun savedSpec(): ListSpec = ListSpec(localize("Saved Channels"), savedRadioStations.mapIndexed { i, freq ->
+        RowSpec("CH ${i + 1} :  " + String.format(Locale.US, "%.1f MHz", freq), key = channelKey(freq),
+            onClick = { playSavedChannel(freq) },
+            onHold = {
                 ActionScreens.open(confirmScreen(
                     localize("Delete Channel"),
                     String.format(Locale.US, localize("Remove %.1f MHz from saved channels?"), freq),
@@ -572,48 +555,20 @@ class FmRadioController(
                     saveRadioStationsToPrefs()
                     refresh()
                 })
-                true
-            }
-            containerSettingsItems.addView(btnFreq)
-        }
-        showList(if (focus >= 0) focus else tuned)
-    }
+            })
+    }, empty = localize("No saved channels."))
+
+    private fun channelKey(freq: Float): String = String.format(Locale.US, "%.1f", Math.round(freq * 10.0f) / 10.0f)
 
     /** As the iPod Favorites list: the chosen channel plays, and the tuner shows (Back: the Radio menu). */
     private fun playSavedChannel(freq: Float) {
-        clickFeedback()
         tuneTo(freq)
-        if (!fmManager.isPowerUp) toggleRadioPower()
+        if (!fmManager.isPowerUp) toggleRadioPower(feedback = false)
         (activity as? MainActivity)?.changeScreen(ScreenState.FmRadio)
     }
 
-    /** Top of the list, and row [focus] (or the last row) selected. */
-    private fun showList(focus: Int) {
-        containerSettingsItems.isFocusable = false
-        (containerSettingsItems.parent as? ScrollView)?.scrollTo(0, 0)
-        val rows = (0 until containerSettingsItems.childCount).map { containerSettingsItems.getChildAt(it) }.filter { it.isFocusable }
-        val row = rows.getOrNull(focus.coerceIn(0, Math.max(0, rows.size - 1))) ?: return
-        row.post { row.requestFocus() }
-    }
-
-    /** The index of the selected row among the rows that can be selected, or 0. */
-    private fun focusedRow(): Int {
-        val focused = containerSettingsItems.findFocus() ?: return 0
-        val rows = (0 until containerSettingsItems.childCount).map { containerSettingsItems.getChildAt(it) }.filter { it.isFocusable }
-        return Math.max(0, rows.indexOfFirst { it === focused || (it is ViewGroup && isDescendant(it, focused)) })
-    }
-
-    private fun isDescendant(group: ViewGroup, view: View): Boolean {
-        var p = view.parent
-        while (p != null) {
-            if (p === group) return true
-            p = p.parent
-        }
-        return false
-    }
-
     override fun onWheel(delta: Int, event: KeyEvent): Boolean {
-        if (page != Page.TUNER) return false
+        if (page != Page.TUNER) return screen.wheel(delta)
         val step = if (delta > 0) 0.1f else -0.1f
         var newFreq = fmManager.currentFreq + step
         if (newFreq > 108.0f) newFreq = 87.5f

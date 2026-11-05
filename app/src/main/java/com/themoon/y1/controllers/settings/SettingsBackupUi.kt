@@ -1,9 +1,9 @@
 package com.themoon.y1.controllers.settings
 
+import com.themoon.y1.Prefs
 import android.app.Activity
 import android.content.Context
 import android.util.Log
-import android.widget.LinearLayout
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.managers.AudioEffectManager
 import com.themoon.y1.managers.LanguageManager
@@ -11,33 +11,11 @@ import com.themoon.y1.managers.SettingsBackup
 import com.themoon.y1.views.Notice
 import java.io.File
 
-/** The Export Settings and Import Settings rows of the Settings screen. */
+/** The actions of the Export Settings and Import Settings rows (Settings → General). */
 internal object SettingsBackupUi {
     private const val TAG = "SettingsBackup"
 
-    fun addRows(
-        activity: Activity,
-        container: LinearLayout,
-        createSettingRow: (title: String, value: String) -> LinearLayout,
-        clickFeedback: () -> Unit,
-        localize: (String) -> String
-    ) {
-        val btnExport = createSettingRow(localize("Export Settings"), "〉 ")
-        btnExport.setOnClickListener {
-            clickFeedback()
-            exportSettings(activity, localize)
-        }
-        container.addView(btnExport)
-
-        val btnImport = createSettingRow(localize("Import Settings"), "〉 ")
-        btnImport.setOnClickListener {
-            clickFeedback()
-            confirmImport(activity, localize)
-        }
-        container.addView(btnImport)
-    }
-
-    private fun exportSettings(activity: Activity, localize: (String) -> String) {
+    fun exportSettings(activity: Activity, localize: (String) -> String) {
         try {
             val file = SettingsBackup.export(activity, appVersion(activity))
             Notice.show(activity, localize("Settings exported:") + "\n" + StoragePaths.toDisplayPath(file.absolutePath), long = true)
@@ -47,7 +25,7 @@ internal object SettingsBackupUi {
         }
     }
 
-    private fun confirmImport(activity: Activity, localize: (String) -> String) {
+    fun confirmImport(activity: Activity, localize: (String) -> String) {
         val file = SettingsBackup.findImportFile()
         if (file == null) {
             Notice.show(activity, localize("No settings backup found."))
@@ -76,7 +54,7 @@ internal object SettingsBackupUi {
             return
         }
         val prefs = activity.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
-        LanguageManager.getInstance(activity).applyLanguage(prefs.getString("app_language", "English (Default)"))
+        LanguageManager.getInstance(activity).applyLanguage(Prefs.LANGUAGE.get(prefs))
         try {
             AudioEffectManager.getInstance().applySoundCheck()
             AudioEffectManager.getInstance().applyEqProfile()

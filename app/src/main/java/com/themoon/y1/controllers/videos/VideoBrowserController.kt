@@ -5,38 +5,38 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.util.LruCache
-import android.util.TypedValue
-import android.view.Gravity
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.TextView
 import com.themoon.y1.MainActivity
 import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
-import com.themoon.y1.models.TvSeason
-import com.themoon.y1.models.TvSeries
+import com.themoon.y1.lists.ListScreen
+import com.themoon.y1.lists.ListSpec
+import com.themoon.y1.lists.Pane
+import com.themoon.y1.lists.RowLook
+import com.themoon.y1.lists.RowSpec
 import com.themoon.y1.models.VideoItem
+import com.themoon.y1.models.TvSeries
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.navigation.VideoMode
-import com.themoon.y1.views.ClassicMenuStyle
-import com.themoon.y1.views.ListItemViewFactory
-import com.themoon.y1.views.TablerIcons
 import java.io.File
 import java.util.Locale
 
 /**
  * Controller for Video library browser:
- * - Dual-pane root menu (Movies, TV Series, By Directory) with right artwork preview pane
- * - Standalone Movies full-width browser with async cover/frame thumbnails
+ * - Root menu (Movies, TV Series, By Directory) with the art pane at the right
+ * - Movies list with async cover/frame thumbnails
  * - Hierarchical TV Series browser: Series -> Season -> Episode
  * - Folder tree directory browser for Movies and Tvshows
  * - LRU cached cover and video frame loading
+ *
+ * Each list is a [ListSpec] on one [ListScreen]; the video rows are [RowLook.ART] rows.
  */
 class VideoBrowserController(
     private val activity: Activity,
@@ -52,32 +52,28 @@ class VideoBrowserController(
 ) : ScreenController {
 
     private val layoutVideos: LinearLayout = rootView.findViewById(R.id.layout_videos_mode)
-    private val layoutVideosLeftPane: LinearLayout? = rootView.findViewById(R.id.layout_videos_left_pane)
-    private val containerVideoItems: LinearLayout = rootView.findViewById(R.id.container_video_items)
-    private val scrollVideos: ScrollView? = rootView.findViewById(R.id.scroll_videos)
-    private val frameVideoCover: FrameLayout? = rootView.findViewById(R.id.frame_video_cover)
     private val ivVideoCover: ImageView? = rootView.findViewById(R.id.iv_video_cover)
+    private val screen = ListScreen(rootView.findViewById(R.id.container_video_items), clickFeedback = clickFeedback)
+
+    /** The art pane of the root menu. */
+    private val pane: Pane? = rootView.findViewById<LinearLayout?>(R.id.layout_videos_left_pane)?.let { left ->
+        rootView.findViewById<FrameLayout?>(R.id.frame_video_cover)?.let { frame ->
+            Pane(activity, left, frame, ivVideoCover) { refreshCoverPane() }
+        }
+    }
 
     private val thumbCache = LruCache<String, Bitmap>(50)
     var currentVideoMode: VideoMode = VideoMode.Root
-    private var coverPaneSetUp: Boolean = false
 
     fun clearThumbCache() {
         thumbCache.evictAll()
     }
 
-    fun isCoverPaneActive(): Boolean = frameVideoCover?.visibility == View.VISIBLE
+    fun isCoverPaneActive(): Boolean = pane?.isShown == true
 
-    fun getCurrentTitle(): String {
-        return when (val mode = currentVideoMode) {
-            is VideoMode.Root -> localize("Videos")
-            is VideoMode.Movies -> localize("Movies")
-            is VideoMode.TvShows -> localize("TV Series")
-            is VideoMode.TvSeasons -> mode.seriesName
-            is VideoMode.TvEpisodes -> "${mode.seriesName} - ${localize("Season")} ${mode.seasonNumber}"
-            is VideoMode.Directory -> if (StoragePaths.isAnyStorageRoot(mode.directory) || !mode.directory.exists()) localize("By Directory") else mode.directory.name
-        }
-    }
+    fun getCurrentTitle(): String = screen.title ?: localize("Videos")
+
+    override fun title(): String? = screen.title
 
     private val videoExtensions = setOf("mp4", "mkv", "avi", "mov", "m4v", "webm", "3gp", "ts", "wmv")
 
@@ -91,12 +87,14 @@ class VideoBrowserController(
 
     override fun onExit() {
         layoutVideos.visibility = View.GONE
-        hideCoverPane()
+        screen.clear()
     }
 
     override fun onThemeChanged() {
         buildCurrentModeUI()
     }
+
+    override fun onWheel(delta: Int, event: KeyEvent): Boolean = screen.wheel(delta, event.eventTime)
 
     fun buildCurrentModeUI() {
         val classic = ThemeManager.isClassicTheme()
@@ -119,459 +117,68 @@ class VideoBrowserController(
         }
     }
 
-    // ------------------------------------------------------------------------
-    // Root Menu (Dual-Pane View)
-    // ------------------------------------------------------------------------
+    private fun show(spec: ListSpec) {
+        screen.show(spec)
+        updateHeaderTitle(spec.title.orEmpty())
+    }
 
+    /** Movies, TV Series, By Directory, with the art of the last video at the right. */
     private fun buildRootVideoMenu() {
-        showCoverPane()
-        updateHeaderTitle(localize("Videos"))
-        containerVideoItems.removeAllViews()
-
-        // 1. Movies button
-        val btnMovies = ListItemViewFactory.createTablerListButtonWithRightIcon(
-            context = activity,
-            iconPaths = TablerIcons.MOVIE,
-            text = localize("Movies"),
-            rightIconPaths = TablerIcons.CHEVRON_RIGHT,
-            iconColor = ThemeManager.getTextColorPrimary(),
-            textColor = ThemeManager.getTextColorPrimary()
-        )
-        btnMovies.setOnClickListener {
-            clickFeedback()
-            onNavigateToMode(VideoMode.Movies)
-        }
-        btnMovies.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                btnMovies.setBackgroundColor(ThemeManager.getListButtonFocusedBg())
-                val tv = findFirstTextView(btnMovies)
-                tv?.setTextColor(ThemeManager.getListButtonFocusedTextColor())
-                tv?.isSelected = true
-            } else {
-                btnMovies.setBackgroundColor(0)
-                val tv = findFirstTextView(btnMovies)
-                tv?.setTextColor(ThemeManager.getTextColorPrimary())
-                tv?.isSelected = false
-            }
-        }
-        containerVideoItems.addView(btnMovies)
-
-        // 2. TV Series button
-        val btnTv = ListItemViewFactory.createTablerListButtonWithRightIcon(
-            context = activity,
-            iconPaths = TablerIcons.DEVICE_TV,
-            text = localize("TV Series"),
-            rightIconPaths = TablerIcons.CHEVRON_RIGHT,
-            iconColor = ThemeManager.getTextColorPrimary(),
-            textColor = ThemeManager.getTextColorPrimary()
-        )
-        btnTv.setOnClickListener {
-            clickFeedback()
-            onNavigateToMode(VideoMode.TvShows)
-        }
-        btnTv.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                btnTv.setBackgroundColor(ThemeManager.getListButtonFocusedBg())
-                val tv = findFirstTextView(btnTv)
-                tv?.setTextColor(ThemeManager.getListButtonFocusedTextColor())
-                tv?.isSelected = true
-            } else {
-                btnTv.setBackgroundColor(0)
-                val tv = findFirstTextView(btnTv)
-                tv?.setTextColor(ThemeManager.getTextColorPrimary())
-                tv?.isSelected = false
-            }
-        }
-        containerVideoItems.addView(btnTv)
-
-        // 3. By Directory button
-        val btnDir = ListItemViewFactory.createTablerListButtonWithRightIcon(
-            context = activity,
-            iconPaths = TablerIcons.FOLDER,
-            text = localize("By Directory"),
-            rightIconPaths = TablerIcons.CHEVRON_RIGHT,
-            iconColor = ThemeManager.getTextColorPrimary(),
-            textColor = ThemeManager.getTextColorPrimary()
-        )
-        btnDir.setOnClickListener {
-            clickFeedback()
-            val initialDir = StoragePaths.getMoviesDir().parentFile ?: StoragePaths.getMoviesDir()
-            onNavigateToMode(VideoMode.Directory(initialDir))
-        }
-        btnDir.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                btnDir.setBackgroundColor(ThemeManager.getListButtonFocusedBg())
-                val tv = findFirstTextView(btnDir)
-                tv?.setTextColor(ThemeManager.getListButtonFocusedTextColor())
-                tv?.isSelected = true
-            } else {
-                btnDir.setBackgroundColor(0)
-                val tv = findFirstTextView(btnDir)
-                tv?.setTextColor(ThemeManager.getTextColorPrimary())
-                tv?.isSelected = false
-            }
-        }
-        containerVideoItems.addView(btnDir)
-
-        refreshCoverPane()
-
-        containerVideoItems.post {
-            if (containerVideoItems.childCount > 0) {
-                containerVideoItems.getChildAt(0).requestFocus()
-            }
-        }
+        val initialDir = StoragePaths.getMoviesDir().parentFile ?: StoragePaths.getMoviesDir()
+        show(ListSpec(localize("Videos"), listOf(
+            RowSpec(localize("Movies"), onClick = { onNavigateToMode(VideoMode.Movies) }),
+            RowSpec(localize("TV Series"), onClick = { onNavigateToMode(VideoMode.TvShows) }),
+            RowSpec(localize("By Directory"), onClick = { onNavigateToMode(VideoMode.Directory(initialDir)) })
+        ), pane = pane))
     }
-
-    private fun findFirstTextView(view: View): TextView? {
-        if (view is TextView) return view
-        if (view is ViewGroup) {
-            for (i in 0 until view.childCount) {
-                val child = view.getChildAt(i)
-                if (child is TextView) return child
-            }
-        }
-        return null
-    }
-
-    // ------------------------------------------------------------------------
-    // Movies List View
-    // ------------------------------------------------------------------------
 
     private fun buildMoviesListUI() {
-        hideCoverPane()
-        updateHeaderTitle(localize("Movies"))
-        containerVideoItems.removeAllViews()
-
-        val movies = movieVideosProvider()
-        if (movies.isEmpty()) {
-            val tvEmpty = TextView(activity).apply {
-                text = localize("No movies found.")
-                textSize = 16f
-                setTextColor(ThemeManager.getTextColorSecondary())
-                gravity = Gravity.CENTER
-                setPadding(0, 60, 0, 0)
-            }
-            containerVideoItems.addView(tvEmpty)
-            return
-        }
-
-        for (movie in movies) {
-            val row = createVideoItemRow(movie) {
-                clickFeedback()
-                onVideoSelected(movie.file)
-            }
-            containerVideoItems.addView(row)
-        }
-
-        containerVideoItems.post {
-            if (containerVideoItems.childCount > 0) {
-                containerVideoItems.getChildAt(0).requestFocus()
-            }
-        }
+        show(ListSpec(localize("Movies"), movieVideosProvider().map { videoRow(it) }, empty = localize("No movies found.")))
     }
-
-    // ------------------------------------------------------------------------
-    // TV Series List View
-    // ------------------------------------------------------------------------
 
     private fun buildTvShowsListUI() {
-        hideCoverPane()
-        updateHeaderTitle(localize("TV Series"))
-        containerVideoItems.removeAllViews()
-
-        val seriesList = tvSeriesProvider()
-        if (seriesList.isEmpty()) {
-            val tvEmpty = TextView(activity).apply {
-                text = localize("No TV series found.")
-                textSize = 16f
-                setTextColor(ThemeManager.getTextColorSecondary())
-                gravity = Gravity.CENTER
-                setPadding(0, 60, 0, 0)
-            }
-            containerVideoItems.addView(tvEmpty)
-            return
-        }
-
-        val d = activity.resources.displayMetrics.density
-        val coverSize = (52 * d).toInt()
-
-        for (series in seriesList) {
-            val row = LinearLayout(activity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                isFocusable = true
-                isClickable = true
-                setBackgroundColor(0)
-                setPadding((8 * d).toInt(), (6 * d).toInt(), (10 * d).toInt(), (6 * d).toInt())
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    setMargins(0, if (ThemeManager.isClassicTheme()) 0 else 2, 0, if (ThemeManager.isClassicTheme()) 0 else 2)
-                }
-            }
-
-            val ivCover = ImageView(activity).apply {
-                scaleType = ImageView.ScaleType.CENTER_CROP
-                setImageResource(R.drawable.video_circle)
-                layoutParams = LinearLayout.LayoutParams(coverSize, coverSize).apply {
-                    rightMargin = (10 * d).toInt()
-                }
-            }
-            row.addView(ivCover)
-
-            val textContainer = LinearLayout(activity).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER_VERTICAL
-                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f)
-            }
-
-            val tvTitle = TextView(activity).apply {
-                text = series.name
-                textSize = 16f
-                setTextColor(ThemeManager.getTextColorPrimary())
-                typeface = ThemeManager.getCustomFontBold()
-                setSingleLine(true)
-                ellipsize = android.text.TextUtils.TruncateAt.MARQUEE
-                marqueeRepeatLimit = -1
-            }
-            textContainer.addView(tvTitle)
-
+        val rows = tvSeriesProvider().map { series ->
             val seasonWord = if (series.seasons.size == 1) localize("Season") else localize("Seasons")
             val epWord = if (series.totalEpisodes == 1) localize("Episode") else localize("Episodes")
-            val tvSub = TextView(activity).apply {
-                text = "${series.seasons.size} $seasonWord • ${series.totalEpisodes} $epWord"
-                textSize = 12f
-                setTextColor(ThemeManager.getTextColorSecondary())
-                setSingleLine(true)
-            }
-            textContainer.addView(tvSub)
-            row.addView(textContainer)
-
-            val tvArrow = TextView(activity).apply {
-                text = "〉"
-                textSize = 20f
-                setTextColor(0xFFFFFFFF.toInt())
-                visibility = View.GONE
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    leftMargin = (10 * d).toInt()
-                }
-            }
-            row.addView(tvArrow)
-
-            ClassicMenuStyle.apply(row, tvTitle, tvArrow, 64)
-
-            row.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
-                if (hasFocus) {
-                    row.setBackgroundColor(ThemeManager.getListButtonFocusedBg())
-                    tvTitle.setTextColor(ThemeManager.getListButtonFocusedTextColor())
-                    tvSub.setTextColor(ThemeManager.getListButtonFocusedTextColor())
-                    tvTitle.isSelected = true
-                    tvArrow.visibility = View.VISIBLE
-                } else {
-                    row.setBackgroundColor(0)
-                    tvTitle.setTextColor(ThemeManager.getTextColorPrimary())
-                    tvSub.setTextColor(ThemeManager.getTextColorSecondary())
-                    tvTitle.isSelected = false
-                    tvArrow.visibility = View.GONE
-                }
-            }
-
-            row.setOnClickListener {
-                clickFeedback()
-                onNavigateToMode(VideoMode.TvSeasons(series.name))
-            }
-
-            if (series.posterFile != null && series.posterFile.exists()) {
-                loadArtworkIntoImageView(series.posterFile, ivCover)
-            } else {
-                val firstEp = series.seasons.firstOrNull()?.episodes?.firstOrNull()
-                if (firstEp != null) {
-                    loadThumbnailIntoImageView(firstEp.file, firstEp.coverFile, ivCover)
-                }
-            }
-
-            containerVideoItems.addView(row)
+            RowSpec(series.name, RowLook.ART, value = "${series.seasons.size} $seasonWord • ${series.totalEpisodes} $epWord",
+                image = { iv ->
+                    iv.setImageResource(R.drawable.video_circle)
+                    if (series.posterFile != null && series.posterFile.exists()) {
+                        loadArtworkIntoImageView(series.posterFile, iv)
+                    } else {
+                        val firstEp = series.seasons.firstOrNull()?.episodes?.firstOrNull()
+                        if (firstEp != null) loadThumbnailIntoImageView(firstEp.file, firstEp.coverFile, iv)
+                    }
+                },
+                onClick = { onNavigateToMode(VideoMode.TvSeasons(series.name)) })
         }
-
-        containerVideoItems.post {
-            if (containerVideoItems.childCount > 0) {
-                containerVideoItems.getChildAt(0).requestFocus()
-            }
-        }
+        show(ListSpec(localize("TV Series"), rows, empty = localize("No TV series found.")))
     }
-
-    // ------------------------------------------------------------------------
-    // TV Seasons List View
-    // ------------------------------------------------------------------------
 
     private fun buildTvSeasonsListUI(seriesName: String) {
-        hideCoverPane()
-        updateHeaderTitle(seriesName)
-        containerVideoItems.removeAllViews()
-
         val series = tvSeriesProvider().firstOrNull { it.name.equals(seriesName, ignoreCase = true) }
-        val seasons = series?.seasons ?: emptyList()
-
-        if (seasons.isEmpty()) {
-            val tvEmpty = TextView(activity).apply {
-                text = localize("No TV series found.")
-                textSize = 16f
-                setTextColor(ThemeManager.getTextColorSecondary())
-                gravity = Gravity.CENTER
-                setPadding(0, 60, 0, 0)
-            }
-            containerVideoItems.addView(tvEmpty)
-            return
-        }
-
-        val d = activity.resources.displayMetrics.density
-
-        for (season in seasons) {
-            val row = LinearLayout(activity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                isFocusable = true
-                isClickable = true
-                setBackgroundColor(0)
-                setPadding((8 * d).toInt(), (6 * d).toInt(), (10 * d).toInt(), (6 * d).toInt())
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    setMargins(0, if (ThemeManager.isClassicTheme()) 0 else 2, 0, if (ThemeManager.isClassicTheme()) 0 else 2)
-                }
-            }
-
-            val textContainer = LinearLayout(activity).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER_VERTICAL
-                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f)
-            }
-
-            val tvTitle = TextView(activity).apply {
-                text = season.seasonTitle
-                textSize = 16f
-                setTextColor(ThemeManager.getTextColorPrimary())
-                typeface = ThemeManager.getCustomFontBold()
-                setSingleLine(true)
-            }
-            textContainer.addView(tvTitle)
-
+        val rows = (series?.seasons ?: emptyList()).map { season ->
             val epWord = if (season.episodes.size == 1) localize("Episode") else localize("Episodes")
-            val tvSub = TextView(activity).apply {
-                text = "${season.episodes.size} $epWord"
-                textSize = 12f
-                setTextColor(ThemeManager.getTextColorSecondary())
-                setSingleLine(true)
-            }
-            textContainer.addView(tvSub)
-            row.addView(textContainer)
-
-            val tvArrow = TextView(activity).apply {
-                text = "〉"
-                textSize = 20f
-                setTextColor(0xFFFFFFFF.toInt())
-                visibility = View.GONE
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    leftMargin = (10 * d).toInt()
-                }
-            }
-            row.addView(tvArrow)
-
-            ClassicMenuStyle.apply(row, tvTitle, tvArrow, 48)
-
-            row.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
-                if (hasFocus) {
-                    row.setBackgroundColor(ThemeManager.getListButtonFocusedBg())
-                    tvTitle.setTextColor(ThemeManager.getListButtonFocusedTextColor())
-                    tvSub.setTextColor(ThemeManager.getListButtonFocusedTextColor())
-                    tvTitle.isSelected = true
-                    tvArrow.visibility = View.VISIBLE
-                } else {
-                    row.setBackgroundColor(0)
-                    tvTitle.setTextColor(ThemeManager.getTextColorPrimary())
-                    tvSub.setTextColor(ThemeManager.getTextColorSecondary())
-                    tvTitle.isSelected = false
-                    tvArrow.visibility = View.GONE
-                }
-            }
-
-            row.setOnClickListener {
-                clickFeedback()
-                onNavigateToMode(VideoMode.TvEpisodes(seriesName, season.seasonNumber))
-            }
-
-            containerVideoItems.addView(row)
+            RowSpec(season.seasonTitle, RowLook.ART, value = "${season.episodes.size} $epWord",
+                onClick = { onNavigateToMode(VideoMode.TvEpisodes(seriesName, season.seasonNumber)) })
         }
-
-        containerVideoItems.post {
-            if (containerVideoItems.childCount > 0) {
-                containerVideoItems.getChildAt(0).requestFocus()
-            }
-        }
+        show(ListSpec(seriesName, rows, empty = localize("No TV series found.")))
     }
-
-    // ------------------------------------------------------------------------
-    // TV Episodes List View
-    // ------------------------------------------------------------------------
 
     private fun buildTvEpisodesListUI(seriesName: String, seasonNumber: Int) {
-        hideCoverPane()
-        val seasonTitle = "${localize("Season")} $seasonNumber"
-        updateHeaderTitle("$seriesName - $seasonTitle")
-        containerVideoItems.removeAllViews()
-
         val series = tvSeriesProvider().firstOrNull { it.name.equals(seriesName, ignoreCase = true) }
         val season = series?.seasons?.firstOrNull { it.seasonNumber == seasonNumber }
-        val episodes = season?.episodes ?: emptyList()
-
-        if (episodes.isEmpty()) {
-            val tvEmpty = TextView(activity).apply {
-                text = localize("No TV series found.")
-                textSize = 16f
-                setTextColor(ThemeManager.getTextColorSecondary())
-                gravity = Gravity.CENTER
-                setPadding(0, 60, 0, 0)
-            }
-            containerVideoItems.addView(tvEmpty)
-            return
-        }
-
-        for (ep in episodes) {
-            val row = createVideoItemRow(ep) {
-                clickFeedback()
-                onVideoSelected(ep.file)
-            }
-            containerVideoItems.addView(row)
-        }
-
-        containerVideoItems.post {
-            if (containerVideoItems.childCount > 0) {
-                containerVideoItems.getChildAt(0).requestFocus()
-            }
-        }
+        show(ListSpec("$seriesName - ${localize("Season")} $seasonNumber", (season?.episodes ?: emptyList()).map { videoRow(it) },
+            empty = localize("No TV series found.")))
     }
 
-    // ------------------------------------------------------------------------
-    // By Directory Browser View
-    // ------------------------------------------------------------------------
-
+    /** By Directory: the Movies and TV Shows folders, then in a folder its folders and videos (A to Z). */
     private fun buildDirectoryListUI(dir: File) {
-        hideCoverPane()
         val title = if (StoragePaths.isAnyStorageRoot(dir) || !dir.exists()) {
             localize("By Directory")
         } else {
             dir.name
         }
-        updateHeaderTitle(title)
-        containerVideoItems.removeAllViews()
 
         // If at synthetic top-level root, list Movies and Tvshows roots
         if (!dir.exists() || StoragePaths.isAnyStorageRoot(dir)) {
@@ -580,6 +187,7 @@ class VideoBrowserController(
             roots.addAll(StoragePaths.getTvShowsDirs())
 
             val hasSec = StoragePaths.hasSecondaryStorage()
+            val rows = ArrayList<RowSpec>()
             for (r in roots) {
                 if (!r.exists()) continue
                 val isSec = r.absolutePath.startsWith(StoragePaths.SECONDARY_PATH)
@@ -588,38 +196,16 @@ class VideoBrowserController(
                 } else {
                     r.name
                 }
-                val row = createFolderRow(label) {
-                    clickFeedback()
-                    onNavigateToMode(VideoMode.Directory(r))
-                }
-                containerVideoItems.addView(row)
+                rows += RowSpec(label, key = r.absolutePath, onClick = { onNavigateToMode(VideoMode.Directory(r)) })
             }
-
-            containerVideoItems.post {
-                if (containerVideoItems.childCount > 0) {
-                    containerVideoItems.getChildAt(0).requestFocus()
-                }
-            }
-            return
-        }
-
-        val files = dir.listFiles()
-        if (files == null || files.isEmpty()) {
-            val tvEmpty = TextView(activity).apply {
-                text = localize("No videos found in this folder.")
-                textSize = 16f
-                setTextColor(ThemeManager.getTextColorSecondary())
-                gravity = Gravity.CENTER
-                setPadding(0, 60, 0, 0)
-            }
-            containerVideoItems.addView(tvEmpty)
+            show(ListSpec(title, rows))
             return
         }
 
         val subfolders = ArrayList<File>()
         val videoFiles = ArrayList<File>()
 
-        for (f in files) {
+        for (f in dir.listFiles() ?: emptyArray()) {
             if (f.name.startsWith(".")) continue
             if (f.isDirectory) {
                 subfolders.add(f)
@@ -634,240 +220,21 @@ class VideoBrowserController(
         subfolders.sortBy { it.name.lowercase(Locale.US) }
         videoFiles.sortBy { it.name.lowercase(Locale.US) }
 
+        val rows = ArrayList<RowSpec>()
         for (sf in subfolders) {
-            val row = createFolderRow(sf.name) {
-                clickFeedback()
-                onNavigateToMode(VideoMode.Directory(sf))
-            }
-            containerVideoItems.addView(row)
+            rows += RowSpec(sf.name, key = sf.absolutePath, onClick = { onNavigateToMode(VideoMode.Directory(sf)) })
         }
-
-        for (vf in videoFiles) {
-            val item = VideoItem(file = vf, title = vf.nameWithoutExtension)
-            val row = createVideoItemRow(item) {
-                clickFeedback()
-                onVideoSelected(vf)
-            }
-            containerVideoItems.addView(row)
-        }
-
-        containerVideoItems.post {
-            if (containerVideoItems.childCount > 0) {
-                containerVideoItems.getChildAt(0).requestFocus()
-            }
-        }
+        for (vf in videoFiles) rows += videoRow(VideoItem(file = vf, title = vf.nameWithoutExtension))
+        show(ListSpec(title, rows, empty = localize("No videos found in this folder.")))
     }
 
-    private fun createFolderRow(name: String, onClick: () -> Unit): LinearLayout {
-        val d = activity.resources.displayMetrics.density
-        val row = LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            isFocusable = true
-            isClickable = true
-            setBackgroundColor(0)
-            setPadding((8 * d).toInt(), (6 * d).toInt(), (10 * d).toInt(), (6 * d).toInt())
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(0, if (ThemeManager.isClassicTheme()) 0 else 2, 0, if (ThemeManager.isClassicTheme()) 0 else 2)
-            }
-        }
-
-        val iconSize = (22 * d).toInt()
-        val ivIcon = ImageView(activity).apply {
-            setImageBitmap(TablerIcons.render(TablerIcons.FOLDER, iconSize, ThemeManager.getTextColorPrimary()))
-            layoutParams = LinearLayout.LayoutParams(iconSize, iconSize).apply {
-                rightMargin = (10 * d).toInt()
-            }
-        }
-        row.addView(ivIcon)
-
-        val tvTitle = TextView(activity).apply {
-            text = name
-            textSize = 16f
-            setTextColor(ThemeManager.getTextColorPrimary())
-            typeface = ThemeManager.getCustomFontBold()
-            setSingleLine(true)
-            ellipsize = android.text.TextUtils.TruncateAt.MARQUEE
-            marqueeRepeatLimit = -1
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f)
-        }
-        row.addView(tvTitle)
-
-        val tvArrow = TextView(activity).apply {
-            text = "〉"
-            textSize = 20f
-            setTextColor(0xFFFFFFFF.toInt())
-            visibility = View.GONE
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                leftMargin = (10 * d).toInt()
-            }
-        }
-        row.addView(tvArrow)
-
-        ClassicMenuStyle.apply(row, tvTitle, tvArrow, 48)
-
-        row.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                row.setBackgroundColor(ThemeManager.getListButtonFocusedBg())
-                tvTitle.setTextColor(ThemeManager.getListButtonFocusedTextColor())
-                tvTitle.isSelected = true
-                tvArrow.visibility = View.VISIBLE
-                ivIcon.setImageBitmap(TablerIcons.render(TablerIcons.FOLDER, iconSize, ThemeManager.getListButtonFocusedTextColor()))
-            } else {
-                row.setBackgroundColor(0)
-                tvTitle.setTextColor(ThemeManager.getTextColorPrimary())
-                tvTitle.isSelected = false
-                tvArrow.visibility = View.GONE
-                ivIcon.setImageBitmap(TablerIcons.render(TablerIcons.FOLDER, iconSize, ThemeManager.getTextColorPrimary()))
-            }
-        }
-
-        row.setOnClickListener { onClick() }
-        return row
-    }
-
-    // ------------------------------------------------------------------------
-    // Shared Video Row Factory
-    // ------------------------------------------------------------------------
-
-    private fun createVideoItemRow(item: VideoItem, onClick: () -> Unit): LinearLayout {
-        val d = activity.resources.displayMetrics.density
-        val coverSize = (52 * d).toInt()
-
-        val row = LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            isFocusable = true
-            isClickable = true
-            setBackgroundColor(0)
-            setPadding((8 * d).toInt(), (6 * d).toInt(), (10 * d).toInt(), (6 * d).toInt())
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(0, if (ThemeManager.isClassicTheme()) 0 else 2, 0, if (ThemeManager.isClassicTheme()) 0 else 2)
-            }
-        }
-
-        val ivCover = ImageView(activity).apply {
-            scaleType = ImageView.ScaleType.CENTER_CROP
-            setImageResource(R.drawable.video_circle)
-            layoutParams = LinearLayout.LayoutParams(coverSize, coverSize).apply {
-                rightMargin = (10 * d).toInt()
-            }
-        }
-        row.addView(ivCover)
-
-        val tvTitle = TextView(activity).apply {
-            text = item.title
-            textSize = 16f
-            setTextColor(ThemeManager.getTextColorPrimary())
-            typeface = ThemeManager.getCustomFontBold()
-            setSingleLine(true)
-            ellipsize = android.text.TextUtils.TruncateAt.MARQUEE
-            marqueeRepeatLimit = -1
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f)
-        }
-        row.addView(tvTitle)
-
-        val tvArrow = TextView(activity).apply {
-            text = "〉"
-            textSize = 20f
-            setTextColor(0xFFFFFFFF.toInt())
-            visibility = View.GONE
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                leftMargin = (10 * d).toInt()
-            }
-        }
-        row.addView(tvArrow)
-
-        ClassicMenuStyle.apply(row, tvTitle, tvArrow, 64)
-
-        row.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                row.setBackgroundColor(ThemeManager.getListButtonFocusedBg())
-                tvTitle.setTextColor(ThemeManager.getListButtonFocusedTextColor())
-                tvTitle.isSelected = true
-                tvArrow.visibility = View.VISIBLE
-            } else {
-                row.setBackgroundColor(0)
-                tvTitle.setTextColor(ThemeManager.getTextColorPrimary())
-                tvTitle.isSelected = false
-                tvArrow.visibility = View.GONE
-            }
-        }
-
-        row.setOnClickListener { onClick() }
-
-        loadThumbnailIntoImageView(item.file, item.coverFile, ivCover)
-        return row
-    }
-
-    // ------------------------------------------------------------------------
-    // Cover Pane & Artwork Helpers
-    // ------------------------------------------------------------------------
-
-    private fun showCoverPane() {
-        val frame = frameVideoCover ?: return
-        frame.visibility = View.VISIBLE
-        val density = activity.resources.displayMetrics.density
-
-        layoutVideosLeftPane?.setPadding(0, (ClassicMenuStyle.STATUS_HEIGHT_DP * density).toInt(), 0, 0)
-        if (ThemeManager.isClassicTheme() && layoutVideosLeftPane != null) {
-            val left = layoutVideosLeftPane.layoutParams as? LinearLayout.LayoutParams
-            if (left != null) {
-                left.width = (ClassicMenuStyle.PANE_WIDTH_DP * density).toInt()
-                left.weight = 0f
-                layoutVideosLeftPane.layoutParams = left
-            }
-        }
-
-        val statusBar = activity.findViewById<View>(R.id.layout_status_bar)
-        if (statusBar != null) {
-            val slp = statusBar.layoutParams
-            slp.width = (ClassicMenuStyle.PANE_WIDTH_DP * density).toInt()
-            statusBar.layoutParams = slp
-            statusBar.background = ThemeManager.createStatusBarBackground()
-        }
-
-
-        if (!coverPaneSetUp && ivVideoCover != null) {
-            coverPaneSetUp = true
-            com.themoon.y1.views.CoverPane.attach(ivVideoCover)
-        }
-    }
-
-    private fun hideCoverPane() {
-        val density = activity.resources.displayMetrics.density
-        layoutVideosLeftPane?.setPadding(0, (ClassicMenuStyle.STATUS_HEIGHT_DP * density).toInt(), 0, 0)
-        if (ThemeManager.isClassicTheme() && layoutVideosLeftPane != null) {
-            val left = layoutVideosLeftPane.layoutParams as? LinearLayout.LayoutParams
-            if (left != null) {
-                left.width = 0
-                left.weight = 1f
-                layoutVideosLeftPane.layoutParams = left
-            }
-        }
-
-        val statusBar = activity.findViewById<View>(R.id.layout_status_bar)
-        if (statusBar != null) {
-            val slp = statusBar.layoutParams
-            slp.width = ViewGroup.LayoutParams.MATCH_PARENT
-            statusBar.layoutParams = slp
-            statusBar.background = ThemeManager.createStatusBarBackground()
-        }
-
-        frameVideoCover?.visibility = View.GONE
-    }
+    /** A movie, an episode or a video file: its cover (or a frame of the video) and its title. */
+    private fun videoRow(item: VideoItem) = RowSpec(item.title, RowLook.ART, key = item.file.absolutePath,
+        image = { iv ->
+            iv.setImageResource(R.drawable.video_circle)
+            loadThumbnailIntoImageView(item.file, item.coverFile, iv)
+        },
+        onClick = { onVideoSelected(item.file) })
 
     fun refreshCoverPane() {
         val iv = ivVideoCover ?: return

@@ -1,5 +1,6 @@
 package com.themoon.y1.managers
 
+import com.themoon.y1.Prefs
 import android.content.Context
 import android.content.SharedPreferences
 import java.io.File
@@ -72,8 +73,8 @@ object AssetInstaller {
                 }
             } catch (_: Exception) {}
 
-            val currentAppTheme = prefs.getString("app_theme_name", null)
-                ?: prefs.getString("current_theme_name", null)
+            val currentAppTheme = prefs.getString(Prefs.THEME_NAME.key, null)
+                ?: prefs.getString(Prefs.CURRENT_THEME_NAME.key, null)
             val migratedTheme = when (currentAppTheme) {
                 "iPod Classic Dark", "iPod Classic (Dark)" -> "Classic Dark"
                 "iPod Classic" -> "Classic Light"
@@ -82,8 +83,8 @@ object AssetInstaller {
             }
             if (migratedTheme != null) {
                 prefs.edit()
-                    .putString("app_theme_name", migratedTheme)
-                    .putString("current_theme_name", migratedTheme)
+                    .putString(Prefs.THEME_NAME.key, migratedTheme)
+                    .putString(Prefs.CURRENT_THEME_NAME.key, migratedTheme)
                     .apply()
             }
 

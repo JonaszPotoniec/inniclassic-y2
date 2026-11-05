@@ -1,5 +1,6 @@
 package com.themoon.y1.managers
 
+import com.themoon.y1.Prefs
 import android.content.Context
 import android.net.Uri
 import android.view.SurfaceView
@@ -82,7 +83,7 @@ class VideoPlayerManager private constructor() {
             val h = surfaceView.height
             if (w > 0 && h > 0) {
                 vlcVout.setWindowSize(w, h)
-                val stretchFill = MainActivity.instance?.prefs?.getBoolean("video_stretch_fill", false) == true
+                val stretchFill = MainActivity.instance?.prefs?.let { Prefs.VIDEO_FILL.get(it) } == true
                 player.aspectRatio = if (stretchFill) "$w:$h" else null
             }
         }

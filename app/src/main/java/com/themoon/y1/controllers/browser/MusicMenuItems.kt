@@ -1,5 +1,6 @@
 package com.themoon.y1.controllers.browser
 
+import com.themoon.y1.Prefs
 import android.content.SharedPreferences
 
 /** The Music menu items and their visibility (Settings → Music Menu Items, `hide_music_btn_<id>` in AppPrefs). */
@@ -36,5 +37,5 @@ object MusicMenuItems {
     fun isHiddenByDefault(id: String): Boolean = id in HIDDEN_BY_DEFAULT
 
     fun isHidden(prefs: SharedPreferences, id: String): Boolean =
-        prefs.getBoolean("hide_music_btn_$id", isHiddenByDefault(id))
+        prefs.getBoolean(Prefs.MUSIC_MENU_HIDDEN.key(id), isHiddenByDefault(id))
 }

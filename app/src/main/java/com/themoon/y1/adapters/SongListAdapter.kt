@@ -1,22 +1,19 @@
 package com.themoon.y1.adapters
 
 import android.graphics.Bitmap
-import android.graphics.Typeface
-import android.text.TextUtils
-import android.util.TypedValue
-import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.AbsListView
 import android.widget.BaseAdapter
 import android.widget.Button
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.themoon.y1.MainActivity
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.core.TimeFormat
+import com.themoon.y1.lists.ArtRow
+import com.themoon.y1.lists.RowTexts
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.podcasts.PodcastDownloadManager
@@ -30,7 +27,7 @@ import java.util.Date
 
 class SongListAdapter(
     private val items: List<SongItem>
-) : BaseAdapter() {
+) : BaseAdapter(), RowTexts {
 
     private val showShuffleRow: Boolean = determineShuffleRow(items)
 
@@ -56,6 +53,9 @@ class SongListAdapter(
     }
 
     override fun getItemId(position: Int): Long = position.toLong()
+
+    /** The song title for the letter jump; none for the Shuffle row. */
+    override fun rowText(position: Int): String? = (getItem(position) as? SongItem)?.title
 
     override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
         if (hasShuffleRow() && position == 0) {
@@ -263,102 +263,8 @@ class SongListAdapter(
         val main = MainActivity.instance ?: return View(convertView?.context)
         val d = main.resources.displayMetrics.density
         val coverSize = (52f * d).toInt()
-
-        val isShuffleRowValid = convertView is LinearLayout &&
-            "shuffle_banner_row" == convertView.tag &&
-            convertView.childCount > 2 &&
-            convertView.getChildAt(0) is ImageView
-
-        val row: LinearLayout
-        val ivCover: ImageView
-        val textStack: LinearLayout
-        val tvTitle: TextView
-        val tvSubtitle: TextView
-        val tvArrow: TextView
-
-        if (isShuffleRowValid && convertView != null) {
-            row = convertView as LinearLayout
-            ivCover = row.getChildAt(0) as ImageView
-            textStack = row.getChildAt(1) as LinearLayout
-            tvTitle = textStack.getChildAt(0) as TextView
-            tvSubtitle = textStack.getChildAt(1) as TextView
-            tvArrow = row.getChildAt(2) as TextView
-        } else {
-            row = LinearLayout(main).apply {
-                tag = "shuffle_banner_row"
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                isFocusable = true
-                isClickable = true
-                isSoundEffectsEnabled = false
-                setPadding((8f * d).toInt(), (6f * d).toInt(), (10f * d).toInt(), (6f * d).toInt())
-                background = main.createButtonBackground(ThemeManager.getListButtonNormalBg())
-                layoutParams = AbsListView.LayoutParams(
-                    AbsListView.LayoutParams.MATCH_PARENT,
-                    AbsListView.LayoutParams.WRAP_CONTENT
-                )
-            }
-
-            ivCover = ImageView(main).apply {
-                scaleType = ImageView.ScaleType.CENTER_CROP
-                layoutParams = LinearLayout.LayoutParams(coverSize, coverSize)
-            }
-            row.addView(ivCover)
-
-            textStack = LinearLayout(main).apply {
-                orientation = LinearLayout.VERTICAL
-                val textLp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                    leftMargin = (10f * d).toInt()
-                }
-                layoutParams = textLp
-            }
-
-            tvTitle = TextView(main).apply {
-                setTextSize(TypedValue.COMPLEX_UNIT_PX, ThemeManager.getListTextSize() * d)
-                typeface = ThemeManager.getCustomFontBold()
-                isSingleLine = true
-                ellipsize = TextUtils.TruncateAt.MARQUEE
-                marqueeRepeatLimit = -1
-                isHorizontalFadingEdgeEnabled = true
-            }
-            textStack.addView(tvTitle)
-
-            tvSubtitle = TextView(main).apply {
-                setTextSize(TypedValue.COMPLEX_UNIT_PX, 15f * d)
-                setTypeface(ThemeManager.getCustomFont(), Typeface.NORMAL)
-                isSingleLine = true
-                ellipsize = TextUtils.TruncateAt.END
-                val subLp = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    topMargin = (1f * d).toInt()
-                }
-                layoutParams = subLp
-            }
-            textStack.addView(tvSubtitle)
-            row.addView(textStack)
-
-            tvArrow = TextView(main).apply {
-                text = "〉"
-                setTextSize(TypedValue.COMPLEX_UNIT_PX, 18f * d)
-                visibility = View.GONE
-                val lpArrow = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    leftMargin = (6f * d).toInt()
-                }
-                layoutParams = lpArrow
-            }
-            row.addView(tvArrow)
-        }
-
-        tvArrow.setTextColor(0xFFFFFFFF.toInt())
-        tvArrow.visibility = if (row.isFocused) View.VISIBLE else View.GONE
-        ClassicMenuStyle.apply(row, tvTitle, tvArrow, 64)
-
-        tvTitle.text = main.t("Shuffle")
+        val art = ArtRow.of(convertView, main)
+        val row = art.view
 
         if (shuffleTileBitmap == null || shuffleTileBitmap?.width != coverSize) {
             shuffleTileBitmap = TablerIcons.renderTile(
@@ -370,42 +276,16 @@ class SongListAdapter(
                 8f * d
             )
         }
-        ivCover.setImageBitmap(shuffleTileBitmap)
+        art.image.setImageBitmap(shuffleTileBitmap)
 
         val count = if (main.virtualSongList != null && main.virtualSongList.isNotEmpty()) {
             main.virtualSongList.size
         } else {
             items.size
         }
-        val countStr = if (count == 1) "1 " + main.t("Song") else "$count " + main.t("Songs")
-        tvSubtitle.text = countStr
-
-        val focusedNow = row.isFocused
-        row.background = if (focusedNow) main.createFocusedButtonBackground() else main.createButtonBackground(ThemeManager.getListButtonNormalBg())
-        tvTitle.setTextColor(if (focusedNow) ThemeManager.getListButtonFocusedTextColor() else ThemeManager.getTextColorPrimary())
-        tvSubtitle.setTextColor(if (focusedNow) ThemeManager.getListButtonFocusedTextColor() else ThemeManager.getTextColorSecondary())
-        tvTitle.isSelected = focusedNow
-
-        row.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                main.virtualListSelectedIndex = 0
-                row.background = main.createFocusedButtonBackground()
-                tvTitle.setTextColor(ThemeManager.getListButtonFocusedTextColor())
-                tvSubtitle.setTextColor(ThemeManager.getListButtonFocusedTextColor())
-                tvArrow.visibility = View.VISIBLE
-                tvTitle.isSelected = true
-                main.showFastScrollLetter(main.t("Shuffle"))
-            } else {
-                row.background = main.createButtonBackground(ThemeManager.getListButtonNormalBg())
-                tvTitle.setTextColor(ThemeManager.getTextColorPrimary())
-                tvSubtitle.setTextColor(ThemeManager.getTextColorSecondary())
-                tvArrow.visibility = View.GONE
-                tvTitle.isSelected = false
-            }
-        }
+        art.bind(main.t("Shuffle"), if (count == 1) "1 " + main.t("Song") else "$count " + main.t("Songs"))
 
         row.setOnClickListener {
-            main.virtualListSelectedIndex = 0
             main.clickFeedback()
             val listToShuffle: List<File> = if (main.virtualSongList != null && main.virtualSongList.isNotEmpty()) {
                 main.virtualSongList

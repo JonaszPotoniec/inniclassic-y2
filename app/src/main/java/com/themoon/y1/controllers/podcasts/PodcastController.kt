@@ -1,26 +1,28 @@
 package com.themoon.y1.controllers.podcasts
 
 import android.app.Activity
-import android.view.Gravity
-import android.view.View
+import android.view.KeyEvent
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.ListView
-import android.widget.ScrollView
-import android.widget.TextView
-import com.themoon.y1.R
+import com.themoon.y1.MainActivity
 import com.themoon.y1.StoragePaths
+import com.themoon.y1.adapters.SongListAdapter
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.controllers.settings.ActionScreens
 import com.themoon.y1.controllers.settings.confirmScreen
+import com.themoon.y1.lists.ListScreen
+import com.themoon.y1.lists.ListSpec
+import com.themoon.y1.lists.RowLook
+import com.themoon.y1.lists.RowSpec
 import com.themoon.y1.managers.AudioPlayerManager
-import com.themoon.y1.models.PodcastChannel
-import com.themoon.y1.models.PodcastEpisode
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.BrowserMode
+import com.themoon.y1.navigation.NavigationManager
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.podcasts.PodcastDownloadManager
 import com.themoon.y1.podcasts.PodcastRepository
+import com.themoon.y1.views.ListItemViewFactory
 import com.themoon.y1.views.Notice
 import com.themoon.y1.views.TablerIcons
 import java.io.File
@@ -28,161 +30,106 @@ import java.util.ArrayList
 
 /**
  * Screen controller for Podcast feeds, episode browsing, download actions,
- * streaming, and subscription management.
+ * streaming, and subscription management. The channels, the episodes of a channel and Manage Subscriptions are
+ * three back-stack entries (as the other lists): Back goes up one list and selects the row that opened it.
  */
 class PodcastController(
     private val activity: Activity,
     override val rootView: ViewGroup,
-    private val containerBrowserItems: LinearLayout,
+    containerBrowserItems: LinearLayout,
     private val listVirtualSongs: ListView,
-    private val tvBrowserPath: TextView?,
     private val repository: PodcastRepository,
     private val downloadManager: PodcastDownloadManager,
     private val onRequestSearch: () -> Unit,
     private val onNavigateToPlayer: () -> Unit,
-    private val createListButton: (icon: String, text: String, color: Int?) -> View,
-    private val createTablerButton: (icon: Array<String>, text: String, textColor: Int, iconColor: Int) -> View,
     private val clickFeedback: () -> Unit,
     private val localize: (String) -> String,
     private val showLoadingPopup: () -> Unit = {},
-    private val onHideLoadingPopup: () -> Unit = {},
-    private val onExitPodcasts: () -> Unit = {}
+    private val onHideLoadingPopup: () -> Unit = {}
 ) : ScreenController {
 
-    private val scrollViewBrowser: View? = containerBrowserItems.parent as? View
-    private var currentMode: BrowserMode = BrowserMode.PodcastChannels
-    private var lastFocusText: String? = null
+    private val screen = ListScreen(containerBrowserItems, listVirtualSongs, clickFeedback)
 
-    val isChannelsMode: Boolean
-        get() = currentMode is BrowserMode.PodcastChannels
+    /** The list that shows. */
+    private var shown: ScreenState? = null
 
-    val isEpisodesMode: Boolean
-        get() = currentMode is BrowserMode.PodcastEpisodes
-
-    val isManageMode: Boolean
-        get() = currentMode is BrowserMode.PodcastManage
-
-    override fun onBackPressed(): Boolean {
-        return when (currentMode) {
-            is BrowserMode.PodcastEpisodes, is BrowserMode.PodcastManage -> {
-                buildChannelsUI()
-                true
-            }
-            is BrowserMode.PodcastChannels -> {
-                onExitPodcasts()
-                true
-            }
-            else -> false
-        }
-    }
+    /** The episodes of the last channel (its RSS URL): Back from an episode shows them again at once. */
+    private var episodes: Pair<String, List<SongItem>>? = null
 
     override fun onEnter(state: ScreenState) {
-        when (state) {
-            is ScreenState.Podcasts -> buildChannelsUI()
-            is ScreenState.PodcastEpisodes -> buildEpisodesUI(state.channelTitle, state.rssUrl)
-            is ScreenState.PodcastManage -> buildManageUI()
-            is ScreenState.Browser -> {
-                currentMode = state.mode
-                when (val mode = state.mode) {
-                    is BrowserMode.PodcastChannels -> buildChannelsUI()
-                    is BrowserMode.PodcastEpisodes -> buildEpisodesUI(mode.channelTitle, mode.rssUrl)
-                    is BrowserMode.PodcastManage -> buildManageUI()
-                    else -> buildChannelsUI()
-                }
+        val list = when (state) {
+            is ScreenState.Browser -> when (val mode = state.mode) {
+                is BrowserMode.PodcastEpisodes -> ScreenState.PodcastEpisodes(mode.channelTitle, mode.rssUrl)
+                is BrowserMode.PodcastManage -> ScreenState.PodcastManage
+                else -> ScreenState.Podcasts
             }
+            is ScreenState.PodcastEpisodes, is ScreenState.PodcastManage -> state
+            else -> ScreenState.Podcasts
+        }
+        shown = list
+        when (list) {
+            is ScreenState.PodcastEpisodes -> buildEpisodesUI(list.channelTitle, list.rssUrl)
+            is ScreenState.PodcastManage -> buildManageUI()
             else -> buildChannelsUI()
         }
     }
 
     override fun onExit() {
+        shown = null
+        screen.clear()
     }
 
     override fun onThemeChanged() {
-        when (currentMode) {
-            // The episode list comes from the network: make only its rows again
-            is BrowserMode.PodcastEpisodes -> listVirtualSongs.adapter = listVirtualSongs.adapter
-            is BrowserMode.PodcastManage -> buildManageUI()
-            else -> buildChannelsUI()
+        shown?.let { onEnter(it) }
+    }
+
+    override fun onWheel(delta: Int, event: KeyEvent): Boolean = screen.wheel(delta)
+
+    override fun title(): String? = screen.title
+
+    private fun open(state: ScreenState) {
+        (activity as? MainActivity)?.changeScreen(state)
+    }
+
+    private fun channelsSpec(): ListSpec {
+        val rows = ArrayList<RowSpec>()
+        rows += RowSpec(localize("Search New Podcasts"), color = 0xFF00FFFF.toInt(), onClick = onRequestSearch)
+        rows += RowSpec(localize("Manage Subscriptions"), color = 0xFFFF5555.toInt(), onClick = { open(ScreenState.PodcastManage) })
+        val channels = repository.getSubscriptions()
+        if (channels.isEmpty()) {
+            rows += RowSpec("⚠️ " + localize("No subscriptions found.") + "\n\n" +
+                    localize("Create a 'subscriptions.txt' file in the Podcasts folder.") + "\n" +
+                    localize("Format: Channel Name|RSS_URL"), RowLook.INFO)
         }
+        for (ch in channels) {
+            rows += RowSpec(ch.title, onClick = {
+                episodes = null
+                Notice.show(activity, localize("Connecting to server: ") + ch.title)
+                open(ScreenState.PodcastEpisodes(ch.title, ch.rssUrl))
+            })
+        }
+        return ListSpec(localize("Podcasts"), rows)
     }
 
     fun buildChannelsUI() {
-        currentMode = BrowserMode.PodcastChannels
-        scrollViewBrowser?.visibility = View.VISIBLE
-        listVirtualSongs.visibility = View.GONE
-        containerBrowserItems.removeAllViews()
-        tvBrowserPath?.text = localize("Podcasts")
-
-        val btnSearch = createListButton("\uE8B6", localize("Search New Podcasts"), 0xFF00FFFF.toInt())
-        btnSearch.setOnClickListener {
-            clickFeedback()
-            onRequestSearch()
-        }
-        containerBrowserItems.addView(btnSearch)
-
-        val btnManage = createListButton("\uE872", localize("Manage Subscriptions"), 0xFFFF5555.toInt())
-        btnManage.setOnClickListener {
-            clickFeedback()
-            buildManageUI()
-        }
-        containerBrowserItems.addView(btnManage)
-
-        val channels = repository.getSubscriptions()
-        if (channels.isEmpty()) {
-            val tvEmpty = TextView(activity).apply {
-                text = "⚠️ " + localize("No subscriptions found.") + "\n\n" +
-                        localize("Create a 'subscriptions.txt' file in the Podcasts folder.") + "\n" +
-                        localize("Format: Channel Name|RSS_URL")
-                setTextColor(0xFF888888.toInt())
-                gravity = Gravity.CENTER
-                setPadding(20, 100, 20, 50)
-                setLineSpacing(15f, 1.2f)
-            }
-            containerBrowserItems.addView(tvEmpty)
-        } else {
-            for (ch in channels) {
-                val btnCh = createListButton("\uE03E", ch.title, null)
-                btnCh.tag = ch.title
-                btnCh.setOnClickListener {
-                    clickFeedback()
-                    lastFocusText = ch.title
-                    buildEpisodesUI(ch.title, ch.rssUrl)
-                    Notice.show(activity, localize("Connecting to server: ") + ch.title)
-                }
-                containerBrowserItems.addView(btnCh)
-            }
-        }
-
-        if (containerBrowserItems.childCount > 0) {
-            var focused = false
-            val target = lastFocusText
-            if (!target.isNullOrEmpty()) {
-                for (i in 0 until containerBrowserItems.childCount) {
-                    val child = containerBrowserItems.getChildAt(i)
-                    if (target == child.tag) {
-                        child.requestFocus()
-                        focused = true
-                        break
-                    }
-                }
-            }
-            if (!focused) {
-                containerBrowserItems.getChildAt(0).requestFocus()
-            }
-        }
+        screen.show(channelsSpec())
     }
 
+    /** The episodes of a channel: from the network (the list is empty until they come), or the episodes kept. */
     fun buildEpisodesUI(channelName: String, rssUrl: String) {
-        currentMode = BrowserMode.PodcastEpisodes(channelName, rssUrl)
-        scrollViewBrowser?.visibility = View.GONE
-        listVirtualSongs.visibility = View.VISIBLE
-        tvBrowserPath?.text = "${localize("Podcast")}: $channelName"
-
+        val title = "${localize("Podcast")}: $channelName"
+        episodes?.takeIf { it.first == rssUrl }?.let {
+            showEpisodes(title, channelName, it.second)
+            return
+        }
+        screen.show(ListSpec(title))
+        val state = ScreenState.PodcastEpisodes(channelName, rssUrl)
         Thread {
             try {
-                val episodes = repository.fetchEpisodes(rssUrl, channelName)
+                val list = repository.fetchEpisodes(rssUrl, channelName)
                 activity.runOnUiThread {
-                    displayEpisodesList(channelName, episodes)
+                    episodes = rssUrl to list
+                    if (shown == state) showEpisodes(title, channelName, list)
                 }
             } catch (e: Exception) {
                 activity.runOnUiThread {
@@ -190,68 +137,41 @@ class PodcastController(
                         activity,
                         localize("Failed to fetch episodes: ") + (e.message ?: "Unknown error")
                     )
+                    if (shown == state) screen.show(ListSpec(title, empty = localize("No Episodes")))
                 }
             }
         }.start()
     }
 
-    private fun displayEpisodesList(channelName: String, episodes: List<SongItem>) {
-        val adapter = com.themoon.y1.adapters.SongListAdapter(episodes)
-        listVirtualSongs.adapter = adapter
+    private fun showEpisodes(title: String, channelName: String, list: List<SongItem>) {
         listVirtualSongs.setOnItemClickListener { _, _, position, _ ->
             clickFeedback()
-            if (position in episodes.indices) {
-                val ep = episodes[position]
+            if (position in list.indices) {
+                val ep = list[position]
                 showActionDialog(ep.title, ep.genre, ep.album, channelName)
             }
         }
-        listVirtualSongs.requestFocus()
+        screen.show(ListSpec(title, adapter = SongListAdapter(list), empty = localize("No Episodes")))
     }
 
-    fun buildManageUI() {
-        currentMode = BrowserMode.PodcastManage
-        scrollViewBrowser?.visibility = View.VISIBLE
-        listVirtualSongs.visibility = View.GONE
-        containerBrowserItems.removeAllViews()
-        tvBrowserPath?.text = "${localize("Podcasts")}: ${localize("Manage Subscriptions")}"
-
-        val btnBack = createListButton("\uE5C4", localize("Back to Podcasts"), null)
-        btnBack.setOnClickListener {
-            clickFeedback()
-            buildChannelsUI()
-        }
-        containerBrowserItems.addView(btnBack)
-
+    private fun manageSpec(): ListSpec {
+        val rows = ArrayList<RowSpec>()
+        rows += RowSpec(localize("Back to Podcasts"), onClick = { NavigationManager.getInstance().popBackStack() })
         val channels = repository.getSubscriptions()
-        if (channels.isEmpty()) {
-            val tvEmpty = TextView(activity).apply {
-                text = "⚠️ " + localize("No subscriptions found.")
-                setTextColor(0xFF888888.toInt())
-                gravity = Gravity.CENTER
-                setPadding(20, 100, 20, 50)
-            }
-            containerBrowserItems.addView(tvEmpty)
-        } else {
-            for (ch in channels) {
-                val btnDel = createTablerButton(
-                    TablerIcons.TRASH,
-                    ch.title,
-                    0xFFFF5555.toInt(),
-                    0xFFFF5555.toInt()
-                )
-                btnDel.setOnClickListener {
-                    clickFeedback()
-                    showDeleteConfirmDialog(ch.title, ch.rssUrl)
-                }
-                containerBrowserItems.addView(btnDel)
-            }
+        if (channels.isEmpty()) rows += RowSpec("⚠️ " + localize("No subscriptions found."), RowLook.INFO)
+        for (ch in channels) {
+            val row = ListItemViewFactory.createTablerListButtonWithRightIcon(activity, TablerIcons.TRASH, ch.title, null,
+                0xFFFF5555.toInt(), 0xFFFF5555.toInt())
+            rows += RowSpec(ch.title, RowLook.CUSTOM, view = row, onClick = { showDeleteConfirmDialog(ch.title, ch.rssUrl) })
         }
+        return ListSpec("${localize("Podcasts")}: ${localize("Manage Subscriptions")}", rows)
+    }
 
-        if (containerBrowserItems.childCount > 1) {
-            containerBrowserItems.postDelayed({
-                containerBrowserItems.getChildAt(1).requestFocus()
-            }, 50)
-        }
+    /** Manage Subscriptions: the first channel is selected (not the Back row). */
+    fun buildManageUI() {
+        val spec = manageSpec()
+        screen.show(spec)
+        spec.rows.getOrNull(1)?.let { screen.select(it.key) }
     }
 
     private fun showDeleteConfirmDialog(channelName: String, rssUrl: String) {
@@ -261,7 +181,7 @@ class PodcastController(
             localize("Delete")
         ) {
             repository.removeSubscription(channelName, rssUrl)
-            buildManageUI()
+            if (shown == ScreenState.PodcastManage) screen.update(manageSpec())
         })
     }
 
@@ -354,7 +274,7 @@ class PodcastController(
                         subFile.appendText("\n$safeName|${item.feedUrl}")
 
                         Notice.show(activity, "✅ ${localize("Subscribed: ")}$safeName")
-                        buildChannelsUI()
+                        if (shown == ScreenState.Podcasts) screen.update(channelsSpec())
                     } catch (e: Exception) {
                         Notice.error(activity, "Error saving: ${e.message}")
                     }

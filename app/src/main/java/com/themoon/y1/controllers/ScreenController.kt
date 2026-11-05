@@ -16,6 +16,9 @@ interface ScreenController {
     fun onExit() {}
     fun onRefreshUI() {}
 
+    /** The status bar title of this screen, or null: then MainActivity gives the title of the screen kind. */
+    fun title(): String? = null
+
     /** The library cache finished loading after the screen was built: show the library data again. */
     fun onLibraryLoaded() {}
 

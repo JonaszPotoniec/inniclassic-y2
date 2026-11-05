@@ -100,21 +100,8 @@ internal fun MainActivity.applyRootSystemSettings() {
 }
 
 internal fun MainActivity.loadPreferences() {
-    isShuffleMode = prefs.getBoolean("shuffle", false)
-    repeatMode = prefs.getInt("repeat_mode", 0)
-    isSoundEffectEnabled = prefs.getBoolean("sound", true)
-    isVibrationEnabled = prefs.getBoolean("vibrate", true)
-    vibrationStrengthLevel = prefs.getInt("vibrate_strength", 1)
-    isScreenOffControlEnabled = prefs.getBoolean("screen_off_control", false)
-    isUsbPromptEnabled = prefs.getBoolean("usb_storage_prompt", true)
-    is24HourFormat = prefs.getBoolean(ClockSettings.KEY_24_HOUR_FORMAT, ClockSettings.DEFAULT_24_HOUR_FORMAT)
-    isTimeInTitleBar = prefs.getBoolean(ClockSettings.KEY_TIME_IN_TITLE, ClockSettings.DEFAULT_TIME_IN_TITLE)
-    isShowBatteryPercentage = prefs.getBoolean("show_battery_percentage", false)
-    isSoundCheckEnabled = prefs.getBoolean("sound_check_enabled", false)
-    isAlbumTiltEnabled = com.themoon.y1.controllers.player.AlbumTiltSetting.isEnabled(prefs)
-    com.themoon.y1.models.AlbumKey.byArtist = prefs.getBoolean(com.themoon.y1.models.AlbumKey.PREF_BY_ARTIST, false)
-    volumeLimitMax = prefs.getInt("volume_limit_max", -1)
-    isSoftwareEqEnabled = prefs.getBoolean("software_eq_enabled", false)
+    // The settings fields of MainActivity read Prefs; only the album grouping keeps a copy (AlbumKey has no prefs).
+    com.themoon.y1.models.AlbumKey.byArtist = Prefs.GROUP_ALBUMS_BY_ARTIST.get(prefs)
 
     eqPresetNames.clear()
     eqPresetNames.addAll(listOf("Off", "Acoustic", "Bass Booster", "Bass Reducer", "Classical", "Electronic", "Hip Hop", "Jazz", "Latin", "Loudness", "Pop", "R&B", "Rock", "Vocal Booster"))

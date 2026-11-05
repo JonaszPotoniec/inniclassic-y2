@@ -222,14 +222,41 @@ class NavigationManagerTest {
         assertEquals(fakeSettings, navManager.activeController)
         assertEquals(ScreenState.Settings(), navManager.currentState)
 
-        navManager.navigateTo(ScreenState.Jellyfin)
+        navManager.navigateTo(ScreenState.Jellyfin())
         assertEquals(fakeJellyfin, navManager.activeController)
-        assertEquals(ScreenState.Jellyfin, navManager.currentState)
+        assertEquals(ScreenState.Jellyfin(), navManager.currentState)
         assertEquals(1, fakeJellyfin.enterCount)
         assertEquals(1, fakeSettings.exitCount)
 
         assertTrue(navManager.popBackStack())
         assertEquals(fakeSettings, navManager.activeController)
+        assertEquals(ScreenState.Settings(), navManager.currentState)
+    }
+
+    @Test
+    fun jellyfinLevelsAreBackStackEntries() {
+        val fakeSettings = FakeController()
+        val fakeJellyfin = FakeController()
+        navManager.registerController(ScreenState.Settings::class.java, fakeSettings)
+        navManager.registerController(ScreenState.Jellyfin::class.java, fakeJellyfin)
+
+        val root = ScreenState.Jellyfin()
+        val library = ScreenState.Jellyfin(JellyfinLevel.Library("lib"))
+        val browse = ScreenState.Jellyfin(JellyfinLevel.Browse("lib"))
+        val artist = ScreenState.Jellyfin(JellyfinLevel.Group("lib", 2))
+        val album = ScreenState.Jellyfin(JellyfinLevel.Items("lib", 2, 0))
+        navManager.navigateTo(ScreenState.MainMenu)
+        navManager.navigateTo(ScreenState.Settings())
+        for (state in listOf(root, library, browse, artist, album)) navManager.navigateTo(state)
+        assertEquals(album, fakeJellyfin.lastStateEntered)
+
+        // Back goes up one level each time, and the controller builds that level again from its state
+        for (state in listOf(artist, browse, library, root)) {
+            assertTrue(navManager.navigateBack())
+            assertEquals(state, navManager.currentState)
+            assertEquals(state, fakeJellyfin.lastStateEntered)
+        }
+        assertTrue(navManager.navigateBack())
         assertEquals(ScreenState.Settings(), navManager.currentState)
     }
 
@@ -244,7 +271,7 @@ class NavigationManagerTest {
 
         navManager.navigateTo(ScreenState.MainMenu)
         navManager.navigateTo(ScreenState.Settings())
-        navManager.navigateTo(ScreenState.Jellyfin)
+        navManager.navigateTo(ScreenState.Jellyfin())
         assertEquals(fakeJellyfin, navManager.activeController)
 
         // Open keyboard
@@ -255,7 +282,7 @@ class NavigationManagerTest {
         // Cancel / exit keyboard pops back to Jellyfin
         assertTrue(navManager.popBackStack())
         assertEquals(fakeJellyfin, navManager.activeController)
-        assertEquals(ScreenState.Jellyfin, navManager.currentState)
+        assertEquals(ScreenState.Jellyfin(), navManager.currentState)
 
         // Back from Jellyfin pops back to Settings
         assertTrue(navManager.popBackStack())

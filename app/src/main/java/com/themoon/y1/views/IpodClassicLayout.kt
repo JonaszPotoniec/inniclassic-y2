@@ -1,5 +1,6 @@
 package com.themoon.y1.views
 
+import com.themoon.y1.Prefs
 import android.content.SharedPreferences
 import android.content.res.ColorStateList
 import android.graphics.Color
@@ -42,7 +43,7 @@ object IpodClassicLayout {
     // SharedPreferences keeps listeners in a weak map, so this object holds the only strong reference.
     private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         // The iPod tilt (pivot, scaleX) is set in applyTheme, so set it again when the tilt changes
-        if (key == "album_tilt_enabled" && isActive) MainActivity.instance?.applyTheme()
+        if (key == Prefs.ALBUM_TILT.key && isActive) MainActivity.instance?.applyTheme()
     }
 
     /** True when a Classic theme is in use: only the Classic themes have the iPod layout. */

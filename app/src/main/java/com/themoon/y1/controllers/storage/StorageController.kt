@@ -3,6 +3,7 @@ package com.themoon.y1.controllers.storage
 import android.app.Activity
 import android.os.Build
 import android.os.StatFs
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
@@ -11,6 +12,10 @@ import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
+import com.themoon.y1.lists.ListScreen
+import com.themoon.y1.lists.ListSpec
+import com.themoon.y1.lists.RowLook
+import com.themoon.y1.lists.RowSpec
 import com.themoon.y1.models.AlbumKey
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.ScreenState
@@ -28,50 +33,54 @@ class StorageController(
     override val rootView: ViewGroup,
     private val songsProvider: () -> List<SongItem>,
     private val videosProvider: () -> List<File>,
-    private val createSettingRow: (title: String, value: String) -> LinearLayout,
-    private val clickFeedback: () -> Unit,
+    clickFeedback: () -> Unit,
     private val localize: (String) -> String
 ) : ScreenController {
 
     private val layoutStorage: LinearLayout = rootView.findViewById(R.id.layout_storage_mode)
-    private val containerStorageItems: LinearLayout = rootView.findViewById(R.id.container_storage_items)
     private val tvStorageHeader: TextView? = rootView.findViewById(R.id.tv_storage_header)
+    private val screen = ListScreen(rootView.findViewById(R.id.container_storage_items), clickFeedback = clickFeedback)
 
     override fun onEnter(state: ScreenState) {
-        buildStorageUI()
+        showColours()
+        screen.show(spec())
     }
 
     override fun onExit() {
         layoutStorage.visibility = View.GONE
+        screen.clear()
     }
 
     override fun onLibraryLoaded() {
-        buildStorageUI()
+        screen.update(spec())
     }
 
     override fun onThemeChanged() {
-        buildStorageUI()
+        showColours()
+        screen.update(spec())
     }
 
-    fun buildStorageUI() {
-        containerStorageItems.removeAllViews()
+    override fun onWheel(delta: Int, event: KeyEvent): Boolean = screen.wheel(delta)
+
+    override fun title(): String? = screen.title
+
+    private fun showColours() {
         layoutStorage.setBackgroundColor(ThemeManager.getOverlayBackgroundColor())
         tvStorageHeader?.text = localize("About")
         tvStorageHeader?.setTextColor(ThemeManager.getTextColorPrimary())
+    }
 
-        val rowName = createSettingRow(localize("Name"), "iPod")
-        rowName.setOnClickListener { clickFeedback() }
-        containerStorageItems.addView(rowName)
+    /** One row for each value; the centre button only gives the click feedback. */
+    private fun spec(): ListSpec {
+        val rows = ArrayList<RowSpec>()
+        fun row(title: String, value: String) {
+            rows += RowSpec(localize(title), RowLook.VALUE, value = value, key = title, onClick = {})
+        }
 
+        row("Name", "iPod")
         val songs = songsProvider()
-        val rowSongs = createSettingRow(localize("Songs"), songs.size.toString())
-        rowSongs.setOnClickListener { clickFeedback() }
-        containerStorageItems.addView(rowSongs)
-
-        val videos = videosProvider()
-        val rowVideos = createSettingRow(localize("Videos"), videos.size.toString())
-        rowVideos.setOnClickListener { clickFeedback() }
-        containerStorageItems.addView(rowVideos)
+        row("Songs", songs.size.toString())
+        row("Videos", videosProvider().size.toString())
 
         val uniqueAlbums = HashSet<String>()
         val uniqueArtists = HashSet<String>()
@@ -79,81 +88,35 @@ class StorageController(
             if (song.album.isNotBlank()) uniqueAlbums.add(AlbumKey.of(song))
             if (song.albumArtist.isNotBlank()) uniqueArtists.add(song.albumArtist)
         }
-
-        val rowAlbums = createSettingRow(localize("Albums"), uniqueAlbums.size.toString())
-        rowAlbums.setOnClickListener { clickFeedback() }
-        containerStorageItems.addView(rowAlbums)
-
-        val rowArtists = createSettingRow(localize("Artists"), uniqueArtists.size.toString())
-        rowArtists.setOnClickListener { clickFeedback() }
-        containerStorageItems.addView(rowArtists)
+        row("Albums", uniqueAlbums.size.toString())
+        row("Artists", uniqueArtists.size.toString())
 
         try {
             val statInternal = StatFs(StoragePaths.getPrimaryRoot().absolutePath)
             val blockSize = statInternal.blockSize.toLong()
-            val totalInternal = statInternal.blockCount.toLong() * blockSize
-            val freeInternal = statInternal.availableBlocks.toLong() * blockSize
-
-            val rowIntCap = createSettingRow(localize("Internal Capacity"), formatSize(totalInternal))
-            rowIntCap.setOnClickListener { clickFeedback() }
-            containerStorageItems.addView(rowIntCap)
-
-            val rowIntAvail = createSettingRow(localize("Internal Available"), formatSize(freeInternal))
-            rowIntAvail.setOnClickListener { clickFeedback() }
-            containerStorageItems.addView(rowIntAvail)
+            row("Internal Capacity", formatSize(statInternal.blockCount.toLong() * blockSize))
+            row("Internal Available", formatSize(statInternal.availableBlocks.toLong() * blockSize))
         } catch (e: Exception) {
-            val rowIntCap = createSettingRow(localize("Internal Capacity"), "0 MB")
-            rowIntCap.setOnClickListener { clickFeedback() }
-            containerStorageItems.addView(rowIntCap)
+            row("Internal Capacity", "0 MB")
         }
 
-        if (StoragePaths.hasSecondaryStorage()) {
-            try {
-                val statSd = StatFs(StoragePaths.SECONDARY_PATH)
-                val sdBlockSize = statSd.blockSize.toLong()
-                val totalSd = statSd.blockCount.toLong() * sdBlockSize
-                val freeSd = statSd.availableBlocks.toLong() * sdBlockSize
-
-                val rowSdCap = createSettingRow(localize("SD Card Capacity"), formatSize(totalSd))
-                rowSdCap.setOnClickListener { clickFeedback() }
-                containerStorageItems.addView(rowSdCap)
-
-                val rowSdAvail = createSettingRow(localize("SD Card Available"), formatSize(freeSd))
-                rowSdAvail.setOnClickListener { clickFeedback() }
-                containerStorageItems.addView(rowSdAvail)
-            } catch (e: Exception) {
-                val rowSd = createSettingRow(localize("SD Card"), localize("Not Inserted"))
-                rowSd.setOnClickListener { clickFeedback() }
-                containerStorageItems.addView(rowSd)
-            }
+        val statSd = if (StoragePaths.hasSecondaryStorage()) try { StatFs(StoragePaths.SECONDARY_PATH) } catch (e: Exception) { null } else null
+        if (statSd != null) {
+            val sdBlockSize = statSd.blockSize.toLong()
+            row("SD Card Capacity", formatSize(statSd.blockCount.toLong() * sdBlockSize))
+            row("SD Card Available", formatSize(statSd.availableBlocks.toLong() * sdBlockSize))
         } else {
-            val rowSd = createSettingRow(localize("SD Card"), localize("Not Inserted"))
-            rowSd.setOnClickListener { clickFeedback() }
-            containerStorageItems.addView(rowSd)
+            row("SD Card", localize("Not Inserted"))
         }
 
         var versionName = ""
         try {
             versionName = activity.packageManager.getPackageInfo(activity.packageName, 0).versionName ?: ""
         } catch (ignored: Exception) {}
-
-        val rowVer = createSettingRow(localize("Software Version"), versionName)
-        rowVer.setOnClickListener { clickFeedback() }
-        containerStorageItems.addView(rowVer)
-
-        val rowModel = createSettingRow(localize("Model"), Build.MODEL)
-        rowModel.setOnClickListener { clickFeedback() }
-        containerStorageItems.addView(rowModel)
-
-        val rowFormat = createSettingRow(localize("Format"), "FAT32")
-        rowFormat.setOnClickListener { clickFeedback() }
-        containerStorageItems.addView(rowFormat)
-
-        if (containerStorageItems.childCount > 0) {
-            containerStorageItems.post {
-                containerStorageItems.getChildAt(0).requestFocus()
-            }
-        }
+        row("Software Version", versionName)
+        row("Model", Build.MODEL)
+        row("Format", "FAT32")
+        return ListSpec(localize("About"), rows)
     }
 
     private fun formatSize(bytes: Long): String {

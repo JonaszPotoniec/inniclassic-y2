@@ -1,6 +1,5 @@
 package com.themoon.y1.controllers.quiz
 
-import com.themoon.y1.navigation.RowFocus
 import android.app.Activity
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -24,6 +23,10 @@ import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.controllers.settings.ActionScreens
 import com.themoon.y1.controllers.settings.confirmScreen
+import com.themoon.y1.lists.ListScreen
+import com.themoon.y1.lists.ListSpec
+import com.themoon.y1.lists.RowLook
+import com.themoon.y1.lists.RowSpec
 import com.themoon.y1.managers.AlbumCoverManager
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.managers.MediaLibraryManager
@@ -84,6 +87,27 @@ class MusicQuizController(
     /** Back from the Clear Scores screen: the leaderboard again (its fromGameOver), else null. */
     private var returnToLeaderboard: Boolean? = null
 
+    /** True when the last game made a new high score (the game-over menu shows it again after the leaderboard). */
+    private var lastGameNewHighScore = false
+
+    /** A heart was bought in this round pause. */
+    private var heartBought = false
+
+    /**
+     * The menus (start, round complete, game over, leaderboard) are lists on the list model, in a scroll view in
+     * the quiz items area; the question screen puts its answer pills or cover tiles there in their place.
+     */
+    private val menuRows = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
+    private val menuScroll = ScrollView(activity).apply {
+        isVerticalScrollBarEnabled = false
+        isFillViewport = true
+        addView(menuRows, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+    }
+    private val screen = ListScreen(menuRows, null, clickFeedback)
+
+    /** Makes the menu that shows (for a theme change); null while a question shows. */
+    private var menu: (() -> ListSpec)? = null
+
     override fun onEnter(state: ScreenState) {
         layoutQuiz.visibility = View.VISIBLE
         val leaderboard = returnToLeaderboard
@@ -94,8 +118,44 @@ class MusicQuizController(
     override fun onExit() {
         cancelTimer()
         engine.stopPreview()
+        screen.clear()
+        menu = null
         layoutQuiz.visibility = View.GONE
     }
+
+    override fun onWheel(delta: Int, event: KeyEvent): Boolean = menu != null && screen.wheel(delta)
+
+    override fun onThemeChanged() {
+        menuScroll.setBackgroundColor(ThemeManager.getOverlayBackgroundColor())
+        menu?.let { screen.update(it()) }
+    }
+
+    /** Shows the menu that [build] makes, with its first row selected. */
+    private fun showMenu(build: () -> ListSpec) {
+        containerQuizItems.orientation = LinearLayout.VERTICAL
+        if (menuScroll.parent !== containerQuizItems) {
+            containerQuizItems.removeAllViews()
+            containerQuizItems.addView(menuScroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        }
+        // The list colours of the theme (as Settings), so the rows can be read on the quiz background
+        menuScroll.setBackgroundColor(ThemeManager.getOverlayBackgroundColor())
+        menu = build
+        screen.show(build())
+    }
+
+    /** The question screen takes the quiz items area. */
+    private fun clearMenu() {
+        menu = null
+        screen.clear()
+        containerQuizItems.removeAllViews()
+    }
+
+    private fun menuSpec(rows: List<RowSpec>) = ListSpec(localize("Music Quiz"), rows)
+
+    private fun action(label: String, run: () -> Unit) = RowSpec(label, RowLook.MENU, onClick = run)
+
+    /** A grey row that the wheel skips. */
+    private fun disabled(label: String) = RowSpec(label, RowLook.MENU, enabled = false)
 
     fun showStartHub() {
         currentScreenMode = MODE_HUB
@@ -110,35 +170,13 @@ class MusicQuizController(
         tvQuizLives?.text = ""
         tvQuizScore?.text = ""
 
-        containerQuizItems.orientation = LinearLayout.VERTICAL
-        containerQuizItems.removeAllViews()
-
-        val btnPlay = createAnswerPill(localize("Play Game"))
-        btnPlay.setOnClickListener {
-            clickFeedback()
-            startSession()
+        showMenu {
+            menuSpec(listOf(
+                action(localize("Play Game")) { startSession() },
+                action(localize("Leaderboard")) { showLeaderboardView(fromGameOver = false) },
+                action(localize("Exit")) { exitQuiz() }
+            ))
         }
-        containerQuizItems.addView(btnPlay)
-
-        val btnLeaderboard = createAnswerPill(localize("Leaderboard"))
-        btnLeaderboard.setOnClickListener {
-            clickFeedback()
-            showLeaderboardView(fromGameOver = false)
-        }
-        containerQuizItems.addView(btnLeaderboard)
-
-        val btnExit = createAnswerPill(localize("Exit"))
-        btnExit.setOnClickListener {
-            clickFeedback()
-            exitQuiz()
-        }
-        containerQuizItems.addView(btnExit)
-
-        containerQuizItems.postDelayed({
-            if (containerQuizItems.childCount > 0) {
-                containerQuizItems.getChildAt(0).requestFocus()
-            }
-        }, 50)
     }
 
     fun startSession() {
@@ -184,7 +222,7 @@ class MusicQuizController(
         updateScoreLivesUI()
 
         tvQuizPrompt?.text = question.promptText
-        containerQuizItems.removeAllViews()
+        clearMenu()
 
         if (question.type == MusicQuizEngine.TYPE_ALBUM_COVER) {
             val bitmaps = question.coverOptions.map { loadSongCoverBitmap(it.file, it.album) }
@@ -340,6 +378,7 @@ class MusicQuizController(
 
         val completedRound = engine.roundNumber
         val perfectRoundBonus = engine.advanceRound()
+        heartBought = false
 
         val bonusNotice = if (perfectRoundBonus) {
             "\n★ " + localize("Perfect Round! +1 Life")
@@ -349,57 +388,29 @@ class MusicQuizController(
         updateScoreLivesUI()
         tvQuizRound?.text = completedRound.toString()
 
-        containerQuizItems.orientation = LinearLayout.VERTICAL
-        containerQuizItems.removeAllViews()
+        showRoundPauseMenu(completedRound)
+    }
 
-        val btnContinue = createAnswerPill(localize("Continue"))
-        btnContinue.setOnClickListener {
-            clickFeedback()
-            loadNextQuestion()
+    /** Continue, Buy 1 Heart (grey when the score is too low or a heart was bought) and Exit. */
+    private fun showRoundPauseMenu(completedRound: Int) {
+        showMenu {
+            menuSpec(listOf(
+                action(localize("Continue")) { loadNextQuestion() },
+                if (engine.canBuyHeart()) {
+                    action(localize("Buy 1 Heart ($1,500)")) {
+                        if (engine.buyHeart()) {
+                            updateScoreLivesUI()
+                            tvQuizRound?.text = completedRound.toString()
+                            heartBought = true
+                            showRoundPauseMenu(completedRound)
+                        }
+                    }
+                } else {
+                    disabled(if (heartBought) "✓ " + localize("Heart Purchased") else localize("Buy 1 Heart ($1,500)"))
+                },
+                action(localize("Exit")) { exitQuiz() }
+            ))
         }
-        containerQuizItems.addView(btnContinue)
-
-        val btnBuyHeart = createAnswerPill(localize("Buy 1 Heart ($1,500)"))
-
-        fun setBuyButtonDisabled(label: String) {
-            btnBuyHeart.onFocusChangeListener = null
-            btnBuyHeart.isFocusable = false
-            btnBuyHeart.isClickable = false
-            btnBuyHeart.alpha = 0.5f
-            btnBuyHeart.setBackgroundResource(R.drawable.quiz_answer_pill_disabled)
-            btnBuyHeart.getChildAt(0)?.visibility = View.INVISIBLE
-            val tvText = btnBuyHeart.getChildAt(1) as? TextView
-            tvText?.setTextColor(0xFFB0B5BA.toInt())
-            tvText?.text = label
-        }
-
-        if (engine.canBuyHeart()) {
-            btnBuyHeart.setOnClickListener {
-                if (engine.buyHeart()) {
-                    clickFeedback()
-                    updateScoreLivesUI()
-                    tvQuizRound?.text = completedRound.toString()
-                    setBuyButtonDisabled("✓ " + localize("Heart Purchased"))
-                    btnContinue.requestFocus()
-                }
-            }
-        } else {
-            setBuyButtonDisabled(localize("Buy 1 Heart ($1,500)"))
-        }
-        containerQuizItems.addView(btnBuyHeart)
-
-        val btnExit = createAnswerPill(localize("Exit"))
-        btnExit.setOnClickListener {
-            clickFeedback()
-            exitQuiz()
-        }
-        containerQuizItems.addView(btnExit)
-
-        containerQuizItems.postDelayed({
-            if (containerQuizItems.childCount > 0) {
-                containerQuizItems.getChildAt(0).requestFocus()
-            }
-        }, 50)
     }
 
     private fun showGameOver() {
@@ -407,47 +418,30 @@ class MusicQuizController(
         cancelTimer()
         engine.stopPreview()
         pbQuizTimer?.progress = 0
+        // Once for each game (the menu shows again after the leaderboard)
+        lastGameNewHighScore = leaderboardManager.recordScore(engine.score, engine.roundNumber)
+        showGameOverMenu()
+    }
 
-        val isNewHighScore = leaderboardManager.recordScore(engine.score, engine.roundNumber)
+    private fun showGameOverMenu() {
+        currentScreenMode = MODE_GAME_OVER
         val highScore = leaderboardManager.getHighScore()
 
         val title = localize("Game Over!")
         val scoreStr = String.format(Locale.US, "$%,d", engine.score)
         val roundStr = "${localize("Round ")}${engine.roundNumber}"
-        val highScoreNotice = if (isNewHighScore) "🏆 " + localize("New High Score!") else "${localize("Best")}: ${String.format(Locale.US, "$%,d", highScore)}"
+        val highScoreNotice = if (lastGameNewHighScore) "🏆 " + localize("New High Score!") else "${localize("Best")}: ${String.format(Locale.US, "$%,d", highScore)}"
 
         tvQuizPrompt?.text = "$title\n$scoreStr ($roundStr)\n$highScoreNotice"
         updateScoreLivesUI()
 
-        containerQuizItems.orientation = LinearLayout.VERTICAL
-        containerQuizItems.removeAllViews()
-
-        val btnAgain = createAnswerPill(localize("Play Again"))
-        btnAgain.setOnClickListener {
-            clickFeedback()
-            startSession()
+        showMenu {
+            menuSpec(listOf(
+                action(localize("Play Again")) { startSession() },
+                action(localize("Leaderboard")) { showLeaderboardView(fromGameOver = true) },
+                action(localize("Exit")) { exitQuiz() }
+            ))
         }
-        containerQuizItems.addView(btnAgain)
-
-        val btnLeaderboard = createAnswerPill(localize("Leaderboard"))
-        btnLeaderboard.setOnClickListener {
-            clickFeedback()
-            showLeaderboardView(fromGameOver = true)
-        }
-        containerQuizItems.addView(btnLeaderboard)
-
-        val btnExit = createAnswerPill(localize("Exit"))
-        btnExit.setOnClickListener {
-            clickFeedback()
-            exitQuiz()
-        }
-        containerQuizItems.addView(btnExit)
-
-        containerQuizItems.postDelayed({
-            if (containerQuizItems.childCount > 0) {
-                containerQuizItems.getChildAt(0).requestFocus()
-            }
-        }, 50)
     }
 
     private fun showLeaderboardView(fromGameOver: Boolean) {
@@ -461,80 +455,32 @@ class MusicQuizController(
         tvQuizLives?.text = ""
         tvQuizScore?.text = ""
 
-        containerQuizItems.orientation = LinearLayout.VERTICAL
-        containerQuizItems.removeAllViews()
-
-        val scrollView = ScrollView(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-            isVerticalScrollBarEnabled = false
-        }
-
-        val scrollContent = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-        }
-        scrollView.addView(scrollContent)
-        containerQuizItems.addView(scrollView)
-
-        val entries = leaderboardManager.getTopEntries()
-        if (entries.isEmpty()) {
-            val emptyPill = createAnswerPill(localize("No scores yet"))
-            emptyPill.isFocusable = false
-            scrollContent.addView(emptyPill)
-        } else {
-            val dateFormat = java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM)
-            for ((index, entry) in entries.withIndex()) {
-                val rank = index + 1
-                val dateStr = dateFormat.format(java.util.Date(entry.timestamp))
-                val scoreStr = String.format(Locale.US, "$%,d", entry.score)
-                val roundStr = "R${entry.round}"
-                val text = "#$rank   $scoreStr   $dateStr   ($roundStr)"
-                val row = createLeaderboardRow(text)
-                scrollContent.addView(row)
-            }
-        }
-
-        val btnBack = createAnswerPill(localize("Back"))
-        btnBack.setOnClickListener {
-            clickFeedback()
-            if (fromGameOver) {
-                showGameOver()
+        showMenu {
+            val rows = ArrayList<RowSpec>()
+            val entries = leaderboardManager.getTopEntries()
+            if (entries.isEmpty()) {
+                rows += RowSpec(localize("No scores yet"), RowLook.INFO)
             } else {
-                showStartHub()
-            }
-        }
-        scrollContent.addView(btnBack)
-
-        if (entries.isNotEmpty()) {
-            val btnClear = createAnswerPill(localize("Clear Scores"))
-            btnClear.setOnClickListener {
-                clickFeedback()
-                returnToLeaderboard = fromGameOver
-                ActionScreens.open(confirmScreen(localize("Leaderboard"), "", localize("Clear Scores")) {
-                    leaderboardManager.clearLeaderboard()
-                    Notice.show(activity, localize("Scores Cleared"))
-                    showLeaderboardView(fromGameOver)
-                })
-            }
-            scrollContent.addView(btnClear)
-        }
-
-        scrollContent.postDelayed({
-            if (scrollContent.childCount > 0) {
-                val target = scrollContent.getChildAt(0)
-                if (target.isFocusable) {
-                    target.requestFocus()
-                } else {
-                    btnBack.requestFocus()
+                val dateFormat = java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM)
+                for ((index, entry) in entries.withIndex()) {
+                    val scoreStr = String.format(Locale.US, "$%,d", entry.score)
+                    val dateStr = dateFormat.format(java.util.Date(entry.timestamp))
+                    rows += RowSpec("#${index + 1}   $scoreStr", RowLook.VALUE, value = "$dateStr   (R${entry.round})", key = "#${index + 1}")
                 }
             }
-        }, 50)
+            rows += action(localize("Back")) { if (fromGameOver) showGameOverMenu() else showStartHub() }
+            if (entries.isNotEmpty()) {
+                rows += action(localize("Clear Scores")) {
+                    returnToLeaderboard = fromGameOver
+                    ActionScreens.open(confirmScreen(localize("Leaderboard"), "", localize("Clear Scores")) {
+                        leaderboardManager.clearLeaderboard()
+                        Notice.show(activity, localize("Scores Cleared"))
+                        showLeaderboardView(fromGameOver)
+                    })
+                }
+            }
+            menuSpec(rows)
+        }
     }
 
     private fun exitQuiz() {
@@ -549,13 +495,8 @@ class MusicQuizController(
         onExitRequested()
     }
 
+    // The wheel never comes here at a list: onWheel takes it in the menus, and InputRouter steps the answers
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == 21 || keyCode == 22) {
-            val list = (activity.currentFocus?.parent as? ViewGroup) ?: containerQuizItems
-            if (RowFocus.step(list, if (keyCode == 22) 1 else -1) != null) clickFeedback()
-            return true
-        }
-
         if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
             // The focused button clicks on release. A click here also came with each key repeat of a hold.
             return true
@@ -609,66 +550,6 @@ class MusicQuizController(
         val tvText = TextView(activity).apply {
             setText(text)
             textSize = 17f
-            setTextColor(0xFF173350.toInt())
-            typeface = ThemeManager.getCustomFontBold()
-            setSingleLine(true)
-            ellipsize = android.text.TextUtils.TruncateAt.MARQUEE
-            marqueeRepeatLimit = -1
-            isHorizontalFadingEdgeEnabled = true
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f)
-        }
-
-        row.addView(dot)
-        row.addView(tvText)
-
-        row.onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                row.setBackgroundResource(R.drawable.quiz_answer_pill_focused)
-                tvText.setTextColor(0xFFFFFFFF.toInt())
-                dot.visibility = View.VISIBLE
-                tvText.isSelected = true
-            } else {
-                row.setBackgroundResource(R.drawable.quiz_answer_pill_normal)
-                tvText.setTextColor(0xFF173350.toInt())
-                dot.visibility = View.INVISIBLE
-                tvText.isSelected = false
-            }
-        }
-
-        return row
-    }
-
-    private fun createLeaderboardRow(text: String): LinearLayout {
-        val d = activity.resources.displayMetrics.density
-        val row = LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            isFocusable = true
-            isClickable = false
-            setBackgroundResource(R.drawable.quiz_answer_pill_normal)
-            val padH = (14 * d).toInt()
-            val padV = (6 * d).toInt()
-            setPadding(padH, padV, padH, padV)
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(0, (2 * d).toInt(), 0, (2 * d).toInt())
-            }
-        }
-
-        val dot = View(activity).apply {
-            val dotSize = (10 * d).toInt()
-            layoutParams = LinearLayout.LayoutParams(dotSize, dotSize).apply {
-                rightMargin = (10 * d).toInt()
-            }
-            setBackgroundResource(R.drawable.quiz_dot_filled)
-            visibility = View.INVISIBLE
-        }
-
-        val tvText = TextView(activity).apply {
-            setText(text)
-            textSize = 15f
             setTextColor(0xFF173350.toInt())
             typeface = ThemeManager.getCustomFontBold()
             setSingleLine(true)

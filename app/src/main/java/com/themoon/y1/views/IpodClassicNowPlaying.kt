@@ -1,5 +1,6 @@
 package com.themoon.y1.views
 
+import com.themoon.y1.Prefs
 import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.PorterDuff
@@ -37,7 +38,6 @@ object IpodClassicNowPlaying {
         val dark = 0.299 * ((c shr 16) and 0xFF) + 0.587 * ((c shr 8) and 0xFF) + 0.114 * (c and 0xFF) < 128
         return if (dark) 0xFFCCCCCC.toInt() else 0xFF333333.toInt()
     }
-    private const val KEY_REPEAT_MODE = "repeat_mode"
     private const val STAR = "★"
     private const val HOLLOW_STAR = '☆'
 
@@ -48,8 +48,8 @@ object IpodClassicNowPlaying {
     // Repeat One and Repeat All have different icons. The mode is stored in AppPrefs; older
     // Now Playing code also writes it to y1_settings, so both are watched.
     private val repeatListener = SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
-        if (key == KEY_REPEAT_MODE && L.isActive) {
-            repeatIcon?.get()?.let { setModeIcon(it, repeatIconRes(prefs.getInt(KEY_REPEAT_MODE, 0))) }
+        if (key == Prefs.REPEAT_MODE.key && L.isActive) {
+            repeatIcon?.get()?.let { setModeIcon(it, repeatIconRes(Prefs.REPEAT_MODE.get(prefs))) }
         }
     }
 
@@ -99,7 +99,7 @@ object IpodClassicNowPlaying {
     // Album art
 
     private fun applyTilt(main: MainActivity, art: View, reflection: View?, side: Int) {
-        val tiltOn = main.prefs.getBoolean("album_tilt_enabled", true)
+        val tiltOn = Prefs.ALBUM_TILT.get(main.prefs)
         val tilt = M.artTilt(side.toFloat())
         val cameraDistance = M.cameraDistanceSetting(tilt.cameraDistancePx, main.resources.displayMetrics.densityDpi)
         // The reflection turns about the same axis as the art: the art's centre line, above the reflection.
@@ -228,7 +228,7 @@ object IpodClassicNowPlaying {
         // The glyphs have their own side bearings, which give about the iPod's gap.
         L.setMargins(shuffle, right = 0)
         setModeIcon(shuffle, R.drawable.ic_shuffle)
-        setModeIcon(repeat, repeatIconRes(main.prefs.getInt(KEY_REPEAT_MODE, 0)))
+        setModeIcon(repeat, repeatIconRes(Prefs.REPEAT_MODE.get(main.prefs)))
         repeatIcon = WeakReference(repeat)
         if (listenedPrefs.isEmpty()) {
             for (name in arrayOf("AppPrefs", "y1_settings")) {

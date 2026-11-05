@@ -27,7 +27,7 @@ object FeatureVisibility {
             val ids = ThemeManager.getCurrentTheme().menuElements
                 .filter { it.type == "button" && it.action.equals(action, ignoreCase = true) }
                 .map { it.id }
-            isHidden(ids) { prefs.getBoolean("hide_btn_$it", false) }
+            isHidden(ids) { prefs.getBoolean(Prefs.MAIN_MENU_HIDDEN.key(it), false) }
         } catch (e: Exception) {
             false
         }

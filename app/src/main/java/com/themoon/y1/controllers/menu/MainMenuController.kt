@@ -1,5 +1,6 @@
 package com.themoon.y1.controllers.menu
 
+import com.themoon.y1.Prefs
 import com.themoon.y1.navigation.RowFocus
 import android.app.Activity
 import android.content.Context
@@ -134,9 +135,7 @@ class MainMenuController(
 
         val statusBarForWidth = activity.findViewById<View>(R.id.layout_status_bar)
         if (statusBarForWidth != null) {
-            val slpMenu = statusBarForWidth.layoutParams
-            slpMenu.width = (ClassicMenuStyle.PANE_WIDTH_DP * density).toInt()
-            statusBarForWidth.layoutParams = slpMenu
+            com.themoon.y1.lists.Pane.fitStatusBar(statusBarForWidth, split = true)
             statusBarForWidth.background = ThemeManager.createStatusBarBackground()
         }
 
@@ -440,7 +439,7 @@ class MainMenuController(
         val createdButtons = ArrayList<LinearLayout>()
         val visibleButtonElements = ArrayList<ThemeManager.MenuElement>()
         for (el in buttonElements) {
-            if (!prefs.getBoolean("hide_btn_" + el.id, false)) {
+            if (!prefs.getBoolean(Prefs.MAIN_MENU_HIDDEN.key(el.id), false)) {
                 visibleButtonElements.add(el)
             }
         }

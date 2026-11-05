@@ -16,7 +16,7 @@ internal fun MainActivity.createStatusBarBackground(): GradientDrawable {
 internal fun MainActivity.updateMainMenuBackgroundInternal() {
     val bgView = ivMainBg ?: return
     try {
-        val savedBgPath = prefs.getString("bg_path", null)
+        val savedBgPath = prefs.getString(Prefs.BACKGROUND.key, null)
         val currentTheme = ThemeManager.getCurrentTheme()
 
         if ("THEME_DEFAULT" == savedBgPath) {

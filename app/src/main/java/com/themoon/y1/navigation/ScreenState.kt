@@ -39,7 +39,25 @@ sealed interface ScreenState {
     data object FmRadioMenu : ScreenState
     /** The list of the saved channels. */
     data object FmRadioSaved : ScreenState
-    data object Jellyfin : ScreenState
+    /** Jellyfin sync: the settings ([JellyfinLevel.Root]) and the lists of a library. Each level is a back-stack entry. */
+    data class Jellyfin(val level: JellyfinLevel = JellyfinLevel.Root) : ScreenState
+}
+
+/**
+ * The levels of Jellyfin sync. A library list is found again by its place in the list above it (the library
+ * items stay in memory while its levels are on the back stack).
+ */
+sealed interface JellyfinLevel {
+    /** Server, libraries and sync settings. */
+    data object Root : JellyfinLevel
+    /** The sync mode of a library (Sync All, Manual, Off). */
+    data class Library(val libraryId: String) : JellyfinLevel
+    /** The items of a library to select: series, artists, authors or movies. */
+    data class Browse(val libraryId: String) : JellyfinLevel
+    /** A series, artist or author ([group]: its place in [Browse]): seasons, albums or books. */
+    data class Group(val libraryId: String, val group: Int) : JellyfinLevel
+    /** A season, album or book ([item]: its place in [Group]): episodes, songs or chapters. */
+    data class Items(val libraryId: String, val group: Int, val item: Int) : JellyfinLevel
 }
 
 /** A level of the folder browser: the file tree of Folders, or of the background picker of Settings. */
@@ -92,7 +110,7 @@ sealed interface BrowserMode {
  */
 sealed interface SettingsSubMode {
     data object Root : SettingsSubMode
-    /** A group of the top level, by its English title (SettingsGroups). */
+    /** A group of the top level, by its English title (SettingsController.groups). */
     data class Group(val title: String) : SettingsSubMode
     /** The screen of a Settings row, by its id (for example "Theme"); [arg] for a screen of one value ("DateTime", "Year"). */
     data class Page(val id: String, val arg: String = "") : SettingsSubMode

@@ -1,5 +1,7 @@
 package com.themoon.y1.navigation
 
+import com.themoon.y1.AppPrefs
+import com.themoon.y1.Prefs
 import android.content.Context
 import android.view.View
 import android.view.ViewGroup
@@ -17,7 +19,7 @@ object RowFocus {
 
     /** Settings → Controls → Wheel Loop Scroll (default On). */
     fun isLoopOn(context: Context): Boolean =
-        context.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE).getBoolean("loop_scroll_on", true)
+        Prefs.LOOP_SCROLL.get(AppPrefs.get(context))
 
     fun isSelectable(row: View?): Boolean = row != null && row.visibility == View.VISIBLE && row.isFocusable
 
@@ -61,7 +63,7 @@ object RowFocus {
      * Selects row [position] of [list]. A row that is not on the screen comes into the list first. With
      * List Edges = Fade the row stays clear of the fades ([ListEdges.focusRow]).
      */
-    private fun showRow(list: AbsListView, position: Int) {
+    fun showRow(list: AbsListView, position: Int) {
         if (list is ListView && ListEdges.focusRow(list, position)) return
         val first = list.firstVisiblePosition
         val row = if (position in first..list.lastVisiblePosition) list.getChildAt(position - first) else null

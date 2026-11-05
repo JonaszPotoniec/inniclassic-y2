@@ -1,5 +1,6 @@
 package com.themoon.y1.managers
 
+import com.themoon.y1.Prefs
 import android.content.SharedPreferences
 import android.media.audiofx.AudioEffect
 import android.media.audiofx.BassBoost
@@ -41,9 +42,6 @@ class AudioEffectManager private constructor() {
         val player = AudioPlayerManager.getInstance()
         val settings = readSettings(main.prefs)
         val plan = AudioEffectPlan.from(settings)
-
-        main.isSoftwareEqEnabled = settings.softwareEq
-        main.isSoundCheckEnabled = settings.soundCheck
 
         // Software DSP (ExoPlayer): with a neutral setting it only copies the buffer.
         if (plan.softwareEq) {
@@ -91,8 +89,8 @@ class AudioEffectManager private constructor() {
     }
 
     private fun readSettings(prefs: SharedPreferences): AudioEffectSettings {
-        val softwareEq = prefs.getBoolean("software_eq_enabled", false)
-        val profile = prefs.getString("eq_profile_id", "preset_0") ?: "preset_0"
+        val softwareEq = Prefs.SOFTWARE_EQ.get(prefs)
+        val profile = Prefs.EQ_PROFILE.get(prefs)
         val name = AudioEffectPlan.levelsName(profile, softwareEq)
         val levels = if (name == null) IntArray(0) else IntArray(AudioEffectPlan.bandCount(softwareEq)) {
             prefs.getInt(AudioEffectPlan.bandLevelKey(name, it), 0)
@@ -101,10 +99,10 @@ class AudioEffectManager private constructor() {
             softwareEq = softwareEq,
             eqProfile = profile,
             eqBandLevels = levels,
-            bassBoostStep = prefs.getInt("bass_boost_step", 0),
-            virtualizerStep = prefs.getInt("virtualizer_step", 0),
-            crossfeedStep = prefs.getInt("crossfeed_step", 0),
-            soundCheck = prefs.getBoolean("sound_check_enabled", false)
+            bassBoostStep = Prefs.BASS_BOOST.get(prefs),
+            virtualizerStep = Prefs.VIRTUALIZER.get(prefs),
+            crossfeedStep = Prefs.CROSSFEED.get(prefs),
+            soundCheck = Prefs.SOUND_CHECK.get(prefs)
         )
     }
 
@@ -164,7 +162,7 @@ class AudioEffectManager private constructor() {
     /** Sets all band levels of the custom profile [name] to 0 (flat), in the prefs and in the profile file. */
     fun resetCustomEqProfile(name: String) {
         val main = MainActivity.instance ?: return
-        val bands = AudioEffectPlan.bandCount(main.prefs.getBoolean("software_eq_enabled", false))
+        val bands = AudioEffectPlan.bandCount(Prefs.SOFTWARE_EQ.get(main.prefs))
         val editor = main.prefs.edit()
         for (i in 0 until bands) {
             editor.putInt(AudioEffectPlan.bandLevelKey(name, i), 0)
@@ -184,7 +182,7 @@ class AudioEffectManager private constructor() {
             e.printStackTrace()
         }
 
-        val listStr = main.prefs.getString("custom_eq_list", "") ?: ""
+        val listStr = Prefs.CUSTOM_EQ_LIST.get(main.prefs)
         val items = listStr.split(",")
         val sb = StringBuilder()
         for (item in items) {
@@ -195,7 +193,7 @@ class AudioEffectManager private constructor() {
         }
 
         val editor = main.prefs.edit()
-        editor.putString("custom_eq_list", sb.toString())
+        Prefs.CUSTOM_EQ_LIST.put(editor, sb.toString())
 
         for (i in 0 until 32) {
             editor.remove(AudioEffectPlan.bandLevelKey(name, i))
@@ -220,7 +218,7 @@ class AudioEffectManager private constructor() {
             json.put("profile_name", name)
 
             val bandsArray = JSONArray()
-            val bands = AudioEffectPlan.bandCount(main.prefs.getBoolean("software_eq_enabled", false))
+            val bands = AudioEffectPlan.bandCount(Prefs.SOFTWARE_EQ.get(main.prefs))
             for (i in 0 until bands) {
                 bandsArray.put(main.prefs.getInt(AudioEffectPlan.bandLevelKey(name, i), 0))
             }
@@ -278,7 +276,7 @@ class AudioEffectManager private constructor() {
                     if (i > 0) sb.append(",")
                     sb.append(validCustomList[i])
                 }
-                editor.putString("custom_eq_list", sb.toString())
+                Prefs.CUSTOM_EQ_LIST.put(editor, sb.toString())
                 editor.commit()
             }
         } catch (e: Exception) {

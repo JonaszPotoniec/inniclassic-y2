@@ -99,7 +99,7 @@ class DateTimeSyncTest {
         val dir = "src/main/java/com/themoon/y1/controllers/settings/SettingsController.kt"
         val code = listOf(File(dir), File("app/$dir")).first { it.exists() }.readText()
         assertEquals(-1, code.indexOf("APPLY DATE & TIME"))
-        val start = code.indexOf("fun buildDateTimeUI(")
+        val start = code.indexOf("fun dateTimeSpec(")
         val end = code.indexOf("\n    private fun ", start)
         assertEquals("no divider in Date & Time", -1, code.substring(start, end).indexOf("createCategoryHeader"))
     }

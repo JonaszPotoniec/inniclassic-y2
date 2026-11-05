@@ -32,7 +32,6 @@ import android.provider.Settings
 import android.view.KeyEvent
 import android.view.MotionEvent
 import com.themoon.y1.views.BatteryIconView
-import com.themoon.y1.views.ClassicMenuStyle
 import com.themoon.y1.views.Notice
 import com.themoon.y1.views.IpodClassicLayout
 import com.themoon.y1.views.TablerIcons
@@ -161,26 +160,26 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     var lastAlbumArtBytes: ByteArray? = null
 
     var isAudiobookLibraryMode: Boolean = false
-    var isShuffleMode: Boolean = false
-    var repeatMode: Int = 0
-    var isSoundEffectEnabled: Boolean = true
-    var isVibrationEnabled: Boolean = true
-    var vibrationStrengthLevel: Int = 1
-    var isScreenOffControlEnabled: Boolean = false
-    var isUsbPromptEnabled: Boolean
-        get() = if (::prefs.isInitialized) prefs.getBoolean("usb_storage_prompt", true) else true
-        set(value) {
-            if (::prefs.isInitialized) {
-                prefs.edit().putBoolean("usb_storage_prompt", value).apply()
-            }
-        }
-    var is24HourFormat: Boolean = ClockSettings.DEFAULT_24_HOUR_FORMAT
-    var isTimeInTitleBar: Boolean = ClockSettings.DEFAULT_TIME_IN_TITLE
-    var isShowBatteryPercentage: Boolean = false
-    var isSoundCheckEnabled: Boolean = false
-    var isAlbumTiltEnabled: Boolean = true
-    var volumeLimitMax: Int = -1
-    var isSoftwareEqEnabled: Boolean = false
+    // Settings: each one reads its key in AppPrefs ([Prefs]), so there is one value and a change has effect at once.
+    // To change one, write the pref.
+    val isShuffleMode: Boolean get() = setting(Prefs.SHUFFLE)
+    val repeatMode: Int get() = setting(Prefs.REPEAT_MODE)
+    val isSoundEffectEnabled: Boolean get() = setting(Prefs.BUTTON_SOUND)
+    val isVibrationEnabled: Boolean get() = setting(Prefs.VIBRATE)
+    val vibrationStrengthLevel: Int get() = setting(Prefs.VIBRATE_STRENGTH)
+    val isScreenOffControlEnabled: Boolean get() = setting(Prefs.SCREEN_OFF_CONTROL)
+    val isUsbPromptEnabled: Boolean get() = setting(Prefs.USB_PROMPT)
+    val is24HourFormat: Boolean get() = setting(Prefs.CLOCK_24_HOUR)
+    val isTimeInTitleBar: Boolean get() = setting(Prefs.TIME_IN_TITLE)
+    val isShowBatteryPercentage: Boolean get() = setting(Prefs.BATTERY_PERCENTAGE)
+    val isSoundCheckEnabled: Boolean get() = setting(Prefs.SOUND_CHECK)
+    val isAlbumTiltEnabled: Boolean get() = setting(Prefs.ALBUM_TILT)
+    /** The Volume Limit as a step; -1 = no limit. Write it with [setVolumeLimit]. */
+    val volumeLimitMax: Int get() = setting(Prefs.VOLUME_LIMIT)
+    val isSoftwareEqEnabled: Boolean get() = setting(Prefs.SOFTWARE_EQ)
+
+    /** The value of [pref]; its default before onCreate opens the preferences. */
+    private fun <T> setting(pref: Pref<T>): T = if (::prefs.isInitialized) pref.get(prefs) else pref.default
 
     var currentVirtualVolume: Int = -1
     var lastTargetVolume: Int = -1
@@ -344,8 +343,8 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
         val themeDir = File(filesDir, "themes")
         ThemeManager.loadThemesFromStorage(themeDir)
-        val savedThemeName = prefs.getString("app_theme_name", null)
-            ?: prefs.getString("current_theme_name", "Classic Light")
+        val savedThemeName = prefs.getString(Prefs.THEME_NAME.key, null)
+            ?: Prefs.CURRENT_THEME_NAME.get(prefs)
         val themeIdx = ThemeManager.findThemeIndexByName(savedThemeName)
         if (themeIdx != -1) ThemeManager.setThemeIndex(themeIdx)
         com.themoon.y1.managers.AutoThemeManager.applyAtStart(prefs)
@@ -574,7 +573,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             STATE_COVERFLOW -> ScreenState.CoverFlow
             STATE_EQUALIZER -> ScreenState.Equalizer
             STATE_FM_RADIO -> ScreenState.FmRadio
-            STATE_JELLYFIN -> ScreenState.Jellyfin
+            STATE_JELLYFIN -> ScreenState.Jellyfin()
             else -> ScreenState.MainMenu
         }
         changeScreen(screenState)
@@ -619,7 +618,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     fun changeScreen(state: ScreenState) {
         val targetState = when {
             state is ScreenState.Browser && state.mode is BrowserMode.CoverFlow -> ScreenState.CoverFlow
-            state is ScreenState.Settings && state.subMode is SettingsSubMode.Jellyfin -> ScreenState.Jellyfin
+            state is ScreenState.Settings && state.subMode is SettingsSubMode.Jellyfin -> ScreenState.Jellyfin()
             else -> state
         }
         if (::browserController.isInitialized) browserController.endLetterJump()
@@ -727,7 +726,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         val output = detectAudioOutput()
         if (!force && output == currentAudioOutput) return
         currentAudioOutput = output
-        volumeLimitMax = volumeMemory.limitStep()
         val step = volumeMemory.stepFor(output) { audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) }
         applyVolumeStep(step, output, showOverlay = false)
     }
@@ -789,8 +787,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
     /** Sets the Volume Limit (a step; -1 = off) and lowers the volume to it when necessary. */
     fun setVolumeLimit(limitStep: Int) {
-        volumeLimitMax = limitStep
-        prefs.edit().putInt(VolumeSteps.PREF_LIMIT, limitStep).apply()
+        Prefs.VOLUME_LIMIT.setAsync(prefs, limitStep)
         if (limitStep > 0 && currentVirtualVolume > limitStep) {
             setVolumeLevel(limitStep, showOverlay = false)
         }
@@ -1145,7 +1142,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     }
 
     private fun updateStatusBarTitle() {
-        tvStatusBarTitle?.text = when (currentScreenState) {
+        tvStatusBarTitle?.text = NavigationManager.getInstance().activeController?.title() ?: when (currentScreenState) {
             STATE_MENU -> t("iPod")
             STATE_BROWSER -> if (::browserController.isInitialized) browserController.getCurrentBrowserTitle() else t("Music")
             STATE_PLAYER -> t("Now Playing")
@@ -1167,7 +1164,6 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                 }
             }
             STATE_EQUALIZER -> t("Equalizer")
-            STATE_FM_RADIO -> if (::fmRadioController.isInitialized) fmRadioController.title() else t("Radio")
             STATE_JELLYFIN -> t("Jellyfin")
             else -> t("iPod")
         }
@@ -1198,18 +1194,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     }
 
     fun updateStatusBarWidth() {
-        val statusBar = findViewById<View>(R.id.layout_status_bar) ?: return
-        val density = resources.displayMetrics.density
-        val slp = statusBar.layoutParams ?: return
-        val targetWidth = if (isPaneBasedScreen()) {
-            (ClassicMenuStyle.PANE_WIDTH_DP * density).toInt()
-        } else {
-            ViewGroup.LayoutParams.MATCH_PARENT
-        }
-        if (slp.width != targetWidth) {
-            slp.width = targetWidth
-            statusBar.layoutParams = slp
-        }
+        findViewById<View>(R.id.layout_status_bar)?.let { com.themoon.y1.lists.Pane.fitStatusBar(it, isPaneBasedScreen()) }
     }
 
     fun showUsbStorageDialog() = usbStorageManager.showUsbStorageDialog()
@@ -1519,7 +1504,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
             if (!isScreenOn) {
                 val isScreenOffCtrl = instance?.isScreenOffControlEnabled
-                    ?: AppPrefs.get(context).getBoolean("screen_off_control", false)
+                    ?: Prefs.SCREEN_OFF_CONTROL.get(AppPrefs.get(context))
                 // Media keys from a remote (car, Bluetooth headphones, wired headset) always act
                 val keys = com.themoon.y1.navigation.RemoteMediaKeys
                 val device = keys.deviceName(event)

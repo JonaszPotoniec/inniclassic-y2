@@ -1,21 +1,19 @@
 package com.themoon.y1.controllers.settings
 
-import android.content.Context
-import android.util.TypedValue
-import android.view.ViewGroup
-import android.widget.LinearLayout
-import android.widget.TextView
 import com.themoon.y1.MainActivity
-import com.themoon.y1.ThemeManager
+import com.themoon.y1.lists.Focus
+import com.themoon.y1.lists.ListSpec
+import com.themoon.y1.lists.RowLook
+import com.themoon.y1.lists.RowSpec
 import com.themoon.y1.navigation.NavigationManager
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.navigation.SettingsSubMode
 
 /**
  * An iPod-style list screen in place of an Android dialog: the title in the status bar, grey info rows (the wheel
- * skips them) and one row for each action. The centre button does the action of the selected row; Back (Menu)
- * closes the screen, so the screen has no Cancel row. Each screen is a back-stack entry with the route key
- * ScreenState.Settings(SettingsSubMode.Action(key)); SettingsController shows it.
+ * skips them) and one row for each action, shown as a list of the list model ([list]). The centre button does the
+ * action of the selected row; Back (Menu) closes the screen, so the screen has no Cancel row. Each screen is a
+ * back-stack entry with the route key ScreenState.Settings(SettingsSubMode.Action(key)); SettingsController shows it.
  *
  * A screen with no action is a message, or a progress screen when its caller changes the info rows ([update]).
  */
@@ -111,22 +109,17 @@ object ActionScreens {
         }
     }
 
-    /** A grey info row: not focusable (the wheel skips it), more lines when the text is long. */
-    fun infoRow(context: Context, text: String): TextView {
-        val d = context.resources.displayMetrics.density
-        val classic = ThemeManager.isClassicTheme()
-        val padX = ((if (classic) 8 else 12) * d).toInt()
-        return TextView(context).apply {
-            this.text = text
-            setTextColor(ThemeManager.getTextColorSecondary())
-            setTextSize(TypedValue.COMPLEX_UNIT_PX, (if (classic) 19f else 14f) * d)
-            typeface = ThemeManager.getCustomFont()
-            setPadding(padX, (6 * d).toInt(), padX, (6 * d).toInt())
-            isFocusable = false
-            isClickable = false
-            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-        }
-    }
+    /**
+     * [spec] as a list ([ListSpec]): an info row ([RowLook.INFO]: the wheel skips it) for each info line, then a row
+     * for each action. A row closes the screen ([close]), then does its action ([choose]).
+     */
+    fun list(spec: Spec, close: () -> Unit): ListSpec = ListSpec(
+        spec.title,
+        spec.info.map { RowSpec(it, RowLook.INFO) } + spec.actions.map { action ->
+            RowSpec(action.label, RowLook.VALUE, value = "", onClick = { choose(action, close) })
+        },
+        focus = if (spec.selectAction) Focus.FIRST else Focus.NONE
+    )
 }
 
 /** A confirmation: one info line and one action row. Back cancels. */

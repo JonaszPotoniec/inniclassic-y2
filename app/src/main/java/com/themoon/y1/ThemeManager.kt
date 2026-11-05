@@ -387,14 +387,14 @@ object ThemeManager {
         val index = findThemeIndexByName(name)
         if (index < 0) return false
         val theme = availableThemes[index]
-        val changed = index != currentThemeIndex || getCurrentTheme().name != prefs.getString("app_theme_name", null)
+        val changed = index != currentThemeIndex || getCurrentTheme().name != prefs.getString(Prefs.THEME_NAME.key, null)
         setThemeIndex(index)
         try {
             val editor = prefs.edit()
-                .putInt("app_theme_index", index)
-                .putString("app_theme_name", theme.name)
-                .putString("current_theme_name", theme.name)
-            if (hasThemeBackground(theme)) editor.putString("bg_path", "THEME_DEFAULT")
+                .putInt(Prefs.THEME_INDEX.key, index)
+                .putString(Prefs.THEME_NAME.key, theme.name)
+                .putString(Prefs.CURRENT_THEME_NAME.key, theme.name)
+            if (hasThemeBackground(theme)) editor.putString(Prefs.BACKGROUND.key, "THEME_DEFAULT")
             val types = theme.menuElements.map { it.type }.toSet()
             for (widget in WIDGET_TYPES) editor.putBoolean(widget, widget in types)
             editor.commit()
