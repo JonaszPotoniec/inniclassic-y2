@@ -57,10 +57,8 @@ import com.themoon.y1.controllers.playlists.PlaylistController
 import com.themoon.y1.controllers.podcasts.PodcastController
 import com.themoon.y1.controllers.quiz.MusicQuizController
 import com.themoon.y1.controllers.radio.FmRadioController
-import com.themoon.y1.controllers.settings.AppDrawerController
 import com.themoon.y1.controllers.settings.BrightnessController
 import com.themoon.y1.controllers.settings.EqualizerController
-import com.themoon.y1.controllers.settings.ScreenRecorderController
 import com.themoon.y1.controllers.settings.SettingsController
 import com.themoon.y1.controllers.storage.StorageController
 import com.themoon.y1.controllers.sync.JellyfinUiController
@@ -304,9 +302,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     lateinit var wifiController: WifiController
     lateinit var wifiKeyboardController: WifiKeyboardController
     lateinit var settingsController: SettingsController
-    lateinit var appDrawerController: AppDrawerController
     lateinit var brightnessController: BrightnessController
-    lateinit var screenRecorderController: ScreenRecorderController
     lateinit var storageController: StorageController
     lateinit var jellyfinUiController: JellyfinUiController
     lateinit var webServerController: WebServerController

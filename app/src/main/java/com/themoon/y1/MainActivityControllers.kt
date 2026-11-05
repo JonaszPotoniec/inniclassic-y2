@@ -24,10 +24,8 @@ import com.themoon.y1.controllers.playlists.PlaylistController
 import com.themoon.y1.controllers.podcasts.PodcastController
 import com.themoon.y1.controllers.quiz.MusicQuizController
 import com.themoon.y1.controllers.radio.FmRadioController
-import com.themoon.y1.controllers.settings.AppDrawerController
 import com.themoon.y1.controllers.settings.BrightnessController
 import com.themoon.y1.controllers.settings.EqualizerController
-import com.themoon.y1.controllers.settings.ScreenRecorderController
 import com.themoon.y1.views.ClassicMenuStyle
 import com.themoon.y1.controllers.settings.SettingsController
 import com.themoon.y1.controllers.storage.StorageController
@@ -592,22 +590,6 @@ internal fun MainActivity.initControllers() {
                 else -> t("Off")
             }
         },
-        localize = { t(it) }
-    )
-
-    appDrawerController = AppDrawerController(
-        activity = this,
-        rootView = layoutSettingsMode as ViewGroup,
-        createListButton = { text -> ListItemViewFactory.createListButtonSimple(this, text) },
-        clickFeedback = { clickFeedback() },
-        localize = { t(it) }
-    )
-
-    screenRecorderController = ScreenRecorderController(
-        activity = this,
-        rootView = layoutSettingsMode as ViewGroup,
-        createSettingRow = { title, value -> ListItemViewFactory.createSettingRow(this, title, value) },
-        clickFeedback = { clickFeedback() },
         localize = { t(it) }
     )
 
