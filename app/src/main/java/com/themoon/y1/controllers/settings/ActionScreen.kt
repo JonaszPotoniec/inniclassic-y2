@@ -86,10 +86,6 @@ object ActionScreens {
         val main = MainActivity.instance ?: return key
         main.runOnUiThread {
             main.wakeFromFakeScreenOff()
-            // From Settings, Back comes back into the open group (SettingsController.onEnter)
-            if (NavigationManager.getInstance().currentState is ScreenState.Settings) {
-                main.backTargetForUtility = MainActivity.STATE_SETTINGS
-            }
             main.changeScreen(route(key))
         }
         return key

@@ -1,24 +1,18 @@
 package com.themoon.y1.controllers.podcasts
 
 import android.app.Activity
-import android.app.Dialog
-import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
-import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
-import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.Window
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.ScrollView
 import android.widget.TextView
-import android.widget.Toast
 import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
-import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
+import com.themoon.y1.controllers.settings.ActionScreens
+import com.themoon.y1.controllers.settings.confirmScreen
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.models.PodcastChannel
 import com.themoon.y1.models.PodcastEpisode
@@ -27,6 +21,7 @@ import com.themoon.y1.navigation.BrowserMode
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.podcasts.PodcastDownloadManager
 import com.themoon.y1.podcasts.PodcastRepository
+import com.themoon.y1.views.Notice
 import com.themoon.y1.views.TablerIcons
 import java.io.File
 import java.util.ArrayList
@@ -152,7 +147,7 @@ class PodcastController(
                     clickFeedback()
                     lastFocusText = ch.title
                     buildEpisodesUI(ch.title, ch.rssUrl)
-                    Toast.makeText(activity, localize("Connecting to server: ") + ch.title, Toast.LENGTH_SHORT).show()
+                    Notice.show(activity, localize("Connecting to server: ") + ch.title)
                 }
                 containerBrowserItems.addView(btnCh)
             }
@@ -191,11 +186,10 @@ class PodcastController(
                 }
             } catch (e: Exception) {
                 activity.runOnUiThread {
-                    Toast.makeText(
+                    Notice.error(
                         activity,
-                        localize("Failed to fetch episodes: ") + (e.message ?: "Unknown error"),
-                        Toast.LENGTH_LONG
-                    ).show()
+                        localize("Failed to fetch episodes: ") + (e.message ?: "Unknown error")
+                    )
                 }
             }
         }.start()
@@ -261,226 +255,65 @@ class PodcastController(
     }
 
     private fun showDeleteConfirmDialog(channelName: String, rssUrl: String) {
-        val d = activity.resources.displayMetrics.density
-        val dialog = Dialog(activity).apply {
-            requestWindowFeature(Window.FEATURE_NO_TITLE)
-            window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-        }
-
-        val rootLayout = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            val bg = GradientDrawable().apply {
-                setColor(ThemeManager.getOverlayBackgroundColor() or 0xFF000000.toInt())
-                cornerRadius = 15 * d
-                setStroke((1 * d).toInt(), 0x33FFFFFF)
-            }
-            background = bg
-            setPadding((15 * d).toInt(), (20 * d).toInt(), (15 * d).toInt(), (15 * d).toInt())
-        }
-
-        val tvTitle = TextView(activity).apply {
-            text = "🗑️ " + localize("Delete Channel")
-            setTextColor(0xFFFF5555.toInt())
-            textSize = 18f
-            typeface = ThemeManager.getCustomFontBold()
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, (10 * d).toInt())
-        }
-        rootLayout.addView(tvTitle)
-
-        val tvMsg = TextView(activity).apply {
-            text = "${localize("Do you want to delete '")}$channelName'?"
-            setTextColor(ThemeManager.getTextColorPrimary())
-            textSize = 16f
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, (20 * d).toInt())
-            setLineSpacing(5f, 1.2f)
-        }
-        rootLayout.addView(tvMsg)
-
-        val wheelListener = View.OnKeyListener { v, keyCode, event ->
-            if (event.action == KeyEvent.ACTION_DOWN) {
-                if (keyCode == 21 || keyCode == 19) {
-                    val idx = rootLayout.indexOfChild(v)
-                    for (i in idx - 1 downTo 0) {
-                        if (rootLayout.getChildAt(i).isFocusable) {
-                            rootLayout.getChildAt(i).requestFocus()
-                            clickFeedback()
-                            return@OnKeyListener true
-                        }
-                    }
-                    return@OnKeyListener true
-                }
-                if (keyCode == 22 || keyCode == 20) {
-                    val idx = rootLayout.indexOfChild(v)
-                    for (i in idx + 1 until rootLayout.childCount) {
-                        if (rootLayout.getChildAt(i).isFocusable) {
-                            rootLayout.getChildAt(i).requestFocus()
-                            clickFeedback()
-                            return@OnKeyListener true
-                        }
-                    }
-                    return@OnKeyListener true
-                }
-            }
-            false
-        }
-
-        val btnDelete = createTablerButton(TablerIcons.TRASH, localize("Delete"), 0xFFFF5555.toInt(), 0xFFFF5555.toInt()).apply {
-            setOnKeyListener(wheelListener)
-            setOnClickListener {
-                clickFeedback()
-                dialog.dismiss()
-                repository.removeSubscription(channelName, rssUrl)
-                buildManageUI()
-            }
-        }
-        rootLayout.addView(btnDelete)
-
-        val btnCancel = createListButton("\uE5CD", localize("Cancel"), ThemeManager.getTextColorPrimary()).apply {
-            setOnKeyListener(wheelListener)
-            setOnClickListener {
-                clickFeedback()
-                dialog.dismiss()
-            }
-        }
-        rootLayout.addView(btnCancel)
-
-        dialog.setContentView(rootLayout)
-        dialog.window?.setLayout((300 * d).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT)
-        dialog.show()
-        btnDelete.requestFocus()
+        ActionScreens.open(confirmScreen(
+            localize("Delete Channel"),
+            "${localize("Do you want to delete '")}$channelName'?",
+            localize("Delete")
+        ) {
+            repository.removeSubscription(channelName, rssUrl)
+            buildManageUI()
+        })
     }
 
+    /** The episode screen: Play (downloaded) or Stream, and Download. Back cancels. */
     fun showActionDialog(title: String, audioUrl: String, imageUrl: String, channelName: String) {
         val safeChannel = sanitize(channelName)
         val safeTitle = "${sanitize(title)}.mp3"
         val localFile = File(StoragePaths.getPodcastChannelDir(safeChannel), safeTitle)
-
-        val d = activity.resources.displayMetrics.density
-        val dialog = Dialog(activity).apply {
-            requestWindowFeature(Window.FEATURE_NO_TITLE)
-            window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-        }
-
-        val rootLayout = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            val bg = GradientDrawable().apply {
-                setColor(ThemeManager.getOverlayBackgroundColor() or 0x88000000.toInt())
-                cornerRadius = 15 * d
-                setStroke((1 * d).toInt(), 0x33FFFFFF)
-            }
-            background = bg
-            setPadding((15 * d).toInt(), (20 * d).toInt(), (15 * d).toInt(), (15 * d).toInt())
-        }
-
-        val tvTitle = TextView(activity).apply {
-            text = title
-            setTextColor(ThemeManager.getTextColorPrimary())
-            textSize = 17f
-            typeface = ThemeManager.getCustomFontBold()
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, (20 * d).toInt())
-        }
-        rootLayout.addView(tvTitle)
-
-        val wheelListener = View.OnKeyListener { v, keyCode, event ->
-            if (event.action == KeyEvent.ACTION_DOWN) {
-                if (keyCode == 21) {
-                    val idx = rootLayout.indexOfChild(v)
-                    for (i in idx - 1 downTo 0) {
-                        if (rootLayout.getChildAt(i).isFocusable) {
-                            rootLayout.getChildAt(i).requestFocus()
-                            clickFeedback()
-                            return@OnKeyListener true
-                        }
-                    }
-                    return@OnKeyListener true
-                }
-                if (keyCode == 22) {
-                    val idx = rootLayout.indexOfChild(v)
-                    for (i in idx + 1 until rootLayout.childCount) {
-                        if (rootLayout.getChildAt(i).isFocusable) {
-                            rootLayout.getChildAt(i).requestFocus()
-                            clickFeedback()
-                            return@OnKeyListener true
-                        }
-                    }
-                    return@OnKeyListener true
-                }
-            }
-            false
-        }
-
         val prefs = activity.getSharedPreferences("AppPrefs", 0)
+        val info = ArrayList<String>()
+        val actions = ArrayList<ActionScreens.Action>()
 
         if (localFile.exists() && localFile.length() > 0) {
-            val btnPlay = createListButton("\uE037", localize("Play (Downloaded)"), null).apply {
-                setOnKeyListener(wheelListener)
-                setOnClickListener {
-                    clickFeedback()
-                    dialog.dismiss()
-                    val streamKey = "/PODCAST_STREAM/$safeChannel/$safeTitle"
-                    var savedPos = prefs.getInt("book_pos_${localFile.absolutePath}", 0)
-                    if (savedPos == 0) savedPos = prefs.getInt("book_pos_$streamKey", 0)
-
-                    val playList = arrayListOf(localFile)
-                    if (savedPos > 0) {
-                        AudioPlayerManager.getInstance().playTrackListWithOffset(playList, 0, savedPos)
-                    } else {
-                        AudioPlayerManager.getInstance().playTrackList(playList, 0)
-                    }
-                    onNavigateToPlayer()
+            actions += ActionScreens.Action(localize("Play (Downloaded)")) {
+                val streamKey = "/PODCAST_STREAM/$safeChannel/$safeTitle"
+                var savedPos = prefs.getInt("book_pos_${localFile.absolutePath}", 0)
+                if (savedPos == 0) savedPos = prefs.getInt("book_pos_$streamKey", 0)
+                val playList = arrayListOf(localFile)
+                if (savedPos > 0) {
+                    AudioPlayerManager.getInstance().playTrackListWithOffset(playList, 0, savedPos)
+                } else {
+                    AudioPlayerManager.getInstance().playTrackList(playList, 0)
                 }
+                onNavigateToPlayer()
             }
-            rootLayout.addView(btnPlay)
         } else {
-            val btnStream = createListButton("\uE037", localize("Stream (Play)"), null).apply {
-                setOnKeyListener(wheelListener)
-                setOnClickListener {
-                    clickFeedback()
-                    dialog.dismiss()
-                    Toast.makeText(activity, "${localize("Connecting to server: ")}\n$title", Toast.LENGTH_SHORT).show()
-                    val streamKey = "/PODCAST_STREAM/$safeChannel/$safeTitle"
-                    var savedPos = prefs.getInt("book_pos_$streamKey", 0)
-                    if (savedPos == 0) savedPos = prefs.getInt("book_pos_${localFile.absolutePath}", 0)
-
-                    AudioPlayerManager.getInstance().playPodcastStream(audioUrl, title, imageUrl, channelName, savedPos)
-                    onNavigateToPlayer()
-                }
+            actions += ActionScreens.Action(localize("Stream (Play)")) {
+                Notice.show(activity, "${localize("Connecting to server: ")}\n$title")
+                val streamKey = "/PODCAST_STREAM/$safeChannel/$safeTitle"
+                var savedPos = prefs.getInt("book_pos_$streamKey", 0)
+                if (savedPos == 0) savedPos = prefs.getInt("book_pos_${localFile.absolutePath}", 0)
+                AudioPlayerManager.getInstance().playPodcastStream(audioUrl, title, imageUrl, channelName, savedPos)
+                onNavigateToPlayer()
             }
-            rootLayout.addView(btnStream)
-
             if (downloadManager.isDownloading(audioUrl)) {
-                val btnDownloading = createListButton("\uE863", localize("Downloading..."), null).apply {
-                    setOnKeyListener(wheelListener)
-                }
-                rootLayout.addView(btnDownloading)
+                info += localize("Downloading...")
             } else {
-                val btnDown = createListButton("\uE2C4", localize("Download"), null).apply {
-                    setOnKeyListener(wheelListener)
-                    setOnClickListener {
-                        clickFeedback()
-                        dialog.dismiss()
-                        downloadManager.startDownload(
-                            title,
-                            audioUrl,
-                            channelName,
-                            object : PodcastDownloadManager.DownloadListener {
-                                override fun onProgress(audioUrl: String, progressPercent: Int) {}
-                                override fun onComplete(audioUrl: String, destFile: File) {}
-                                override fun onError(audioUrl: String, errorMsg: String) {}
-                            }
-                        )
-                    }
+                actions += ActionScreens.Action(localize("Download")) {
+                    downloadManager.startDownload(
+                        title,
+                        audioUrl,
+                        channelName,
+                        object : PodcastDownloadManager.DownloadListener {
+                            override fun onProgress(audioUrl: String, progressPercent: Int) {}
+                            override fun onComplete(audioUrl: String, destFile: File) {}
+                            override fun onError(audioUrl: String, errorMsg: String) {}
+                        }
+                    )
                 }
-                rootLayout.addView(btnDown)
             }
         }
-
-        dialog.setContentView(rootLayout)
-        dialog.window?.setLayout((300 * d).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT)
-        dialog.show()
+        ActionScreens.open(ActionScreens.Spec(title, info, actions))
     }
 
     fun searchApplePodcasts(keyword: String) {
@@ -493,7 +326,7 @@ class PodcastController(
                 activity.runOnUiThread {
                     onHideLoadingPopup()
                     if (results.isEmpty()) {
-                        Toast.makeText(activity, "${localize("No podcasts found for: ")}$keyword", Toast.LENGTH_SHORT).show()
+                        Notice.show(activity, "${localize("No podcasts found for: ")}$keyword")
                     } else {
                         showSearchResultsDialog(results)
                     }
@@ -501,202 +334,18 @@ class PodcastController(
             } catch (e: Exception) {
                 activity.runOnUiThread {
                     onHideLoadingPopup()
-                    Toast.makeText(activity, "Search Failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    Notice.error(activity, "Search Failed: ${e.message}")
                 }
             }
         }.start()
     }
 
+    /** The search results: one row for each podcast; the centre button subscribes. Back cancels. */
     private fun showSearchResultsDialog(results: List<com.themoon.y1.podcasts.PodcastSearchClient.PodcastSearchResult>) {
-        val d = activity.resources.displayMetrics.density
-
-        val dialog = Dialog(activity)
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-
-        val rootLayout = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            background = GradientDrawable().apply {
-                setColor(ThemeManager.getOverlayBackgroundColor() or -0x1000000)
-                cornerRadius = 15 * d
-            }
-            setPadding((10 * d).toInt(), (20 * d).toInt(), (10 * d).toInt(), (10 * d).toInt())
-        }
-
-        val tvTitle = TextView(activity).apply {
-            text = "🔍 ${localize("Search Results")} (${results.size})"
-            setTextColor(0xFF00FFFF.toInt())
-            textSize = 18f
-            typeface = ThemeManager.getCustomFontBold()
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, (15 * d).toInt())
-        }
-        rootLayout.addView(tvTitle)
-
-        val listView = ListView(activity).apply {
-            divider = ColorDrawable(0x00000000)
-            dividerHeight = if (ThemeManager.isClassicTheme()) 0 else (4 * d).toInt()
-            selector = ColorDrawable(Color.TRANSPARENT)
-            isScrollbarFadingEnabled = false
-            itemsCanFocus = true
-        }
-
-        val adapter = object : android.widget.BaseAdapter() {
-            override fun getCount(): Int = results.size
-            override fun getItem(position: Int): Any = results[position]
-            override fun getItemId(position: Int): Long = position.toLong()
-
-            override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
-                val itemBtn: LinearLayout
-                val ivThumb: android.widget.ImageView
-                val t1: TextView
-                val t2: TextView
-
-                if (convertView == null) {
-                    itemBtn = LinearLayout(activity).apply {
-                        orientation = LinearLayout.HORIZONTAL
-                        gravity = Gravity.CENTER_VERTICAL
-                        isFocusable = true
-                        isClickable = true
-                        isSoundEffectsEnabled = false
-                        background = GradientDrawable().apply {
-                            shape = GradientDrawable.RECTANGLE
-                            setColor(ThemeManager.getListButtonNormalBg())
-                            cornerRadius = 6 * d
-                        }
-                        setPadding((10 * d).toInt(), (10 * d).toInt(), (10 * d).toInt(), (10 * d).toInt())
-                        layoutParams = android.widget.AbsListView.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.WRAP_CONTENT
-                        )
-                    }
-
-                    ivThumb = android.widget.ImageView(activity).apply {
-                        layoutParams = LinearLayout.LayoutParams((55 * d).toInt(), (55 * d).toInt()).apply {
-                            rightMargin = (15 * d).toInt()
-                        }
-                        scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
-                        setBackgroundColor(0x22FFFFFF)
-                    }
-
-                    val textContainer = LinearLayout(activity).apply {
-                        orientation = LinearLayout.VERTICAL
-                        layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f)
-                    }
-
-                    t1 = TextView(activity).apply {
-                        setTextColor(ThemeManager.getTextColorPrimary())
-                        textSize = 16f
-                        typeface = ThemeManager.getCustomFontBold()
-                        isSingleLine = true
-                        ellipsize = android.text.TextUtils.TruncateAt.END
-                    }
-
-                    t2 = TextView(activity).apply {
-                        setTextColor(ThemeManager.getTextColorSecondary())
-                        textSize = 13f
-                        typeface = ThemeManager.getCustomFont()
-                        isSingleLine = true
-                        ellipsize = android.text.TextUtils.TruncateAt.END
-                    }
-
-                    textContainer.addView(t1)
-                    textContainer.addView(t2)
-                    itemBtn.addView(ivThumb)
-                    itemBtn.addView(textContainer)
-                    itemBtn.tag = arrayOf(ivThumb, t1, t2)
-                } else {
-                    itemBtn = convertView as LinearLayout
-                    val holder = itemBtn.tag as Array<*>
-                    ivThumb = holder[0] as android.widget.ImageView
-                    t1 = holder[1] as TextView
-                    t2 = holder[2] as TextView
-                }
-
-                val item = results[position]
-                t1.text = item.name
-                t2.text = item.author
-
-                ivThumb.setImageBitmap(null)
-                ivThumb.tag = item.artworkUrl
-
-                if (item.artworkUrl.isNotEmpty()) {
-                    Thread {
-                        try {
-                            val request = okhttp3.Request.Builder().url(item.artworkUrl).build()
-                            val response = okhttp3.OkHttpClient().newCall(request).execute()
-                            if (response.isSuccessful) {
-                                val stream = response.body()?.byteStream()
-                                val bmp = android.graphics.BitmapFactory.decodeStream(stream)
-                                stream?.close()
-                                activity.runOnUiThread {
-                                    if (item.artworkUrl == ivThumb.tag && bmp != null) {
-                                        ivThumb.setImageBitmap(bmp)
-                                    }
-                                }
-                            }
-                        } catch (ignored: Exception) {}
-                    }.start()
-                }
-
-                itemBtn.setOnFocusChangeListener { v, hasFocus ->
-                    val focusedBg = GradientDrawable().apply {
-                        shape = GradientDrawable.RECTANGLE
-                        setColor(ThemeManager.getListButtonFocusedBg())
-                        cornerRadius = 6 * d
-                    }
-                    val normalBg = GradientDrawable().apply {
-                        shape = GradientDrawable.RECTANGLE
-                        setColor(ThemeManager.getListButtonNormalBg())
-                        cornerRadius = 6 * d
-                    }
-                    if (hasFocus) {
-                        v.background = focusedBg
-                        t1.setTextColor(ThemeManager.getListButtonFocusedTextColor())
-                        t2.setTextColor(ThemeManager.getListButtonFocusedTextColor())
-                    } else {
-                        v.background = normalBg
-                        t1.setTextColor(ThemeManager.getTextColorPrimary())
-                        t2.setTextColor(ThemeManager.getTextColorSecondary())
-                    }
-                }
-
-                itemBtn.setOnKeyListener { _, keyCode, event ->
-                    if (event.action == KeyEvent.ACTION_DOWN) {
-                        if (keyCode == 21 || keyCode == 19) {
-                            val targetPos = position - 1
-                            if (targetPos >= 0) {
-                                listView.setSelectionFromTop(targetPos, (10 * d).toInt())
-                                listView.post {
-                                    val visibleIdx = targetPos - listView.firstVisiblePosition
-                                    if (visibleIdx in 0 until listView.childCount) {
-                                        listView.getChildAt(visibleIdx).requestFocus()
-                                    }
-                                }
-                                clickFeedback()
-                            }
-                            return@setOnKeyListener true
-                        }
-                        if (keyCode == 22 || keyCode == 20) {
-                            val targetPos = position + 1
-                            if (targetPos < results.size) {
-                                listView.setSelectionFromTop(targetPos, (10 * d).toInt())
-                                listView.post {
-                                    val visibleIdx = targetPos - listView.firstVisiblePosition
-                                    if (visibleIdx in 0 until listView.childCount) {
-                                        listView.getChildAt(visibleIdx).requestFocus()
-                                    }
-                                }
-                                clickFeedback()
-                            }
-                            return@setOnKeyListener true
-                        }
-                    }
-                    false
-                }
-
-                itemBtn.setOnClickListener {
-                    clickFeedback()
+        ActionScreens.open(ActionScreens.Spec(
+            "${localize("Search Results")} (${results.size})",
+            actions = results.map { item ->
+                ActionScreens.Action(item.name) {
                     try {
                         val podcastDir = StoragePaths.getPodcastsDir()
                         if (!podcastDir.exists()) podcastDir.mkdirs()
@@ -704,33 +353,14 @@ class PodcastController(
                         val safeName = item.name.replace("|", "-")
                         subFile.appendText("\n$safeName|${item.feedUrl}")
 
-                        Toast.makeText(activity, "✅ ${localize("Subscribed: ")}$safeName", Toast.LENGTH_SHORT).show()
-                        dialog.dismiss()
+                        Notice.show(activity, "✅ ${localize("Subscribed: ")}$safeName")
                         buildChannelsUI()
                     } catch (e: Exception) {
-                        Toast.makeText(activity, "Error saving: ${e.message}", Toast.LENGTH_SHORT).show()
+                        Notice.error(activity, "Error saving: ${e.message}")
                     }
                 }
-
-                return itemBtn
             }
-        }
-        listView.adapter = adapter
-
-        val listWrapper = LinearLayout(activity).apply {
-            addView(listView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (320 * d).toInt()))
-        }
-        rootLayout.addView(listWrapper)
-
-        dialog.setContentView(rootLayout)
-        dialog.window?.setLayout((340 * d).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT)
-        dialog.show()
-
-        listView.postDelayed({
-            if (listView.childCount > 0) {
-                listView.getChildAt(0).requestFocus()
-            }
-        }, 100)
+        ))
     }
 
     private fun sanitize(input: String): String {

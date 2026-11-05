@@ -67,7 +67,6 @@ internal fun MainActivity.startMediaLibraryScanInternal() {
     if (isCustomScanning) return
     isCustomScanning = true
     mediaLibraryScanCount++
-    pbLoadingProgress?.progress = 0
     showLoadingPopup(t("Preparing to scan...\nPlease wait."))
     val mlm = MediaLibraryManager.getInstance()
     mlm.startMediaLibraryScan(this, blacklist, object : MediaLibraryManager.ScanProgressListener {
@@ -75,9 +74,8 @@ internal fun MainActivity.startMediaLibraryScanInternal() {
             if (total > 0) {
                 val progress = ((scanned.toFloat() / total) * 100).toInt()
                 runOnUiThread {
-                    pbLoadingProgress?.progress = progress
                     val template = t("Scanning Media: %d%%\n(%d / %d)\nDo not turn off the screen.")
-                    tvLoadingProgress?.text = String.format(java.util.Locale.US, template, progress, scanned, total)
+                    updateLoadingProgress(progress, String.format(java.util.Locale.US, template, progress, scanned, total))
                 }
             }
         }

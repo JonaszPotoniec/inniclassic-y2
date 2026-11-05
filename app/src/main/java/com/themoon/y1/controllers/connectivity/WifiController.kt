@@ -13,13 +13,13 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.core.extensions.onOff
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.ListItemViewFactory
+import com.themoon.y1.views.Notice
 import com.themoon.y1.views.RowGlyphs
 import com.themoon.y1.views.TablerIcons
 
@@ -125,10 +125,10 @@ class WifiController(
                 if (wm != null) {
                     val isCurrentlyOn = wm.isWifiEnabled
                     if (isCurrentlyOn) {
-                        Toast.makeText(activity, localize("Turning Wi-Fi off…"), Toast.LENGTH_SHORT).show()
+                        Notice.show(activity, localize("Turning Wi-Fi off…"))
                         wm.isWifiEnabled = false
                     } else {
-                        Toast.makeText(activity, localize("Turning Wi-Fi on…"), Toast.LENGTH_SHORT).show()
+                        Notice.show(activity, localize("Turning Wi-Fi on…"))
                         wm.isWifiEnabled = true
                     }
                     val tvRight = btnToggle.getChildAt(1) as? TextView
@@ -229,7 +229,7 @@ class WifiController(
             } catch (ignored: Exception) {}
 
             if (isSaved && savedNetId != -1) {
-                Toast.makeText(activity, localize("Connecting to saved network..."), Toast.LENGTH_SHORT).show()
+                Notice.show(activity, localize("Connecting to saved network..."))
                 manager?.disconnect()
                 manager?.enableNetwork(savedNetId, true)
                 manager?.reconnect()

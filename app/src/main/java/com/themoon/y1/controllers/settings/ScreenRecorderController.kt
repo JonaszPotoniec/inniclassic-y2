@@ -7,10 +7,10 @@ import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
-import android.widget.Toast
 import com.themoon.y1.R
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.navigation.ScreenState
+import com.themoon.y1.views.Notice
 
 /**
  * Controller for the Screen Recorder settings sub-menu.
@@ -42,11 +42,10 @@ class ScreenRecorderController(
                 if (intent != null) {
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     activity.startActivity(intent)
-                    Toast.makeText(
+                    Notice.show(
                         activity,
-                        localize("Preparing screen recording... Please wait!"),
-                        Toast.LENGTH_SHORT
-                    ).show()
+                        localize("Preparing screen recording... Please wait!")
+                    )
 
                     Handler(Looper.getMainLooper()).postDelayed({
                         Thread {
@@ -56,7 +55,7 @@ class ScreenRecorderController(
                         }.start()
                     }, 2000)
                 } else {
-                    Toast.makeText(activity, localize("App is not installed."), Toast.LENGTH_SHORT).show()
+                    Notice.error(activity, localize("App is not installed."))
                 }
             } catch (ignored: Exception) {}
         }
@@ -66,7 +65,7 @@ class ScreenRecorderController(
         val btnSettingsScr = createSettingRow("SCR Settings", "")
         btnSettingsScr.setOnClickListener {
             clickFeedback()
-            Toast.makeText(activity, localize("Opening settings..."), Toast.LENGTH_SHORT).show()
+            Notice.show(activity, localize("Opening settings..."))
             Thread {
                 try {
                     Runtime.getRuntime().exec(arrayOf("su", "-c", "input tap 245 40"))
@@ -79,7 +78,7 @@ class ScreenRecorderController(
         val btnCloseScr = createSettingRow("Close Screen Recorder", "")
         btnCloseScr.setOnClickListener {
             clickFeedback()
-            Toast.makeText(activity, localize("Closing screen recorder."), Toast.LENGTH_SHORT).show()
+            Notice.show(activity, localize("Closing screen recorder."))
             Thread {
                 try {
                     Runtime.getRuntime().exec(arrayOf("su", "-c", "input tap 304 41"))
@@ -97,11 +96,11 @@ class ScreenRecorderController(
                 if (intent != null) {
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     activity.startActivity(intent)
-                    Toast.makeText(
+                    Notice.show(
                         activity,
                         localize("Recording saved safely!"),
-                        Toast.LENGTH_LONG
-                    ).show()
+                        long = true
+                    )
                 }
             } catch (ignored: Exception) {}
         }

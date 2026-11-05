@@ -6,9 +6,9 @@ import android.media.audiofx.BassBoost
 import android.media.audiofx.Equalizer
 import android.media.audiofx.LoudnessEnhancer
 import android.media.audiofx.Virtualizer
-import android.widget.Toast
 import com.themoon.y1.MainActivity
 import com.themoon.y1.StoragePaths
+import com.themoon.y1.views.Notice
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -202,7 +202,7 @@ class AudioEffectManager private constructor() {
         }
         editor.commit()
 
-        Toast.makeText(main, "Profile Deleted Completely.", Toast.LENGTH_SHORT).show()
+        Notice.show(main, "Profile Deleted Completely.")
     }
 
     /**

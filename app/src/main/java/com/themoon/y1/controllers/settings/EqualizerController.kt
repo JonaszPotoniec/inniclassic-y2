@@ -11,7 +11,6 @@ import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
@@ -22,6 +21,7 @@ import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.EqSliderView
 import com.themoon.y1.views.ListItemViewFactory
+import com.themoon.y1.views.Notice
 import com.themoon.y1.views.TablerIcons
 
 /**
@@ -108,7 +108,7 @@ class EqualizerController(
                 isSoftwareEqEnabled = false
                 currentEqProfile = "preset_0"
                 rebootAudioEngine()
-                Toast.makeText(activity, localize("Switched to Hardware 5-Band EQ"), Toast.LENGTH_SHORT).show()
+                Notice.show(activity, localize("Switched to Hardware 5-Band EQ"))
                 buildEqualizerSettingsUI()
             } else {
                 showSoftwareEqDialog()
@@ -169,7 +169,7 @@ class EqualizerController(
             btnSave.setOnClickListener {
                 clickFeedback()
                 AudioEffectManager.getInstance().saveCustomEqProfile(customName)
-                Toast.makeText(activity, localize("Configuration Saved!"), Toast.LENGTH_SHORT).show()
+                Notice.show(activity, localize("Configuration Saved!"))
             }
             containerSettingsItems.addView(btnSave)
 
@@ -209,7 +209,7 @@ class EqualizerController(
         btnGraphicEq.setOnClickListener {
             clickFeedback()
             if (currentEqProfile.startsWith("preset_")) {
-                Toast.makeText(activity, localize("Please create a Custom Profile to edit!"), Toast.LENGTH_LONG).show()
+                Notice.show(activity, localize("Please create a Custom Profile to edit!"), long = true)
             } else {
                 buildGraphicEqualizerUI()
             }
@@ -395,7 +395,7 @@ class EqualizerController(
             isSoftwareEqEnabled = true
             currentEqProfile = "preset_0"
             rebootAudioEngine()
-            Toast.makeText(activity, localize("Switched to Software 10-Band EQ"), Toast.LENGTH_SHORT).show()
+            Notice.show(activity, localize("Switched to Software 10-Band EQ"))
             buildEqualizerSettingsUI()
         })
     }

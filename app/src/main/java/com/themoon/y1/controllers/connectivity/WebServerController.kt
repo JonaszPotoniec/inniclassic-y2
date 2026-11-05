@@ -11,13 +11,13 @@ import android.view.WindowManager
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.Y1WebServer
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.navigation.ScreenState
+import com.themoon.y1.views.Notice
 
 /**
  * Controller for the PC Upload HTTP Web Server screen:
@@ -92,7 +92,7 @@ class WebServerController(
         } else {
             val wm = activity.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
             if (wm == null || !wm.isWifiEnabled) {
-                Toast.makeText(activity, localize("Turn on Wi-Fi first"), Toast.LENGTH_SHORT).show()
+                Notice.show(activity, localize("Turn on Wi-Fi first"))
                 return
             }
 
@@ -112,7 +112,7 @@ class WebServerController(
 
                 onServerStateChanged(true)
             } catch (e: Exception) {
-                Toast.makeText(activity, "${localize("Server failed:")} ${e.message}", Toast.LENGTH_SHORT).show()
+                Notice.error(activity, "${localize("Server failed:")} ${e.message}")
                 isServerRunning = false
             }
         }

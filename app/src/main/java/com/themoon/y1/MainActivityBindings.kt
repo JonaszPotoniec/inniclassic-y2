@@ -1,12 +1,10 @@
 package com.themoon.y1
 
-import android.graphics.Color
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.ProgressBar
 import android.widget.TextView
 
 internal fun MainActivity.initViewBindings() {
@@ -23,7 +21,6 @@ internal fun MainActivity.initViewBindings() {
     layoutMusicQuizMode = findViewById(R.id.layout_music_quiz_mode)
     layoutVideosMode = findViewById(R.id.layout_videos_mode)
     layoutVideoPlayerMode = findViewById(R.id.layout_video_player_mode)
-    layoutVolumeOverlay = findViewById(R.id.layout_volume_overlay)
 
     val rootContent = findViewById<ViewGroup>(android.R.id.content)
     val d = resources.displayMetrics.density
@@ -34,18 +31,6 @@ internal fun MainActivity.initViewBindings() {
         // The letter box of speed scrolling, in the middle of the screen (see LetterJump).
         val lp = FrameLayout.LayoutParams((96 * d).toInt(), (96 * d).toInt(), Gravity.CENTER)
         rootContent.addView(this, lp)
-    }
-
-    volumeProgress = findViewById(R.id.volume_progress)
-    volumeProgress?.max = MainActivity.VIRTUAL_VOLUME_STEPS
-
-    findViewById<View>(R.id.tv_overlay_volume_down)?.setOnClickListener {
-        adjustVolume(false)
-        clickFeedback()
-    }
-    findViewById<View>(R.id.tv_overlay_volume_up)?.setOnClickListener {
-        adjustVolume(true)
-        clickFeedback()
     }
 
     ivMainBg = findViewById(R.id.iv_main_bg)
@@ -67,26 +52,6 @@ internal fun MainActivity.initViewBindings() {
         isClickable = true
         isFocusable = true
         visibility = View.GONE
-
-        val density = resources.displayMetrics.density
-        val pb = ProgressBar(this@initViewBindings, null, android.R.attr.progressBarStyleHorizontal).apply {
-            max = 100
-        }
-        pbLoadingProgress = pb
-        val pbLp = LinearLayout.LayoutParams(
-            (250 * density).toInt(),
-            (20 * density).toInt()
-        )
-        addView(pb, pbLp)
-
-        val tv = TextView(this@initViewBindings).apply {
-            setTextColor(Color.WHITE)
-            textSize = 16f
-            gravity = Gravity.CENTER
-            setPadding(0, (20 * density).toInt(), 0, 0)
-        }
-        tvLoadingProgress = tv
-        addView(tv, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
     }
     rootContent.addView(layoutLoadingOverlay, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
 

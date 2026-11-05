@@ -33,6 +33,17 @@ class CoverArtView @JvmOverloads constructor(
     private var frameQueued = false
     private var frameCallback: Choreographer.FrameCallback? = null
 
+    /**
+     * The art layer of a menu slide ([MenuSlide]): the pane starts [artLeft] px right of the left edge of this
+     * view, and the art also fills the part on its left (under the list pane). No menu shadow. Not a pane of
+     * [CoverPane.shownPane].
+     */
+    internal var slideLayer = false
+    internal var artLeft = 0
+
+    /** Slide layer: the x of the left edge of the art in this view at the last draw (not less than 0: the clip). */
+    internal var artEdge = 0f
+
     init {
         scaleType = ScaleType.CENTER_CROP
     }
@@ -71,11 +82,12 @@ class CoverArtView @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         val d = drawable
-        val w = width
+        val left = artLeft.coerceIn(0, width)
+        val w = width - left
         val h = height
         if (d == null || w <= 0 || h <= 0) {
             super.onDraw(canvas)
-            if (h > 0) CoverPane.drawShadow(canvas, resources.displayMetrics.density, h)
+            if (h > 0 && !slideLayer) CoverPane.drawShadow(canvas, resources.displayMetrics.density, h)
             return
         }
         val p = pose ?: FloatArray(3).also { pose = it }
@@ -99,9 +111,26 @@ class CoverArtView @JvmOverloads constructor(
         }
 
         val save = canvas.save()
-        canvas.clipRect(0, 0, w, h)
+        canvas.clipRect(0, 0, width, h)
+        // The pane starts at artLeft (0, except in a slide layer): the same art place as in the pane.
+        canvas.translate(left.toFloat(), 0f)
         transform(canvas, d.intrinsicWidth.toFloat(), d.intrinsicHeight.toFloat(), x, y, zoom)
-        super.onDraw(canvas)
+        if (slideLayer) {
+            // ImageView would crop the art to the full view; the layer crops it to the pane, as the pane does.
+            val cw = d.intrinsicWidth.toFloat()
+            val ch = d.intrinsicHeight.toFloat()
+            if (cw > 0f && ch > 0f) {
+                val crop = CoverMotion.cropScale(cw, ch, w.toFloat(), h.toFloat())
+                val dx = CoverMotion.offset(x, cw * crop, w.toFloat(), zoom)
+                artEdge = (left + w / 2f + dx - zoom * cw * crop / 2f).coerceAtLeast(0f)
+                canvas.translate((w - cw * crop) / 2f, (h - ch * crop) / 2f)
+                canvas.scale(crop, crop)
+                d.setBounds(0, 0, cw.toInt(), ch.toInt())
+                d.draw(canvas)
+            }
+        } else {
+            super.onDraw(canvas)
+        }
         canvas.restoreToCount(save)
 
         // The old art over the new art, more transparent at each frame: a cross-fade with one more draw.
@@ -117,7 +146,8 @@ class CoverArtView @JvmOverloads constructor(
                 val paint = fadePaint ?: Paint(Paint.FILTER_BITMAP_FLAG).also { fadePaint = it }
                 paint.alpha = ((1f - t.coerceAtLeast(0f)) * 255f).toInt()
                 val s2 = canvas.save()
-                canvas.clipRect(0, 0, w, h)
+                canvas.clipRect(0, 0, width, h)
+                canvas.translate(left.toFloat(), 0f)
                 transform(canvas, bw, bh, x, y, zoom)
                 // CENTER_CROP of the old art, as ImageView does for the new art.
                 val crop = CoverMotion.cropScale(bw, bh, w.toFloat(), h.toFloat())
@@ -130,7 +160,7 @@ class CoverArtView @JvmOverloads constructor(
         }
         if (moving || fading) queueFrame()
         // Over the art and outside its motion: the shadow stays at the menu edge.
-        CoverPane.drawShadow(canvas, resources.displayMetrics.density, h)
+        if (!slideLayer) CoverPane.drawShadow(canvas, resources.displayMetrics.density, h)
     }
 
     /**
@@ -138,7 +168,7 @@ class CoverArtView @JvmOverloads constructor(
      * same for each pane of the same size, so the same art is at the same place in each menu.
      */
     private fun transform(canvas: Canvas, cw: Float, ch: Float, x: Float, y: Float, zoom: Float) {
-        val w = width.toFloat()
+        val w = (width - artLeft.coerceIn(0, width)).toFloat()
         val h = height.toFloat()
         val crop = CoverMotion.cropScale(cw, ch, w, h)
         val drawnW = if (cw > 0f) cw * crop else w

@@ -1,23 +1,22 @@
 package com.themoon.y1.controllers.player
 
-import android.app.Activity
+import com.themoon.y1.controllers.settings.ActionScreens
 import com.themoon.y1.models.SongItem
-import com.themoon.y1.views.WheelDialog
 import java.io.File
 
 /**
- * Context menu displayed on long pressing the center button in Now Playing screen.
- * Replicates iPod Classic context actions:
+ * The menu of a held centre button on Now Playing: an action screen (a list that slides in, Back comes back to
+ * Now Playing). Replicates iPod Classic context actions:
  * - Add/Remove from Favorites
  * - Add to On-The-Go playlist
  * - Add to Playlist
  * - Browse Album / Browse Artist
  * Only actions on the current song: the display options (Spectrum, Total Time) are in Settings.
+ * A row closes the menu, then does its action (ActionScreens.choose), so Browse Album goes from Now Playing.
  */
 object NowPlayingContextMenu {
 
     fun show(
-        activity: Activity,
         songFile: File,
         songItem: SongItem?,
         isFavorite: Boolean,
@@ -28,52 +27,21 @@ object NowPlayingContextMenu {
         onBrowseArtist: (artistName: String) -> Unit,
         localize: (String) -> String
     ) {
-        WheelDialog.show(activity) {
-            title = localize("Now Playing")
-
-            addButton(
-                text = if (isFavorite) localize("Remove from Favorites") else localize("Add to Favorites"),
-                icon = null
-            ) {
-                onToggleFavorite()
-            }
-
-            addButton(
-                text = localize("Add to On-The-Go"),
-                icon = null
-            ) {
-                onAddToOnTheGo(songFile)
-            }
-
-            addButton(
-                text = localize("Add to Playlist"),
-                icon = null
-            ) {
-                onAddToPlaylist(songFile)
-            }
-
-            if (songItem != null) {
-                if (songItem.album.isNotEmpty()) {
-                    addButton(
-                        text = localize("Browse Album"),
-                        icon = null
-                    ) {
-                        onBrowseAlbum(songItem.album)
-                    }
-                }
-
-                val artist = if (songItem.albumArtist.isNotEmpty()) songItem.albumArtist else songItem.artist
-                if (artist.isNotEmpty()) {
-                    addButton(
-                        text = localize("Browse Artist"),
-                        icon = null
-                    ) {
-                        onBrowseArtist(artist)
-                    }
-                }
-            }
-
-            negativeButton(localize("Cancel"))
+        val rows = ArrayList<ActionScreens.Action>()
+        rows += ActionScreens.Action(if (isFavorite) localize("Remove from Favorites") else localize("Add to Favorites")) {
+            onToggleFavorite()
         }
+        rows += ActionScreens.Action(localize("Add to On-The-Go")) { onAddToOnTheGo(songFile) }
+        rows += ActionScreens.Action(localize("Add to Playlist")) { onAddToPlaylist(songFile) }
+        if (songItem != null) {
+            if (songItem.album.isNotEmpty()) {
+                rows += ActionScreens.Action(localize("Browse Album")) { onBrowseAlbum(songItem.album) }
+            }
+            val artist = if (songItem.albumArtist.isNotEmpty()) songItem.albumArtist else songItem.artist
+            if (artist.isNotEmpty()) {
+                rows += ActionScreens.Action(localize("Browse Artist")) { onBrowseArtist(artist) }
+            }
+        }
+        ActionScreens.open(ActionScreens.Spec(localize("Now Playing"), actions = rows))
     }
 }

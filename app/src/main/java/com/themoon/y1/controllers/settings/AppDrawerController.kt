@@ -10,10 +10,10 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import com.themoon.y1.R
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.navigation.ScreenState
+import com.themoon.y1.views.Notice
 import java.util.Collections
 
 /**
@@ -58,13 +58,12 @@ class AppDrawerController(
                     try {
                         launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         activity.startActivity(launchIntent)
-                        Toast.makeText(
+                        Notice.show(
                             activity,
-                            localize("Starting: ") + pm.getApplicationLabel(appInfo),
-                            Toast.LENGTH_SHORT
-                        ).show()
+                            localize("Starting: ") + pm.getApplicationLabel(appInfo)
+                        )
                     } catch (e: Exception) {
-                        Toast.makeText(activity, localize("Unable to launch app."), Toast.LENGTH_SHORT).show()
+                        Notice.error(activity, localize("Unable to launch app."))
                     }
                 }
 

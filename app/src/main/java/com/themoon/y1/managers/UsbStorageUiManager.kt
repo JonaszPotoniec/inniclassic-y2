@@ -1,24 +1,20 @@
 package com.themoon.y1.managers
 
 import android.app.Activity
-import android.app.Dialog
-import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
-import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
-import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.Window
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import com.themoon.y1.ThemeManager
+import com.themoon.y1.controllers.settings.ActionScreens
+import com.themoon.y1.navigation.NavigationManager
+import com.themoon.y1.views.Notice
 import com.themoon.y1.views.TablerIcons
 
 class UsbStorageUiManager(
@@ -34,7 +30,8 @@ class UsbStorageUiManager(
         private set
     var usbStorageBusy: Boolean = false
         private set
-    var usbStorageDialog: Dialog? = null
+    /** The key of the USB prompt screen (ActionScreen.kt), or null. */
+    private var usbPromptScreen: Int? = null
         private set
     var lastUsbDialogShownMs: Long = 0L
 
@@ -42,149 +39,35 @@ class UsbStorageUiManager(
         get() = usbStorageOverlay != null
 
     val isDialogShowing: Boolean
-        get() = usbStorageDialog != null && usbStorageDialog?.isShowing == true
+        get() = usbPromptScreen?.let { NavigationManager.getInstance().currentState == ActionScreens.route(it) } == true
 
     fun dismissUsbStorageDialog() {
-        usbStorageDialog?.let {
-            try { it.dismiss() } catch (_: Exception) {}
-        }
-        usbStorageDialog = null
+        usbPromptScreen?.let { ActionScreens.close(it) }
+        usbPromptScreen = null
     }
 
+    /** USB cable in: Connect as Storage or Charge Only, on a screen of its own. Back is Charge Only. */
     fun showUsbStorageDialog() {
-        if (usbStorageDialog != null) {
-            try { usbStorageDialog?.dismiss() } catch (_: Exception) {}
-            usbStorageDialog = null
-        }
-        val dialog = Dialog(activity)
-        usbStorageDialog = dialog
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-        dialog.setOnDismissListener {
-            lastUsbDialogShownMs = System.currentTimeMillis()
-            if (usbStorageDialog === dialog) {
-                usbStorageDialog = null
-            }
-        }
-        dialog.setOnCancelListener {
-            lastUsbDialogShownMs = System.currentTimeMillis()
-        }
-
-        val d = activity.resources.displayMetrics.density
-
-        val rootLayout = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            val bg = GradientDrawable().apply {
-                val baseBg = ThemeManager.getOverlayBackgroundColor() or 0xCC000000.toInt()
-                setColor(baseBg)
-                cornerRadius = 15f * d
-                val strokeColor = if (ThemeManager.isClassicLightTheme()) 0x33000000 else 0x33FFFFFF
-                setStroke((1f * d).toInt(), strokeColor)
-            }
-            background = bg
-            setPadding((15f * d).toInt(), (20f * d).toInt(), (15f * d).toInt(), (15f * d).toInt())
-        }
-
-        val iconSizePx = (36f * d).toInt()
-        val ivUsb = ImageView(activity).apply {
-            setImageBitmap(TablerIcons.render(TablerIcons.USB, iconSizePx, ThemeManager.getTextColorPrimary()))
-            layoutParams = LinearLayout.LayoutParams(iconSizePx, iconSizePx).apply {
-                gravity = Gravity.CENTER_HORIZONTAL
-                bottomMargin = (8f * d).toInt()
-            }
-        }
-        rootLayout.addView(ivUsb)
-
-        val tvTitle = TextView(activity).apply {
-            text = localize("USB Connected")
-            setTextColor(ThemeManager.getTextColorPrimary())
-            textSize = 17f
-            typeface = ThemeManager.getCustomFontBold()
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, (6f * d).toInt())
-        }
-        rootLayout.addView(tvTitle)
-
-        val tvMsg = TextView(activity).apply {
-            text = localize("Connect this device as USB storage to transfer files to your computer?")
-            setTextColor(ThemeManager.getTextColorSecondary())
-            textSize = 13f
-            typeface = ThemeManager.getCustomFont()
-            gravity = Gravity.CENTER
-            setPadding((4f * d).toInt(), 0, (4f * d).toInt(), (18f * d).toInt())
-            setLineSpacing(0f, 1.3f)
-        }
-        rootLayout.addView(tvMsg)
-
-        val dialogWheelListener = View.OnKeyListener { v, keyCode, event ->
-            if (event.action == KeyEvent.ACTION_DOWN) {
-                if (keyCode == 19 || keyCode == 21) {
-                    val idx = rootLayout.indexOfChild(v)
-                    for (i in idx - 1 downTo 0) {
-                        val child = rootLayout.getChildAt(i)
-                        if (child.isFocusable) {
-                            child.requestFocus()
-                            clickFeedback()
-                            return@OnKeyListener true
-                        }
-                    }
-                    return@OnKeyListener true
+        dismissUsbStorageDialog()
+        usbPromptScreen = ActionScreens.open(ActionScreens.Spec(
+            localize("USB Connected"),
+            listOf(localize("Connect this device as USB storage to transfer files to your computer?")),
+            listOf(
+                ActionScreens.Action(localize("Connect as Storage")) {
+                    usbPromptScreen = null
+                    lastUsbDialogShownMs = System.currentTimeMillis()
+                    startUsbStorage()
+                },
+                ActionScreens.Action(localize("Charge Only")) {
+                    usbPromptScreen = null
+                    lastUsbDialogShownMs = System.currentTimeMillis()
                 }
-                if (keyCode == 20 || keyCode == 22) {
-                    val idx = rootLayout.indexOfChild(v)
-                    for (i in idx + 1 until rootLayout.childCount) {
-                        val child = rootLayout.getChildAt(i)
-                        if (child.isFocusable) {
-                            child.requestFocus()
-                            clickFeedback()
-                            return@OnKeyListener true
-                        }
-                    }
-                    return@OnKeyListener true
-                }
-            }
-            false
-        }
-
-        val btnConnect = createListButtonWithIcon("", localize("Connect as Storage")).apply {
-            isFocusable = true
-            setOnKeyListener(dialogWheelListener)
-            setOnClickListener {
-                clickFeedback()
-                dialog.dismiss()
-                startUsbStorage()
-            }
-        }
-        rootLayout.addView(btnConnect)
-
-        val btnCharge = createListButtonWithIcon("", localize("Charge Only")).apply {
-            isFocusable = true
-            setOnKeyListener(dialogWheelListener)
-            setOnClickListener {
-                clickFeedback()
+            ),
+            onCancel = {
+                usbPromptScreen = null
                 lastUsbDialogShownMs = System.currentTimeMillis()
-                dialog.dismiss()
             }
-        }
-        rootLayout.addView(btnCharge)
-
-        dialog.setContentView(rootLayout)
-        dialog.window?.let { window ->
-            window.setLayout((300f * d).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT)
-        }
-        dialog.show()
-
-        rootLayout.postDelayed({
-            if (rootLayout.childCount > 0) {
-                for (i in 0 until rootLayout.childCount) {
-                    val child = rootLayout.getChildAt(i)
-                    if (child.isFocusable) {
-                        child.requestFocus()
-                        break
-                    }
-                }
-            }
-        }, 60)
+        ))
     }
 
     private fun pauseAllPlaybackForUsb() {
@@ -211,7 +94,7 @@ class UsbStorageUiManager(
         if (usbStorageBusy) return
         if (MediaLibraryManager.getInstance().isScanning) {
             // The scan keeps files open; vold would kill this app to unmount the volume.
-            Toast.makeText(activity, localize("Wait for the library scan to finish, then try again."), Toast.LENGTH_LONG).show()
+            Notice.error(activity, localize("Wait for the library scan to finish, then try again."))
             return
         }
         usbStorageBusy = true
@@ -231,7 +114,7 @@ class UsbStorageUiManager(
                     // The function switch reconnects USB; do not ask again at once.
                     lastUsbDialogShownMs = System.currentTimeMillis()
                     getExternalSdMountMonitor()?.setSuspended(false)
-                    Toast.makeText(activity, localize("Couldn't connect as USB storage."), Toast.LENGTH_LONG).show()
+                    Notice.error(activity, localize("Couldn't connect as USB storage."))
                 }
             }
         }, "y1-ums-on").start()
@@ -248,7 +131,7 @@ class UsbStorageUiManager(
             activity.runOnUiThread {
                 usbStorageBusy = false
                 if (stillOn) {
-                    Toast.makeText(activity, localize("Couldn't eject USB storage."), Toast.LENGTH_LONG).show()
+                    Notice.error(activity, localize("Couldn't eject USB storage."))
                     return@runOnUiThread
                 }
                 // The function switch reconnects USB; do not ask again at once.

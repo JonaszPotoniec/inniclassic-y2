@@ -10,12 +10,12 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.util.LruCache
-import android.widget.Toast
 import com.themoon.y1.MainActivity
 import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.models.SongItem
+import com.themoon.y1.views.Notice
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -501,11 +501,10 @@ class AlbumCoverManager private constructor() {
                 if (finalGenerated > 0) {
                     MainActivity.instance?.let { act ->
                         act.runOnUiThread {
-                            Toast.makeText(
+                            Notice.show(
                                 act,
-                                "Cover cache updated ($finalGenerated thumbnails ready)",
-                                Toast.LENGTH_SHORT
-                            ).show()
+                                "Cover cache updated ($finalGenerated thumbnails ready)"
+                            )
                         }
                     }
                 }

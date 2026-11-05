@@ -11,7 +11,6 @@ import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.util.Base64
-import android.widget.Toast
 import com.google.android.exoplayer2.C
 import com.google.android.exoplayer2.DefaultRenderersFactory
 import com.google.android.exoplayer2.ExoPlaybackException
@@ -36,6 +35,7 @@ import com.themoon.y1.MainActivity
 import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.core.TimeFormat
+import com.themoon.y1.views.Notice
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
@@ -303,7 +303,7 @@ class AudioPlayerManager private constructor() {
         } else if (isUsingLegacyPlayer) {
             MainActivity.instance?.let { main ->
                 main.runOnUiThread {
-                    Toast.makeText(main, "Speed control is disabled for FLAC files on this device.", Toast.LENGTH_SHORT).show()
+                    Notice.show(main, "Speed control is disabled for FLAC files on this device.")
                 }
             }
         }
@@ -379,7 +379,7 @@ class AudioPlayerManager private constructor() {
     private fun handleTrackError(errorMsg: String) {
         val main = MainActivity.instance ?: return
         main.runOnUiThread {
-            Toast.makeText(main, "$errorMsg Skipping...", Toast.LENGTH_SHORT).show()
+            Notice.error(main, "$errorMsg Skipping...")
             nextTrack()
         }
     }
@@ -540,13 +540,7 @@ class AudioPlayerManager private constructor() {
             val sec = totalSec % 60
             MainActivity.instance?.let { main ->
                 main.runOnUiThread {
-                    try {
-                        val toast = Toast.makeText(main, "Resuming playback from ${min}m ${sec}s", Toast.LENGTH_SHORT)
-                        val toastLayout = toast.view as? android.widget.LinearLayout
-                        val toastTV = toastLayout?.getChildAt(0) as? android.widget.TextView
-                        toastTV?.textSize = 18f
-                        toast.show()
-                    } catch (ignored: Exception) {}
+                    Notice.show(main, "Resuming playback from ${min}m ${sec}s")
                 }
             }
         }
@@ -726,12 +720,12 @@ class AudioPlayerManager private constructor() {
 
             main.consecutiveErrorCount++
             if (main.consecutiveErrorCount >= main.currentPlaylist.size) {
-                Toast.makeText(main, "All tracks failed. Playback stopped.", Toast.LENGTH_SHORT).show()
+                Notice.error(main, "All tracks failed. Playback stopped.")
                 main.isPausedByHand = true
                 main.updatePlayerUI()
                 main.consecutiveErrorCount = 0
             } else {
-                Toast.makeText(main, "Corrupted file detected. Skipping...", Toast.LENGTH_SHORT).show()
+                Notice.error(main, "Corrupted file detected. Skipping...")
                 Handler(Looper.getMainLooper()).postDelayed({ nextTrack() }, 1500)
             }
             return
@@ -1021,7 +1015,7 @@ class AudioPlayerManager private constructor() {
             main.tvPlayerTitle.text = "Load Failed"
             main.tvPlayerArtist.text = failReason
             main.tvPlayerAlbum.text = ""
-            Toast.makeText(main, failReason, Toast.LENGTH_SHORT).show()
+            Notice.error(main, failReason)
 
             if (main.consecutiveErrorCount >= main.currentPlaylist.size) {
                 main.isPausedByHand = true

@@ -162,6 +162,55 @@ class NavigationManagerTest {
     }
 
     @Test
+    fun testDirectionListener() {
+        val seen = ArrayList<String>()
+        navManager.addDirectionListener(object : NavigationManager.DirectionListener {
+            override fun onBeforeTransition(from: ScreenState?, to: ScreenState, direction: NavigationManager.Direction) {
+                // Before: the old screen is still the current one
+                seen.add("before ${direction} ${navManager.currentState == from}")
+            }
+
+            override fun onAfterTransition(from: ScreenState?, to: ScreenState, direction: NavigationManager.Direction) {
+                seen.add("after ${direction} ${navManager.currentState == to}")
+            }
+        })
+
+        navManager.navigateTo(ScreenState.MainMenu)
+        navManager.navigateTo(ScreenState.Browser(BrowserMode.Root))
+        navManager.navigateTo(ScreenState.Browser(BrowserMode.Artists))
+        navManager.navigateTo(ScreenState.Browser(BrowserMode.Artists)) // same state: refresh only, not told
+        navManager.navigateTo(ScreenState.Browser(BrowserMode.Albums()), addToBackStack = false)
+        navManager.popBackStack()
+        navManager.navigateTo(ScreenState.Browser(BrowserMode.Artists))
+        navManager.navigateTo(ScreenState.MainMenu)
+
+        assertEquals(
+            listOf(
+                "before NONE true", "after NONE true", // first screen
+                "before PUSH true", "after PUSH true",
+                "before PUSH true", "after PUSH true",
+                "before NONE true", "after NONE true", // replaced in place
+                "before POP true", "after POP true",
+                "before PUSH true", "after PUSH true",
+                "before POP true", "after POP true" // to the bottom entry
+            ),
+            seen
+        )
+    }
+
+    @Test
+    fun testDirectionOf() {
+        val menu = ScreenState.MainMenu
+        val music = ScreenState.Browser(BrowserMode.Root)
+        assertEquals(NavigationManager.Direction.NONE, NavigationManager.directionOf(null, menu, true, false))
+        assertEquals(NavigationManager.Direction.PUSH, NavigationManager.directionOf(menu, music, true, false))
+        assertEquals(NavigationManager.Direction.NONE, NavigationManager.directionOf(music, ScreenState.Player, false, false))
+        assertEquals(NavigationManager.Direction.POP, NavigationManager.directionOf(music, menu, false, true))
+        // Back with an empty back stack goes to the main menu, and a direct change to it also goes up
+        assertEquals(NavigationManager.Direction.POP, NavigationManager.directionOf(music, menu, false, false))
+    }
+
+    @Test
     fun testJellyfinNavigationAndBackStack() {
         val fakeSettings = FakeController()
         val fakeJellyfin = FakeController()

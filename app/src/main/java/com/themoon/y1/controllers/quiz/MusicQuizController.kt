@@ -18,11 +18,12 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
-import android.widget.Toast
 import com.themoon.y1.R
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
+import com.themoon.y1.controllers.settings.ActionScreens
+import com.themoon.y1.controllers.settings.confirmScreen
 import com.themoon.y1.managers.AlbumCoverManager
 import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.managers.MediaLibraryManager
@@ -30,6 +31,7 @@ import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.quiz.MusicQuizEngine
 import com.themoon.y1.quiz.QuizLeaderboardManager
+import com.themoon.y1.views.Notice
 import com.themoon.y1.views.SquareImageView
 import java.io.File
 import java.io.FileInputStream
@@ -79,9 +81,14 @@ class MusicQuizController(
     private var totalQuestionTimeMs = 15000L
     private var currentTimerMillisRemaining = 0L
 
+    /** Back from the Clear Scores screen: the leaderboard again (its fromGameOver), else null. */
+    private var returnToLeaderboard: Boolean? = null
+
     override fun onEnter(state: ScreenState) {
         layoutQuiz.visibility = View.VISIBLE
-        showStartHub()
+        val leaderboard = returnToLeaderboard
+        returnToLeaderboard = null
+        if (leaderboard != null) showLeaderboardView(leaderboard) else showStartHub()
     }
 
     override fun onExit() {
@@ -145,7 +152,7 @@ class MusicQuizController(
 
         val hasEnoughSongs = engine.resetSession(libraryProvider())
         if (!hasEnoughSongs) {
-            Toast.makeText(activity, localize("Not enough songs in your library for Music Quiz."), Toast.LENGTH_LONG).show()
+            Notice.error(activity, localize("Not enough songs in your library for Music Quiz."))
             showStartHub()
             return
         }
@@ -508,9 +515,12 @@ class MusicQuizController(
             val btnClear = createAnswerPill(localize("Clear Scores"))
             btnClear.setOnClickListener {
                 clickFeedback()
-                leaderboardManager.clearLeaderboard()
-                Toast.makeText(activity, localize("Scores Cleared"), Toast.LENGTH_SHORT).show()
-                showLeaderboardView(fromGameOver)
+                returnToLeaderboard = fromGameOver
+                ActionScreens.open(confirmScreen(localize("Leaderboard"), "", localize("Clear Scores")) {
+                    leaderboardManager.clearLeaderboard()
+                    Notice.show(activity, localize("Scores Cleared"))
+                    showLeaderboardView(fromGameOver)
+                })
             }
             scrollContent.addView(btnClear)
         }

@@ -284,7 +284,7 @@ class InputRouter private constructor() {
         return false
     }
 
-    private fun isBackKey(keyCode: Int): Boolean =
+    fun isBackKey(keyCode: Int): Boolean =
         keyCode == KeyEvent.KEYCODE_BACK || keyCode == 19 || keyCode == 4
 
     /** The one Back path: one click, then the screen's own Back (a level up in its lists), else the previous screen. */

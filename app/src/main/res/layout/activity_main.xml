@@ -494,44 +494,6 @@
     </RelativeLayout>
 
     <LinearLayout
-        android:id="@+id/layout_volume_overlay"
-        android:layout_width="320dp"
-        android:layout_height="56dp"
-        android:layout_gravity="center"
-        android:background="@drawable/bg_volume_overlay"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingLeft="24dp"
-        android:paddingRight="22dp"
-        android:visibility="gone">
-        <ImageView
-            android:id="@+id/tv_overlay_volume_down"
-            android:layout_width="22dp"
-            android:layout_height="22dp"
-            android:src="@drawable/ic_ipod_volume_down"
-            android:scaleType="fitCenter"
-            android:layout_marginRight="16dp"
-            android:contentDescription="Volume Down"/>
-        <ProgressBar
-            android:id="@+id/volume_progress"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:progressDrawable="@drawable/progress_bar_volume_overlay"
-            android:layout_width="0dp"
-            android:layout_height="8dp"
-            android:layout_weight="1"
-            android:max="30"
-            android:progress="0"/>
-        <ImageView
-            android:id="@+id/tv_overlay_volume_up"
-            android:layout_width="22dp"
-            android:layout_height="22dp"
-            android:src="@drawable/ic_ipod_volume_up"
-            android:scaleType="fitCenter"
-            android:layout_marginLeft="16dp"
-            android:contentDescription="Volume Up"/>
-    </LinearLayout>
-
-    <LinearLayout
         android:id="@+id/layout_brightness_mode"
         android:layout_width="match_parent"
         android:layout_height="match_parent"

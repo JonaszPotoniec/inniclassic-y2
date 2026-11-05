@@ -116,16 +116,25 @@ object CoverPane {
 
     /**
      * Draws the menu shadow on the left [height] px high edge of a pane, over the art. One rectangle with a
-     * shader that is made once: no cost in the frames of the motion.
+     * shader that is made once: no cost in the frames of the motion. [alpha] (0..1) fades it.
      */
-    fun drawShadow(canvas: Canvas, density: Float, height: Int) {
+    fun drawShadow(canvas: Canvas, density: Float, height: Int, alpha: Float = 1f) {
         val w = SHADOW_WIDTH_DP * density
         val paint = shadowPaint?.takeIf { shadowWidthPx == w } ?: Paint().also {
             it.shader = LinearGradient(0f, 0f, w, 0f, SHADOW_COLORS, SHADOW_STOPS, Shader.TileMode.CLAMP)
             shadowPaint = it
             shadowWidthPx = w
         }
+        paint.alpha = (alpha.coerceIn(0f, 1f) * 255f).toInt()
         canvas.drawRect(0f, 0f, w, height.toFloat(), paint)
+    }
+
+    /** The art pane that shows now (not a slide layer), or null when no split screen shows. */
+    fun shownPane(): CoverArtView? {
+        for (v in views.keys) {
+            if (!v.slideLayer && v.isShown && v.width > 0 && v.height > 0) return v
+        }
+        return null
     }
 
     internal fun register(view: CoverArtView) {

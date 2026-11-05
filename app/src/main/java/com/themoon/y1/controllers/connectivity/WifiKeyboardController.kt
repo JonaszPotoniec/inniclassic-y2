@@ -11,7 +11,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import com.themoon.y1.R
 import com.themoon.y1.controllers.ScreenController
 import com.themoon.y1.navigation.InputRouter
@@ -19,6 +18,7 @@ import com.themoon.y1.navigation.KeyboardSubmit
 import com.themoon.y1.navigation.KeyboardTarget
 import com.themoon.y1.navigation.KeyboardTargets
 import com.themoon.y1.navigation.ScreenState
+import com.themoon.y1.views.Notice
 import com.themoon.y1.views.QwertyKeyboardView
 
 /**
@@ -159,7 +159,7 @@ class WifiKeyboardController(
         val current = target
         when (val result = KeyboardTargets.submit(current, typedText)) {
             is KeyboardSubmit.Rejected -> {
-                Toast.makeText(activity, localize(result.message), Toast.LENGTH_SHORT).show()
+                Notice.show(activity, localize(result.message))
             }
             is KeyboardSubmit.Accepted -> {
                 // A login asks for the password next, on the same keyboard

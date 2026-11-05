@@ -1,31 +1,17 @@
 package com.themoon.y1.managers
 
 import android.app.Activity
-import android.app.AlertDialog
-import android.app.Dialog
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.ColorDrawable
-import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.net.wifi.WifiManager
 import android.os.Handler
 import android.os.Looper
-import android.view.Gravity
 import android.view.KeyEvent
-import android.view.View
-import android.view.ViewGroup
-import android.view.Window
-import android.widget.ImageView
-import android.widget.LinearLayout
-import android.widget.ProgressBar
-import android.widget.TextView
-import android.widget.Toast
 import com.themoon.y1.StoragePaths
-import com.themoon.y1.ThemeManager
-import com.themoon.y1.views.TablerIcons
+import com.themoon.y1.controllers.settings.ActionScreens
+import com.themoon.y1.views.Notice
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
@@ -51,6 +37,9 @@ class OtaUpdateManager(
 ) {
 
     companion object {
+        /** True from the start of a download to its install or its end: one at a time, as all write the same file. */
+        private val downloadRunning = java.util.concurrent.atomic.AtomicBoolean(false)
+
         const val UPDATE_JSON_URL = "https://raw.githubusercontent.com/JonaszPotoniec/inniclassic-y2/main/app/version.json"
 
         fun extractBuildNumber(suffix: String?): Int {
@@ -163,51 +152,14 @@ class OtaUpdateManager(
         return net.isConnected
     }
 
+    /** System Update → Check for Updates: a progress screen, then the result screen. Back cancels. */
     fun checkForUpdates() {
-        val d = activity.resources.displayMetrics.density
-        val loaderDialog = Dialog(activity)
-        loaderDialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        loaderDialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-
-        val loaderLayout = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            background = GradientDrawable().apply {
-                setColor(ThemeManager.getOverlayBackgroundColor() or 0xEE000000.toInt())
-                cornerRadius = 15f * d
-                setStroke((1f * d).toInt(), 0x33FFFFFF)
-            }
-            setPadding((24f * d).toInt(), (24f * d).toInt(), (24f * d).toInt(), (24f * d).toInt())
-        }
-
-        val progressBar = ProgressBar(activity)
-        val pbLp = LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.WRAP_CONTENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        ).apply {
-            gravity = Gravity.CENTER_HORIZONTAL
-            bottomMargin = (14f * d).toInt()
-        }
-        loaderLayout.addView(progressBar, pbLp)
-
-        val tvLoaderMsg = TextView(activity).apply {
-            text = localize("Connecting to Wi-Fi...")
-            setTextColor(ThemeManager.getTextColorPrimary())
-            textSize = 15f
-            typeface = ThemeManager.getCustomFontBold()
-            gravity = Gravity.CENTER
-        }
-        loaderLayout.addView(tvLoaderMsg)
-
-        loaderDialog.setContentView(loaderLayout)
-        loaderDialog.setCancelable(true)
-        loaderDialog.setCanceledOnTouchOutside(false)
-        loaderDialog.window?.setLayout((270f * d).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT)
-        loaderDialog.show()
-
-        var isCancelled = false
-        loaderDialog.setOnCancelListener { isCancelled = true }
-        loaderDialog.setOnDismissListener { isCancelled = true }
+        val cancelled = java.util.concurrent.atomic.AtomicBoolean(false)
+        val key = ActionScreens.open(ActionScreens.Spec(
+            localize("System Update"),
+            listOf(localize("Connecting to Wi-Fi...")),
+            onCancel = { cancelled.set(true) }
+        ))
 
         Thread {
             try {
@@ -221,7 +173,7 @@ class OtaUpdateManager(
 
                     var waitCount = 0
                     while (!connected && waitCount < 20) {
-                        if (isCancelled) return@Thread
+                        if (cancelled.get()) return@Thread
                         try {
                             Thread.sleep(500)
                         } catch (_: InterruptedException) {
@@ -232,26 +184,21 @@ class OtaUpdateManager(
                     }
                 }
 
-                if (isCancelled) return@Thread
+                if (cancelled.get()) return@Thread
 
                 if (!connected) {
                     activity.runOnUiThread {
-                        if (loaderDialog.isShowing) loaderDialog.dismiss()
-                        Toast.makeText(
+                        ActionScreens.close(key)
+                        Notice.error(
                             activity,
-                            localize("Wi-Fi connection required. Please connect."),
-                            Toast.LENGTH_LONG
-                        ).show()
+                            localize("Wi-Fi connection required. Please connect.")
+                        )
                         onRequireWifi()
                     }
                     return@Thread
                 }
 
-                activity.runOnUiThread {
-                    if (loaderDialog.isShowing) {
-                        tvLoaderMsg.text = localize("Checking for updates...")
-                    }
-                }
+                ActionScreens.update(key, listOf(localize("Checking for updates...")))
 
                 val client = getUpdateHttpClient()
                 val request = Request.Builder()
@@ -287,7 +234,8 @@ class OtaUpdateManager(
                 val hasUpdate = isServerVersionNewer(serverVersionCode, serverVersionName, myVersionCode, myVersionName)
 
                 activity.runOnUiThread {
-                    if (loaderDialog.isShowing) loaderDialog.dismiss()
+                    if (cancelled.get()) return@runOnUiThread
+                    ActionScreens.close(key)
                     if (hasUpdate) {
                         showNewVersionDialog(serverVersionName, myVersionName, finalApkUrl)
                     } else {
@@ -296,7 +244,8 @@ class OtaUpdateManager(
                 }
             } catch (e: Throwable) {
                 activity.runOnUiThread {
-                    if (loaderDialog.isShowing) loaderDialog.dismiss()
+                    if (cancelled.get()) return@runOnUiThread
+                    ActionScreens.close(key)
                     showUpdateErrorDialog(e.message ?: "Network error")
                 }
             }
@@ -304,271 +253,55 @@ class OtaUpdateManager(
     }
 
     private fun showNewVersionDialog(serverVersion: String, currentVersion: String, apkUrl: String) {
-        val d = activity.resources.displayMetrics.density
-        val dialog = Dialog(activity)
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-
-        val rootLayout = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            background = GradientDrawable().apply {
-                setColor(ThemeManager.getOverlayBackgroundColor() or 0xEE000000.toInt())
-                cornerRadius = 15f * d
-                setStroke((1f * d).toInt(), 0x33FFFFFF)
-            }
-            setPadding((18f * d).toInt(), (18f * d).toInt(), (18f * d).toInt(), (14f * d).toInt())
-        }
-
-        val ivIcon = ImageView(activity).apply {
-            val size = (36f * d).toInt()
-            setImageBitmap(TablerIcons.render(TablerIcons.DOWNLOAD, size, ThemeManager.getTextColorPrimary()))
-            layoutParams = LinearLayout.LayoutParams(size, size).apply {
-                gravity = Gravity.CENTER_HORIZONTAL
-                bottomMargin = (8f * d).toInt()
-            }
-        }
-        rootLayout.addView(ivIcon)
-
-        val tvTitle = TextView(activity).apply {
-            text = localize("New Version Available")
-            setTextColor(ThemeManager.getTextColorPrimary())
-            textSize = 17f
-            typeface = ThemeManager.getCustomFontBold()
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, (6f * d).toInt())
-        }
-        rootLayout.addView(tvTitle)
-
-        val tvMsg = TextView(activity).apply {
-            text = "${localize("New version")}: $serverVersion\n(${localize("Current")}: $currentVersion)"
-            setTextColor(ThemeManager.getTextColorSecondary())
-            textSize = 13f
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, (14f * d).toInt())
-        }
-        rootLayout.addView(tvMsg)
-
-        val btnContainer = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-        }
-
-        val btnUpdate = createDialogButton(localize("Update Now"), isFocused = true)
-        btnUpdate.setOnClickListener {
-            clickFeedback()
-            dialog.dismiss()
-            downloadAndInstallApk(apkUrl)
-        }
-        btnContainer.addView(btnUpdate)
-
-        val btnCancel = createDialogButton(localize("Later"), isFocused = false)
-        btnCancel.setOnClickListener {
-            clickFeedback()
-            dialog.dismiss()
-        }
-        btnContainer.addView(btnCancel)
-
-        rootLayout.addView(btnContainer)
-        dialog.setContentView(rootLayout)
-        dialog.window?.setLayout((290f * d).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT)
-        dialog.show()
-
-        btnUpdate.post { btnUpdate.requestFocus() }
+        ActionScreens.open(ActionScreens.Spec(
+            localize("New Version Available"),
+            listOf("${localize("New version")}: $serverVersion", "(${localize("Current")}: $currentVersion)"),
+            listOf(ActionScreens.Action(localize("Update Now")) { downloadAndInstallApk(apkUrl) })
+        ))
     }
 
     private fun showUpToDateDialog(serverVersion: String, currentVersion: String, apkUrl: String) {
-        val d = activity.resources.displayMetrics.density
-        val dialog = Dialog(activity)
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-
-        val rootLayout = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            background = GradientDrawable().apply {
-                setColor(ThemeManager.getOverlayBackgroundColor() or 0xEE000000.toInt())
-                cornerRadius = 15f * d
-                setStroke((1f * d).toInt(), 0x33FFFFFF)
-            }
-            setPadding((18f * d).toInt(), (18f * d).toInt(), (18f * d).toInt(), (14f * d).toInt())
-        }
-
-        val ivIcon = ImageView(activity).apply {
-            val size = (36f * d).toInt()
-            setImageBitmap(TablerIcons.render(TablerIcons.CHECK, size, ThemeManager.getTextColorPrimary()))
-            layoutParams = LinearLayout.LayoutParams(size, size).apply {
-                gravity = Gravity.CENTER_HORIZONTAL
-                bottomMargin = (8f * d).toInt()
-            }
-        }
-        rootLayout.addView(ivIcon)
-
-        val tvTitle = TextView(activity).apply {
-            text = localize("Up to Date")
-            setTextColor(ThemeManager.getTextColorPrimary())
-            textSize = 17f
-            typeface = ThemeManager.getCustomFontBold()
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, (6f * d).toInt())
-        }
-        rootLayout.addView(tvTitle)
-
         val curVerStr = if (currentVersion.startsWith("v")) currentVersion else "v$currentVersion"
-        val tvMsg = TextView(activity).apply {
-            text = "$curVerStr\n${localize("You are using the latest version.")}"
-            setTextColor(ThemeManager.getTextColorSecondary())
-            textSize = 13f
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, (14f * d).toInt())
-        }
-        rootLayout.addView(tvMsg)
-
-        val btnContainer = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-
-        val btnOk = createDialogButton(localize("OK"), isFocused = true)
-        btnOk.setOnClickListener {
-            clickFeedback()
-            dialog.dismiss()
-        }
-        btnContainer.addView(btnOk)
-
-        val btnReinstall = createDialogButton(localize("Reinstall"), isFocused = false)
-        btnReinstall.setOnClickListener {
-            clickFeedback()
-            dialog.dismiss()
-            downloadAndInstallApk(apkUrl)
-        }
-        btnContainer.addView(btnReinstall)
-
-        rootLayout.addView(btnContainer)
-        dialog.setContentView(rootLayout)
-        dialog.window?.setLayout((290f * d).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT)
-        dialog.show()
-
-        btnOk.post { btnOk.requestFocus() }
+        // No row selected at the start (before, OK had the focus): one centre push does not download again
+        ActionScreens.open(ActionScreens.Spec(
+            localize("Up to Date"),
+            listOf(curVerStr, localize("You are using the latest version.")),
+            listOf(ActionScreens.Action(localize("Reinstall")) { downloadAndInstallApk(apkUrl) }),
+            selectAction = false
+        ))
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun showUpdateErrorDialog(errorMsg: String) {
-        val d = activity.resources.displayMetrics.density
-        val dialog = Dialog(activity)
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-
-        val rootLayout = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            background = GradientDrawable().apply {
-                setColor(ThemeManager.getOverlayBackgroundColor() or 0xEE000000.toInt())
-                cornerRadius = 15f * d
-                setStroke((1f * d).toInt(), 0x33FFFFFF)
-            }
-            setPadding((18f * d).toInt(), (18f * d).toInt(), (18f * d).toInt(), (14f * d).toInt())
-        }
-
-        val tvTitle = TextView(activity).apply {
-            text = localize("Update Check Failed")
-            setTextColor(0xFFFF4444.toInt())
-            textSize = 17f
-            typeface = ThemeManager.getCustomFontBold()
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, (6f * d).toInt())
-        }
-        rootLayout.addView(tvTitle)
-
-        val tvMsg = TextView(activity).apply {
-            text = localize("Unable to check for updates. Check internet connection.")
-            setTextColor(ThemeManager.getTextColorSecondary())
-            textSize = 13f
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, (14f * d).toInt())
-        }
-        rootLayout.addView(tvMsg)
-
-        val btnOk = createDialogButton(localize("OK"), isFocused = true)
-        btnOk.setOnClickListener {
-            clickFeedback()
-            dialog.dismiss()
-        }
-        rootLayout.addView(btnOk)
-
-        dialog.setContentView(rootLayout)
-        dialog.window?.setLayout((290f * d).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT)
-        dialog.show()
-
-        btnOk.post { btnOk.requestFocus() }
+        ActionScreens.open(ActionScreens.Spec(
+            localize("Update Check Failed"),
+            listOf(localize("Unable to check for updates. Check internet connection."))
+        ))
     }
 
-    private fun createDialogButton(label: String, isFocused: Boolean): View {
-        val d = activity.resources.displayMetrics.density
-        val btn = TextView(activity).apply {
-            text = label
-            textSize = 15f
-            typeface = ThemeManager.getCustomFontBold()
-            gravity = Gravity.CENTER
-            isFocusable = true
-            isClickable = true
-            val padH = (12f * d).toInt()
-            val padV = (10f * d).toInt()
-            setPadding(padH, padV, padH, padV)
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(0, (4f * d).toInt(), 0, (4f * d).toInt())
-            }
-        }
-
-        fun updateBackground(hasF: Boolean) {
-            val bg = GradientDrawable().apply {
-                cornerRadius = 8f * d
-                if (hasF) {
-                    setColor(ThemeManager.getListButtonFocusedBg())
-                    btn.setTextColor(ThemeManager.getListButtonFocusedTextColor())
-                } else {
-                    setColor(ThemeManager.getListButtonNormalBg())
-                    btn.setTextColor(ThemeManager.getTextColorPrimary())
-                }
-            }
-            btn.background = bg
-        }
-
-        updateBackground(isFocused)
-        btn.setOnFocusChangeListener { _, hasFocus ->
-            updateBackground(hasFocus)
-        }
-        return btn
-    }
-
+    /** Downloads the update on a progress screen, then installs it. Back stops the download. */
     fun downloadAndInstallApk(apkUrl: String) {
-        val progressBar = ProgressBar(activity, null, android.R.attr.progressBarStyleHorizontal).apply {
-            max = 100
+        // A download that Back stopped can still wait for its server (read timeout 60 s)
+        if (!downloadRunning.compareAndSet(false, true)) {
+            Notice.show(activity, localize("Please wait a moment..."))
+            return
         }
-        val tvProgress = TextView(activity).apply {
-            gravity = Gravity.CENTER
-            setPadding(0, 30, 0, 0)
-            textSize = 16f
-            text = localize("Connecting to server...")
-        }
-
-        val layout = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(50, 50, 50, 50)
-            addView(progressBar)
-            addView(tvProgress)
-        }
-
-        val progressDialog = AlertDialog.Builder(activity, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-            .setTitle(localize("Downloading Update"))
-            .setView(layout)
-            .setCancelable(false)
-            .create()
-
-        progressDialog.show()
+        val cancelled = java.util.concurrent.atomic.AtomicBoolean(false)
+        val call = java.util.concurrent.atomic.AtomicReference<okhttp3.Call?>(null)
+        val title = localize("Downloading Update")
+        val key = ActionScreens.open(ActionScreens.Spec(
+            title,
+            listOf(localize("Connecting to server...")),
+            onCancel = {
+                cancelled.set(true)
+                // Also a read that waits for the server stops now
+                call.get()?.cancel()
+            }
+        ))
 
         Thread {
+            var updateFile: File? = null
+            var installs = false
             try {
                 val client = getUpdateHttpClient()
                 val request = Request.Builder()
@@ -577,7 +310,10 @@ class OtaUpdateManager(
                     .header("Accept-Encoding", "identity")
                     .build()
 
-                val response = client.newCall(request).execute()
+                val newCall = client.newCall(request)
+                call.set(newCall)
+                if (cancelled.get()) newCall.cancel()
+                val response = newCall.execute()
                 if (!response.isSuccessful) {
                     throw Exception("HTTP ${response.code()}")
                 }
@@ -586,57 +322,69 @@ class OtaUpdateManager(
                 val fileLength = responseBody.contentLength()
 
                 val dir = activity.getDir("update", Context.MODE_PRIVATE)
-                val updateFile = File(dir, "InniClassic_Update.apk")
+                val file = File(dir, "InniClassic_Update.apk")
+                updateFile = file
 
-                val fos = FileOutputStream(updateFile)
+                val fos = FileOutputStream(file)
                 val isStream = responseBody.byteStream()
                 val buffer = ByteArray(8192)
                 var len: Int
                 var total: Long = 0
+                var shownProgress = -1
 
-                while (isStream.read(buffer).also { len = it } != -1) {
-                    total += len.toLong()
-                    fos.write(buffer, 0, len)
+                try {
+                    while (isStream.read(buffer).also { len = it } != -1) {
+                        if (cancelled.get()) throw InterruptedException("cancelled")
+                        total += len.toLong()
+                        fos.write(buffer, 0, len)
 
-                    if (fileLength > 0) {
-                        val progress = (total * 100 / fileLength).toInt()
-                        val downloadedMB = total / (1024 * 1024)
-                        val totalMB = fileLength / (1024 * 1024)
-
-                        activity.runOnUiThread {
-                            progressBar.progress = progress
-                            tvProgress.text = "$progress%   (${downloadedMB}MB / ${totalMB}MB)"
+                        if (fileLength > 0) {
+                            val progress = (total * 100 / fileLength).toInt()
+                            if (progress != shownProgress) {
+                                shownProgress = progress
+                                val downloadedMB = total / (1024 * 1024)
+                                val totalMB = fileLength / (1024 * 1024)
+                                ActionScreens.update(key, listOf("$progress%   (${downloadedMB}MB / ${totalMB}MB)"))
+                            }
                         }
                     }
+                } finally {
+                    fos.close()
+                    isStream.close()
                 }
-                fos.close()
-                isStream.close()
 
                 if (fileLength > 0 && total != fileLength) {
-                    if (updateFile.exists()) updateFile.delete()
                     throw Exception("Incomplete download")
                 }
 
-                activity.runOnUiThread {
-                    progressBar.progress = 100
-                    tvProgress.text = localize("Download Finished! Installing...")
-
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        progressDialog.dismiss()
-                        Thread {
-                            installApk(updateFile)
-                        }.start()
-                    }, 1000)
-                }
+                ActionScreens.update(key, listOf(localize("Download Finished! Installing...")))
+                installs = true
+                Handler(Looper.getMainLooper()).postDelayed({
+                    ActionScreens.close(key)
+                    // Back in this last second also stops the update: no install and no restart
+                    if (cancelled.get()) {
+                        file.delete()
+                        downloadRunning.set(false)
+                        return@postDelayed
+                    }
+                    Thread {
+                        installApk(file)
+                        downloadRunning.set(false)
+                    }.start()
+                }, 1000)
             } catch (_: Exception) {
+                updateFile?.let { if (it.exists()) it.delete() }
                 activity.runOnUiThread {
-                    progressDialog.dismiss()
-                    Toast.makeText(
-                        activity,
-                        localize("Download failed. Check your internet connection."),
-                        Toast.LENGTH_LONG
-                    ).show()
+                    ActionScreens.close(key)
+                    if (!cancelled.get()) {
+                        Notice.error(
+                            activity,
+                            localize("Download failed. Check your internet connection.")
+                        )
+                    }
                 }
+            } finally {
+                if (!installs) downloadRunning.set(false)
             }
         }.start()
     }
@@ -680,7 +428,7 @@ class OtaUpdateManager(
             activity.startActivity(intent)
         } catch (_: Exception) {
             activity.runOnUiThread {
-                Toast.makeText(activity, localize("Install Failed."), Toast.LENGTH_SHORT).show()
+                Notice.error(activity, localize("Install Failed."))
             }
         }
     }

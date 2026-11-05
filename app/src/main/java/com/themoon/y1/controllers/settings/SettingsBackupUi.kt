@@ -4,11 +4,11 @@ import android.app.Activity
 import android.content.Context
 import android.util.Log
 import android.widget.LinearLayout
-import android.widget.Toast
 import com.themoon.y1.StoragePaths
 import com.themoon.y1.managers.AudioEffectManager
 import com.themoon.y1.managers.LanguageManager
 import com.themoon.y1.managers.SettingsBackup
+import com.themoon.y1.views.Notice
 import java.io.File
 
 /** The Export Settings and Import Settings rows of the Settings screen. */
@@ -40,17 +40,17 @@ internal object SettingsBackupUi {
     private fun exportSettings(activity: Activity, localize: (String) -> String) {
         try {
             val file = SettingsBackup.export(activity, appVersion(activity))
-            Toast.makeText(activity, localize("Settings exported:") + "\n" + StoragePaths.toDisplayPath(file.absolutePath), Toast.LENGTH_LONG).show()
+            Notice.show(activity, localize("Settings exported:") + "\n" + StoragePaths.toDisplayPath(file.absolutePath), long = true)
         } catch (e: Exception) {
             Log.e(TAG, "Export failed", e)
-            Toast.makeText(activity, localize("Export failed."), Toast.LENGTH_SHORT).show()
+            Notice.error(activity, localize("Export failed."))
         }
     }
 
     private fun confirmImport(activity: Activity, localize: (String) -> String) {
         val file = SettingsBackup.findImportFile()
         if (file == null) {
-            Toast.makeText(activity, localize("No settings backup found."), Toast.LENGTH_SHORT).show()
+            Notice.show(activity, localize("No settings backup found."))
             return
         }
         // No row is selected at the start: one centre push must not replace the settings
@@ -68,11 +68,11 @@ internal object SettingsBackupUi {
             SettingsBackup.import(activity, file)
         } catch (e: SettingsBackup.InvalidBackupException) {
             Log.w(TAG, "Invalid backup: ${e.message}")
-            Toast.makeText(activity, localize("Not a valid settings backup."), Toast.LENGTH_SHORT).show()
+            Notice.error(activity, localize("Not a valid settings backup."))
             return
         } catch (e: Exception) {
             Log.e(TAG, "Import failed", e)
-            Toast.makeText(activity, localize("Import failed."), Toast.LENGTH_SHORT).show()
+            Notice.error(activity, localize("Import failed."))
             return
         }
         val prefs = activity.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
@@ -81,7 +81,7 @@ internal object SettingsBackupUi {
             AudioEffectManager.getInstance().applySoundCheck()
             AudioEffectManager.getInstance().applyEqProfile()
         } catch (_: Exception) {}
-        Toast.makeText(activity, LanguageManager.getInstance(activity).t("Settings imported."), Toast.LENGTH_SHORT).show()
+        Notice.showAfterRecreate(LanguageManager.getInstance(activity).t("Settings imported."))
         // The activity reads the theme, the menus and the other settings again in onCreate.
         activity.recreate()
     }

@@ -2,7 +2,6 @@ package com.themoon.y1.managers
 
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.app.AlertDialog
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.content.BroadcastReceiver
@@ -13,9 +12,10 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
-import android.widget.Toast
+import com.themoon.y1.controllers.settings.ActionScreens
 import com.themoon.y1.managers.BluetoothPairingPolicy.Action
 import com.themoon.y1.managers.BluetoothPairingPolicy.FailureOutcome
+import com.themoon.y1.views.Notice
 
 /**
  * Answers Bluetooth pairing requests for the Y2, which has no touch screen.
@@ -34,7 +34,8 @@ class BluetoothPairingAgent(
 ) {
     private val handler = Handler(Looper.getMainLooper())
     private var registered = false
-    private var codeDialog: AlertDialog? = null
+    /** The key of the pairing code screen while it shows (ActionScreen.kt), or null. */
+    private var codeScreen: Int? = null
 
     /** Next PIN index to send, per device address (set for a retry). */
     private val nextPinIndex = HashMap<String, Int>()
@@ -172,27 +173,19 @@ class BluetoothPairingAgent(
         }
     }
 
+    /** The code to compare or to type on the other device, on a screen of its own; Back closes it, the bond end too. */
     private fun showCode(device: BluetoothDevice, variant: Int, code: String?) {
         if (code == null) return
         dismissCode()
-        val message = localize(BluetoothPairingPolicy.codePrompt(variant)) + " " + deviceName(device) + ":\n\n" + code
-        try {
-            codeDialog = AlertDialog.Builder(activity, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                .setTitle(localize("Bluetooth Pairing"))
-                .setMessage(message)
-                .setPositiveButton(localize("OK"), null)
-                .show()
-            // The bond normally ends before this and closes the dialog.
-            handler.postDelayed({ dismissCode() }, CODE_DIALOG_MAX_MS)
-        } catch (e: Exception) {
-            Log.e(TAG, "Cannot show pairing code dialog", e)
-            Toast.makeText(activity, message, Toast.LENGTH_LONG).show()
-        }
+        val prompt = localize(BluetoothPairingPolicy.codePrompt(variant)) + " " + deviceName(device) + ":"
+        codeScreen = ActionScreens.open(ActionScreens.Spec(localize("Bluetooth Pairing"), listOf(prompt, code)))
+        // The bond normally ends before this and closes the screen.
+        handler.postDelayed({ dismissCode() }, CODE_DIALOG_MAX_MS)
     }
 
     private fun dismissCode() {
-        try { codeDialog?.dismiss() } catch (_: Exception) {}
-        codeDialog = null
+        codeScreen?.let { ActionScreens.close(it) }
+        codeScreen = null
     }
 
     @SuppressLint("MissingPermission")
@@ -207,7 +200,7 @@ class BluetoothPairingAgent(
     }
 
     private fun toast(text: String) {
-        Toast.makeText(activity, text, Toast.LENGTH_LONG).show()
+        Notice.error(activity, text)
     }
 
     companion object {

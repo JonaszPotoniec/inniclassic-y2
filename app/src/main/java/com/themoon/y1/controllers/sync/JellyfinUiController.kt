@@ -1,9 +1,7 @@
 package com.themoon.y1.controllers.sync
 
 import android.app.Activity
-import android.app.Dialog
 import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.os.StatFs
 import android.text.TextUtils
@@ -12,15 +10,14 @@ import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.Window
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
-import android.widget.Toast
 import com.themoon.y1.R
 import com.themoon.y1.ThemeManager
 import com.themoon.y1.controllers.ScreenController
+import com.themoon.y1.controllers.settings.ActionScreens
 import com.themoon.y1.core.extensions.onOff
 import com.themoon.y1.models.SongItem
 import com.themoon.y1.navigation.KeyboardTarget
@@ -31,6 +28,7 @@ import com.themoon.y1.sync.jellyfin.JellyfinClient
 import com.themoon.y1.sync.jellyfin.JellyfinMediaItem
 import com.themoon.y1.sync.jellyfin.JellyfinSyncHierarchy
 import com.themoon.y1.sync.jellyfin.JellyfinSyncProvider
+import com.themoon.y1.views.Notice
 import com.themoon.y1.views.TablerIcons
 import java.io.File
 import java.text.SimpleDateFormat
@@ -447,9 +445,16 @@ class JellyfinUiController(
         val btnLogout = createWrappedSettingRow(localize("Log Out / Reset"), "〉 ")
         btnLogout.setOnClickListener {
             clickFeedback()
-            provider.clearConfiguration()
-            lastFocusIndex = -1
-            buildSettingsUI()
+            val server = listOf(provider.username.takeIf { it.isNotEmpty() }?.let { "@$it" }, provider.serverUrl.takeIf { it.isNotEmpty() })
+            ActionScreens.open(ActionScreens.Spec(
+                localize("Jellyfin Sync"),
+                server.filterNotNull(),
+                listOf(ActionScreens.Action(localize("Log Out / Reset")) {
+                    provider.clearConfiguration()
+                    lastFocusIndex = -1
+                    buildSettingsUI()
+                })
+            ))
         }
         containerSettingsItems.addView(btnLogout)
 
@@ -1875,59 +1880,16 @@ class JellyfinUiController(
             return
         }
 
-        val d = activity.resources.displayMetrics.density
-        val loaderDialog = Dialog(activity).apply {
-            requestWindowFeature(Window.FEATURE_NO_TITLE)
-            window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-        }
-
-        val loaderLayout = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            val bg = GradientDrawable().apply {
-                setColor(ThemeManager.getOverlayBackgroundColor() or 0xEE000000.toInt())
-                cornerRadius = 15 * d
-                setStroke((1 * d).toInt(), 0x33FFFFFF)
-            }
-            background = bg
-            setPadding((24 * d).toInt(), (24 * d).toInt(), (24 * d).toInt(), (24 * d).toInt())
-        }
-
-        val progressBar = ProgressBar(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = Gravity.CENTER_HORIZONTAL
-                bottomMargin = (14 * d).toInt()
-            }
-        }
-        loaderLayout.addView(progressBar)
-
-        val tvLoaderMsg = TextView(activity).apply {
-            text = localize("Connecting...")
-            setTextColor(ThemeManager.getTextColorPrimary())
-            textSize = 15f
-            typeface = ThemeManager.getCustomFontBold()
-            gravity = Gravity.CENTER
-        }
-        loaderLayout.addView(tvLoaderMsg)
-
-        loaderDialog.setContentView(loaderLayout)
-        loaderDialog.setCancelable(true)
-        loaderDialog.setCanceledOnTouchOutside(false)
-        loaderDialog.window?.setLayout((270 * d).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT)
-        loaderDialog.show()
+        val key = ActionScreens.open(ActionScreens.Spec(localize("Test Connection"), listOf(localize("Connecting..."))))
 
         provider.testConnection(object : MediaSyncProvider.ConnectionCallback {
             override fun onSuccess(serverName: String, version: String) {
                 activity.runOnUiThread {
-                    if (loaderDialog.isShowing) loaderDialog.dismiss()
-                    Toast.makeText(
+                    ActionScreens.close(key)
+                    Notice.show(
                         activity,
-                        "${localize("Connected")}: $serverName",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                        "${localize("Connected")}: $serverName"
+                    )
                     if (currentDepth == 1) {
                         buildSettingsUI()
                     }
@@ -1936,12 +1898,11 @@ class JellyfinUiController(
 
             override fun onError(errorMessage: String) {
                 activity.runOnUiThread {
-                    if (loaderDialog.isShowing) loaderDialog.dismiss()
-                    Toast.makeText(
+                    ActionScreens.close(key)
+                    Notice.error(
                         activity,
-                        "${localize("Cannot reach server. Check URL and network.")}\n$errorMessage",
-                        Toast.LENGTH_LONG
-                    ).show()
+                        "${localize("Cannot reach server. Check URL and network.")}\n$errorMessage"
+                    )
                 }
             }
         })
@@ -1949,7 +1910,7 @@ class JellyfinUiController(
 
     fun fetchLibraries() {
         if (!provider.isConfigured()) {
-            Toast.makeText(activity, localize("Connect to discover libraries."), Toast.LENGTH_SHORT).show()
+            Notice.show(activity, localize("Connect to discover libraries."))
             return
         }
 
@@ -1958,68 +1919,25 @@ class JellyfinUiController(
             return
         }
 
-        val d = activity.resources.displayMetrics.density
-        val loaderDialog = Dialog(activity).apply {
-            requestWindowFeature(Window.FEATURE_NO_TITLE)
-            window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-        }
-
-        val loaderLayout = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            val bg = GradientDrawable().apply {
-                setColor(ThemeManager.getOverlayBackgroundColor() or 0xEE000000.toInt())
-                cornerRadius = 15 * d
-                setStroke((1 * d).toInt(), 0x33FFFFFF)
-            }
-            background = bg
-            setPadding((24 * d).toInt(), (24 * d).toInt(), (24 * d).toInt(), (24 * d).toInt())
-        }
-
-        val progressBar = ProgressBar(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = Gravity.CENTER_HORIZONTAL
-                bottomMargin = (14 * d).toInt()
-            }
-        }
-        loaderLayout.addView(progressBar)
-
-        val tvLoaderMsg = TextView(activity).apply {
-            text = localize("Fetching libraries...")
-            setTextColor(ThemeManager.getTextColorPrimary())
-            textSize = 15f
-            typeface = ThemeManager.getCustomFontBold()
-            gravity = Gravity.CENTER
-        }
-        loaderLayout.addView(tvLoaderMsg)
-
-        loaderDialog.setContentView(loaderLayout)
-        loaderDialog.setCancelable(true)
-        loaderDialog.setCanceledOnTouchOutside(false)
-        loaderDialog.window?.setLayout((270 * d).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT)
-        loaderDialog.show()
+        val key = ActionScreens.open(ActionScreens.Spec(localize("Fetch Libraries"), listOf(localize("Fetching libraries..."))))
 
         Thread {
             try {
                 provider.fetchLibraries(MediaSyncProvider.CancellationToken())
                 activity.runOnUiThread {
-                    if (loaderDialog.isShowing) loaderDialog.dismiss()
-                    Toast.makeText(activity, localize("Libraries updated"), Toast.LENGTH_SHORT).show()
+                    ActionScreens.close(key)
+                    Notice.show(activity, localize("Libraries updated"))
                     if (currentDepth == 1) {
                         buildSettingsUI()
                     }
                 }
             } catch (e: Exception) {
                 activity.runOnUiThread {
-                    if (loaderDialog.isShowing) loaderDialog.dismiss()
-                    Toast.makeText(
+                    ActionScreens.close(key)
+                    Notice.error(
                         activity,
-                        "${localize("Failed to fetch libraries")}: ${e.message ?: ""}",
-                        Toast.LENGTH_LONG
-                    ).show()
+                        "${localize("Failed to fetch libraries")}: ${e.message ?: ""}"
+                    )
                 }
             }
         }.start()
@@ -2028,7 +1946,7 @@ class JellyfinUiController(
     fun startQuickConnect() {
         val serverUrl = provider.serverUrl
         if (serverUrl.isBlank()) {
-            Toast.makeText(activity, localize("Server URL is empty"), Toast.LENGTH_SHORT).show()
+            Notice.error(activity, localize("Server URL is empty"))
             return
         }
 
@@ -2037,133 +1955,24 @@ class JellyfinUiController(
             return
         }
 
-        val d = activity.resources.displayMetrics.density
-        val qcDialog = Dialog(activity).apply {
-            requestWindowFeature(Window.FEATURE_NO_TITLE)
-            window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-        }
-
-        val rootLayout = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            val bg = GradientDrawable().apply {
-                setColor(ThemeManager.getOverlayBackgroundColor() or 0xEE000000.toInt())
-                cornerRadius = 15 * d
-                setStroke((1 * d).toInt(), 0x33FFFFFF)
-            }
-            background = bg
-            setPadding((22 * d).toInt(), (20 * d).toInt(), (22 * d).toInt(), (20 * d).toInt())
-        }
-
-        val tvTitle = TextView(activity).apply {
-            text = localize("QuickConnect")
-            setTextColor(ThemeManager.getTextColorPrimary())
-            textSize = 17f
-            typeface = ThemeManager.getCustomFontBold()
-            gravity = Gravity.CENTER
-        }
-        rootLayout.addView(tvTitle)
-
-        val tvInstruction = TextView(activity).apply {
-            text = localize("Enter this code on your device:")
-            setTextColor(ThemeManager.getTextColorSecondary())
-            textSize = 13f
-            gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = (8 * d).toInt()
-            }
-        }
-        rootLayout.addView(tvInstruction)
-
-        val progressBar = ProgressBar(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = Gravity.CENTER_HORIZONTAL
-                topMargin = (14 * d).toInt()
-                bottomMargin = (14 * d).toInt()
-            }
-        }
-        rootLayout.addView(progressBar)
-
-        val tvCode = TextView(activity).apply {
-            text = "------"
-            setTextColor(0xFF00AAFF.toInt())
-            textSize = 32f
-            typeface = ThemeManager.getCustomFontBold()
-            gravity = Gravity.CENTER
-            visibility = View.GONE
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = (10 * d).toInt()
-                bottomMargin = (10 * d).toInt()
-            }
-        }
-        rootLayout.addView(tvCode)
-
-        val tvSubInstruction = TextView(activity).apply {
-            text = localize("Go to Jellyfin Settings > Quick Connect")
-            setTextColor(ThemeManager.getTextColorSecondary())
-            textSize = 11f
-            gravity = Gravity.CENTER
-        }
-        rootLayout.addView(tvSubInstruction)
-
-        val tvStatus = TextView(activity).apply {
-            text = localize("Connecting...")
-            setTextColor(0xAAFFFFFF.toInt())
-            textSize = 12f
-            gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = (8 * d).toInt()
-                bottomMargin = (14 * d).toInt()
-            }
-        }
-        rootLayout.addView(tvStatus)
-
-        val btnCancel = createDialogButton(localize("Cancel")).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                (36 * d).toInt()
-            )
-        }
-        rootLayout.addView(btnCancel)
-
-        qcDialog.setContentView(rootLayout)
-        qcDialog.setCancelable(true)
-        qcDialog.setCanceledOnTouchOutside(false)
-        qcDialog.window?.setLayout((280 * d).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT)
-
+        // The code and the state on a screen; Back cancels
         val isCancelled = booleanArrayOf(false)
-        btnCancel.setOnClickListener {
-            isCancelled[0] = true
-            clickFeedback()
-            qcDialog.dismiss()
-        }
-        qcDialog.setOnCancelListener {
-            isCancelled[0] = true
-        }
-
-        qcDialog.show()
-        btnCancel.requestFocus()
+        fun info(code: String?, status: String) = listOfNotNull(
+            localize("Enter this code on your device:"), code, localize("Go to Jellyfin Settings > Quick Connect"), status
+        )
+        val key = ActionScreens.open(ActionScreens.Spec(
+            localize("QuickConnect"),
+            info(null, localize("Connecting...")),
+            onCancel = { isCancelled[0] = true }
+        ))
 
         Thread {
             try {
                 val client = provider.createClient()
                 if (!client.isQuickConnectEnabled()) {
                     activity.runOnUiThread {
-                        progressBar.visibility = View.GONE
-                        tvStatus.text = localize("Server does not support QuickConnect")
-                        Toast.makeText(activity, localize("Server does not support QuickConnect"), Toast.LENGTH_LONG).show()
+                        ActionScreens.update(key, info(null, localize("Server does not support QuickConnect")))
+                        Notice.error(activity, localize("Server does not support QuickConnect"))
                     }
                     return@Thread
                 }
@@ -2171,12 +1980,7 @@ class JellyfinUiController(
                 val initSession = client.initiateQuickConnect()
                 if (isCancelled[0]) return@Thread
 
-                activity.runOnUiThread {
-                    progressBar.visibility = View.GONE
-                    tvCode.visibility = View.VISIBLE
-                    tvCode.text = initSession.code
-                    tvStatus.text = localize("Waiting for authorization...")
-                }
+                ActionScreens.update(key, info(initSession.code, localize("Waiting for authorization...")))
 
                 val secret = initSession.secret
                 var authenticated = false
@@ -2199,9 +2003,7 @@ class JellyfinUiController(
                 if (isCancelled[0]) return@Thread
 
                 if (!authenticated) {
-                    activity.runOnUiThread {
-                        tvStatus.text = localize("QuickConnect Expired / Failed")
-                    }
+                    ActionScreens.update(key, info(initSession.code, localize("QuickConnect Expired / Failed")))
                     return@Thread
                 }
 
@@ -2216,14 +2018,12 @@ class JellyfinUiController(
                 if (isCancelled[0]) return@Thread
 
                 activity.runOnUiThread {
-                    try {
-                        qcDialog.dismiss()
-                    } catch (ignored: Exception) {}
-                    Toast.makeText(
+                    ActionScreens.close(key)
+                    Notice.show(
                         activity,
                         "${localize("QuickConnect Paired!")} ${localize("Paired as ")}${auth.serverName}",
-                        Toast.LENGTH_LONG
-                    ).show()
+                        long = true
+                    )
                     if (currentDepth == 1) {
                         buildSettingsUI()
                     }
@@ -2231,10 +2031,9 @@ class JellyfinUiController(
             } catch (e: Exception) {
                 if (isCancelled[0]) return@Thread
                 activity.runOnUiThread {
-                    progressBar.visibility = View.GONE
                     val msg = e.message ?: localize("Connection Error")
-                    tvStatus.text = msg
-                    Toast.makeText(activity, msg, Toast.LENGTH_LONG).show()
+                    ActionScreens.update(key, info(null, msg))
+                    Notice.error(activity, msg)
                 }
             }
         }.start()
@@ -2242,12 +2041,12 @@ class JellyfinUiController(
 
     fun launchSync() {
         if (isCustomScanning()) {
-            Toast.makeText(activity, localize("Scanning Media..."), Toast.LENGTH_SHORT).show()
+            Notice.show(activity, localize("Scanning Media..."))
             return
         }
 
         if (syncManager.isSyncing) {
-            Toast.makeText(activity, localize("Syncing..."), Toast.LENGTH_SHORT).show()
+            Notice.show(activity, localize("Syncing..."))
             return
         }
 
@@ -2290,91 +2089,32 @@ class JellyfinUiController(
         syncManager.startSync(customLibrary, trackNumberMap)
     }
 
+    /** The sync state on a progress screen. Back stops the sync. */
     private fun showSyncModal() {
-        val d = activity.resources.displayMetrics.density
-        val dialog = Dialog(activity).apply {
-            requestWindowFeature(Window.FEATURE_NO_TITLE)
-            window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-        }
-
-        val root = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            val bg = GradientDrawable().apply {
-                setColor(ThemeManager.getOverlayBackgroundColor() or 0xEE000000.toInt())
-                cornerRadius = 15 * d
-                setStroke((1 * d).toInt(), 0x33FFFFFF)
-            }
-            background = bg
-            setPadding((20 * d).toInt(), (18 * d).toInt(), (20 * d).toInt(), (18 * d).toInt())
-        }
-
-        val tvTitle = TextView(activity).apply {
-            text = localize("Jellyfin Sync")
-            setTextColor(ThemeManager.getTextColorPrimary())
-            textSize = 16f
-            typeface = ThemeManager.getCustomFontBold()
-            gravity = Gravity.CENTER
-        }
-        root.addView(tvTitle)
-
-        val tvStatus = TextView(activity).apply {
-            text = localize("Syncing...")
-            setTextColor(ThemeManager.getTextColorSecondary())
-            textSize = 13f
-            gravity = Gravity.CENTER
-            setPadding(0, (6 * d).toInt(), 0, (8 * d).toInt())
-        }
-        root.addView(tvStatus)
-
-        val pBar = ProgressBar(activity, null, android.R.attr.progressBarStyleHorizontal).apply {
-            max = 100
-            progress = 0
-            val pLp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (8 * d).toInt()).apply {
-                bottomMargin = (8 * d).toInt()
-            }
-            layoutParams = pLp
-        }
-        root.addView(pBar)
-
-        val tvDetail = TextView(activity).apply {
-            text = ""
-            setTextColor(ThemeManager.getTextColorSecondary())
-            textSize = 12f
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, (12 * d).toInt())
-        }
-        root.addView(tvDetail)
-
-        val btnCancel = createDialogButton(localize("Cancel")).apply {
-            setOnClickListener {
-                clickFeedback()
-                syncManager.cancelSync()
-                dialog.dismiss()
-            }
-        }
-        root.addView(btnCancel)
-
-        dialog.setContentView(root)
-        dialog.window?.setLayout((290 * d).toInt(), ViewGroup.LayoutParams.WRAP_CONTENT)
+        val key = ActionScreens.open(ActionScreens.Spec(
+            localize("Jellyfin Sync"),
+            listOf(localize("Syncing...")),
+            onCancel = { syncManager.cancelSync() }
+        ))
+        var lastUpdate = 0L
 
         syncManager.syncListener = object : SyncManager.SyncListener {
             override fun onStateChanged(state: SyncManager.SyncState, message: String?) {
                 activity.runOnUiThread {
-                    tvStatus.text = message ?: ""
+                    ActionScreens.update(key, listOf(message ?: ""))
                     when (state) {
                         SyncManager.SyncState.COMPLETE -> {
-                            Toast.makeText(activity, localize("Sync Complete"), Toast.LENGTH_SHORT).show()
-                            if (dialog.isShowing) dialog.dismiss()
+                            Notice.show(activity, localize("Sync Complete"))
+                            ActionScreens.close(key)
                             if (currentDepth == 1) buildSettingsUI()
                             onSyncFinished()
                         }
                         SyncManager.SyncState.ERROR -> {
-                            Toast.makeText(activity, message ?: "Error", Toast.LENGTH_LONG).show()
-                            if (dialog.isShowing) dialog.dismiss()
+                            Notice.error(activity, message ?: "Error")
+                            ActionScreens.close(key)
                         }
                         SyncManager.SyncState.CANCELLED -> {
-                            if (dialog.isShowing) dialog.dismiss()
+                            ActionScreens.close(key)
                         }
                         else -> {}
                     }
@@ -2389,17 +2129,15 @@ class JellyfinUiController(
                 bytesRead: Long,
                 bytesTotal: Long
             ) {
-                activity.runOnUiThread {
-                    val pct = if (totalItems > 0) currentItem * 100 / totalItems else 0
-                    pBar.progress = pct
-                    tvStatus.text = "$libraryName ($currentItem/$totalItems)"
-                    val sizeStr = if (bytesTotal > 0) " - ${formatSize(bytesRead)} / ${formatSize(bytesTotal)}" else ""
-                    tvDetail.text = "$currentTitle$sizeStr"
-                }
+                // At most 4 new builds of the screen a second
+                val now = android.os.SystemClock.uptimeMillis()
+                if (now - lastUpdate < 250 && currentItem < totalItems) return
+                lastUpdate = now
+                val pct = if (totalItems > 0) currentItem * 100 / totalItems else 0
+                val sizeStr = if (bytesTotal > 0) " - ${formatSize(bytesRead)} / ${formatSize(bytesTotal)}" else ""
+                ActionScreens.update(key, listOf("$libraryName ($currentItem/$totalItems)", "$pct %", "$currentTitle$sizeStr"))
             }
         }
-
-        dialog.show()
     }
 
     private fun formatSize(bytes: Long): String {

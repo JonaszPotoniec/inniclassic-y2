@@ -118,28 +118,26 @@ object SettingsGroups {
     }
 }
 
-/** The open group of the Settings screen, and the step that moves the finished rows into the groups. */
+/**
+ * The group that the Settings screen shows, and the step that moves the finished rows into the groups.
+ * A group is a back-stack entry of its own (SettingsSubMode.Group): Back from it is the back stack's job.
+ */
 class SettingsGroupPages {
 
     var openGroup: Int = SettingsGroups.TOP
         private set
-    private var groupRowIndex = 0
     private val groupRows = HashSet<View>()
     private var subTitles: List<String> = emptyList()
     private var titleGeneration = 0
 
-    val isOpen: Boolean get() = openGroup != SettingsGroups.TOP
-
-    /** Back to the top level. Returns the row of the group that was open (for the focus), or null. */
-    fun close(): Int? {
-        if (!isOpen) return null
-        openGroup = SettingsGroups.TOP
-        return groupRowIndex
+    /** The next [arrange] shows group [group] (an index in GROUPS), or the top level for [SettingsGroups.TOP] or -1. */
+    fun show(group: Int) {
+        openGroup = if (group in SettingsGroups.GROUPS.indices) group else SettingsGroups.TOP
     }
 
     /**
      * Moves the rows in [container] (made by buildSettingsUI) into the page of the open group, or puts the group rows
-     * on the top level. [onOpenGroup] runs when a group row is pushed (after [openGroup] changes).
+     * on the top level. [onOpenGroup] runs with the group index when a group row is pushed.
      */
     fun arrange(
         container: LinearLayout,
@@ -147,7 +145,7 @@ class SettingsGroupPages {
         clickFeedback: () -> Unit,
         localize: (String) -> String,
         title: TextView?,
-        onOpenGroup: () -> Unit
+        onOpenGroup: (Int) -> Unit
     ) {
         val english = HashMap<String, String>()
         for (g in SettingsGroups.GROUPS) for (r in g.rows) english[localize(r)] = r
@@ -163,21 +161,19 @@ class SettingsGroupPages {
         openGroup = shown
         container.removeAllViews()
         groupRows.clear()
-        entries.forEachIndexed { index, entry ->
+        entries.forEach { entry ->
             when (entry) {
                 is SettingsGroups.Entry.GroupRow -> {
                     val row = createSettingRow(localize(SettingsGroups.GROUPS[entry.group].title), "〉 ")
                     row.setOnClickListener {
                         clickFeedback()
-                        openGroup = entry.group
-                        groupRowIndex = index
-                        onOpenGroup()
+                        onOpenGroup(entry.group)
                     }
                     groupRows.add(row)
                     container.addView(row)
                 }
                 is SettingsGroups.Entry.Row -> {
-                    val row = views[entry.label] ?: return@forEachIndexed
+                    val row = views[entry.label] ?: return@forEach
                     SettingsGroups.RENAMES[entry.label]?.let { ((row as? ViewGroup)?.getChildAt(0) as? TextView)?.text = localize(it) }
                     container.addView(row)
                 }
@@ -193,16 +189,15 @@ class SettingsGroupPages {
      * shows the label of the row that opened it; the group list shows the group name ([arrange]).
      * Each sub-screen sets the depth before it removes the rows, so the row that opened it still has the focus here.
      */
-    fun onDepthChanged(old: Int, new: Int, container: LinearLayout, focusIndex: Int, title: TextView?, localize: (String) -> String) {
-        val opener = if (new > old) openerLabel(container, if (old == 0) focusIndex else -1) else null
+    fun onDepthChanged(old: Int, new: Int, container: LinearLayout, title: TextView?, localize: (String) -> String) {
+        val opener = if (new > old) openerLabel(container) else null
         subTitles = SettingsGroups.subScreenTitles(subTitles, old, new, opener, localize("Settings"))
         if (new > 0) showTitle(title, container, subTitles.last())
     }
 
-    private fun openerLabel(container: LinearLayout, focusIndex: Int): String? {
+    private fun openerLabel(container: LinearLayout): String? {
         var v: View? = container.findFocus()
         while (v != null && v.parent !== container) v = v.parent as? View
-        if (v == null && focusIndex in 0 until container.childCount) v = container.getChildAt(focusIndex)
         if (v == null || v in groupRows) return null // e.g. the Theme list opened from the main menu
         val text = ((v as? ViewGroup)?.getChildAt(0) as? TextView ?: v as? TextView)?.text?.toString()
         return text?.takeIf { it.isNotBlank() }

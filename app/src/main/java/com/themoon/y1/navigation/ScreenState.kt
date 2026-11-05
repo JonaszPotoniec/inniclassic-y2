@@ -5,10 +5,14 @@ import java.io.File
 
 /**
  * Top-level screen states representing currently active application views.
+ *
+ * A state is also the route key of a back-stack entry ([NavigationManager]): it says which list shows and has
+ * all that its controller needs to build that list again when Back comes back to it.
  */
 sealed interface ScreenState {
     data object MainMenu : ScreenState
-    data class Browser(val mode: BrowserMode) : ScreenState
+    /** A Music list ([mode]); [audiobooks] = the same lists in the audiobook library. */
+    data class Browser(val mode: BrowserMode, val audiobooks: Boolean = false) : ScreenState
     data object Player : ScreenState
     data class Settings(val subMode: SettingsSubMode = SettingsSubMode.Root) : ScreenState
     data object Bluetooth : ScreenState
@@ -29,16 +33,26 @@ sealed interface ScreenState {
     data class PodcastEpisodes(val channelTitle: String, val rssUrl: String) : ScreenState
     data object PodcastManage : ScreenState
     data object Equalizer : ScreenState
+    /** The FM tuner. It opens directly from the main menu; Back (Menu) goes to [FmRadioMenu], as on the iPod nano. */
     data object FmRadio : ScreenState
+    /** The Radio menu: tuner, power, saved channels, scan. */
+    data object FmRadioMenu : ScreenState
+    /** The list of the saved channels. */
+    data object FmRadioSaved : ScreenState
     data object Jellyfin : ScreenState
 }
+
+/** A level of the folder browser: the file tree of Folders, or of the background picker of Settings. */
+val ScreenState.isFolderLevel: Boolean
+    get() = this is ScreenState.Browser && mode is BrowserMode.Folder
 
 /**
  * Browser navigation modes for music library, file tree, playlists, and podcasts.
  */
 sealed interface BrowserMode {
     data object Root : BrowserMode
-    data class Folder(val dir: File) : BrowserMode
+    /** A folder; [pickImage] = the background picker of Settings (images, no audio). */
+    data class Folder(val dir: File, val pickImage: Boolean = false) : BrowserMode
     data object Artists : BrowserMode
     data object TrackArtists : BrowserMode
     data class Albums(val artistFilter: String? = null, val byTrackArtist: Boolean = false) : BrowserMode
@@ -49,6 +63,19 @@ sealed interface BrowserMode {
     data object Composers : BrowserMode
     data object Years : BrowserMode
     data object VirtualSongs : BrowserMode
+    /**
+     * A song list: [type] and [value] are the query of BrowserController.buildVirtualSongs (ALL, ALBUM, ARTIST, GENRE,
+     * SEARCH...), [albumArtist] tells two albums with the same title apart, and [artist], [byTrackArtist] and [genre]
+     * are the filters of the list that opened it.
+     */
+    data class Songs(
+        val type: String,
+        val value: String = "",
+        val albumArtist: String = "",
+        val artist: String = "",
+        val byTrackArtist: Boolean = false,
+        val genre: String = ""
+    ) : BrowserMode
     data object Favorites : BrowserMode
     data object RecentlyAdded : BrowserMode
     data object Audiobooks : BrowserMode
@@ -65,6 +92,10 @@ sealed interface BrowserMode {
  */
 sealed interface SettingsSubMode {
     data object Root : SettingsSubMode
+    /** A group of the top level, by its English title (SettingsGroups). */
+    data class Group(val title: String) : SettingsSubMode
+    /** The screen of a Settings row, by its id (for example "Theme"); [arg] for a screen of one value ("DateTime", "Year"). */
+    data class Page(val id: String, val arg: String = "") : SettingsSubMode
     data object DateTime : SettingsSubMode
     data object Equalizer5Band : SettingsSubMode
     data object Equalizer10Band : SettingsSubMode

@@ -315,21 +315,10 @@ class CategoryListAdapter(
             bc.virtualListSelectedIndex = position
             main.clickFeedback()
             when (type) {
-                "GENRE_ARTIST" -> {
-                    bc.virtualQueryType = "GENRE"
-                    bc.virtualQueryValue = bc.categoryGenreFilter
-                }
-                "GENRE_ALBUM" -> {
-                    bc.virtualQueryType = "GENRE_ARTIST_SONGS"
-                    bc.virtualQueryValue = bc.categoryArtistFilter
-                }
-                else -> {
-                    bc.virtualQueryType = if (bc.categoryArtistFilterIsTrackArtist) "ARTIST" else "ARTIST_ALL_ALBUMS"
-                    bc.virtualQueryValue = bc.categoryArtistFilter
-                }
+                "GENRE_ARTIST" -> bc.openSongs("GENRE", bc.categoryGenreFilter)
+                "GENRE_ALBUM" -> bc.openSongs("GENRE_ARTIST_SONGS", bc.categoryArtistFilter)
+                else -> bc.openSongs(if (bc.categoryArtistFilterIsTrackArtist) "ARTIST" else "ARTIST_ALL_ALBUMS", bc.categoryArtistFilter)
             }
-            bc.currentBrowserMode = BrowserMode.VirtualSongs
-            bc.buildVirtualSongs()
         }
 
         row.setOnLongClickListener {
@@ -539,17 +528,12 @@ class CategoryListAdapter(
             val bc = main.browserController
             bc.virtualListSelectedIndex = position
             main.clickFeedback()
-            if (type == "GENRE_ALBUM") {
-                bc.virtualQueryType = "GENRE_ALBUM_SONGS"
-                bc.virtualQueryValue = name
-                bc.virtualQueryAlbumArtist = albumArtist ?: ""
-            } else {
-                bc.virtualQueryType = if (bc.currentBrowserMode is BrowserMode.Compilations) "COMPILATION_ALBUM" else type
-                bc.virtualQueryValue = name
-                bc.virtualQueryAlbumArtist = albumArtist ?: ""
+            val query = when {
+                type == "GENRE_ALBUM" -> "GENRE_ALBUM_SONGS"
+                bc.currentBrowserMode is BrowserMode.Compilations -> "COMPILATION_ALBUM"
+                else -> type
             }
-            bc.currentBrowserMode = BrowserMode.VirtualSongs
-            bc.buildVirtualSongs()
+            bc.openSongs(query, name, albumArtist ?: "")
         }
 
         row.setOnLongClickListener {
@@ -675,34 +659,10 @@ class CategoryListAdapter(
             bc.virtualListSelectedIndex = position
             main.clickFeedback()
             when (type) {
-                "GENRE" -> {
-                    bc.categoryGenreFilter = name
-                    bc.categoryArtistFilter = ""
-                    bc.categoryArtistFilterIsTrackArtist = true
-                    bc.currentBrowserMode = BrowserMode.GenreArtists(name)
-                    bc.virtualQueryValue = ""
-                    bc.buildVirtualCategories("GENRE_ARTIST")
-                }
-                "GENRE_ARTIST" -> {
-                    bc.categoryArtistFilter = name
-                    bc.categoryArtistFilterIsTrackArtist = true
-                    bc.currentBrowserMode = BrowserMode.GenreAlbums(bc.categoryGenreFilter, name)
-                    bc.virtualQueryValue = ""
-                    bc.buildVirtualCategories("GENRE_ALBUM")
-                }
-                "ARTIST", "TRACK_ARTIST" -> {
-                    bc.categoryArtistFilter = name
-                    bc.categoryArtistFilterIsTrackArtist = (type == "TRACK_ARTIST")
-                    bc.virtualQueryValue = ""
-                    bc.currentBrowserMode = BrowserMode.Albums(name, type == "TRACK_ARTIST")
-                    bc.buildVirtualCategories("ALBUM")
-                }
-                else -> {
-                    bc.virtualQueryType = type
-                    bc.virtualQueryValue = name
-                    bc.currentBrowserMode = BrowserMode.VirtualSongs
-                    bc.buildVirtualSongs()
-                }
+                "GENRE" -> bc.openList(BrowserMode.GenreArtists(name))
+                "GENRE_ARTIST" -> bc.openList(BrowserMode.GenreAlbums(bc.categoryGenreFilter, name))
+                "ARTIST", "TRACK_ARTIST" -> bc.openList(BrowserMode.Albums(name, type == "TRACK_ARTIST"))
+                else -> bc.openSongs(type, name)
             }
         }
 
