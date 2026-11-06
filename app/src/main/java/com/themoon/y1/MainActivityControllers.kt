@@ -576,6 +576,9 @@ internal fun MainActivity.handleMainMenuAction(action: String) {
         "OPEN_WIFI", "WIFI" -> {
             changeScreen(MainActivity.STATE_WIFI)
         }
+        "OPEN_PLAY_ON" -> {
+            com.themoon.y1.cast.PlayOnMenu.open(this)
+        }
         "OPEN_AUDIOBOOKS" -> {
             this.isAudiobookLibraryMode = true
             changeScreen(ScreenState.Browser(BrowserMode.Audiobooks, audiobooks = true))

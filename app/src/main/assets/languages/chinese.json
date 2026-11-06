@@ -728,5 +728,14 @@
   "Screen On": "屏幕使用",
   "Last charged to": "上次充电至",
   "Charging": "正在充电",
-  "No battery history yet": "暂无电池记录"
+  "No battery history yet": "暂无电池记录",
+  "Play On": "播放到",
+  "This Y2": "本机 Y2",
+  "Search Again": "重新搜索",
+  "Searching for speakers on the Wi-Fi…": "正在搜索 Wi-Fi 上的扬声器…",
+  "No speakers found. The Y2 and the speaker must be on the same Wi-Fi.": "未找到扬声器。Y2 和扬声器必须连接同一 Wi-Fi。",
+  "The Y2 is not connected to a Wi-Fi network. Main menu → Wi-Fi.": "Y2 未连接 Wi-Fi 网络。主菜单 → Wi-Fi。",
+  "Playing on": "正在播放到",
+  "Connecting to": "正在连接",
+  "cannot connect": "无法连接"
 }

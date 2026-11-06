@@ -408,6 +408,7 @@
                     <TextView android:id="@+id/tv_player_album" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Album" android:textColor="#3C3C43" android:textSize="15sp" android:gravity="left" android:layout_marginTop="4dp" android:singleLine="true" android:ellipsize="end" />
                     <TextView android:id="@+id/tv_player_rating" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="" android:textColor="#6194D1" android:textSize="15sp" android:gravity="left" android:layout_marginTop="4dp" android:visibility="gone"/>
                     <TextView android:id="@+id/tv_player_track_count" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="1 of 1" android:textColor="#8E8E93" android:textSize="15sp" android:textStyle="bold" android:gravity="left" android:layout_marginTop="4dp"/>
+                    <TextView android:id="@+id/tv_player_play_on" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="" android:textColor="#8E8E93" android:textSize="15sp" android:textStyle="bold" android:gravity="left" android:layout_marginTop="4dp" android:singleLine="true" android:ellipsize="end" android:drawablePadding="5dp" android:visibility="gone"/>
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>
@@ -487,6 +488,7 @@
 
             <TextView android:id="@+id/tv_status_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginRight="8dp" android:singleLine="true" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold" android:visibility="gone" />
             <ImageView android:id="@+id/iv_status_headphone" android:layout_width="16dp" android:layout_height="16dp" android:src="@drawable/ic_headphone" android:visibility="gone" android:layout_marginRight="6dp"/>
+            <ImageView android:id="@+id/iv_status_play_on" android:layout_width="wrap_content" android:layout_height="16dp" android:visibility="gone" android:layout_marginRight="6dp"/>
             <ImageView android:id="@+id/iv_status_wifi" android:layout_width="16dp" android:layout_height="16dp" android:visibility="gone" android:layout_marginRight="6dp"/>
             <ImageView android:id="@+id/iv_status_bluetooth" android:layout_width="16dp" android:layout_height="16dp" android:src="@drawable/ic_bluetooth" android:visibility="gone" android:layout_marginRight="8dp"/>
             <TextView android:id="@+id/tv_status_battery" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="100%" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold" />

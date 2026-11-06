@@ -728,5 +728,14 @@
   "Screen On": "Pantalla activa",
   "Last charged to": "Última carga al",
   "Charging": "Cargando",
-  "No battery history yet": "Aún no hay historial de batería"
+  "No battery history yet": "Aún no hay historial de batería",
+  "Play On": "Reproducir en",
+  "This Y2": "Este Y2",
+  "Search Again": "Buscar de nuevo",
+  "Searching for speakers on the Wi-Fi…": "Buscando altavoces en la red Wi-Fi…",
+  "No speakers found. The Y2 and the speaker must be on the same Wi-Fi.": "No se encontraron altavoces. El Y2 y el altavoz deben estar en la misma red Wi-Fi.",
+  "The Y2 is not connected to a Wi-Fi network. Main menu → Wi-Fi.": "El Y2 no está conectado a una red Wi-Fi. Menú principal → Wi-Fi.",
+  "Playing on": "Reproduciendo en",
+  "Connecting to": "Conectando con",
+  "cannot connect": "no se puede conectar"
 }

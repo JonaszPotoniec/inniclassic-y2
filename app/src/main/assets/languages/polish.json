@@ -728,5 +728,14 @@
   "Screen On": "Ekran włączony",
   "Last charged to": "Ostatnio naładowano do",
   "Charging": "Ładowanie",
-  "No battery history yet": "Brak historii baterii"
+  "No battery history yet": "Brak historii baterii",
+  "Play On": "Odtwarzaj na",
+  "This Y2": "Ten Y2",
+  "Search Again": "Szukaj ponownie",
+  "Searching for speakers on the Wi-Fi…": "Szukanie głośników w sieci Wi-Fi…",
+  "No speakers found. The Y2 and the speaker must be on the same Wi-Fi.": "Nie znaleziono głośników. Y2 i głośnik muszą być w tej samej sieci Wi-Fi.",
+  "The Y2 is not connected to a Wi-Fi network. Main menu → Wi-Fi.": "Y2 nie jest połączony z siecią Wi-Fi. Menu główne → Wi-Fi.",
+  "Playing on": "Odtwarzanie na",
+  "Connecting to": "Łączenie z",
+  "cannot connect": "nie można połączyć"
 }

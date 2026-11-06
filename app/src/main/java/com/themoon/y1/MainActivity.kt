@@ -271,6 +271,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     var tvFastScrollLetter: TextView? = null
     var tvStatusBarTitle: TextView? = null
     var ivStatusWifi: ImageView? = null
+    var ivStatusPlayOn: ImageView? = null
     var ivStatusBluetooth: ImageView? = null
     var ivStatusHeadphone: ImageView? = null
     var tvStatusTime: TextView? = null
@@ -471,13 +472,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                 ivStatusBluetooth?.visibility = View.VISIBLE
                 queryStatusBarBluetooth()
             }
-            val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
-            if (wm != null && wm.isWifiEnabled) {
-                ivStatusWifi?.visibility = View.VISIBLE
-                val info = wm.connectionInfo
-                val isConnected = (info != null && info.networkId != -1)
-                updateStatusBarWifi(isConnected)
-            }
+            refreshStatusBarWifi()
         } catch (_: Exception) {}
 
         updateStatusBarClock()
@@ -739,6 +734,11 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     }
 
     override fun adjustVolume(isUp: Boolean) {
+        // Play On: the wheel changes the volume of the speaker
+        if (com.themoon.y1.cast.CastManager.adjustVolume(isUp)) {
+            clickFeedback()
+            return
+        }
         restoreVolumeForOutput()
         val current = currentVirtualVolume.coerceAtLeast(0)
         val target = if (isUp) current + 1 else current - 1
@@ -1393,6 +1393,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                     powerBacklightManager?.resetTimer()
                     updateScreenOffFeedback(true)
                     updateStatusBarClock()
+                    com.themoon.y1.cast.CastManager.onScreenOn()
                 }
                 Intent.ACTION_SCREEN_OFF -> {
                     isScreenSleeping = true

@@ -728,5 +728,14 @@
   "Screen On": "Screen On",
   "Last charged to": "Last charged to",
   "Charging": "Charging",
-  "No battery history yet": "No battery history yet"
+  "No battery history yet": "No battery history yet",
+  "Play On": "Play On",
+  "This Y2": "This Y2",
+  "Search Again": "Search Again",
+  "Searching for speakers on the Wi-Fi…": "Searching for speakers on the Wi-Fi…",
+  "No speakers found. The Y2 and the speaker must be on the same Wi-Fi.": "No speakers found. The Y2 and the speaker must be on the same Wi-Fi.",
+  "The Y2 is not connected to a Wi-Fi network. Main menu → Wi-Fi.": "The Y2 is not connected to a Wi-Fi network. Main menu → Wi-Fi.",
+  "Playing on": "Playing on",
+  "Connecting to": "Connecting to",
+  "cannot connect": "cannot connect"
 }

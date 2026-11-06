@@ -35,7 +35,7 @@ import kotlin.math.sqrt
  * so the unit tests can check them.
  */
 object StatusIcons {
-    enum class Icon { HEADPHONES, WIFI, BLUETOOTH }
+    enum class Icon { HEADPHONES, WIFI, BLUETOOTH, PLAY_ON }
 
     // The palette of the iPod play/pause icon.
     const val FILL_TOP = 0xFFA6D6FF.toInt()
@@ -84,8 +84,19 @@ object StatusIcons {
         LinearGradient(0f, boxTop, 0f, boxBottom, FILL_TOP, FILL_BOTTOM, Shader.TileMode.CLAMP)
 
     /** Rows of the bitmap above and below the [heightPx] box of the round icons (optical overshoot of the rune). */
-    fun overshoot(icon: Icon, heightPx: Int): Int =
-        if (icon == Icon.BLUETOOTH) max(1, (heightPx / 15f).roundToInt()) else 0
+    fun overshoot(icon: Icon, heightPx: Int): Int = when (icon) {
+        Icon.BLUETOOTH -> max(1, (heightPx / 15f).roundToInt())
+        // Rows for the larger Play On icon, the same above and below: the bitmap stays centred
+        Icon.PLAY_ON -> PLAY_ON_GROW
+        else -> 0
+    }
+
+    /**
+     * Play On: [PLAY_ON_GROW] px taller than the round icons. The flat base of the triangle and the rings open at the
+     * bottom make the icon look high in the box: 1 px larger, the extra row at the bottom (user checks on the Y2,
+     * 2026-10-29: 1 px lower was too low).
+     */
+    const val PLAY_ON_GROW = 1
 
     fun bitmapHeight(icon: Icon, heightPx: Int): Int = heightPx + 2 * overshoot(icon, heightPx)
 
@@ -96,6 +107,62 @@ object StatusIcons {
     fun boxInBitmap(icon: Icon, heightPx: Int, boxHeightPx: Int): Pair<Float, Float> {
         val bottom = (overshoot(icon, heightPx) + heightPx).toFloat()
         return Pair(bottom - boxHeightPx, bottom)
+    }
+
+    /**
+     * Play On (a speaker on the Wi-Fi plays): two rings open at the bottom and a triangle at the bottom centre, in the
+     * style of the macOS AirPlay audio symbol (own drawing). Designed for a 15 px icon (the core is 1 px smaller than
+     * the ink, as the fan): outer ring edge radius 8, rings 2 px with a 2 px gap, the triangle apex 0.5 px under the
+     * centre, its base 6 px under the centre and 10 px wide. Each ring ends 2 px from the triangle.
+     */
+    class PlayOnGeometry(
+        val width: Float, val centreY: Float, val stroke: Float, val radii: FloatArray, val openHalfDeg: FloatArray,
+        val apexY: Float, val baseY: Float, val halfBase: Float
+    )
+
+    fun playOnGeometry(coreHeight: Float): PlayOnGeometry {
+        val k = coreHeight / 14f
+        val outer = 8f * k
+        val stroke = 2f * k
+        val gap = 2f * k
+        val apex = 0.5f * k
+        val base = 6f * k
+        val half = 5f * k
+        val clear = 2f * k
+        val radii = floatArrayOf(outer - stroke / 2f, outer - stroke / 2f - stroke - gap)
+        // Triangle with the ring centre at (0, 0), y down
+        val tri = floatArrayOf(0f, apex, half, base, -half, base)
+        val open = FloatArray(radii.size) { i ->
+            var deg = 0f
+            while (deg < 170f) {
+                val a = Math.toRadians(deg.toDouble())
+                val x = (radii[i] * kotlin.math.sin(a)).toFloat()
+                val y = (radii[i] * kotlin.math.cos(a)).toFloat()
+                if (distanceToTriangle(x, y, tri) >= stroke / 2f + clear) break
+                deg += 0.5f
+            }
+            deg
+        }
+        return PlayOnGeometry(2f * outer, outer, stroke, radii, open, apex, base, half)
+    }
+
+    /** Distance from (x, y) to the triangle [t] (x0, y0, x1, y1, x2, y2); 0 inside. */
+    internal fun distanceToTriangle(x: Float, y: Float, t: FloatArray): Float {
+        fun side(i: Int): Float {
+            val ax = t[2 * i]; val ay = t[2 * i + 1]; val bx = t[(2 * i + 2) % 6]; val by = t[(2 * i + 3) % 6]
+            return (bx - ax) * (y - ay) - (by - ay) * (x - ax)
+        }
+        val s0 = side(0); val s1 = side(1); val s2 = side(2)
+        if ((s0 >= 0 && s1 >= 0 && s2 >= 0) || (s0 <= 0 && s1 <= 0 && s2 <= 0)) return 0f
+        var best = Float.MAX_VALUE
+        for (i in 0 until 3) {
+            val ax = t[2 * i]; val ay = t[2 * i + 1]; val bx = t[(2 * i + 2) % 6]; val by = t[(2 * i + 3) % 6]
+            val dx = bx - ax; val dy = by - ay
+            val u = (((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)).coerceIn(0f, 1f)
+            val px = ax + u * dx - x; val py = ay + u * dy - y
+            best = minOf(best, sqrt(px * px + py * py))
+        }
+        return best
     }
 
     /** Rounds to a quarter pixel, so that the shapes are the same at each draw and in the tests. */
@@ -198,6 +265,7 @@ object StatusIcons {
         // The shape is designed in an 18 x 18 box.
         Icon.HEADPHONES -> heightPx
         Icon.BLUETOOTH -> bluetoothLayout(bitmapHeight(icon, heightPx), connected).width
+        Icon.PLAY_ON -> ceil(playOnGeometry(heightPx + PLAY_ON_GROW - 1f).width + 1f).toInt()
     }
 
     /**
@@ -245,10 +313,44 @@ object StatusIcons {
             canvas.drawPath(shape, edge)
             if (!active) fill.apply { this.shader = null; xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR) }
             canvas.drawPath(shape, fill)
+        } else if (icon == Icon.PLAY_ON) {
+            drawPlayOn(canvas, w.toFloat(), (h + PLAY_ON_GROW).toFloat(), overshoot(icon, h).toFloat(), fill, edge)
         } else {
             drawWifi(canvas, w.toFloat(), h.toFloat(), active, fill, edge)
         }
         return bmp
+    }
+
+    /** The rings (round ends) and the triangle of [playOnGeometry]: the fill, then the 1 px edge (as the fan). */
+    private fun drawPlayOn(canvas: Canvas, w: Float, h: Float, top: Float, fill: Paint, edge: Paint) {
+        val g = playOnGeometry(h - 1f)
+        val cx = w / 2f
+        val cy = top + 0.5f + g.centreY
+        val line = Paint().apply {
+            style = Paint.Style.STROKE
+            strokeWidth = g.stroke
+            strokeCap = Paint.Cap.ROUND
+        }
+        val shapes = Path()
+        for (i in g.radii.indices) {
+            val r = g.radii[i]
+            val open = g.openHalfDeg[i]
+            // Android angles: 0° = right, 90° = down. The ring goes over the top, from one side of the gap to the other.
+            val arc = Path().apply { arcTo(RectF(cx - r, cy - r, cx + r, cy + r), 90f + open, 360f - 2f * open, true) }
+            val band = Path()
+            line.getFillPath(arc, band)
+            shapes.addPath(band)
+        }
+        val tri = Path().apply {
+            moveTo(cx, cy + g.apexY)
+            lineTo(cx + g.halfBase, cy + g.baseY)
+            lineTo(cx - g.halfBase, cy + g.baseY)
+            close()
+        }
+        shapes.addPath(tri)
+        canvas.drawPath(shapes, fill)
+        edge.strokeJoin = Paint.Join.ROUND
+        canvas.drawPath(shapes, edge)
     }
 
     /**

@@ -1,0 +1,12 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFF"
+    android:alpha="0.8">
+  <!-- Play On: two rings open at the bottom and a triangle (a speaker on the Wi-Fi plays). -->
+  <path
+      android:fillColor="@android:color/white"
+      android:pathData="M12.92,15.28L16.93,20.02A1.2,1.2 0 0,1 16.01,22L7.99,22A1.2,1.2 0 0,1 7.07,20.02L11.08,15.28A1.2,1.2 0 0,1 12.92,15.28ZM3.87,17.82A10,10 0 1,1 20.13,17.82A1.5,1.5 0 0,1 17.69,16.07A7,7 0 1,0 6.31,16.07A1.5,1.5 0 0,1 3.87,17.82ZM7.44,12.61A4.6,4.6 0 1,1 16.56,12.61A1.5,1.5 0 0,1 13.59,12.21A1.6,1.6 0 1,0 10.41,12.21A1.5,1.5 0 0,1 7.44,12.61Z"/>
+</vector>

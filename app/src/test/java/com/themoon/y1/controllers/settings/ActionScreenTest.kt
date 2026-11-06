@@ -41,6 +41,20 @@ class ActionScreenTest {
     }
 
     @Test
+    fun aRowThatOpensAListKeepsTheScreenUnderIt() {
+        val steps = mutableListOf<String>()
+        val playOn = ActionScreens.Action("Play On", opensList = true) { steps.add("open list") }
+        assertFalse(playOn.closes)
+        ActionScreens.choose(playOn) { steps.add("close") }
+        assertEquals(listOf("open list"), steps)
+        // A row that goes to another screen itself: no close first, and no chevron
+        val speaker = ActionScreens.Action("Sonos", checked = false, closes = false) { steps.add("play") }
+        assertFalse(speaker.opensList)
+        ActionScreens.choose(speaker) { steps.add("close") }
+        assertEquals(listOf("open list", "play"), steps)
+    }
+
+    @Test
     fun backClosesTheScreenAndCancelsWithoutTheAction() {
         val steps = mutableListOf<String>()
         val spec = ActionScreens.Spec(
@@ -80,20 +94,25 @@ class ActionScreenTest {
     fun aSpecIsAListOfInfoRowsThenActionRows() {
         val steps = mutableListOf<String>()
         val spec = ActionScreens.Spec(
-            "Power",
-            info = listOf("Battery 50 %"),
+            "Play On",
+            info = listOf("Searching…"),
             actions = listOf(
-                ActionScreens.Action("Restart") { steps.add("restart") },
-                ActionScreens.Action("Power Off") { steps.add("off") }
+                ActionScreens.Action("This Y2", checked = true) { steps.add("y2") },
+                ActionScreens.Action("Kitchen", checked = false) { steps.add("kitchen") },
+                ActionScreens.Action("More", opensList = true) { steps.add("more") },
+                ActionScreens.Action("Search Again") { steps.add("search") }
             )
         )
         val list = ActionScreens.list(spec) { steps.add("close") }
-        assertEquals("Power", list.title)
-        assertEquals(listOf(RowLook.INFO, RowLook.VALUE, RowLook.VALUE), list.rows.map { it.look })
-        assertEquals(listOf("Restart", "Power Off"), list.rows.drop(1).map { it.label })
+        assertEquals("Play On", list.title)
+        assertEquals(listOf(RowLook.INFO, RowLook.CHOICE, RowLook.CHOICE, RowLook.VALUE, RowLook.VALUE), list.rows.map { it.look })
+        assertEquals(listOf(true, false), list.rows.subList(1, 3).map { it.checked })
+        // A chevron only on the row that opens a list
+        assertEquals(listOf("〉", ""), list.rows.subList(3, 5).map { it.value })
         assertEquals(Focus.FIRST, list.focus)
-        list.rows[2].onClick!!()
-        assertEquals(listOf("close", "off"), steps)
+        list.rows[4].onClick!!()
+        list.rows[3].onClick!!()
+        assertEquals(listOf("close", "search", "more"), steps)
     }
 
     @Test

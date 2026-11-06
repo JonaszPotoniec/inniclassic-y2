@@ -728,5 +728,14 @@
   "Screen On": "Экран включён",
   "Last charged to": "Последняя зарядка до",
   "Charging": "Зарядка",
-  "No battery history yet": "Истории аккумулятора пока нет"
+  "No battery history yet": "Истории аккумулятора пока нет",
+  "Play On": "Воспроизвести на",
+  "This Y2": "Этот Y2",
+  "Search Again": "Искать снова",
+  "Searching for speakers on the Wi-Fi…": "Поиск колонок в сети Wi-Fi…",
+  "No speakers found. The Y2 and the speaker must be on the same Wi-Fi.": "Колонки не найдены. Y2 и колонка должны быть в одной сети Wi-Fi.",
+  "The Y2 is not connected to a Wi-Fi network. Main menu → Wi-Fi.": "Y2 не подключён к сети Wi-Fi. Главное меню → Wi-Fi.",
+  "Playing on": "Воспроизведение на",
+  "Connecting to": "Подключение к",
+  "cannot connect": "не удаётся подключиться"
 }

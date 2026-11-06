@@ -112,8 +112,9 @@ object ThemeManager {
         menuElements.add(MenuElement("btn_radio", "button", "main_scroll_list", "", 0, 0, -1, 33, "FM Radio", "FM Radio", "›", "#FF8E8E93", "#FFFFFFFF", "", "", "", "OPEN_RADIO", "top|left", -1, 6, 21, -1, "bottom", "left", "", 0, 0, 0, 1.0f))
         menuElements.add(MenuElement("btn_bt", "button", "main_scroll_list", "", 0, 0, -1, 33, "Bluetooth", "Bluetooth", "›", "#FF8E8E93", "#FFFFFFFF", "", "", "", "OPEN_BLUETOOTH", "top|left", -1, 7, 21, -1, "bottom", "left", "", 0, 0, 0, 1.0f))
         menuElements.add(MenuElement("btn_wifi", "button", "main_scroll_list", "", 0, 0, -1, 33, "Wi-Fi", "Wi-Fi", "›", "#FF8E8E93", "#FFFFFFFF", "", "", "", "OPEN_WIFI", "top|left", -1, 8, 21, -1, "bottom", "left", "", 0, 0, 0, 1.0f))
-        menuElements.add(MenuElement("btn_set", "button", "main_scroll_list", "", 0, 0, -1, 33, "Settings", "Settings", "›", "#FF8E8E93", "#FFFFFFFF", "", "", "", "OPEN_SETTINGS", "top|left", -1, 9, 21, -1, "bottom", "left", "", 0, 0, 0, 1.0f))
-        menuElements.add(MenuElement("btn_web", "button", "main_scroll_list", "", 0, 0, -1, 33, "Web Server", "Web Server", "›", "#FF8E8E93", "#FFFFFFFF", "", "", "", "OPEN_WEBSERVER", "top|left", -1, 10, 21, -1, "bottom", "left", "", 0, 0, 0, 1.0f))
+        menuElements.add(MenuElement("btn_play_on", "button", "main_scroll_list", "", 0, 0, -1, 33, "Play On", "Play On", "›", "#FF8E8E93", "#FFFFFFFF", "", "", "", "OPEN_PLAY_ON", "top|left", -1, 9, 21, -1, "bottom", "left", "", 0, 0, 0, 1.0f))
+        menuElements.add(MenuElement("btn_set", "button", "main_scroll_list", "", 0, 0, -1, 33, "Settings", "Settings", "›", "#FF8E8E93", "#FFFFFFFF", "", "", "", "OPEN_SETTINGS", "top|left", -1, 10, 21, -1, "bottom", "left", "", 0, 0, 0, 1.0f))
+        menuElements.add(MenuElement("btn_web", "button", "main_scroll_list", "", 0, 0, -1, 33, "Web Server", "Web Server", "›", "#FF8E8E93", "#FFFFFFFF", "", "", "", "OPEN_WEBSERVER", "top|left", -1, 11, 21, -1, "bottom", "left", "", 0, 0, 0, 1.0f))
         menuElements.add(MenuElement("widget_cover", "widget_animated_cover", "", "", 242, 0, 238, 325, "", "", "", "", "", "", "", "", "NONE", "top|left", -1, -1, 16, -1, "bottom", "left", "", 0, 0, 0, 1.0f))
     }
 

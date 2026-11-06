@@ -37,7 +37,8 @@ object AssetInstaller {
         if (!themesDir.exists()) themesDir.mkdirs()
 
         val lastThemeVersion = prefs.getInt("last_installed_theme_version", 0)
-        val currentThemeVersion = 1011
+        // 1012: Play On row in the main menu of Classic Light and Classic Dark
+        val currentThemeVersion = 1012
         if (lastThemeVersion >= currentThemeVersion) return
 
         try {

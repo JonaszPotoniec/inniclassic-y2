@@ -1,5 +1,7 @@
 package com.themoon.y1.controllers.player
 
+import com.themoon.y1.MainActivity
+import com.themoon.y1.cast.PlayOnMenu
 import com.themoon.y1.controllers.settings.ActionScreens
 import com.themoon.y1.models.SongItem
 import java.io.File
@@ -11,7 +13,8 @@ import java.io.File
  * - Add to On-The-Go playlist
  * - Add to Playlist
  * - Browse Album / Browse Artist
- * Only actions on the current song: the display options (Spectrum, Total Time) are in Settings.
+ * - Play On (the speaker list; with the speaker name while a speaker plays)
+ * Only actions on the current song and Play On: the display options (Spectrum, Total Time) are in Settings.
  * A row closes the menu, then does its action (ActionScreens.choose), so Browse Album goes from Now Playing.
  */
 object NowPlayingContextMenu {
@@ -41,6 +44,11 @@ object NowPlayingContextMenu {
             if (artist.isNotEmpty()) {
                 rows += ActionScreens.Action(localize("Browse Artist")) { onBrowseArtist(artist) }
             }
+        }
+        // Play On: the speaker list of Main menu → Play On opens over this menu (Back comes back to it)
+        val main = MainActivity.instance
+        if (main != null) {
+            rows += ActionScreens.Action(PlayOnMenu.rowLabel(main), opensList = true) { PlayOnMenu.open(main, fromNowPlaying = true) }
         }
         ActionScreens.open(ActionScreens.Spec(localize("Now Playing"), actions = rows))
     }

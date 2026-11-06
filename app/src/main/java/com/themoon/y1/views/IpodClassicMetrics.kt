@@ -60,6 +60,8 @@ object IpodClassicMetrics {
     const val NP_RATING_CENTRE = 181
     const val NP_RATING_HEIGHT = 14
     const val NP_COUNT_BASELINE = 214
+    /** Play On: the speaker name, one line under the count. */
+    const val NP_PLAY_ON_BASELINE = 241
     const val MODE_ICON_BOX = 28
     const val MODE_ICON_CENTRE_Y = 45
     const val MODE_ICON_RIGHT = 10

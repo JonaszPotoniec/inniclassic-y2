@@ -145,7 +145,7 @@ object IpodClassicNowPlaying {
             L.setTypeface(it, bold)
             L.setIncludeFontPadding(it, false)
         }
-        for (id in intArrayOf(R.id.tv_player_artist, R.id.tv_player_album, R.id.tv_player_track_count)) {
+        for (id in intArrayOf(R.id.tv_player_artist, R.id.tv_player_album, R.id.tv_player_track_count, R.id.tv_player_play_on)) {
             main.findViewById<TextView>(id)?.let {
                 L.setTextSizePx(it, M.NP_DETAIL_SP * d)
                 L.setTypeface(it, bold)
@@ -197,6 +197,7 @@ object IpodClassicNowPlaying {
                 R.id.tv_player_artist -> px(M.NP_ARTIST_BASELINE, d)
                 R.id.tv_player_album -> px(M.NP_ALBUM_BASELINE, d)
                 R.id.tv_player_track_count -> px(M.NP_COUNT_BASELINE, d)
+                R.id.tv_player_play_on -> px(M.NP_PLAY_ON_BASELINE, d)
                 R.id.tv_player_rating -> {
                     val b = Rect()
                     tv.paint.getTextBounds(STAR, 0, STAR.length, b)

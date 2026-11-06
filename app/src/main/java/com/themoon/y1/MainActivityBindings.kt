@@ -59,6 +59,7 @@ internal fun MainActivity.initViewBindings() {
     tvStatusBarTitle?.setShadowLayer(0f, 0f, 0f, 0)
     tvStatusBarTitle?.typeface = ThemeManager.getCustomFontBold()
     ivStatusWifi = findViewById(R.id.iv_status_wifi)
+    ivStatusPlayOn = findViewById(R.id.iv_status_play_on)
     ivStatusBluetooth = findViewById(R.id.iv_status_bluetooth)
     ivStatusHeadphone = findViewById(R.id.iv_status_headphone)
     tvStatusTime = findViewById(R.id.tv_status_time)

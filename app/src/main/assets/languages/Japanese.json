@@ -728,5 +728,14 @@
   "Screen On": "画面オン",
   "Last charged to": "最後の充電",
   "Charging": "充電中",
-  "No battery history yet": "バッテリーの履歴はまだありません"
+  "No battery history yet": "バッテリーの履歴はまだありません",
+  "Play On": "再生先",
+  "This Y2": "このY2",
+  "Search Again": "再検索",
+  "Searching for speakers on the Wi-Fi…": "Wi-Fi上のスピーカーを検索中…",
+  "No speakers found. The Y2 and the speaker must be on the same Wi-Fi.": "スピーカーが見つかりません。Y2とスピーカーを同じWi-Fiに接続してください。",
+  "The Y2 is not connected to a Wi-Fi network. Main menu → Wi-Fi.": "Y2はWi-Fiネットワークに接続されていません。メインメニュー → Wi-Fi。",
+  "Playing on": "再生先:",
+  "Connecting to": "接続中:",
+  "cannot connect": "接続できません"
 }
