@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -8 426 683">
+  <!-- Innioasis Y2 front face, proportions measured on the product render (face 410 x 667). -->
+  <style>
+    .b{fill:#d5d8dd;stroke:#55585e;stroke-width:16}.g{fill:#1d1d1f}.w{fill:#fff;stroke:#55585e;stroke-width:12}.c{fill:#d5d8dd;stroke:#55585e;stroke-width:10}
+    @media (prefers-color-scheme:dark){.b{fill:#55585e;stroke:#c7c9ce}.w{fill:#1d1d1f;stroke:#c7c9ce}.c{fill:#55585e;stroke:#c7c9ce}.g{fill:#000}}
+  </style>
+  <rect class="b" x="0" y="0" width="410" height="667" rx="55"/>
+  <rect class="g" x="30" y="29" width="348" height="269" rx="20"/>
+  <circle class="w" cx="205" cy="477" r="126"/>
+  <circle class="c" cx="205" cy="477" r="46"/>
+</svg>

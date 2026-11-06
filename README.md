@@ -12,13 +12,15 @@ InniClassic is an iPod Classic-style launcher and media player for Innioasis Y1 
 
 ## Screenshots
 
-| Main Menu                                    | Now Playing                                      | Music                                          |
-| -------------------------------------------- | ------------------------------------------------ | ---------------------------------------------- |
-| ![Main Menu](docs/screenshots/main-menu.png) | ![Now Playing](docs/screenshots/now-playing.png) | ![Music Menu](docs/screenshots/music-menu.png) |
+| Music (Classic Light)                                  | Music (Classic Dark)                                  | Cover Flow                                       |
+| ------------------------------------------------------ | ----------------------------------------------------- | ------------------------------------------------ |
+| ![Music menu in Classic Light](site/media/music-l.png) | ![Music menu in Classic Dark](site/media/music-d.png) | ![Cover Flow](site/media/coverflow-l.png)        |
 
-| Artists                                  | Album View                                     | Cover Flow                                     |
-| ---------------------------------------- | ---------------------------------------------- | ---------------------------------------------- |
-| ![Artists](docs/screenshots/artists.png) | ![Album View](docs/screenshots/album-view.png) | ![Cover Flow](docs/screenshots/cover-flow.png) |
+| Now Playing (Classic Light)                            | Now Playing (Classic Dark)                            | Synced lyrics                                    |
+| ------------------------------------------------------ | ----------------------------------------------------- | ------------------------------------------------ |
+| ![Now Playing in Classic Light](site/media/theme-l.png) | ![Now Playing in Classic Dark](site/media/theme-d.png) | ![Synced lyrics on Now Playing](site/media/lyrics-l.png) |
+
+The album covers in the screenshots are from Creative Commons albums, for example *Edge of Summer* by Tenth Cloud ([CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/); photo Anatoliy Laptev, artwork Anna Riet). The credits and the licence of each album are at the end of [site/index.html](site/index.html), in *Music and covers in the screenshots*.
 
 ---
 
@@ -26,29 +28,46 @@ InniClassic is an iPod Classic-style launcher and media player for Innioasis Y1 
 
 ### The iPod Classic experience
 
-- Bundled iPod Classic theme in light and dark variants: plain text menu lists, system-matched typography, authentic spacing, and a status bar showing the active screen name rather than a clock.
-- Two-pane Main Menu and Music menu sharing the same layout: menu list on the left and a slowly panning album cover on the right extending behind the status bar.
-- Redesigned Now Playing screen with a large angled album cover, an optional mirror reflection below it (controlled by Album Cover Tilt), a glass progress and volume bar, and marquee scrolling for longer titles.
-- Center button on Now Playing cycles between Progress, Seek, Shuffle & Repeat, and Rating. When cycling, the click wheel previews seek positions in 5-second steps, toggles shuffle and repeat modes, or sets star ratings, defaulting to volume control otherwise.
-- In Seek mode, spinning the wheel selects a time offset; pressing Center applies the seek and returns to Progress. Pressing Center without turning advances to the next mode.
-- On-The-Go playlist creation and a Now Playing hold menu (long-press Play/Pause) for adding favorites, queueing to On-The-Go, browsing by album or artist, and switching visualizers.
-- Synced lyrics support replacing the spectrum visualizer when lyrics exist for the current track, reading either adjacent `.lrc` files or embedded tags (`USLT` in MP3, or FLAC and ALAC lyrics tags). Timestamps in `[mm:ss.xx]` format scroll smoothly in time with the song.
-- Favorites system with a heart icon on the Now Playing screen, highlighted red when favorited.
-- Fast-scroll letter jumping on alphabetized lists matching original click wheel navigation.
+- Classic Light and Classic Dark themes with the iPod Classic proportions: a 30 px status bar, 38 px rows with a drawn chevron, and Nimbus Sans text. With Settings > Theme > Auto, Classic Light shows from sunrise to sunset and Classic Dark shows at night. A theme change applies immediately, without a restart.
+- iPod status bar: the screen title, a clock, Wi-Fi, Bluetooth and headphone icons, and a battery with optional percentage digits.
+- Two-pane Main Menu and Music menu sharing the same layout: menu list on the left and a slowly panning and zooming album cover on the right (Menu Cover Motion).
+- Menus slide in from the right and go back out to the left, as on the iPod. When Cover Flow or Now Playing opens, the list pane and the cover pane move apart.
+- Questions, notices and progress show as iPod screens, not as Android dialogs.
+- A low-battery banner shows at 10 %. An iPod "Please charge" screen shows when the battery is almost empty (3 % on the Y2).
+- Redesigned Now Playing screen with a large angled album cover, an optional mirror reflection below it (controlled by Cover Tilt), a glass progress and volume bar, and marquee scrolling for longer titles. The times show as on the iPod (`2:08`, `-0:34`, `1:02:08`). Total Time shows the total time in place of the remaining time.
+- Center button on Now Playing cycles between Progress, Lyrics (only when the song has lyrics), Seek, Shuffle & Repeat, and Rating. In these modes, the click wheel scrolls the lyrics, previews seek positions in 5-second steps, toggles shuffle and repeat modes, or sets star ratings. In Progress, the click wheel controls the volume.
+- In Seek mode, turn the wheel to select a new position. Push Center to go to that position and to the next mode.
+- Hold Center on Now Playing to open the song menu: Add to Favorites, Add to On-The-Go, Add to Playlist, Browse Album and Browse Artist.
+- Hold Next or Previous to seek (4× speed, up to 120×). Hold Play/Pause to stop.
+- Synced lyrics use the full width of Now Playing. They come from adjacent `.lrc` files or embedded tags (`USLT` in MP3, or FLAC and ALAC lyrics tags). Timestamps in `[mm:ss.xx]` format scroll smoothly in time with the song.
+- Settings > Spectrum shows a spectrum in the cover color in place of the album cover.
+- Favorites: add the current song from the song menu, or double-click Center (Settings > Double-Click to Favorite). Music > My Favorites shows them.
+- A fast wheel turn jumps letter by letter in the alphabetical lists and in Cover Flow, and a large letter box shows the letter, as on the iPod.
 - Rebuilt iPod Music Quiz in endless survival mode using tracks from your local library, featuring six questions per round, non-linear timer scaling, persistent top-10 leaderboards, and a between-rounds heart shop.
 
 ### Music library
 
-- Library browsing by Artists, Album Artists, Albums, Songs, Genres, Composers, Playlists, and Favorites. The Artists view splits by individual track artist tags so guest features appear distinctly, while Album Artists groups releases by main artist.
-- Recently played albums shelf tracking playback history with direct full-album navigation.
+- Library browsing by Artists, Album Artists, Albums, Compilations, Songs, Genres, Composers, Playlists, Folders, and Favorites. The Artists view splits by individual track artist tags so guest features appear distinctly, while Album Artists groups releases by main artist. Settings > Main Menu Items and Music Menu Items hide menu items; the Main Menu items can also move.
+- Cover Flow in the iPod order (album artist, then album title) and layout, smooth also on a fast wheel turn.
+- Smart playlists Recently Played and Top 25 Most Played (Music > Playlists), from the play history.
 - Audio format support covering MP3, FLAC, WAV, OGG Vorbis, Opus (including Opus audio inside `.ogg` containers), ALAC/M4A, and AAC.
 - Gapless playback for albums and playlists containing 15 tracks or fewer (see [Known limitations](#known-limitations)).
-- Shuffle shortcut pinned to the top of the All Songs list, matching original Y1 firmware behavior.
+- Shuffle Songs in the Music menu, and a Shuffle shortcut pinned to the top of the All Songs list, matching original Y1 firmware behavior.
 - High-resolution cover art support. Using square images of at least 600x600 pixels (preferably 1000x1000 or larger) avoids blur during the panning animation across the menu split screen. Both embedded tags (ID3, FLAC, ALAC) and directory images (`cover.jpg` or `folder.jpg`) are detected automatically.
 - Built-in Last.fm scrobbling. Tracks played past the midpoint or four minutes are logged to `.scrobbler.log` on the SD card root in Audioscrobbler 1.1 format. To upload scrobbles directly to Last.fm, enable Settings > Sync Scrobbles to Last.fm and authenticate via Settings > Last.fm Account. The device displays a QR code and URL to open on a phone or computer, queuing scrobbles locally until a network connection is available.
 
+### Sound, controls and settings
+
+- 30 volume steps of 2 dB each. Each output (speaker, headphones, Bluetooth) keeps its own volume.
+- The Equalizer, Bass Boost and Virtualizer run only when they change the sound.
+- Each button push does one action, on release. Each wheel step gives one click and one vibration; Click Volume and Vibration Strength set their levels.
+- Settings in iPod-style groups (Playback, Display, Now Playing, Status Bar, Appearance, Menus, Controls and more) with On/Off switches. Export Settings and Import Settings save and load all settings as one JSON file.
+- A long press of the Power button opens a Power screen (Restart, Power Off) that the click wheel controls.
+
 ### Beyond music
 
+- Bluetooth headphones, speakers and car audio: pairing with the click wheel only, the song title and artist on the car display (AVRCP), and remote buttons that also work when the screen is off. Music pauses when the Bluetooth device disconnects, and plays again when the same device connects again.
+- Settings > Date & Time > Sync Time Now sets the clock from the internet.
 - Jellyfin music synchronization client with QuickConnect pairing, remote library browsing, offline track caching, and automatic library scanning.
 - Podcast manager supporting feed subscriptions, direct streaming, and episode downloads for offline listening.
 - Built-in FM radio communicating directly with the internal tuner chip.
