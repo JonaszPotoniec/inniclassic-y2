@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Translation Consistency Checker for InniClassic.
+Translation Consistency Checker for Classy.
 
 Checks:
   Check A: All static string keys in code (localize("..."), t("...")) exist in english.json.
@@ -77,13 +77,25 @@ def load_language_files(languages_dir: Path) -> tuple[dict[str, str], dict[str, 
     return english_dict, other_languages
 
 
+def find_repo_root(start: Path) -> Path | None:
+    """Return the repository root above `start`, or None.
+
+    Recognises the root by `app/src/main/java`, so it does not depend on what
+    the clone directory is called.
+    """
+    for candidate in (start, *start.parents):
+        if (candidate / "app" / "src" / "main" / "java").is_dir():
+            return candidate
+    return None
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Check translation consistency for InniClassic")
+    parser = argparse.ArgumentParser(description="Check translation consistency for Classy")
     parser.add_argument(
         "--root-dir",
         type=Path,
         default=None,
-        help="Path to inniclassic-y2 root (auto-detected if omitted)",
+        help="Path to the Classy repository root (auto-detected if omitted)",
     )
     parser.add_argument(
         "--baseline",
@@ -122,19 +134,12 @@ def main() -> int:
     if args.strict:
         args.baseline = 0
 
-    # Auto-detect inniclassic-y2 directory
+    # Auto-detect the repository root. Name-agnostic: the clone directory can be
+    # called anything (Classy, inniclassic-y2, or a scratch checkout).
     if args.root_dir is None:
-        script_dir = Path(__file__).resolve().parent
-        if (script_dir.parent / "app" / "src" / "main").is_dir():
-            root_dir = script_dir.parent
-        elif (Path.cwd() / "app" / "src" / "main").is_dir():
-            root_dir = Path.cwd()
-        elif (Path.cwd() / "inniclassic-y2" / "app" / "src" / "main").is_dir():
-            root_dir = Path.cwd() / "inniclassic-y2"
-        elif (Path.cwd() / "Classy" / "app" / "src" / "main").is_dir():
-            root_dir = Path.cwd() / "Classy"
-        else:
-            print("Error: Could not locate Classy repository directory. Use --root-dir.", file=sys.stderr)
+        root_dir = find_repo_root(Path(__file__).resolve().parent) or find_repo_root(Path.cwd())
+        if root_dir is None:
+            print("Error: Could not locate the Classy repository directory. Use --root-dir.", file=sys.stderr)
             return 2
     else:
         root_dir = args.root_dir
