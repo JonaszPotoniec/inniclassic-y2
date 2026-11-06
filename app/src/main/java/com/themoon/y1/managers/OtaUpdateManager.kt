@@ -42,7 +42,7 @@ class OtaUpdateManager(
 
         // Read from the release asset rather than a file on main: the workflow publishes
         // dist/update.json with every release, so this URL needs nothing committed to the repo.
-        const val UPDATE_JSON_URL = "https://github.com/JonaszPotoniec/Classy/releases/latest/download/update.json"
+        const val UPDATE_JSON_URL = "https://github.com/ClassyPlayer/Classy/releases/latest/download/update.json"
 
         fun extractBuildNumber(suffix: String?): Int {
             if (suffix.isNullOrEmpty()) return 0
@@ -221,7 +221,7 @@ class OtaUpdateManager(
                 var apkUrl = root.optString("apkUrl", "")
                 if (apkUrl.isEmpty()) {
                     val apkName = root.optString("apkName", root.optString("outputFile", "Classy.apk"))
-                    apkUrl = "https://github.com/JonaszPotoniec/Classy/releases/latest/download/$apkName"
+                    apkUrl = "https://github.com/ClassyPlayer/Classy/releases/latest/download/$apkName"
                 }
 
                 var myVersionName = "1.0"

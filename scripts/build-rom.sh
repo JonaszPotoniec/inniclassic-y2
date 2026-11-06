@@ -28,7 +28,7 @@ WORK_DIR=""
 MOUNT_SYS=""
 MOUNT_USER=""
 
-LAUNCHER_REPO="${LAUNCHER_REPO:-JonaszPotoniec/Classy}"
+LAUNCHER_REPO="${LAUNCHER_REPO:-ClassyPlayer/Classy}"
 
 # Published Y2 base (Solar-built pack for stripping + Classy install).
 Y2_BASE_URL="${Y2_BASE_URL:-https://github.com/ryan-specter/jj_auto/releases/download/y2-test/rom_y2.zip}"
