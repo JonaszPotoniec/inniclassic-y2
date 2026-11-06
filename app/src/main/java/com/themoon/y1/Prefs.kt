@@ -4,6 +4,7 @@ import android.content.SharedPreferences
 import com.themoon.y1.controllers.menu.MenuOrder
 import com.themoon.y1.controllers.player.AlbumTiltSetting
 import com.themoon.y1.controllers.player.LyricsKeepScreenOn
+import com.themoon.y1.controllers.player.LyricsScript
 import com.themoon.y1.controllers.player.NowPlayingSpectrum
 import com.themoon.y1.controllers.player.NowPlayingTime
 import com.themoon.y1.controllers.settings.StatusBarSettings
@@ -130,6 +131,7 @@ object Prefs {
     // --- Now Playing ---
     val SPECTRUM = add(BoolPref(NowPlayingSpectrum.PREF, false, PrefGroup.NOW_PLAYING, resettable = true))
     val TOTAL_TIME = add(BoolPref(NowPlayingTime.PREF_SHOW_TOTAL_TIME, false, PrefGroup.NOW_PLAYING, resettable = true))
+    val LYRICS_SCRIPT = add(IntPref(LyricsScript.PREF, LyricsScript.ORIGINAL, PrefGroup.NOW_PLAYING, resettable = true))
     val LYRICS_KEEP_SCREEN_ON = add(BoolPref(LyricsKeepScreenOn.PREF, LyricsKeepScreenOn.DEFAULT, PrefGroup.NOW_PLAYING, resettable = true))
     val ALBUM_TILT = add(BoolPref(AlbumTiltSetting.KEY, true, PrefGroup.NOW_PLAYING, resettable = true))
 

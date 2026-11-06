@@ -737,5 +737,9 @@
   "The Y2 is not connected to a Wi-Fi network. Main menu → Wi-Fi.": "The Y2 is not connected to a Wi-Fi network. Main menu → Wi-Fi.",
   "Playing on": "Playing on",
   "Connecting to": "Connecting to",
-  "cannot connect": "cannot connect"
+  "cannot connect": "cannot connect",
+  "Lyrics": "Lyrics",
+  "Original": "Original",
+  "Romanised": "Romanised",
+  "Original + Romanised": "Original + Romanised"
 }

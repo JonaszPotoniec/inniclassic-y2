@@ -36,7 +36,7 @@ class PrefsTest {
         val before = setOf(
             "is_24h_format", "time_in_title_bar", "show_battery_percentage", "show_battery_icon", "volume_limit_max",
             "toggle_style", "sound_check_enabled", "video_stretch_fill", "album_tilt_enabled", "lyrics_keep_screen_on",
-            "show_total_time", "show_spectrum", "backlight_timer_index", "click_volume",
+            "show_total_time", "show_spectrum", "lyrics_script", "backlight_timer_index", "click_volume",
             "screen_off_control", "double_click_favorite", "repeat_mode", "loop_scroll_on", "list_edges_fade",
             "eq_preset", "eq_profile_id", "group_albums_by_artist", "cover_pan_zoom"
         )

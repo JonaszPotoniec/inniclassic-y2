@@ -16,6 +16,7 @@ import android.widget.TextView
 import com.themoon.y1.Prefs
 import com.themoon.y1.battery.BatteryUsageView
 import com.themoon.y1.MainActivity
+import com.themoon.y1.controllers.player.LyricsScript
 import com.themoon.y1.R
 import com.themoon.y1.changeTheme
 import com.themoon.y1.FeatureVisibility
@@ -171,6 +172,8 @@ class SettingsController(
         SettingsGroup("Now Playing", listOf(
             toggle("Spectrum", { mainActivity?.isVisualizerShowing == true }, { mainActivity?.toggleVisualizer() }),
             toggle("Total Time", Prefs.TOTAL_TIME),
+            // Original (native script), Romanised (pinyin, romaji) or both lines, for songs with a .romanised.lrc file
+            cycle("Lyrics", Prefs.LYRICS_SCRIPT, Array(3) { LyricsScript.label(it) }, LyricsScript::normalize),
             // The screen stays on while the lyrics show on Now Playing and music plays (LyricsKeepScreenOn)
             toggle("Lyrics Keep Screen On", Prefs.LYRICS_KEEP_SCREEN_ON),
             toggle("Cover Tilt", Prefs.ALBUM_TILT) { applyAlbumTiltSetting() },

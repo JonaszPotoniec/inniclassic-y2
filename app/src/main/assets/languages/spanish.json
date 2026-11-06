@@ -737,5 +737,9 @@
   "The Y2 is not connected to a Wi-Fi network. Main menu → Wi-Fi.": "El Y2 no está conectado a una red Wi-Fi. Menú principal → Wi-Fi.",
   "Playing on": "Reproduciendo en",
   "Connecting to": "Conectando con",
-  "cannot connect": "no se puede conectar"
+  "cannot connect": "no se puede conectar",
+  "Lyrics": "Letra",
+  "Original": "Original",
+  "Romanised": "Romanizada",
+  "Original + Romanised": "Original + romanizada"
 }

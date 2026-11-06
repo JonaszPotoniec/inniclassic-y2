@@ -34,7 +34,7 @@ class SettingsSpecTest {
             listOf(
                 "Playback" to listOf("Shuffle", "Repeat", "EQ", "Sound Check", "Volume Limit", "Playback Speed"),
                 "Display" to listOf("Brightness", "Backlight"),
-                "Now Playing" to listOf("Spectrum", "Total Time", "Lyrics Keep Screen On", "Cover Tilt"),
+                "Now Playing" to listOf("Spectrum", "Total Time", "Lyrics", "Lyrics Keep Screen On", "Cover Tilt"),
                 "Status Bar" to listOf("Clock", "Battery Icon", "Battery Percentage"),
                 "Appearance" to listOf("Theme", "Background", "Toggle Style", "List Edges", "Menu Cover Motion", "Fill Video Screen"),
                 "Menus" to listOf("Main Menu Items", "Music Menu Items", "Group Albums"),

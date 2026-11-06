@@ -737,5 +737,9 @@
   "The Y2 is not connected to a Wi-Fi network. Main menu → Wi-Fi.": "Y2가 Wi-Fi 네트워크에 연결되어 있지 않습니다. 메인 메뉴 → Wi-Fi.",
   "Playing on": "재생 중:",
   "Connecting to": "연결 중:",
-  "cannot connect": "연결할 수 없음"
+  "cannot connect": "연결할 수 없음",
+  "Lyrics": "가사",
+  "Original": "원문",
+  "Romanised": "로마자",
+  "Original + Romanised": "원문 + 로마자"
 }

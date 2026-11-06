@@ -737,5 +737,9 @@
   "The Y2 is not connected to a Wi-Fi network. Main menu → Wi-Fi.": "Y2 не подключён к сети Wi-Fi. Главное меню → Wi-Fi.",
   "Playing on": "Воспроизведение на",
   "Connecting to": "Подключение к",
-  "cannot connect": "не удаётся подключиться"
+  "cannot connect": "не удаётся подключиться",
+  "Lyrics": "Текст песни",
+  "Original": "Оригинал",
+  "Romanised": "Латиница",
+  "Original + Romanised": "Оригинал + латиница"
 }

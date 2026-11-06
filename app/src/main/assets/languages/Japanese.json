@@ -737,5 +737,9 @@
   "The Y2 is not connected to a Wi-Fi network. Main menu → Wi-Fi.": "Y2はWi-Fiネットワークに接続されていません。メインメニュー → Wi-Fi。",
   "Playing on": "再生先:",
   "Connecting to": "接続中:",
-  "cannot connect": "接続できません"
+  "cannot connect": "接続できません",
+  "Lyrics": "歌詞",
+  "Original": "原文",
+  "Romanised": "ローマ字",
+  "Original + Romanised": "原文 + ローマ字"
 }
