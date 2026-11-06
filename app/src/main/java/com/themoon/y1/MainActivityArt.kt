@@ -251,15 +251,15 @@ private fun MainActivity.setStatusBarIcon(
     connected: Boolean = false
 ) {
     val d = resources.displayMetrics.density
-    val ipod = com.themoon.y1.views.IpodClassicLayout.isActive
+    val ipod = com.themoon.y1.views.ClassyLayout.isActive
     val heightPx = if (ipod) {
-        com.themoon.y1.views.IpodClassicLayout.px(com.themoon.y1.views.IpodClassicMetrics.STATUS_ROUND_ICON_HEIGHT, d)
+        com.themoon.y1.views.ClassyLayout.px(com.themoon.y1.views.ClassyMetrics.STATUS_ROUND_ICON_HEIGHT, d)
     } else {
-        com.themoon.y1.views.IpodClassicLayout.px(16, d)
+        com.themoon.y1.views.ClassyLayout.px(16, d)
     }
     // The gradient spans the status item box (the cap height), as in the play/pause icon.
     val boxPx = if (ipod) {
-        com.themoon.y1.views.IpodClassicLayout.px(com.themoon.y1.views.IpodClassicMetrics.STATUS_ICON_HEIGHT, d)
+        com.themoon.y1.views.ClassyLayout.px(com.themoon.y1.views.ClassyMetrics.STATUS_ICON_HEIGHT, d)
     } else {
         heightPx
     }
@@ -269,7 +269,7 @@ private fun MainActivity.setStatusBarIcon(
     iv.setImageBitmap(bmp)
 
     val lp = iv.layoutParams as? android.widget.LinearLayout.LayoutParams ?: return
-    val bottom = if (ipod) com.themoon.y1.views.IpodClassicLayout.px(com.themoon.y1.views.IpodClassicMetrics.STATUS_BAR_RULE, d) else 0
+    val bottom = if (ipod) com.themoon.y1.views.ClassyLayout.px(com.themoon.y1.views.ClassyMetrics.STATUS_BAR_RULE, d) else 0
     if (ipod) {
         // The optical bearings of the new bitmap; updateStatusItemGaps() sets the right margin.
         val sideDots = icon == com.themoon.y1.views.StatusIcons.Icon.BLUETOOTH && connected
@@ -281,7 +281,7 @@ private fun MainActivity.setStatusBarIcon(
         )
     } else {
         statusBearings.remove(iv)
-        lp.rightMargin = com.themoon.y1.views.IpodClassicLayout.px(rightMarginDp, d)
+        lp.rightMargin = com.themoon.y1.views.ClassyLayout.px(rightMarginDp, d)
     }
     if (lp.width != bmp.width || lp.height != bmp.height || lp.bottomMargin != bottom ||
         lp.gravity != android.view.Gravity.CENTER_VERTICAL
@@ -300,13 +300,13 @@ private val statusBearings = java.util.WeakHashMap<android.view.View, FloatArray
 private val statusGapListeners = java.util.WeakHashMap<android.view.View, Boolean>()
 
 /**
- * Classic themes (iPod Classic layout): sets the gap after each visible status item (icons, play/pause) to the next visible one, from
+ * Classic themes (Classy layout): sets the gap after each visible status item (icons, play/pause) to the next visible one, from
  * their optical bearings (StatusSpacing), so the spaces look equal. Items without bearings (play/pause, battery) are
  * flat: 8 px. The gap from the battery to the clock is the text's own. A layout listener on the group runs it again
  * when an item shows or hides; it changes the margins only when they are different, so it stops after one pass.
  */
 internal fun MainActivity.updateStatusItemGaps() {
-    if (!com.themoon.y1.views.IpodClassicLayout.isActive) return
+    if (!com.themoon.y1.views.ClassyLayout.isActive) return
     val battery = batteryIconView ?: return
     val group = battery.parent as? android.view.ViewGroup ?: return
     if (statusGapListeners[group] == null) {
@@ -331,7 +331,7 @@ internal fun MainActivity.updateStatusItemGaps() {
         val next = if (j < end) group.getChildAt(j) else battery
         val right = statusBearings[v]?.get(1) ?: 0f
         val left = statusBearings[next]?.get(0) ?: 0f
-        val gap = com.themoon.y1.views.IpodClassicLayout.px(com.themoon.y1.views.StatusSpacing.gap(right / d, left / d), d)
+        val gap = com.themoon.y1.views.ClassyLayout.px(com.themoon.y1.views.StatusSpacing.gap(right / d, left / d), d)
         val lp = v.layoutParams as? android.view.ViewGroup.MarginLayoutParams
         if (lp != null && lp.rightMargin != gap) {
             lp.rightMargin = gap
@@ -493,7 +493,7 @@ internal fun MainActivity.applyThemeInternal() {
             }
         }
 
-        com.themoon.y1.views.IpodClassicLayout.apply(this)
+        com.themoon.y1.views.ClassyLayout.apply(this)
     } catch (_: Exception) {}
 }
 

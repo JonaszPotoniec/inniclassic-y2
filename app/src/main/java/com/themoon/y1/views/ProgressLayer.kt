@@ -39,7 +39,7 @@ object ProgressLayer {
 
     private const val TAG_LAYER = "progress_layer"
 
-    // The iPod bar: 204 × 14 at 320 × 240, so 306 × 21 px on the Y2 (docs: IpodClassicMetrics PROGRESS_*)
+    // The bar: 204 × 14 at 320 × 240, so 306 × 21 px on the Y2 (docs: ClassyMetrics PROGRESS_*)
     private const val BAR_WIDTH = 306
     private const val BAR_HEIGHT = 21
     private const val SPINNER_SIZE = 36
@@ -47,7 +47,7 @@ object ProgressLayer {
     private var layer: FrameLayout? = null
     private var text: TextView? = null
     private var bar: ProgressBar? = null
-    private var spinner: IpodSpinnerView? = null
+    private var spinner: ClassySpinnerView? = null
 
     val isShowing: Boolean get() = layer?.visibility == View.VISIBLE
 
@@ -98,7 +98,7 @@ object ProgressLayer {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
         }
-        val s = IpodSpinnerView(main)
+        val s = ClassySpinnerView(main)
         column.addView(s, LinearLayout.LayoutParams((SPINNER_SIZE * d).toInt(), (SPINNER_SIZE * d).toInt()).apply {
             bottomMargin = (14 * d).toInt()
         })
@@ -150,8 +150,8 @@ object ProgressLayer {
     }
 }
 
-/** The iPod activity spinner: 12 spokes; the bright spoke turns once a second. */
-class IpodSpinnerView(context: Context) : View(context) {
+/** The activity spinner: 12 spokes; the bright spoke turns once a second. */
+class ClassySpinnerView(context: Context) : View(context) {
 
     var color: Int = 0xFF000000.toInt()
         set(value) {
@@ -190,3 +190,6 @@ class IpodSpinnerView(context: Context) : View(context) {
         const val STEP_MS = 83L
     }
 }
+
+/** Backward compatibility alias. */
+typealias IpodSpinnerView = ClassySpinnerView

@@ -22,15 +22,15 @@ import com.themoon.y1.ThemeManager
 import java.lang.ref.WeakReference
 import java.util.Collections
 import java.util.WeakHashMap
-import com.themoon.y1.views.IpodClassicLayout as L
-import com.themoon.y1.views.IpodClassicMetrics as M
+import com.themoon.y1.views.ClassyLayout as L
+import com.themoon.y1.views.ClassyMetrics as M
 
 /**
- * Now Playing in the iPod Classic layout: tilted art at (15, 52), text column at x = 240 with fixed
+ * Now Playing in the Classy layout: tilted art at (15, 52), text column at x = 240 with fixed
  * baselines, rating stars under the album, shuffle/repeat icons under the status bar on the right,
- * and the progress bar and times at the iPod positions. All changes are recorded by [IpodClassicLayout].
+ * and the progress bar and times at classic positions. All changes are recorded by [ClassyLayout].
  */
-object IpodClassicNowPlaying {
+object ClassyNowPlaying {
     // Dark grey on a white Now Playing screen, light grey on a dark one (Classic Dark without a restart)
     private fun detailColor(): Int {
         val bg = MainActivity.instance?.findViewById<View>(R.id.layout_player_mode)?.background as? ColorDrawable
@@ -168,7 +168,7 @@ object IpodClassicNowPlaying {
         }
     }
 
-    /** The iPod shows only the filled stars. */
+    /** Shows only the filled stars. */
     private object HollowStarRemover : TextWatcher {
         override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
         override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -183,7 +183,7 @@ object IpodClassicNowPlaying {
         if (i >= 0) s.delete(i, s.length)
     }
 
-    /** Puts each visible line of the text column at its iPod baseline (or centre, for the stars). */
+    /** Puts each visible line of the text column at its baseline (or centre, for the stars). */
     private fun layoutText(column: LinearLayout, d: Float) {
         val lines = ArrayList<TextView>()
         val tops = ArrayList<Int>()
@@ -226,7 +226,6 @@ object IpodClassicNowPlaying {
             L.setWidth(iv, box)
             L.setHeight(iv, box)
         }
-        // The glyphs have their own side bearings, which give about the iPod's gap.
         L.setMargins(shuffle, right = 0)
         setModeIcon(shuffle, R.drawable.ic_shuffle)
         setModeIcon(repeat, repeatIconRes(Prefs.REPEAT_MODE.get(main.prefs)))
@@ -342,3 +341,6 @@ object IpodClassicNowPlaying {
 
     private fun px(dp: Int, d: Float): Int = L.px(dp, d)
 }
+
+/** Backward compatibility alias. */
+typealias IpodClassicNowPlaying = ClassyNowPlaying

@@ -1,7 +1,7 @@
 {
     "PresetList": [
         {
-            "PresetName": "InniClassic Y1 (MT6572) - Low-Res Diagnostic",
+            "PresetName": "Classy Y1 (MT6572) - Low-Res Diagnostic",
             "PresetDescription": "Diagnostic step for choppy/stuttering video playback on the Y1 - 320x240, 30fps CFR, ~900 kbps H.264 Main, AAC 96kbps. If this still stutters, the bottleneck isn't resolution/bitrate but the decode+render pipeline itself on this hardware.",
             "PresetFolder": false,
             "Type": 1,

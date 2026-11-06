@@ -26,8 +26,8 @@ import com.themoon.y1.navigation.ScreenState
 import com.themoon.y1.views.CircularBatteryView
 import com.themoon.y1.views.ClassicMenuStyle
 import com.themoon.y1.views.CustomAnalogClockView
-import com.themoon.y1.views.IpodClassicLayout
-import com.themoon.y1.views.IpodClassicLists
+import com.themoon.y1.views.ClassyLayout
+import com.themoon.y1.views.ClassyLists
 import com.themoon.y1.views.WidgetBatteryBarView
 import java.util.Locale
 import java.io.File
@@ -174,7 +174,7 @@ class MainMenuController(
         ivWidgetFocusImage = null
         ivAnimatedCover = null
 
-        val elements = IpodClassicLists.menuElements(ThemeManager.getCurrentTheme().menuElements, activity)
+        val elements = ClassyLists.menuElements(ThemeManager.getCurrentTheme().menuElements, activity)
         val buttonElements = ArrayList<ThemeManager.MenuElement>()
         val widgetElements = ArrayList<ThemeManager.MenuElement>()
 
@@ -398,8 +398,8 @@ class MainMenuController(
                     val animContainer = FrameLayout(activity)
                     val dm = activity.resources.displayMetrics
                     val leftPx = (el.x * density).toInt()
-                    // The iPod Classic layout (Classic themes) puts the cover below the full-width status bar (IpodClassicLists.menuElements).
-                    val topPx = if (IpodClassicLayout.isActive) (el.y * density).toInt() else 0
+                    // The Classy layout (Classic themes) puts the cover below the full-width status bar (ClassyLists.menuElements).
+                    val topPx = if (ClassyLayout.isActive) (el.y * density).toInt() else 0
                     val contW = dm.widthPixels - leftPx
                     val contH = dm.heightPixels - topPx
 
@@ -680,7 +680,7 @@ class MainMenuController(
 
         currentButtons.clear()
         currentButtons.addAll(createdButtons)
-        IpodClassicLists.styleMainMenuButtons(createdButtons)
+        ClassyLists.styleMainMenuButtons(createdButtons)
 
         // 4. Restore Focus & Scroll Position
         if (createdButtons.isNotEmpty()) {

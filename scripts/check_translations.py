@@ -131,8 +131,10 @@ def main() -> int:
             root_dir = Path.cwd()
         elif (Path.cwd() / "inniclassic-y2" / "app" / "src" / "main").is_dir():
             root_dir = Path.cwd() / "inniclassic-y2"
+        elif (Path.cwd() / "Classy" / "app" / "src" / "main").is_dir():
+            root_dir = Path.cwd() / "Classy"
         else:
-            print("Error: Could not locate inniclassic-y2 directory. Use --root-dir.", file=sys.stderr)
+            print("Error: Could not locate Classy repository directory. Use --root-dir.", file=sys.stderr)
             return 2
     else:
         root_dir = args.root_dir

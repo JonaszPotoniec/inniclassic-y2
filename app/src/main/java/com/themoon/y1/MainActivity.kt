@@ -33,7 +33,7 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import com.themoon.y1.views.BatteryIconView
 import com.themoon.y1.views.Notice
-import com.themoon.y1.views.IpodClassicLayout
+import com.themoon.y1.views.ClassyLayout
 import com.themoon.y1.views.TablerIcons
 import android.view.View
 import android.view.ViewGroup
@@ -327,7 +327,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        InniClassicApplication.installConscrypt()
+        ClassyApplication.installConscrypt()
         super.onCreate(savedInstanceState)
         instance = this
 
@@ -387,7 +387,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
         var playbackRestored = false
         if (ExternalSdMountMonitor.hasSecondarySlot() && !ExternalSdMountMonitor.isSecondaryReady()) {
-            android.util.Log.i("InniClassic", "Secondary storage not ready yet at onCreate, will load library once mounted")
+            android.util.Log.i("Classy", "Secondary storage not ready yet at onCreate, will load library once mounted")
             playbackRestored = AudioPlayerManager.getInstance().restoreLastPlaybackState(this)
         } else {
             runMigrationsAsync {
@@ -872,8 +872,8 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         return atMs
     }
 
-    /** Shows the volume at the iPod place of the screen ([VolumeBar]); [leftIcon] is the Play On icon for a speaker. */
-    fun showDynamicVolumeOverlay(currentVol: Int, maxVol: Int, leftIcon: Int = R.drawable.ic_ipod_volume_down) {
+    /** Shows the volume at the status place of the screen ([VolumeBar]); [leftIcon] is the Play On icon for a speaker. */
+    fun showDynamicVolumeOverlay(currentVol: Int, maxVol: Int, leftIcon: Int = R.drawable.ic_classy_volume_down) {
         if (isScreenSleeping) return
         com.themoon.y1.views.VolumeBar.show(this, currentVol, maxVol, leftIcon)
     }
@@ -882,7 +882,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
         if (::playerController.isInitialized) {
             playerController.updatePlayerUI()
         }
-        IpodClassicLayout.refreshPlayIcon(this)
+        ClassyLayout.refreshPlayIcon(this)
         val am = AudioPlayerManager.getInstance()
         sendBluetoothMetaToCar()
         BluetoothAvrcpManager.getInstance(this).updatePlaybackState(am.isPlaying())
@@ -943,7 +943,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
                     }
                 }
             } catch (e: Exception) {
-                android.util.Log.e("InniClassic", "Error applying migrations", e)
+                android.util.Log.e("Classy", "Error applying migrations", e)
             } finally {
                 onComplete?.let { runOnUiThread { it() } }
             }
@@ -1143,7 +1143,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
 
     private fun updateStatusBarTitle() {
         tvStatusBarTitle?.text = NavigationManager.getInstance().activeController?.title() ?: when (currentScreenState) {
-            STATE_MENU -> t("iPod")
+            STATE_MENU -> t("Classy")
             STATE_BROWSER -> if (::browserController.isInitialized) browserController.getCurrentBrowserTitle() else t("Music")
             STATE_PLAYER -> t("Now Playing")
             STATE_SETTINGS -> t("Settings")
@@ -1165,7 +1165,7 @@ class MainActivity : Activity(), InputRouter.VolumeAdjuster {
             }
             STATE_EQUALIZER -> t("Equalizer")
             STATE_JELLYFIN -> t("Jellyfin")
-            else -> t("iPod")
+            else -> t("Classy")
         }
     }
 

@@ -190,7 +190,7 @@ class LowBatteryWarningView private constructor(private val main: MainActivity) 
 
     private fun showBanner(level: Int) {
         val d = resources.displayMetrics.density
-        val rowHeight = (IpodClassicMetrics.ROW_HEIGHT * d).roundToInt()
+        val rowHeight = (ClassyMetrics.ROW_HEIGHT * d).roundToInt()
         (banner.layoutParams as LayoutParams).let {
             it.height = rowHeight
             it.topMargin = (ClassicMenuStyle.STATUS_HEIGHT_DP * d).roundToInt()
@@ -200,14 +200,14 @@ class LowBatteryWarningView private constructor(private val main: MainActivity) 
         banner.background = ListItemViewFactory.createFocusedButtonBackground(main)
         banner.setTextColor(ThemeManager.getListButtonFocusedTextColor())
         banner.typeface = ThemeManager.getCustomFontBold()
-        banner.setTextSize(TypedValue.COMPLEX_UNIT_PX, IpodClassicMetrics.LIST_TEXT_SP * d)
+        banner.setTextSize(TypedValue.COMPLEX_UNIT_PX, ClassyMetrics.LIST_TEXT_SP * d)
         banner.includeFontPadding = false
         banner.isSingleLine = true
         banner.gravity = Gravity.LEFT or Gravity.TOP
         banner.text = "${t("Battery low")}: $level %"
-        val padLeft = (IpodClassicMetrics.ROW_PADDING_LEFT * d).roundToInt()
-        val padRight = (IpodClassicMetrics.ROW_PADDING_RIGHT * d).roundToInt()
-        banner.setPadding(padLeft, IpodClassicLayout.capCentredPaddingTop(banner, rowHeight.toFloat()), padRight, 0)
+        val padLeft = (ClassyMetrics.ROW_PADDING_LEFT * d).roundToInt()
+        val padRight = (ClassyMetrics.ROW_PADDING_RIGHT * d).roundToInt()
+        banner.setPadding(padLeft, ClassyLayout.capCentredPaddingTop(banner, rowHeight.toFloat()), padRight, 0)
         banner.visibility = VISIBLE
         postDelayed(hideBanner, LowBatteryWarnings.BANNER_MS)
     }

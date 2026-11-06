@@ -9,11 +9,11 @@ import org.conscrypt.Conscrypt
 import java.security.Security
 
 /**
- * Application class for InniClassic.
+ * Application class for Classy.
  * Ensures modern TLS/SSL security providers (Conscrypt) are initialized on startup
  * before any networking calls or background services execute.
  */
-class InniClassicApplication : MultiDexApplication() {
+class ClassyApplication : MultiDexApplication() {
 
     override fun onCreate() {
         super.onCreate()
@@ -49,7 +49,7 @@ class InniClassicApplication : MultiDexApplication() {
     data class RunningProcess(val pid: Int, val uid: Int, val name: String?)
 
     companion object {
-        private const val TAG = "InniClassicApplication"
+        private const val TAG = "ClassyApplication"
 
         /** The other processes with our process name and user: older copies of this app. */
         fun staleProcessIds(myPid: Int, myUid: Int, processName: String, running: List<RunningProcess>): List<Int> =
@@ -68,3 +68,6 @@ class InniClassicApplication : MultiDexApplication() {
         }
     }
 }
+
+/** Backward compatibility alias for tests and reflection. */
+typealias InniClassicApplication = ClassyApplication

@@ -51,7 +51,7 @@ object VolumeBar {
     private val hideTask = Runnable { MainActivity.instance?.let { hide(it) } }
 
     /** Shows [level] of [max] with [leftIcon] at the left (the Play On icon for a speaker). */
-    fun show(main: MainActivity, level: Int, max: Int, leftIcon: Int = R.drawable.ic_ipod_volume_down) {
+    fun show(main: MainActivity, level: Int, max: Int, leftIcon: Int = R.drawable.ic_classy_volume_down) {
         val place = placeFor(main.currentScreenState)
         if (shown != null && shown != place) hide(main)
         val ok = when (place) {
@@ -179,11 +179,11 @@ object VolumeBar {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             visibility = View.GONE
-            addView(icon(R.drawable.ic_ipod_volume_down, 16 * scale, 18 * scale, 0, gap))
+            addView(icon(R.drawable.ic_classy_volume_down, 16 * scale, 18 * scale, 0, gap))
             addView(ProgressBar(main, null, android.R.attr.progressBarStyleHorizontal).apply {
                 layoutParams = LinearLayout.LayoutParams(0, (barHeight * d).toInt(), 1f)
             })
-            addView(icon(R.drawable.ic_ipod_volume_up, 24 * scale, 20 * scale, gap, 0))
+            addView(icon(R.drawable.ic_classy_volume_up, 24 * scale, 20 * scale, gap, 0))
         }
     }
 

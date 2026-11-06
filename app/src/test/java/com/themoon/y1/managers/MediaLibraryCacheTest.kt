@@ -113,7 +113,7 @@ class MediaLibraryCacheTest {
 
     @Test
     fun scanDirectorySkipsUnchangedFilesAndUpdatesModifiedFilesInPlace() {
-        val tempDir = java.io.File(System.getProperty("java.io.tmpdir"), "inniclassic_test_" + System.currentTimeMillis()).canonicalFile
+        val tempDir = java.io.File(System.getProperty("java.io.tmpdir"), "classy_test_" + System.currentTimeMillis()).canonicalFile
         tempDir.mkdirs()
         try {
             val audioFile = java.io.File(tempDir, "track.mp3")

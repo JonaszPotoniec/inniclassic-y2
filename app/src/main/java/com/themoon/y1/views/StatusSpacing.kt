@@ -13,7 +13,7 @@ import kotlin.math.roundToInt
  * flat items keep the gap of 8 px. No Android dependencies, for the unit tests.
  */
 object StatusSpacing {
-    /** Gap between the ink of two flat items (IpodClassicMetrics.STATUS_ITEM_GAP). */
+    /** Gap between the ink of two flat items (ClassyMetrics.STATUS_ITEM_GAP). */
     const val TARGET = 8f
     /** Smallest ink gap. */
     const val MIN_GAP = 3

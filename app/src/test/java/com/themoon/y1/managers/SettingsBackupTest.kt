@@ -83,7 +83,7 @@ class SettingsBackupTest {
         assertFalse(json.contains("\"tok\""))
         assertFalse(json.contains("http://server"))
         assertFalse(json.contains("lastfm_username"))
-        assertTrue(json.contains("\"format\":\"inniclassic-settings\""))
+        assertTrue(json.contains("\"format\":\"classy-settings\""))
         assertTrue(json.contains("\"version\":1"))
     }
 
@@ -93,11 +93,12 @@ class SettingsBackupTest {
             "not json",
             "{}",
             "{\"format\":\"other\",\"version\":1,\"prefs\":{}}",
+            "{\"format\":\"classy-settings\",\"version\":99,\"prefs\":{}}",
             "{\"format\":\"inniclassic-settings\",\"version\":99,\"prefs\":{}}",
-            "{\"format\":\"inniclassic-settings\",\"version\":1}",
-            "{\"format\":\"inniclassic-settings\",\"version\":1,\"prefs\":{\"AppPrefs\":{\"a\":{\"type\":\"int\",\"value\":\"x\"}}}}",
-            "{\"format\":\"inniclassic-settings\",\"version\":1,\"prefs\":{\"AppPrefs\":{\"a\":{\"type\":\"blob\",\"value\":1}}}}",
-            "{\"format\":\"inniclassic-settings\",\"version\":1,\"prefs\":{\"AppPrefs\":{\"a\":{\"type\":\"boolean\",\"value\":\"yes\"}}}}"
+            "{\"format\":\"classy-settings\",\"version\":1}",
+            "{\"format\":\"classy-settings\",\"version\":1,\"prefs\":{\"AppPrefs\":{\"a\":{\"type\":\"int\",\"value\":\"x\"}}}}",
+            "{\"format\":\"classy-settings\",\"version\":1,\"prefs\":{\"AppPrefs\":{\"a\":{\"type\":\"blob\",\"value\":1}}}}",
+            "{\"format\":\"classy-settings\",\"version\":1,\"prefs\":{\"AppPrefs\":{\"a\":{\"type\":\"boolean\",\"value\":\"yes\"}}}}"
         )
         for (text in bad) {
             try {
@@ -109,8 +110,15 @@ class SettingsBackupTest {
     }
 
     @Test
+    fun parsesLegacyInniclassicBackup() {
+        val text = "{\"format\":\"inniclassic-settings\",\"version\":1,\"prefs\":{\"AppPrefs\":{\"volume\":{\"type\":\"int\",\"value\":15}}}}"
+        val backup = SettingsBackup.parse(text)
+        assertEquals(15, backup.prefs["AppPrefs"]?.get("volume"))
+    }
+
+    @Test
     fun ignoresUnknownFilesAndExcludedKeysOnImport() {
-        val text = "{\"format\":\"inniclassic-settings\",\"version\":1,\"prefs\":{" +
+        val text = "{\"format\":\"classy-settings\",\"version\":1,\"prefs\":{" +
             "\"Y1_LASTFM\":{\"session_key\":{\"type\":\"string\",\"value\":\"s\"}}," +
             "\"AppPrefs\":{\"lastfm_password\":{\"type\":\"string\",\"value\":\"p\"},\"shuffle\":{\"type\":\"boolean\",\"value\":true}}}}"
         val backup = SettingsBackup.parse(text)

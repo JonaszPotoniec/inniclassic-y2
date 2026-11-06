@@ -10,15 +10,15 @@ import com.themoon.y1.ThemeManager
 
 /**
  * Shared metrics matching the approved Classic main menu (480 x 360 reference). The Classic themes use the
- * iPod Classic layout ([IpodClassicMetrics]); the second values are for the other themes (theme store).
+ * Classy layout ([ClassyMetrics]); the second values are for the other themes (theme store).
  */
 object ClassicMenuStyle {
     val ROW_HEIGHT_DP: Int
-        get() = if (IpodClassicLayout.isActive) IpodClassicMetrics.ROW_HEIGHT else 33
+        get() = if (ClassyLayout.isActive) ClassyMetrics.ROW_HEIGHT else 33
     val STATUS_HEIGHT_DP: Int
-        get() = if (IpodClassicLayout.isActive) IpodClassicMetrics.STATUS_BAR_HEIGHT else 26
+        get() = if (ClassyLayout.isActive) ClassyMetrics.STATUS_BAR_HEIGHT else 26
     val PANE_WIDTH_DP: Int
-        get() = if (IpodClassicLayout.isActive) IpodClassicMetrics.PANE_WIDTH else 242
+        get() = if (ClassyLayout.isActive) ClassyMetrics.PANE_WIDTH else 242
     fun apply(row: LinearLayout, title: TextView, arrow: TextView?, heightDp: Int) {
         if (!ThemeManager.isClassicTheme()) return
         val density = row.resources.displayMetrics.density
@@ -43,6 +43,6 @@ object ClassicMenuStyle {
             arrow.setTextColor(ThemeManager.getListButtonFocusedTextColor())
             arrow.visibility = if (row.isFocused) View.VISIBLE else View.GONE
         }
-        IpodClassicLists.styleClassicRow(row, title, arrow, heightDp)
+        ClassyLists.styleClassicRow(row, title, arrow, heightDp)
     }
 }

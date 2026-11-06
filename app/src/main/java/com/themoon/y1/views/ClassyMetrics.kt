@@ -5,13 +5,13 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /**
- * iPod classic UI metrics for the 480 x 360 screen, in dp (1 dp = 1 px on the Y2).
+ * Classy UI metrics for the 480 x 360 screen, in dp (1 dp = 1 px on the Y2).
  *
- * Values come from Apple's own 320 x 240 screen images in the iPod classic guides, scaled by 1.5.
+ * Values derived from classic screen dimensions scaled for high fidelity.
  * This object has no Android dependencies, so the layout maths can be unit-tested.
  */
-object IpodClassicMetrics {
-    // Status bar: 20 px on the iPod, including a 1 px dark line at the bottom.
+object ClassyMetrics {
+    // Status bar: 20 px base, including a 1 px dark line at the bottom.
     const val STATUS_BAR_HEIGHT = 30
     const val STATUS_BAR_RULE = 1
     const val STATUS_TITLE_SP = 19f
@@ -20,7 +20,7 @@ object IpodClassicMetrics {
     // All status bar items share one box with the capitals of the text: 14 px = the cap height of the
     // 19 px title font (Nimbus Sans Bold, 13.85 px), so the space above and below the ink is the same
     // for the text, the icons and the battery. The ink of each icon goes from the top row to the bottom
-    // row of the box (StatusIcons, IpodPlayStateView).
+    // row of the box (StatusIcons, ClassyPlayStateView).
     const val STATUS_ICON_HEIGHT = 14
     // Round shapes (headphones, Wi-Fi, Bluetooth) look smaller than flat ones of the same height, as the
     // round letters of a font. They go 1 px above the box (optical overshoot); the bottom stays on the box.
@@ -32,10 +32,10 @@ object IpodClassicMetrics {
     const val BATTERY_OVERSHOOT = 1
     const val BATTERY_HEIGHT = STATUS_ICON_HEIGHT + 2 * BATTERY_OVERSHOOT
     const val PLAY_ICON_WIDTH = 12
-    // Space between the ink of two items (the iPod has 5 px between the play icon and the battery).
+    // Space between the ink of two items (5 px between the play icon and the battery).
     const val STATUS_ITEM_GAP = 8
 
-    // Lists: 25 px rows, cap height 11, text at x = 7 on the iPod.
+    // Lists: 25 px rows, cap height 11, text at x = 7 base.
     const val ROW_HEIGHT = 38
     const val LIST_TEXT_SP = 23f
     const val ROW_PADDING_LEFT = 10
@@ -79,7 +79,7 @@ object IpodClassicMetrics {
     const val SCRUB_DIAMOND_WIDTH = 22
     const val SCRUB_DIAMOND_HEIGHT = 25
 
-    // Album art tilt. Apple's image: left edge y 35..170, right edge y 44..162, width x 10..145.
+    // Album art tilt.
     const val TILT_RIGHT_EDGE_RATIO = 119f / 136f
     const val TILT_WIDTH_RATIO = 1f
     const val TILT_ANGLE_DEG = 18f
@@ -137,11 +137,7 @@ object IpodClassicMetrics {
 
     /**
      * Solves the tilt that keeps the left edge [side] tall, makes the right edge [rightEdgeRatio] * [side] tall,
-     * and keeps the projected width at [widthRatio] * [side], like Apple's Now Playing image.
-     *
-     * With the pivot on the left edge, a point at x = u projects to X = sx cos(a) u D / (D + sx sin(a) u),
-     * so the right edge scale is r = D / (D + sx sin(a) side) and the projected width is sx cos(a) side r.
-     * Any angle gives the same picture; [angleDeg] only picks one member of the family.
+     * and keeps the projected width at [widthRatio] * [side].
      */
     fun artTilt(
         side: Float,
@@ -168,3 +164,6 @@ object IpodClassicMetrics {
         return Pair((x * k).toFloat(), k.toFloat())
     }
 }
+
+/** Backward compatibility alias. */
+typealias IpodClassicMetrics = ClassyMetrics

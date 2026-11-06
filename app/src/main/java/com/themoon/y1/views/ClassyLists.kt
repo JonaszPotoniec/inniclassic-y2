@@ -18,16 +18,16 @@ import com.themoon.y1.ThemeManager
 import java.util.Collections
 import java.util.WeakHashMap
 
-/** List rows and the main menu in the iPod Classic layout of the Classic themes (see [IpodClassicLayout]). */
-object IpodClassicLists {
+/** List rows and the main menu in the Classy layout of the Classic themes (see [ClassyLayout]). */
+object ClassyLists {
     // Recycled list rows can come back with another height; this set tells which titles to put back.
     private val centred: MutableSet<TextView> = Collections.newSetFromMap(WeakHashMap())
 
     /** Called by [ClassicMenuStyle.apply] for each Classic list row. */
     fun styleClassicRow(row: LinearLayout, title: TextView, arrow: TextView?, heightDp: Int) {
         val d = row.resources.displayMetrics.density
-        row.setPadding(px(IpodClassicMetrics.ROW_PADDING_LEFT, d), 0, px(IpodClassicMetrics.ROW_PADDING_RIGHT, d), 0)
-        title.setTextSize(TypedValue.COMPLEX_UNIT_PX, IpodClassicMetrics.LIST_TEXT_SP * d)
+        row.setPadding(px(ClassyMetrics.ROW_PADDING_LEFT, d), 0, px(ClassyMetrics.ROW_PADDING_RIGHT, d), 0)
+        title.setTextSize(TypedValue.COMPLEX_UNIT_PX, ClassyMetrics.LIST_TEXT_SP * d)
         // Rows with cover art (64 dp) or thumbnails stack two lines of text; only one-line rows are centred.
         if (heightDp == ClassicMenuStyle.ROW_HEIGHT_DP) {
             centreInRow(title, heightDp * d)
@@ -39,15 +39,15 @@ object IpodClassicLists {
 
     /**
      * Called at the end of the ListItemViewFactory row builders. [row] can be the title itself (a Button).
-     * In a Classic theme the row gets the iPod row metrics and cap-centred text.
+     * In a Classic theme the row gets the Classy row metrics and cap-centred text.
      */
     fun styleListRow(row: View, title: TextView, value: TextView?) {
-        if (!IpodClassicLayout.isActive) return
+        if (!ClassyLayout.isActive) return
         val d = row.resources.displayMetrics.density
-        val rowHeight = px(IpodClassicMetrics.ROW_HEIGHT, d)
-        val textSize = IpodClassicMetrics.LIST_TEXT_SP * d
-        val padLeft = px(IpodClassicMetrics.ROW_PADDING_LEFT, d)
-        val padRight = px(IpodClassicMetrics.ROW_PADDING_RIGHT, d)
+        val rowHeight = px(ClassyMetrics.ROW_HEIGHT, d)
+        val textSize = ClassyMetrics.LIST_TEXT_SP * d
+        val padLeft = px(ClassyMetrics.ROW_PADDING_LEFT, d)
+        val padRight = px(ClassyMetrics.ROW_PADDING_RIGHT, d)
         row.layoutParams?.let {
             it.height = rowHeight
             row.layoutParams = it
@@ -56,8 +56,8 @@ object IpodClassicLists {
         title.typeface = ThemeManager.getCustomFontBold()
         title.includeFontPadding = false
         if (row === title) {
-            title.gravity = IpodClassicLayout.horizontalGravity(title) or Gravity.TOP
-            title.setPadding(padLeft, IpodClassicLayout.capCentredPaddingTop(title, rowHeight.toFloat()), padRight, 0)
+            title.gravity = ClassyLayout.horizontalGravity(title) or Gravity.TOP
+            title.setPadding(padLeft, ClassyLayout.capCentredPaddingTop(title, rowHeight.toFloat()), padRight, 0)
             return
         }
         row.setPadding(padLeft, 0, padRight, 0)
@@ -71,26 +71,26 @@ object IpodClassicLists {
     }
 
     /**
-     * Main menu elements with the iPod metrics: list pane 240 wide, 38 px rows with 23 sp text and a
-     * drawn chevron, and the cover pane moved to the new pane edge and below the full-width status bar
-     * (as on the iPod, where the title bar spans the screen). The theme's own elements are not changed.
+     * Main menu elements with the Classy metrics: list pane 240 wide, 38 px rows with 23 sp text and a
+     * drawn chevron, and the cover pane moved to the new pane edge and below the full-width status bar.
+     * The theme's own elements are not changed.
      */
     fun menuElements(elements: List<ThemeManager.MenuElement>, context: Context): List<ThemeManager.MenuElement> {
-        if (!IpodClassicLayout.isActive) return elements
+        if (!ClassyLayout.isActive) return elements
         val list = elements.firstOrNull { it.type == "list_box" } ?: return elements
         val dm = context.resources.displayMetrics
         val screenWidth = (dm.widthPixels / dm.density).toInt()
         val screenHeight = (dm.heightPixels / dm.density).toInt()
         val oldRight = list.x + list.width
-        val newRight = list.x + IpodClassicMetrics.PANE_WIDTH
+        val newRight = list.x + ClassyMetrics.PANE_WIDTH
         return elements.map { el ->
             when {
-                el === list -> copy(el, width = IpodClassicMetrics.PANE_WIDTH,
-                    height = screenHeight - IpodClassicMetrics.STATUS_BAR_HEIGHT - list.y)
-                el.type == "button" && el.parentId == list.id -> copy(el, height = IpodClassicMetrics.ROW_HEIGHT,
-                    textSize = IpodClassicMetrics.LIST_TEXT_SP.toInt(), textRight = "")
+                el === list -> copy(el, width = ClassyMetrics.PANE_WIDTH,
+                    height = screenHeight - ClassyMetrics.STATUS_BAR_HEIGHT - list.y)
+                el.type == "button" && el.parentId == list.id -> copy(el, height = ClassyMetrics.ROW_HEIGHT,
+                    textSize = ClassyMetrics.LIST_TEXT_SP.toInt(), textRight = "")
                 el.type != "button" && el.x == oldRight -> {
-                    val top = if (isBottomAligned(el)) el.y else maxOf(el.y, IpodClassicMetrics.STATUS_BAR_HEIGHT)
+                    val top = if (isBottomAligned(el)) el.y else maxOf(el.y, ClassyMetrics.STATUS_BAR_HEIGHT)
                     copy(el, x = newRight, y = top,
                         width = if (el.width > 0) screenWidth - newRight else el.width,
                         height = if (el.height > 0 && top != el.y) screenHeight - top else el.height)
@@ -100,16 +100,16 @@ object IpodClassicLists {
         }
     }
 
-    /** Main menu rows in a Classic theme: the iPod padding, cap-centred text and a drawn chevron in place of the "›" text. */
+    /** Main menu rows in a Classic theme: the Classy padding, cap-centred text and a drawn chevron in place of the "›" text. */
     fun styleMainMenuButtons(buttons: List<LinearLayout>) {
-        if (!IpodClassicLayout.isActive) return
+        if (!ClassyLayout.isActive) return
         for (btn in buttons) {
             val main = btn.getChildAt(0) as? TextView ?: continue
             val right = btn.getChildAt(1) as? TextView
             val d = btn.resources.displayMetrics.density
             val height = btn.layoutParams?.height ?: continue
             if (height <= 0 || btn.paddingTop != 0 || btn.paddingBottom != 0) continue
-            btn.setPadding(px(IpodClassicMetrics.ROW_PADDING_LEFT, d), 0, px(IpodClassicMetrics.ROW_PADDING_RIGHT, d), 0)
+            btn.setPadding(px(ClassyMetrics.ROW_PADDING_LEFT, d), 0, px(ClassyMetrics.ROW_PADDING_RIGHT, d), 0)
             if (right != null) showChevron(right, d)
             centreInRow(main, height.toFloat())
         }
@@ -123,8 +123,8 @@ object IpodClassicLists {
             lp.height = ViewGroup.LayoutParams.MATCH_PARENT
             tv.layoutParams = lp
         }
-        tv.gravity = IpodClassicLayout.horizontalGravity(tv) or Gravity.TOP
-        tv.setPadding(tv.paddingLeft, IpodClassicLayout.capCentredPaddingTop(tv, rowHeight), tv.paddingRight, 0)
+        tv.gravity = ClassyLayout.horizontalGravity(tv) or Gravity.TOP
+        tv.setPadding(tv.paddingLeft, ClassyLayout.capCentredPaddingTop(tv, rowHeight), tv.paddingRight, 0)
     }
 
     private fun uncentre(tv: TextView) {
@@ -133,25 +133,25 @@ object IpodClassicLists {
             lp.height = ViewGroup.LayoutParams.WRAP_CONTENT
             tv.layoutParams = lp
         }
-        tv.gravity = IpodClassicLayout.horizontalGravity(tv) or Gravity.CENTER_VERTICAL
+        tv.gravity = ClassyLayout.horizontalGravity(tv) or Gravity.CENTER_VERTICAL
         tv.setPadding(tv.paddingLeft, 0, tv.paddingRight, 0)
     }
 
     private fun showChevron(arrow: TextView, d: Float) {
         arrow.text = ""
         val existing = arrow.compoundDrawables[2]
-        if (existing is IpodChevronDrawable) return
-        val chevron = IpodChevronDrawable(
+        if (existing is ClassyChevronDrawable) return
+        val chevron = ClassyChevronDrawable(
             ThemeManager.getListButtonFocusedTextColor(),
-            IpodClassicMetrics.CHEVRON_STROKE * d
+            ClassyMetrics.CHEVRON_STROKE * d
         ).apply {
-            setBounds(0, 0, px(IpodClassicMetrics.CHEVRON_WIDTH, d), px(IpodClassicMetrics.CHEVRON_HEIGHT, d))
+            setBounds(0, 0, px(ClassyMetrics.CHEVRON_WIDTH, d), px(ClassyMetrics.CHEVRON_HEIGHT, d))
         }
         arrow.setCompoundDrawables(null, null, chevron, null)
         arrow.compoundDrawablePadding = 0
     }
 
-    private fun px(dp: Int, d: Float): Int = IpodClassicLayout.px(dp, d)
+    private fun px(dp: Int, d: Float): Int = ClassyLayout.px(dp, d)
 
     // MainMenuController measures y from the bottom for these elements.
     private fun isBottomAligned(el: ThemeManager.MenuElement): Boolean =
@@ -174,8 +174,8 @@ object IpodClassicLists {
     )
 }
 
-/** The bold "›" chevron of the selected iPod row, drawn to the bounds (10 x 16 px). */
-class IpodChevronDrawable(color: Int, strokeWidth: Float) : Drawable() {
+/** The bold "›" chevron of the selected row, drawn to the bounds (10 x 16 px). */
+class ClassyChevronDrawable(color: Int, strokeWidth: Float) : Drawable() {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         this.color = color
         this.strokeWidth = strokeWidth
@@ -210,3 +210,7 @@ class IpodChevronDrawable(color: Int, strokeWidth: Float) : Drawable() {
     @Deprecated("Deprecated in Java")
     override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
 }
+
+/** Backward compatibility aliases. */
+typealias IpodClassicLists = ClassyLists
+typealias IpodChevronDrawable = ClassyChevronDrawable

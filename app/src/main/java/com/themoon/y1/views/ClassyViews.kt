@@ -12,8 +12,8 @@ import com.themoon.y1.managers.AudioPlayerManager
 import com.themoon.y1.managers.FmRadioManager
 import kotlin.math.roundToInt
 
-/** The iPod's blue play (▶) or pause (‖) state icon, shown left of the battery. Hidden when nothing is loaded. */
-class IpodPlayStateView(context: Context) : View(context) {
+/** The blue play (▶) or pause (‖) state icon, shown left of the battery. Hidden when nothing is loaded. */
+class ClassyPlayStateView(context: Context) : View(context) {
     private var state = STATE_NONE
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -35,7 +35,7 @@ class IpodPlayStateView(context: Context) : View(context) {
     /** Reads the player state again. MainActivity.updatePlayerUI calls it at each player change. */
     fun refresh() {
         val s = currentState()
-        val vis = if (s == STATE_NONE || !IpodClassicLayout.isActive) GONE else VISIBLE
+        val vis = if (s == STATE_NONE || !ClassyLayout.isActive) GONE else VISIBLE
         if (visibility != vis) visibility = vis
         if (s != state) {
             state = s
@@ -92,17 +92,17 @@ class IpodPlayStateView(context: Context) : View(context) {
 }
 
 /**
- * The 1 px dark line at the bottom of the iPod status bar. It hides itself when the status bar has a
+ * The 1 px dark line at the bottom of the status bar. It hides itself when the status bar has a
  * transparent background (video player). Before each frame it also keeps the status bar at the full
- * width ([IpodClassicLayout.keepStatusBarFull]); it is in the status bar only in the Classic themes.
+ * width ([ClassyLayout.keepStatusBarFull]); it is in the status bar only in the Classic themes.
  */
-class IpodStatusRuleView(context: Context) : View(context) {
+class ClassyStatusRuleView(context: Context) : View(context) {
     private val preDraw = ViewTreeObserver.OnPreDrawListener {
         val bar = parent as? View
         // A changed bar is drawn in the next frame, so this frame is skipped.
-        if (IpodClassicLayout.keepStatusBarFull(bar)) return@OnPreDrawListener false
-        val transparent = IpodClassicLayout.isTransparent(bar?.background)
-        val vis = if (transparent || !IpodClassicLayout.isActive) INVISIBLE else VISIBLE
+        if (ClassyLayout.keepStatusBarFull(bar)) return@OnPreDrawListener false
+        val transparent = ClassyLayout.isTransparent(bar?.background)
+        val vis = if (transparent || !ClassyLayout.isActive) INVISIBLE else VISIBLE
         if (visibility != vis) visibility = vis
         true
     }
@@ -121,3 +121,7 @@ class IpodStatusRuleView(context: Context) : View(context) {
         canvas.drawColor(if (ThemeManager.isClassicLightTheme()) 0xFF686868.toInt() else 0xFF000000.toInt())
     }
 }
+
+/** Backward compatibility aliases. */
+typealias IpodPlayStateView = ClassyPlayStateView
+typealias IpodStatusRuleView = ClassyStatusRuleView

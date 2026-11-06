@@ -74,7 +74,7 @@ private inline fun step(name: String, block: () -> Unit) {
     try {
         block()
     } catch (e: Exception) {
-        Log.e("InniClassic", "Live theme change: $name failed", e)
+        Log.e("Classy", "Live theme change: $name failed", e)
     }
 }
 

@@ -44,7 +44,7 @@ class SafeFilesParityTest {
     @Test
     fun writeStringToFile_readStringFromFile_roundTripAscii() {
         val target = File(tempFolder.root, "ascii_test.txt")
-        val content = "InniClassic Y2 Audio Player - High Fidelity Audio"
+        val content = "Classy Y2 Audio Player - High Fidelity Audio"
 
         val writeResult = SafeFiles.writeStringToFile(target, content)
         assertTrue("writeStringToFile should succeed", writeResult)

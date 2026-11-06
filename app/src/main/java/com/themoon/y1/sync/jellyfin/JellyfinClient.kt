@@ -31,7 +31,7 @@ class JellyfinClient(rawUrl: String?, deviceId: String?) {
     private val httpClient: OkHttpClient = buildOkHttpClient()
 
     private fun buildOkHttpClient(): OkHttpClient {
-        com.themoon.y1.InniClassicApplication.installConscrypt()
+        com.themoon.y1.ClassyApplication.installConscrypt()
         val trustAll = object : X509TrustManager {
             override fun checkClientTrusted(certs: Array<X509Certificate>, authType: String) {}
             override fun checkServerTrusted(certs: Array<X509Certificate>, authType: String) {}
@@ -75,7 +75,7 @@ class JellyfinClient(rawUrl: String?, deviceId: String?) {
     }
 
     private fun getAuthHeader(token: String?): String {
-        val sb = StringBuilder("MediaBrowser Client=\"InniClassic\", Device=\"Innioasis Y2\", DeviceId=\"")
+        val sb = StringBuilder("MediaBrowser Client=\"Classy\", Device=\"Innioasis Y2\", DeviceId=\"")
             .append(deviceId).append("\", Version=\"1.0\"")
         if (!token.isNullOrEmpty()) {
             sb.append(", Token=\"").append(token).append("\"")

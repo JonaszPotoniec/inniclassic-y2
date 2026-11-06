@@ -108,7 +108,7 @@ jobs:
             fi
           fi
 
-          APK_NAME="InniClassic-${TAG_NAME}.apk"
+          APK_NAME="Classy-${TAG_NAME}.apk"
 
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
@@ -142,7 +142,7 @@ jobs:
           {
             "versionCode": ${{ steps.version.outputs.version_code }},
             "versionName": "${{ steps.version.outputs.version_name }}",
-            "releaseName": "InniClassic ${{ steps.version.outputs.release_name }}",
+            "releaseName": "Classy ${{ steps.version.outputs.release_name }}",
             "apkName": "${{ steps.version.outputs.apk_name }}",
             "apkUrl": "https://github.com/${{ github.repository }}/releases/latest/download/${{ steps.version.outputs.apk_name }}",
             "outputFile": "${{ steps.version.outputs.apk_name }}"
@@ -156,7 +156,7 @@ jobs:
         with:
           name: launcher-apk
           path: |
-            dist/InniClassic-*.apk
+            dist/Classy-*.apk
             dist/update.json
           retention-days: 14
 
@@ -242,7 +242,7 @@ jobs:
       - name: Prepare Release Notes
         run: |
           cat << 'EOF' > release_body.md
-          ### InniClassic Release
+          ### Classy Release
 
           Automated build with full support for **Innioasis Y1** (Type A & Type B) and **Innioasis Y2**.
 
@@ -271,7 +271,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.build-apk.outputs.tag_name }}
-          name: InniClassic ${{ needs.build-apk.outputs.release_name }}
+          name: Classy ${{ needs.build-apk.outputs.release_name }}
           body_path: release_body.md
           files: release_assets/*
           fail_on_unmatched_files: true

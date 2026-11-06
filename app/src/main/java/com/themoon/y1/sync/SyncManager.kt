@@ -143,12 +143,12 @@ class SyncManager internal constructor(context: Context? = null) {
             var wifiLock: WifiManager.WifiLock? = null
 
             try {
-                wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "InniClassic:JellyfinSync")
+                wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Classy:JellyfinSync")
                 wakeLock?.acquire()
 
                 val wm = context?.getSystemService(Context.WIFI_SERVICE) as? WifiManager
                 if (wm != null) {
-                    wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "InniClassic:JellyfinSync")
+                    wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "Classy:JellyfinSync")
                     wifiLock.acquire()
                 }
 

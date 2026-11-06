@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build an InniClassic ROM for the Innioasis Y1 (type a/b) or Y2 (type y2).
+# Build a Classy ROM for the Innioasis Y1 (type a/b) or Y2 (type y2).
 #
 # Lives in this repository as:  scripts/build-rom.sh
 #
@@ -7,7 +7,7 @@
 #
 # Type a|b — Y1 stock bases from rockbox-y1.
 # Type y2  — base ROM from y2-test release (Solar Y2 pack), strip Solar
-#            artefacts, install InniClassic launcher as /system/app/com.themoon.y1.apk,
+#            artefacts, install Classy launcher as /system/app/com.themoon.y1.apk,
 #            pin scripts/Y2.kl (wheel -> DPAD_LEFT/RIGHT), add the stock
 #            Bluetooth.apk + Bluetooth.odex from tools/rom_assets (the base has none) with
 #            the phone profiles (HFP, PBAP, MAP) turned off in the installed Bluetooth.apk,
@@ -28,9 +28,9 @@ WORK_DIR=""
 MOUNT_SYS=""
 MOUNT_USER=""
 
-LAUNCHER_REPO="${LAUNCHER_REPO:-JonaszPotoniec/inniclassic-y2}"
+LAUNCHER_REPO="${LAUNCHER_REPO:-JonaszPotoniec/Classy}"
 
-# Published Y2 base (Solar-built pack for stripping + InniClassic install).
+# Published Y2 base (Solar-built pack for stripping + Classy install).
 Y2_BASE_URL="${Y2_BASE_URL:-https://github.com/ryan-specter/jj_auto/releases/download/y2-test/rom_y2.zip}"
 
 # Original /system/app/Bluetooth.apk + Bluetooth.odex of the Innioasis build the Y2 base uses
@@ -45,7 +45,7 @@ usage() {
 usage: $0 <a|b|y2> [--launcher-apk PATH] [--launcher-tag TAG] [--launcher-apk-url URL] [output.zip]
 
   a|b                   Type A (firmware 2.0.0+) or Type B (firmware before 2.0.0) — Y1
-  y2                    Y2 ROM from y2-test base (Solar stripped, InniClassic + Y2.kl)
+  y2                    Y2 ROM from y2-test base (Solar stripped, Classy + Y2.kl)
   --launcher-apk        Path to local APK to bundle (e.g. app-release.apk)
   --launcher-tag        Release tag (default: latest)
   --launcher-apk-url    Direct APK download URL (skips HTML/API lookup)
@@ -144,7 +144,7 @@ resolve_latest_launcher_tag() {
     local release_url tag
 
     release_url="$(
-        curl -fsSIL -A 'inniclassic-rom-build/1.0' \
+        curl -fsSIL -A 'classy-rom-build/1.0' \
             "https://github.com/${LAUNCHER_REPO}/releases/latest" \
         | awk -F': ' 'tolower($1) ~ /^location$/ { print $2 }' \
         | tr -d '\r' \
@@ -172,9 +172,9 @@ download_launcher_apk() {
     fi
 
     apk_url="$(
-        curl -fsSL -A 'inniclassic-rom-build/1.0' \
+        curl -fsSL -A 'classy-rom-build/1.0' \
             "https://github.com/${LAUNCHER_REPO}/releases/expanded_assets/${tag}" \
-        | grep -Eo "href=\"/${LAUNCHER_REPO}/releases/download/[^\"]+(InniClassic|app-release)[^\"]*\.apk\"" \
+        | grep -Eo "href=\"/${LAUNCHER_REPO}/releases/download/[^\"]+(Classy|InniClassic|app-release)[^\"]*\.apk\"" \
         | head -1 \
         | sed 's/^href="//; s/"$//'
     )"
@@ -567,7 +567,7 @@ if [ -f "$MOUNT_SYS/framework/framework-res.apk" ]; then
     sudo chown root:root "$MOUNT_SYS/framework/framework-res.apk"
 fi
 
-# Y2 Solar base only: strip Solar before installing InniClassic. Type a|b skip this (Y1 path unchanged).
+# Y2 Solar base only: strip Solar before installing Classy. Type a|b skip this (Y1 path unchanged).
 if [ "$TYPE" = "y2" ]; then
     strip_solar_artefacts "$MOUNT_SYS" "$MOUNT_USER"
     echo "==> Patching Y2 audio gain table for quiet headphone listening"

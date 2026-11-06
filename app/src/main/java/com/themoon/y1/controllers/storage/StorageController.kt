@@ -77,7 +77,7 @@ class StorageController(
             rows += RowSpec(localize(title), RowLook.VALUE, value = value, key = title, onClick = {})
         }
 
-        row("Name", "iPod")
+        row("Name", "Classy")
         val songs = songsProvider()
         row("Songs", songs.size.toString())
         row("Videos", videosProvider().size.toString())

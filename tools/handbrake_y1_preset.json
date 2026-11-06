@@ -1,8 +1,8 @@
 {
     "PresetList": [
         {
-            "PresetName": "InniClassic Y1 (MT6572)",
-            "PresetDescription": "For video played back on the Innioasis Y1 / InniClassic - 640x480, 30fps CFR, ~2.2 Mbps H.264 Main, AAC 128kbps. Tuned for the Y1's MediaTek MT6572 hardware decoder, which chokes on high-framerate/high-bitrate 720p+ source video.",
+            "PresetName": "Classy Y1 (MT6572)",
+            "PresetDescription": "For video played back on the Innioasis Y1 / Classy - 640x480, 30fps CFR, ~2.2 Mbps H.264 Main, AAC 128kbps. Tuned for the Y1's MediaTek MT6572 hardware decoder, which chokes on high-framerate/high-bitrate 720p+ source video.",
             "PresetFolder": false,
             "Type": 1,
             "VersionMajor": 1,

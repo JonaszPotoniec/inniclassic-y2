@@ -1,6 +1,6 @@
 package com.themoon.y1.sync
 
-import com.themoon.y1.InniClassicApplication
+import com.themoon.y1.ClassyApplication
 import com.themoon.y1.sync.jellyfin.JellyfinClient
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -19,7 +19,7 @@ class JellyfinClientTest {
 
     @Test
     fun testClientInitializationWithTls() {
-        InniClassicApplication.installConscrypt()
+        ClassyApplication.installConscrypt()
         val client = JellyfinClient("https://192.168.1.100:8920", "TestDevice")
         assertNotNull(client)
     }

@@ -18,10 +18,12 @@ import java.io.File
  * except secrets and device state ([isExcluded]). Playlists are .m3u8 files in Y1_Playlists, so they are not in it.
  */
 object SettingsBackup {
-    const val FORMAT = "inniclassic-settings"
+    const val FORMAT = "classy-settings"
+    const val LEGACY_FORMAT = "inniclassic-settings"
     const val VERSION = 1
     const val FILE_NAME = "settings-backup.json"
-    const val DIR_NAME = "Inniclassic"
+    const val DIR_NAME = "Classy"
+    const val LEGACY_DIR_NAME = "Inniclassic"
 
     /** Preference files in the backup. Y1_LASTFM, Y1_RECENTLY_PLAYED and Y1_MIGRATIONS are not in it. */
     val FILES = listOf(AppPrefs.NAME, "y1_settings", "Y1_SETTINGS", "Y1_AUDIOBOOK_BOOKMARKS", "Y1_JELLYFIN")
@@ -89,7 +91,8 @@ object SettingsBackup {
         } catch (e: Exception) {
             throw InvalidBackupException("Not JSON")
         }
-        if (root.optString("format") != FORMAT) throw InvalidBackupException("Not a settings backup")
+        val format = root.optString("format")
+        if (format != FORMAT && format != LEGACY_FORMAT) throw InvalidBackupException("Not a settings backup")
         val version = root.optInt("version", -1)
         if (version < 1 || version > VERSION) throw InvalidBackupException("Unknown version $version")
         val files = root.optJSONObject("prefs") ?: throw InvalidBackupException("No prefs")
@@ -175,7 +178,7 @@ object SettingsBackup {
     /** The backup to import: the newest file on the microSD card or on the internal storage. */
     fun findImportFile(): File? =
         listOf(File(StoragePaths.SECONDARY_PATH), StoragePaths.getPrimaryRoot())
-            .map { File(File(it, DIR_NAME), FILE_NAME) }
+            .flatMap { root -> listOf(File(File(root, DIR_NAME), FILE_NAME), File(File(root, LEGACY_DIR_NAME), FILE_NAME)) }
             .filter { it.isFile }
             .maxByOrNull { it.lastModified() }
 

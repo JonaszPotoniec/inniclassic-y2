@@ -348,7 +348,7 @@
             <TextView android:id="@+id/tv_quiz_prompt" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="What song is playing?" android:textColor="#173350" android:textSize="16sp" android:textStyle="bold" android:gravity="center"/>
         </LinearLayout>
 
-        <ProgressBar android:id="@+id/pb_quiz_timer" style="?android:attr/progressBarStyleHorizontal" android:progressDrawable="@drawable/progress_bar_ipod" android:layout_width="match_parent" android:layout_height="6dp" android:max="1000" android:progress="1000" android:layout_marginBottom="6dp"/>
+        <ProgressBar android:id="@+id/pb_quiz_timer" style="?android:attr/progressBarStyleHorizontal" android:progressDrawable="@drawable/progress_bar_classy" android:layout_width="match_parent" android:layout_height="6dp" android:max="1000" android:progress="1000" android:layout_marginBottom="6dp"/>
 
         <LinearLayout android:id="@+id/container_quiz_items" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="vertical"/>
 
@@ -422,9 +422,9 @@
 
         <!-- Temporary inline volume gauge replacing progress bar -->
         <LinearLayout android:id="@+id/row_player_volume" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="bottom" android:orientation="horizontal" android:gravity="center_vertical" android:paddingLeft="26dp" android:paddingRight="26dp" android:paddingBottom="14dp" android:visibility="gone">
-            <ImageView android:id="@+id/tv_player_volume_down" android:layout_width="16dp" android:layout_height="18dp" android:src="@drawable/ic_ipod_volume_down" android:tint="#000000" android:scaleType="fitCenter" android:layout_marginRight="10dp" android:contentDescription="Volume Down"/>
+            <ImageView android:id="@+id/tv_player_volume_down" android:layout_width="16dp" android:layout_height="18dp" android:src="@drawable/ic_classy_volume_down" android:tint="#000000" android:scaleType="fitCenter" android:layout_marginRight="10dp" android:contentDescription="Volume Down"/>
             <ProgressBar android:id="@+id/player_volume_progress" style="?android:attr/progressBarStyleHorizontal" android:progressDrawable="@drawable/progress_bar_now_playing" android:layout_width="0dp" android:layout_height="26dp" android:layout_weight="1" android:max="30" android:progress="0"/>
-            <ImageView android:id="@+id/tv_player_volume_up" android:layout_width="24dp" android:layout_height="20dp" android:src="@drawable/ic_ipod_volume_up" android:tint="#000000" android:scaleType="fitCenter" android:layout_marginLeft="10dp" android:contentDescription="Volume Up"/>
+            <ImageView android:id="@+id/tv_player_volume_up" android:layout_width="24dp" android:layout_height="20dp" android:src="@drawable/ic_classy_volume_up" android:tint="#000000" android:scaleType="fitCenter" android:layout_marginLeft="10dp" android:contentDescription="Volume Up"/>
         </LinearLayout>
 
         <!-- Scrub seek bar with diamond thumb -->

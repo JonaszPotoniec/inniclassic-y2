@@ -26,7 +26,7 @@ object PowerMenu {
 
     const val EXTRA_REASON = "reason"
     const val REASON_GLOBAL_ACTIONS = "globalactions"
-    const val REASON_OURS = "inniclassic-power"
+    const val REASON_OURS = "classy-power"
 
     /**
      * Android makes its menu while it sends the broadcast, adds the window 20-100 ms later and draws it 100-250 ms

@@ -24,16 +24,16 @@ import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 /**
- * The iPod Classic layout of the Classic themes (Classic Light and Classic Dark; Auto switches between them).
+ * The Classy layout of the Classic themes (Classic Light and Classic Dark; Auto switches between them).
  *
- * The status bar, the lists and Now Playing use the iPod classic proportions from [IpodClassicMetrics]. The
+ * The status bar, the lists and Now Playing use the classic proportions from [ClassyMetrics]. The
  * status bar spans the full width on all screens, also over the split screens and Cover Flow. The static views
  * from activity_main.xml are changed at runtime. Each changed property is recorded the first time it changes,
  * so a theme change without a restart restores the original views first (the other themes keep their own layout).
  */
-object IpodClassicLayout {
-    private const val TAG_PLAY_ICON = "ipod_play_state"
-    private const val TAG_STATUS_RULE = "ipod_status_rule"
+object ClassyLayout {
+    private const val TAG_PLAY_ICON = "classy_play_state"
+    private const val TAG_STATUS_RULE = "classy_status_rule"
 
     private var listenedPrefs: SharedPreferences? = null
     private var applied = false
@@ -42,11 +42,11 @@ object IpodClassicLayout {
 
     // SharedPreferences keeps listeners in a weak map, so this object holds the only strong reference.
     private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        // The iPod tilt (pivot, scaleX) is set in applyTheme, so set it again when the tilt changes
+        // The tilt (pivot, scaleX) is set in applyTheme, so set it again when the tilt changes
         if (key == Prefs.ALBUM_TILT.key && isActive) MainActivity.instance?.applyTheme()
     }
 
-    /** True when a Classic theme is in use: only the Classic themes have the iPod layout. */
+    /** True when a Classic theme is in use: only the Classic themes have the Classy layout. */
     val isActive: Boolean
         get() = ThemeManager.isClassicTheme()
 
@@ -90,7 +90,7 @@ object IpodClassicLayout {
             keepStatusBarFull(main.findViewById(R.id.layout_status_bar))
             applyScreenPaddings(main, d)
             if (first || main.findViewById<View>(R.id.layout_player_mode)?.visibility == View.VISIBLE) {
-                IpodClassicNowPlaying.apply(main, d)
+                ClassyNowPlaying.apply(main, d)
             }
         } catch (_: Exception) {}
     }
@@ -108,17 +108,17 @@ object IpodClassicLayout {
 
     private fun applyStatusBar(main: MainActivity, d: Float) {
         val bar = main.findViewById<RelativeLayout>(R.id.layout_status_bar) ?: return
-        val padLeft = px(IpodClassicMetrics.STATUS_PADDING_LEFT, d)
-        val padRight = px(IpodClassicMetrics.STATUS_PADDING_RIGHT, d)
-        setHeight(bar, px(IpodClassicMetrics.STATUS_BAR_HEIGHT, d))
+        val padLeft = px(ClassyMetrics.STATUS_PADDING_LEFT, d)
+        val padRight = px(ClassyMetrics.STATUS_PADDING_RIGHT, d)
+        setHeight(bar, px(ClassyMetrics.STATUS_BAR_HEIGHT, d))
         setPadding(bar, padLeft, 0, padRight, 0)
         // The 1 px line spans the full width, past the padding.
         setClipToPadding(bar, false, true)
 
         // The capitals are centred on the centre line of the icons and the battery.
-        val textBox = 2f * IpodClassicMetrics.statusCentreLine() * d
-        val titleSize = IpodClassicMetrics.STATUS_TITLE_SP * d
-        val gap = IpodClassicMetrics.STATUS_ITEM_GAP * d
+        val textBox = 2f * ClassyMetrics.statusCentreLine() * d
+        val titleSize = ClassyMetrics.STATUS_TITLE_SP * d
+        val gap = ClassyMetrics.STATUS_ITEM_GAP * d
         main.findViewById<TextView>(R.id.tv_status_clock)?.let {
             styleCentredText(it, titleSize, ThemeManager.getCustomFontBold(), textBox)
         }
@@ -130,9 +130,9 @@ object IpodClassicLayout {
             when (child) {
                 is BatteryIconView -> {
                     batteryIndex = i
-                    setWidth(child, px(IpodClassicMetrics.BATTERY_WIDTH, d))
-                    setHeight(child, px(IpodClassicMetrics.BATTERY_HEIGHT, d))
-                    setMargins(child, 0, 0, 0, px(IpodClassicMetrics.STATUS_BAR_RULE, d))
+                    setWidth(child, px(ClassyMetrics.BATTERY_WIDTH, d))
+                    setHeight(child, px(ClassyMetrics.BATTERY_HEIGHT, d))
+                    setMargins(child, 0, 0, 0, px(ClassyMetrics.STATUS_BAR_RULE, d))
                     record(child, "thinOutline") { (it as BatteryIconView).setThinOutline(false) }
                     child.setThinOutline(true)
                 }
@@ -148,33 +148,33 @@ object IpodClassicLayout {
         // The play/pause icon has the box (height, top) and the gap of the other status icons.
         if (group.findViewWithTag<View>(TAG_PLAY_ICON) == null && batteryIndex >= 0) {
             val lp = LinearLayout.LayoutParams(
-                px(IpodClassicMetrics.PLAY_ICON_WIDTH, d),
-                px(IpodClassicMetrics.STATUS_ICON_HEIGHT, d)
+                px(ClassyMetrics.PLAY_ICON_WIDTH, d),
+                px(ClassyMetrics.STATUS_ICON_HEIGHT, d)
             ).apply {
                 gravity = Gravity.CENTER_VERTICAL
                 rightMargin = gap.roundToInt()
-                bottomMargin = px(IpodClassicMetrics.STATUS_BAR_RULE, d)
+                bottomMargin = px(ClassyMetrics.STATUS_BAR_RULE, d)
             }
-            group.addView(IpodPlayStateView(main).apply { tag = TAG_PLAY_ICON }, batteryIndex, lp)
+            group.addView(ClassyPlayStateView(main).apply { tag = TAG_PLAY_ICON }, batteryIndex, lp)
         }
 
         if (bar.findViewWithTag<View>(TAG_STATUS_RULE) == null) {
             val lp = RelativeLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                px(IpodClassicMetrics.STATUS_BAR_RULE, d)
+                px(ClassyMetrics.STATUS_BAR_RULE, d)
             ).apply {
                 addRule(RelativeLayout.ALIGN_PARENT_BOTTOM)
                 leftMargin = -padLeft
                 rightMargin = -padRight
             }
-            bar.addView(IpodStatusRuleView(main).apply { tag = TAG_STATUS_RULE }, lp)
+            bar.addView(ClassyStatusRuleView(main).apply { tag = TAG_STATUS_RULE }, lp)
         }
     }
 
     /** Shows the current play state in the status bar play icon, if the status bar has it. */
     fun refreshPlayIcon(main: MainActivity) {
         val bar = main.findViewById<View>(R.id.layout_status_bar) ?: return
-        (bar.findViewWithTag<View>(TAG_PLAY_ICON) as? IpodPlayStateView)?.refresh()
+        (bar.findViewWithTag<View>(TAG_PLAY_ICON) as? ClassyPlayStateView)?.refresh()
     }
 
     private fun removeAddedViews(main: MainActivity) {
@@ -188,7 +188,7 @@ object IpodClassicLayout {
     /**
      * Keeps the status bar at the full width (the controllers set half the width for the split screens)
      * and opaque in Cover Flow (applyTheme and Cover Flow make it transparent there). It stays transparent
-     * over the video player. Called at each apply and before each frame ([IpodStatusRuleView]), because
+     * over the video player. Called at each apply and before each frame ([ClassyStatusRuleView]), because
      * the controllers also change it outside applyTheme(). Returns true when it changed the bar.
      */
     internal fun keepStatusBarFull(bar: View?): Boolean {
@@ -230,11 +230,11 @@ object IpodClassicLayout {
             record(v, "statusPadding") {
                 it.setPadding(it.paddingLeft, px(ClassicMenuStyle.STATUS_HEIGHT_DP, d), it.paddingRight, it.paddingBottom)
             }
-            v.setPadding(v.paddingLeft, px(IpodClassicMetrics.STATUS_BAR_HEIGHT, d), v.paddingRight, v.paddingBottom)
+            v.setPadding(v.paddingLeft, px(ClassyMetrics.STATUS_BAR_HEIGHT, d), v.paddingRight, v.paddingBottom)
         }
         // The cover panes of the split screens start below the full-width status bar.
         for (id in coverPaneIds) {
-            main.findViewById<View>(id)?.let { setMargins(it, top = px(IpodClassicMetrics.STATUS_BAR_HEIGHT, d)) }
+            main.findViewById<View>(id)?.let { setMargins(it, top = px(ClassyMetrics.STATUS_BAR_HEIGHT, d)) }
         }
     }
 
@@ -271,7 +271,7 @@ object IpodClassicLayout {
         paint.getTextPath("H", 0, 1, 0f, 0f, path)
         val bounds = android.graphics.RectF()
         path.computeBounds(bounds, true)
-        return IpodClassicMetrics.capCentredPaddingTop(boxHeight, paint.fontMetricsInt.ascent, -bounds.top)
+        return ClassyMetrics.capCentredPaddingTop(boxHeight, paint.fontMetricsInt.ascent, -bounds.top)
             .coerceAtLeast(0)
     }
 
@@ -467,3 +467,6 @@ object IpodClassicLayout {
         if (tv.currentTextColor != color) tv.setTextColor(color)
     }
 }
+
+/** Backward compatibility alias. */
+typealias IpodClassicLayout = ClassyLayout

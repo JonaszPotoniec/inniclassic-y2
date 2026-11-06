@@ -731,10 +731,10 @@ class SettingsController(
 
     private fun legalSpec(): ListSpec {
         val tvLegal = TextView(activity).apply {
-            text = "JJ Launcher Classic Version\n\n" +
-                "A fan-made, non-commercial fork of JJ Launcher (github.com/ismileblue/y1_launcher), " +
-                "built to bring an iPod Classic-style experience to the Innioasis Y1.\n\n" +
-                "This software is not affiliated with or endorsed by Apple Inc.\n\n" +
+            text = "Classy\n\n" +
+                "A classic click wheel launcher and media player for Innioasis Y1 and Y2 devices, " +
+                "originally based on JJ Launcher (github.com/ismileblue/y1_launcher) and InniClassic (github.com/FabianZettl/inniclassic).\n\n" +
+                "This software is an independent open-source project and is not affiliated with or endorsed by Apple Inc.\n\n" +
                 "Open source components used:\n" +
                 "- ExoPlayer (Apache License 2.0)\n" +
                 "- OkHttp (Apache License 2.0)\n" +

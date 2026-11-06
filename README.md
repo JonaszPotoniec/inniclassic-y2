@@ -1,4 +1,4 @@
-# InniClassic
+# Classy
 
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Platform">
@@ -6,7 +6,7 @@
   <img src="https://img.shields.io/badge/Status-Beta-Orange?style=flat-square" alt="Status">
 </p>
 
-InniClassic is an iPod Classic-style launcher and media player for Innioasis Y1 and Y2 portable audio players, based on [FabianZettl/inniclassic](https://github.com/FabianZettl/inniclassic) and [ismileblue/y1_launcher](https://github.com/ismileblue/y1_launcher). It recreates the classic click wheel interface while adding features like hardware FM radio, podcasts, video playback, and a library-based Music Quiz.
+Classy is an iPod Classic-style launcher and media player for Innioasis Y1 and Y2 portable audio players, based on InniClassic by [FabianZettl/inniclassic](https://github.com/FabianZettl/inniclassic) and [ismileblue/y1_launcher](https://github.com/ismileblue/y1_launcher). It recreates the classic click wheel interface while adding features like hardware FM radio, podcasts, video playback, and a library-based Music Quiz.
 
 ---
 
@@ -95,16 +95,16 @@ Two installation methods are available depending on whether you want a full ROM 
 
 ### Method 1: Innioasis Updater (recommended)
 
-Prebuilt firmware packages with InniClassic preinstalled as the default system launcher are available on [Releases](https://github.com/JonaszPotoniec/inniclassic-y2/releases):
+Prebuilt firmware packages with Classy preinstalled as the default system launcher are available on [Releases](https://github.com/JonaszPotoniec/Classy/releases):
 
 - Innioasis Y2: `rom_y2.zip` (Android 4.4.2 KitKat)
 - Innioasis Y1: `rom_y1_type_a.zip` or `rom_y1_type_b.zip` depending on hardware revision
 
 To flash via the updater:
 
-1. Download the archive matching your device from [Releases](https://github.com/JonaszPotoniec/inniclassic-y2/releases) and ensure it is named `rom.zip` (required by the updater tool).
+1. Download the archive matching your device from [Releases](https://github.com/JonaszPotoniec/Classy/releases) and ensure it is named `rom.zip` (required by the updater tool).
 2. Open the [Innioasis Updater](https://www.innioasis.com/pages/download), choose `rom.zip` as the local firmware package, and follow the on-screen steps.
-3. Once the flashing process completes and the player restarts, InniClassic starts automatically.
+3. Once the flashing process completes and the player restarts, Classy starts automatically.
 
 > [!WARNING]
 > Keep the device connected and powered until the update finishes. Do not unplug the cable during the flash.
@@ -123,10 +123,10 @@ Use this method to update the app on an existing device without reflashing the f
    ```
    > [!NOTE]
    > Uninstalling is required due to differing APK signature keys between builds. Your music library, custom themes in `/storage/sdcard0/Y1_Themes`, and `.scrobbler.log` on storage remain untouched.
-2. Download `InniClassic-<version>.apk` from [Releases](https://github.com/JonaszPotoniec/inniclassic-y2/releases).
+2. Download `Classy-<version>.apk` from [Releases](https://github.com/JonaszPotoniec/Classy/releases).
 3. Install the APK via ADB:
    ```bash
-   adb install InniClassic-<version>.apk
+   adb install Classy-<version>.apk
    ```
 4. Optional step if Bluetooth pairing prompts for elevated permissions unavailable through the interface:
    ```bash
@@ -135,7 +135,7 @@ Use this method to update the app on an existing device without reflashing the f
 
 ## Pre-building the library cache
 
-InniClassic caches scanned track metadata to `.y1_library_cache.json` at the root of the SD card. Files already indexed in this file skip tag extraction during subsequent scans.
+Classy caches scanned track metadata to `.y1_library_cache.json` at the root of the SD card. Files already indexed in this file skip tag extraction during subsequent scans.
 
 For large music libraries with thousands of songs, you can generate this cache on a computer using [`tools/build_library_cache.py`](tools/build_library_cache.py). Running tag extraction on desktop hardware takes seconds, leaving the portable player to perform only a fast file existence check when the card is inserted.
 
@@ -166,7 +166,7 @@ Last.fm API credentials are not included in this repository. To compile with scr
 - The iPod Classic interface uses [Nimbus Sans](https://en.wikipedia.org/wiki/Nimbus_Sans) (URW++), a metric-compatible alternative to Helvetica.
 - Distributed under upstream's license terms; see [LICENSE](LICENSE) for personal and educational use guidelines.
 
-Version history is documented on [GitHub Releases](https://github.com/JonaszPotoniec/inniclassic-y2/releases).
+Version history is documented on [GitHub Releases](https://github.com/JonaszPotoniec/Classy/releases).
 
 ## Contributors
 
