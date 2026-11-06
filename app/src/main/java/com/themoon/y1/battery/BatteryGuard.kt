@@ -44,7 +44,8 @@ object BatteryGuard {
     private val listeners = ArrayList<Listener>()
     private var app: Context? = null
     private val logic = BatteryGuardLogic()
-    private var lastIntent: Intent? = null
+    /** The last battery broadcast (set on the main thread). */
+    @Volatile private var lastIntent: Intent? = null
     private var cpuLast: LongArray? = null
     private var shutdownStarted = false
 
@@ -80,6 +81,9 @@ object BatteryGuard {
         val shown = logic.shown
         return if (shown >= 0 && !logic.charging) shown else gauge
     }
+
+    /** The level to show now, from the last battery broadcast; -1 when the guard does not run (not a Y2) or has no broadcast yet. */
+    fun percent(): Int = percent(lastIntent)
 
     /** Charging as the status bar shows it: charging, full, or on a charger. */
     fun isCharging(intent: Intent): Boolean {
@@ -180,20 +184,21 @@ object BatteryGuard {
         c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putInt("shown", logic.shown)
             .putBoolean("charging", logic.charging)
-            .putString("boot", bootId())
+            .putString("boot", kernelBootId())
             .apply()
     }
 
     /** A restart of the app in the same boot and discharge keeps the shown level. */
     private fun restore(c: Context) {
         val p = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        if (p.getBoolean("charging", true) || p.getString("boot", "") != bootId()) return
+        if (p.getBoolean("charging", true) || p.getString("boot", "") != kernelBootId()) return
         logic.restore(p.getInt("shown", -1))
     }
+}
 
-    private fun bootId(): String = try {
-        File("/proc/sys/kernel/random/boot_id").readText().trim()
-    } catch (_: Throwable) {
-        ""
-    }
+/** The kernel boot id (a new value at each boot, the same after an app restart), or "" when it cannot be read. */
+internal fun kernelBootId(): String = try {
+    File("/proc/sys/kernel/random/boot_id").readText().trim()
+} catch (_: Throwable) {
+    ""
 }

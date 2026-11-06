@@ -14,6 +14,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import com.themoon.y1.Prefs
+import com.themoon.y1.battery.BatteryUsageView
 import com.themoon.y1.MainActivity
 import com.themoon.y1.R
 import com.themoon.y1.changeTheme
@@ -105,6 +106,9 @@ class SettingsController(
     private var materialIconFont: Typeface? = null
 
     companion object {
+        /** The page of Settings → Battery. */
+        const val BATTERY_USAGE = "BatteryUsage"
+
         /** The values of each Date & Time row's screen (Settings → Date & Time → Year...). */
         val DATE_TIME_RANGES = mapOf("Year" to 2020..2035, "Month" to 1..12, "Day" to 1..31, "Hour" to 0..23, "Minute" to 0..59)
 
@@ -173,7 +177,7 @@ class SettingsController(
         )),
         SettingsGroup("Status Bar", listOf(
             toggle("Clock", Prefs.TIME_IN_TITLE) { mainActivity?.onClockSettingsChanged() },
-            toggle("Battery", Prefs.SHOW_BATTERY) { mainActivity?.let { StatusBarSettings.applyBattery(it) } },
+            toggle("Battery Icon", Prefs.SHOW_BATTERY) { mainActivity?.let { StatusBarSettings.applyBattery(it) } },
             // Grey, and the wheel skips it, while the battery icon is hidden
             toggle("Battery Percentage", Prefs.BATTERY_PERCENTAGE, enabled = { Prefs.SHOW_BATTERY.get(prefs) }) {
                 mainActivity?.batteryIconView?.setShowPercentage(it)
@@ -218,6 +222,11 @@ class SettingsController(
             action("Web Server") { onNavigateToScreen(MainActivity.STATE_WEBSERVER) },
             toggle("Ask on USB Connect", Prefs.USB_PROMPT),
         )),
+        // Battery level, charging, screen on and screen off playing of the last 24 hours or 10 days (BatteryUsageView):
+        // on the top level, as Settings → Battery of iOS and macOS (macOS: after the connections)
+        SettingsGroup("Battery", listOf(
+            action("Battery", { "〉" }) { openPage(BATTERY_USAGE) },
+        ), direct = true),
         SettingsGroup("Library", listOf(
             action("Clear Album Art & Info") {
                 ActionScreens.open(confirmScreen(
@@ -297,6 +306,7 @@ class SettingsController(
                 "Update" -> return updateSpec()
                 "MainMenuItems" -> return mainMenuItemsSpec()
                 "MusicMenuItems" -> return musicMenuItemsSpec()
+                BATTERY_USAGE -> return batteryUsageSpec()
             }
         }
         return topLevelSpec()
@@ -394,6 +404,11 @@ class SettingsController(
             return true
         }
 
+        if (page == SettingsSubMode.Page(BATTERY_USAGE)) {
+            // The wheel changes the range: down = Last 10 Days, up = Last 24 Hours
+            if (batteryUsageView?.step(delta) == true) clickFeedback()
+            return true
+        }
         RowFocus.step(containerSettingsItems, delta) ?: return false
         clickFeedback()
         return true
@@ -745,6 +760,22 @@ class SettingsController(
             RowSpec("divider", RowLook.CUSTOM, view = divider),
             RowSpec(localize("Check for Updates"), RowLook.CUSTOM, view = check, checked = true, onClick = { onOpenUpdateCheck() })
         ), focus = Focus.CHECKED)
+    }
+
+    private var batteryUsageView: BatteryUsageView? = null
+
+    /**
+     * Settings → Battery: one view with the range and the two charts; the centre button also changes the range. The range
+     * stays when the view is made again (a theme change, the next visit).
+     */
+    private fun batteryUsageSpec(): ListSpec {
+        val tenDays = batteryUsageView?.tenDays == true
+        val view = BatteryUsageView(activity, localize) { Prefs.CLOCK_24_HOUR.get(prefs) }.apply {
+            this.tenDays = tenDays
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        }
+        batteryUsageView = view
+        return ListSpec(localize("Battery"), listOf(RowSpec(BATTERY_USAGE, RowLook.CUSTOM, view = view, onClick = { view.toggle() })))
     }
 
     // --- Main Menu Items and Music Menu Items ---

@@ -718,5 +718,15 @@
   "Backlight": "バックライト",
   "Clock": "時計",
   "Reset Settings": "設定をリセット",
-  "No Episodes": "エピソードがありません"
+  "No Episodes": "エピソードがありません",
+  "Battery Icon": "バッテリーアイコン",
+  "Screen Off": "画面オフ",
+  "Last 24 Hours": "過去24時間",
+  "Last 10 Days": "過去10日間",
+  "Battery Level": "バッテリー残量",
+  "Battery Used": "使用したバッテリー",
+  "Screen On": "画面オン",
+  "Last charged to": "最後の充電",
+  "Charging": "充電中",
+  "No battery history yet": "バッテリーの履歴はまだありません"
 }

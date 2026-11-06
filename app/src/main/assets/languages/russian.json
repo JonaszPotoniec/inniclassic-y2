@@ -718,5 +718,15 @@
   "Backlight": "Подсветка",
   "Clock": "Часы",
   "Reset Settings": "Сбросить настройки",
-  "No Episodes": "Нет эпизодов"
+  "No Episodes": "Нет эпизодов",
+  "Battery Icon": "Значок аккумулятора",
+  "Screen Off": "Экран выключен",
+  "Last 24 Hours": "Последние 24 часа",
+  "Last 10 Days": "Последние 10 дней",
+  "Battery Level": "Уровень заряда",
+  "Battery Used": "Израсходовано",
+  "Screen On": "Экран включён",
+  "Last charged to": "Последняя зарядка до",
+  "Charging": "Зарядка",
+  "No battery history yet": "Истории аккумулятора пока нет"
 }

@@ -35,7 +35,7 @@ class SettingsSpecTest {
                 "Playback" to listOf("Shuffle", "Repeat", "EQ", "Sound Check", "Volume Limit", "Playback Speed"),
                 "Display" to listOf("Brightness", "Backlight"),
                 "Now Playing" to listOf("Spectrum", "Total Time", "Lyrics Keep Screen On", "Cover Tilt"),
-                "Status Bar" to listOf("Clock", "Battery", "Battery Percentage"),
+                "Status Bar" to listOf("Clock", "Battery Icon", "Battery Percentage"),
                 "Appearance" to listOf("Theme", "Background", "Toggle Style", "List Edges", "Menu Cover Motion", "Fill Video Screen"),
                 "Menus" to listOf("Main Menu Items", "Music Menu Items", "Group Albums"),
                 "Controls" to listOf(
@@ -43,6 +43,7 @@ class SettingsSpecTest {
                     "Screen-Off Control", "Double-Click to Favorite"
                 ),
                 "Connectivity" to listOf("Bluetooth", "Wi-Fi", "Web Server", "Ask on USB Connect"),
+                "Battery" to listOf("Battery"),
                 "Library" to listOf("Clear Album Art & Info", "Jellyfin Sync", "Sync Scrobbles to Last.fm", "Last.fm Account"),
                 "Date & Time" to listOf("Date & Time"),
                 "General" to listOf(
@@ -54,9 +55,10 @@ class SettingsSpecTest {
     }
 
     @Test
-    fun theTopLevelHasAtMostTwelveShortGroupsAndEachRowIsInOneGroup() {
+    fun theTopLevelHasAtMostThirteenShortGroupsAndEachRowIsInOneGroup() {
         val groups = specGroups()
-        assertTrue(groups.size in 6..12)
+        // 13 with Battery (2026-10-31): the top level as Settings of iOS and macOS
+        assertTrue(groups.size in 6..13)
         for ((title, rows) in groups) {
             assertTrue("$title: label too long", title.length <= 12)
             assertTrue("$title: ${rows.size} rows", rows.size in 1..10)

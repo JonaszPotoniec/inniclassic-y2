@@ -718,5 +718,15 @@
   "Backlight": "Backlight",
   "Clock": "Clock",
   "Reset Settings": "Reset Settings",
-  "No Episodes": "No Episodes"
+  "No Episodes": "No Episodes",
+  "Battery Icon": "Battery Icon",
+  "Screen Off": "Screen Off",
+  "Last 24 Hours": "Last 24 Hours",
+  "Last 10 Days": "Last 10 Days",
+  "Battery Level": "Battery Level",
+  "Battery Used": "Battery Used",
+  "Screen On": "Screen On",
+  "Last charged to": "Last charged to",
+  "Charging": "Charging",
+  "No battery history yet": "No battery history yet"
 }

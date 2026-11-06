@@ -718,5 +718,15 @@
   "Backlight": "화면 조명",
   "Clock": "시계",
   "Reset Settings": "설정 초기화",
-  "No Episodes": "에피소드 없음"
+  "No Episodes": "에피소드 없음",
+  "Battery Icon": "배터리 아이콘",
+  "Screen Off": "화면 꺼짐",
+  "Last 24 Hours": "지난 24시간",
+  "Last 10 Days": "지난 10일",
+  "Battery Level": "배터리 수준",
+  "Battery Used": "사용한 배터리",
+  "Screen On": "화면 켜짐",
+  "Last charged to": "마지막 충전",
+  "Charging": "충전 중",
+  "No battery history yet": "배터리 기록이 아직 없습니다"
 }

@@ -718,5 +718,15 @@
   "Backlight": "背光",
   "Clock": "时钟",
   "Reset Settings": "重置设置",
-  "No Episodes": "暂无单集"
+  "No Episodes": "暂无单集",
+  "Battery Icon": "电池图标",
+  "Screen Off": "屏幕关闭",
+  "Last 24 Hours": "过去24小时",
+  "Last 10 Days": "过去10天",
+  "Battery Level": "电池电量",
+  "Battery Used": "已用电量",
+  "Screen On": "屏幕使用",
+  "Last charged to": "上次充电至",
+  "Charging": "正在充电",
+  "No battery history yet": "暂无电池记录"
 }

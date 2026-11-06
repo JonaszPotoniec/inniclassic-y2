@@ -271,6 +271,7 @@ class FmRadioManager private constructor(context: Context) {
                 if (fmPlayer !== player || !isPowerUp) return@Runnable
                 try {
                     player.start()
+                    com.themoon.y1.battery.BatteryHistory.setPlaying(com.themoon.y1.battery.BatteryHistory.RADIO, true)
                     applyMasterVolume()
                     routeFmAudio()
                 } catch (t: Throwable) {
@@ -285,6 +286,7 @@ class FmRadioManager private constructor(context: Context) {
     }
 
     private fun stopFmAudio() {
+        com.themoon.y1.battery.BatteryHistory.setPlaying(com.themoon.y1.battery.BatteryHistory.RADIO, false)
         try {
             if (radioWakeLock?.isHeld == true) {
                 radioWakeLock?.release()

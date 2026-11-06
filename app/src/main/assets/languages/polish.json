@@ -718,5 +718,15 @@
   "Backlight": "Podświetlenie",
   "Clock": "Zegar",
   "Reset Settings": "Zresetuj ustawienia",
-  "No Episodes": "Brak odcinków"
+  "No Episodes": "Brak odcinków",
+  "Battery Icon": "Ikona baterii",
+  "Screen Off": "Ekran wyłączony",
+  "Last 24 Hours": "Ostatnie 24 godziny",
+  "Last 10 Days": "Ostatnie 10 dni",
+  "Battery Level": "Poziom baterii",
+  "Battery Used": "Zużycie baterii",
+  "Screen On": "Ekran włączony",
+  "Last charged to": "Ostatnio naładowano do",
+  "Charging": "Ładowanie",
+  "No battery history yet": "Brak historii baterii"
 }
