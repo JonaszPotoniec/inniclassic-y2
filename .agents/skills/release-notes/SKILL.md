@@ -2,14 +2,14 @@
 name: release-notes
 description: >-
   Draft, audit, and update GitHub Release descriptions and changelogs for
-  JonaszPotoniec/Classy using the gh CLI and Humanizer writing rules.
+  ClassyPlayer/Classy using the gh CLI and Humanizer writing rules.
   Use this skill whenever preparing a new release, updating existing GitHub
   Releases, or writing user-facing changelog entries for Classy.
 ---
 
 # Classy Release Notes & Changelog Guide
 
-Use this skill to write or update GitHub Release descriptions on `JonaszPotoniec/Classy` so every release starts with a human-readable changelog focused on user impact and features.
+Use this skill to write or update GitHub Release descriptions on `ClassyPlayer/Classy` so every release starts with a human-readable changelog focused on user impact and features.
 
 ## Release Description Structure
 
@@ -23,7 +23,7 @@ Every GitHub release body must follow this exact structure:
    - Use sentence case with no emoji (`#### Release assets`).
    - Keep file names in inline code (`Classy-<TAG>.apk`, `update.json`, `rom_y2.zip`, `rom_y1_type_a.zip`, `rom_y1_type_b.zip`, `SHA256SUMS.txt`) without bold decoration on every cell.
 3. **Full changelog link**:
-   - End with `Full changelog: https://github.com/JonaszPotoniec/Classy/compare/<PREV_TAG>...<TAG>`.
+   - End with `Full changelog: https://github.com/ClassyPlayer/Classy/compare/<PREV_TAG>...<TAG>`.
    - **Never** include the `Flashing Instructions (SP Flash Tool)` section or decorative `---` horizontal rules.
 
 ### Template
@@ -43,7 +43,7 @@ Every GitHub release body must follow this exact structure:
 | `rom_y1_type_b.zip` (`rom_type_b.zip`) | Innioasis Y1 (Type B) | Flashable ROM for Y1 players with original firmware below 2.0.0 |
 | `SHA256SUMS.txt` | All files | SHA-256 integrity checksums |
 
-Full changelog: https://github.com/JonaszPotoniec/Classy/compare/<PREV_TAG>...<TAG>
+Full changelog: https://github.com/ClassyPlayer/Classy/compare/<PREV_TAG>...<TAG>
 ```
 
 ## Humanizer Writing Rules
@@ -64,7 +64,7 @@ Note: Triggering the **Build & Release** workflow manually from GitHub Actions (
 
 1. **List releases and find the tag range**:
    ```bash
-   gh release list --repo JonaszPotoniec/Classy --limit 10
+   gh release list --repo ClassyPlayer/Classy --limit 10
    git fetch --tags origin
    git log --format="- %h %s%n%w(0,4,4)%b" <PREV_TAG>..<NEW_TAG>
    ```
@@ -80,10 +80,10 @@ Note: Triggering the **Build & Release** workflow manually from GitHub Actions (
    - Compare against past examples in [release-history.md](./references/release-history.md).
 4. **Update the GitHub Release**:
    ```bash
-   gh release edit <NEW_TAG> --repo JonaszPotoniec/Classy --notes-file /tmp/release_notes.md
+   gh release edit <NEW_TAG> --repo ClassyPlayer/Classy --notes-file /tmp/release_notes.md
    rm -f /tmp/release_notes.md
    ```
 5. **Verify**:
    ```bash
-   gh release view <NEW_TAG> --repo JonaszPotoniec/Classy
+   gh release view <NEW_TAG> --repo ClassyPlayer/Classy
    ```

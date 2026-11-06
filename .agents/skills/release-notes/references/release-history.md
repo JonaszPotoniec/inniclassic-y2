@@ -3,7 +3,7 @@
 ## Findings from the 2026-10 Release Audit
 
 1. **Tag Chronology & Versioning**:
-   - Releases on `JonaszPotoniec/Classy` (formerly `JonaszPotoniec/inniclassic-y2`) use `YYYYMMDD` tags (and `YYYYMMDD-vN` or `YYYYMMDD-build.N` for same-day revisions).
+   - Releases on `ClassyPlayer/Classy` (formerly `JonaszPotoniec/inniclassic-y2`) use `YYYYMMDD` tags (and `YYYYMMDD-vN` or `YYYYMMDD-build.N` for same-day revisions).
    - `v1.5.0` (`97775e3`) was the initial internal tag before the CI naming switch; `20260927` (`ef9d2fc`) is the first published GitHub Release and covers `v1.5.0...20260927` (initial Innioasis Y2 support on top of upstream `1.4.3`).
    - `20260928` was followed on the same day by `20260928-build.6`, which was then followed by `20260929`. Therefore `20260929` compares against `20260928-build.6` (`20260928-build.6...20260929`).
 2. **CI Release Workflow Behavior**:
@@ -34,7 +34,7 @@
 | `rom_y1_type_b.zip` (`rom_type_b.zip`) | Innioasis Y1 (Type B) | Flashable ROM for Y1 players with original firmware below 2.0.0 |
 | `SHA256SUMS.txt` | All files | SHA-256 integrity checksums |
 
-Full changelog: https://github.com/JonaszPotoniec/inniclassic-y2/compare/20261011...20261012
+Full changelog: https://github.com/ClassyPlayer/Classy/compare/20261011...20261012
 ```
 
 ### Example 2: `20261011` (Multi-Feature Release with Varied Openings)
@@ -58,7 +58,7 @@ Full changelog: https://github.com/JonaszPotoniec/inniclassic-y2/compare/2026101
 | `rom_y1_type_b.zip` (`rom_type_b.zip`) | Innioasis Y1 (Type B) | Flashable ROM for Y1 players with original firmware below 2.0.0 |
 | `SHA256SUMS.txt` | All files | SHA-256 integrity checksums |
 
-Full changelog: https://github.com/JonaszPotoniec/inniclassic-y2/compare/20261008...20261011
+Full changelog: https://github.com/ClassyPlayer/Classy/compare/20261008...20261011
 ```
 
 ## Published Release Tag Index
