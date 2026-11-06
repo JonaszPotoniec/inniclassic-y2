@@ -1,3 +1,5 @@
+## This fork exists for OTA updates from old clients. Use [ClassyPlayer/Classy](https://github.com/ClassyPlayer/Classy)
+
 # Classy
 
 <p align="center">
