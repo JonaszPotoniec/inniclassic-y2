@@ -81,8 +81,10 @@ class MediaLibraryManager private constructor() {
     ) {
         if (isScanning) return
         isScanning = true
+        // The scan goes on with the screen off
+        val wakeLock = ScanWakeLock.forScan(context).also { it.acquire() }
 
-        Thread({
+        val scanner = Thread({
             try {
                 // 1. Remove missing files
                 synchronized(musicLibrary) {
@@ -156,8 +158,16 @@ class MediaLibraryManager private constructor() {
                 Log.e(tag, "Scan error: ${t.message}", t)
             } finally {
                 isScanning = false
+                wakeLock.release()
             }
-        }, "y1-media-scanner").start()
+        }, "y1-media-scanner")
+        try {
+            scanner.start()
+        } catch (t: Throwable) {
+            isScanning = false
+            wakeLock.release()
+            throw t
+        }
     }
 
     private fun normalizePathKey(file: File): String {
